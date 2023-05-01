@@ -1,0 +1,11 @@
+
+
+locust -f locustfile.py --headless -u 10 -r 10
+
+
+
+
+
+
+export DJANGO_SETTINGS_MODULE=adoorback.settings.development
+export DJANGO_SETTINGS_MODULE=adoorback.settings.production

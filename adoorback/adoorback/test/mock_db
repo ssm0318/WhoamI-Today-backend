@@ -1,0 +1,30 @@
+python manage.py shell
+
+from django.contrib.auth import get_user_model
+from feed.models import Question, Article, Response, Post
+from comment.models import Comment
+from like.models import Like
+from django.contrib.contenttypes.models import ContentType
+from adoorback.test.mock_seed import set_mock_seed
+User = get_user_model()
+
+set_mock_seed()
+
+user = User.objects.last()
+
+article = Article.objects.last()
+response = Response.objects.last()
+question = Question.objects.last()
+comment = Comment.objects.last()
+like = Like.objects.last()
+post = Post.objects.last()
+
+admin_question = Question.objects.admin_questions_only().last()
+custom_question = Question.objects.custom_questions_only().last()
+feed_comment = Comment.objects.comments_only().last()
+reply = Comment.objects.replies_only().last()
+feed_like = Like.objects.feed_likes_only().last()
+comment_like = Like.objects.comment_likes_only().last()
+
+from feed.algorithms.recommender import create_ranks_csv
+create_ranks_csv()

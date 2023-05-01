@@ -1,0 +1,13 @@
+저를 읽으세요 여러분~
+
+백엔드 개꿀팁!
+adoorback/utils/ 폴더의 파일들을 잘 활용하세요!
+
+1. 모델에 변화가 생길 시 `reset_db`에 있는거 그대로 manage.py 있는 경로 command line 복붙하면 완벽히 db 장착 완료~!
+2. 모델에 문제가 있는 것 같다? 모델 작동 방식을 모르겠다? `shell`에 있는거 그대로 같은 경로에 복붙하면 'article', 'user', 등 이미 겁나 편하게 변수들이 다 등록 되어있네 어머어머
+3. 모델 제대로 구현한거 맞아?! 테스트 좀 해봐야겠다~~~ 라는 생각이 든다면? `test_coverage`에 있는거 그대로 복붙하면 테스팅 완료~!
+4. 테스팅 하는데 계속 이상한 메세지가 뜬다? `seed.py` 상단에 `DEBUG=False`로 바꿔주고 다시 돌리면 된다리~ (`shell`에서 `set_seed`를 하고 있을 땐 `DEBUG=True`로 해주는게 좋아요)
+    (logger가 말이 너무 많다 싶으면 `level=logging.ERROR`로 바꿔줄 수도 있습니다~)
+5. `Post` table을 따로 만들어서 모든 Feed를 관리하도록 하였습니다. 그런데 Post 모델의 instance 활용 시에는 반드시 `(특정)post.target`을 불러와서 사용해야 합니다!
+    Post는 target의 content랑 dates만 따라할 뿐, response의 target question 같은 것은 제대로 들고 있지 않아요~
+    (Post 모델은 피드에 보여질 글들을 손쉽게 가져오기 위해 만든거라 created_at 역순으로 정렬되어 있습니다~)

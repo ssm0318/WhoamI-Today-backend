@@ -1,0 +1,12 @@
+
+python manage.py runcrons
+
+python manage.py runcrons --force
+
+python manage.py runcrons --force "feed.cron.DailyQuestionCronJob"
+
+python manage.py runcrons --force "feed.cron.RankQuestionsCronJob"
+
+python manage.py runcrons --force "account.cron.SendSelectQuestionsNotiCronJob"
+
+python manage.py runcrons --force "account.cron.SendAddFriendsNotiCronJob"
