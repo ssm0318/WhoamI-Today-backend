@@ -1,0 +1,28 @@
+psql
+drop database adoor
+drop database test_adoor
+create database adoor with owner adoor
+create database test_adoor with owner adoor
+\q
+
+python manage.py flush
+yes
+rm -r */migrations
+python manage.py makemigrations account feed comment like notification
+python manage.py migrate
+
+python manage.py migrate account zero
+python manage.py migrate feed zero
+python manage.py migrate comment zero
+python manage.py migrate like zero
+python manage.py migrate notification zero
+python manage.py dbshell
+\l
+\dt
+DROP TABLE some_table;
+
+pg_dump -U adoor adoor -h localhost > adoor_data_export.sql
+psql adoor
+
+sudo -u postgres psql adoor
+\dt

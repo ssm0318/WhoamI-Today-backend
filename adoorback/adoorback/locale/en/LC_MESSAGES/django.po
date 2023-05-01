@@ -1,0 +1,144 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-04-01 15:46+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: account/email.py:17
+msgid "이메일 인증을 완료해주세요"
+msgstr "Please verify your email."
+
+#: account/email.py:19
+msgid ""
+"아래 링크를 클릭하면 회원가입 인증이 완료됩니다.\n"
+"\n"
+"회원가입 링크 : "
+msgstr ""
+"Click the following link to complete verification.\n"
+"\n"
+"Link : "
+
+#: account/email.py:21 account/email.py:32
+msgid "감사합니다."
+msgstr "Thank you."
+
+#: account/email.py:27
+msgid "비밀번호 변경 링크입니다."
+msgstr "Reset your Diivers password"
+
+#: account/email.py:30
+msgid ""
+"님, 아래 링크를 클릭하면 비밀번호 변경이 가능합니다.\n"
+"\n"
+"비밀번호 변경 링크 : "
+msgstr ""
+", Click the following link to reset your password.\n"
+"\n"
+"Link : "
+
+#: account/models.py:32 account/models.py:53
+msgid "여성"
+msgstr "Female"
+
+#: account/models.py:33 account/models.py:54
+msgid "남성"
+msgstr "Male"
+
+#: account/models.py:34 account/models.py:55
+msgid "트랜스젠더 (transgender)"
+msgstr "Transgender"
+
+#: account/models.py:35 account/models.py:56
+msgid "논바이너리 (non-binary/non-conforming)"
+msgstr "Non-binary/Non-conforming"
+
+#: account/models.py:36 account/models.py:57
+msgid "응답하고 싶지 않음"
+msgstr "Do not want to reply"
+
+#: account/models.py:40 account/models.py:61
+msgid "미국 원주민/알래스카 원주민 (American Indian/Alaska Native)"
+msgstr "American Indian/Alaska Native"
+
+#: account/models.py:41 account/models.py:62
+msgid "아시아인 (Asian)"
+msgstr "Asian"
+
+#: account/models.py:42 account/models.py:63
+msgid "흑인/아프리카계 미국인 (Black/African American)"
+msgstr "Black/African American"
+
+#: account/models.py:43 account/models.py:64
+msgid "히스패닉/라틴계 미국인 (Hispanic/Latino)"
+msgstr "Hispanic/Latino"
+
+#: account/models.py:44 account/models.py:65
+msgid ""
+"하와이 원주민/다른 태평양 섬 주민 (Native Hawaiian/Other Pacific Islander)"
+msgstr "Native Hawaiian/Other Pacific Islander"
+
+#: account/models.py:45 account/models.py:66
+msgid "백인 (White)"
+msgstr "White"
+
+#: adoorback/settings/base.py:187
+msgid "한국어"
+msgstr "Korean"
+
+#: adoorback/settings/base.py:188
+msgid "영어"
+msgstr "English"
+
+#: adoorback/utils/exceptions.py:9
+msgid ""
+"이미 가입되었으나 인증이 완료되지 않은 계정입니다. 인증 메일을 확인해주세요."
+msgstr "User is not active, please confirm your email."
+
+#: adoorback/utils/exceptions.py:15
+msgid "존재하지 않는 닉네임/이메일입니다."
+msgstr "Username/Email does not exist."
+
+#: adoorback/utils/exceptions.py:21
+msgid "비밀번호를 다시 확인해주세요."
+msgstr "Please check your password."
+
+#: adoorback/utils/exceptions.py:27
+msgid "이미 존재하는 닉네임입니다."
+msgstr "Username already exists."
+
+#: adoorback/utils/exceptions.py:33
+msgid "닉네임은 20글자 이하로 설정해주세요."
+msgstr "Username must be shorter than 21 letters."
+
+#: adoorback/utils/exceptions.py:39
+msgid ""
+"유효하지 않은 닉네임입니다. 닉네임은 영어, 한글, 숫자, 특수문자(_)만 포함할 "
+"수 있습니다."
+msgstr ""
+"Username format is invalid. Usernames can only include letters (alphabet/"
+"Korean), numbers and underscores(_)."
+
+#: adoorback/utils/exceptions.py:45
+msgid "이미 가입된 이메일입니다."
+msgstr "An account with this email already exists."
+
+#: adoorback/utils/exceptions.py:51
+msgid "유효하지 않은 이메일 형식입니다."
+msgstr "Email format is invalid."
+
+#~ msgid "안녕"
+#~ msgstr "hohoo"
