@@ -18,7 +18,8 @@ from safedelete.models import SOFT_DELETE_CASCADE
 from account.models import FriendRequest
 from account.serializers import UserProfileSerializer, \
     UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
-    UserFriendshipStatusSerializer, AuthorFriendSerializer, CustomTokenObtainPairSerializer
+    UserFriendshipStatusSerializer, AuthorFriendSerializer, CustomTokenObtainPairSerializer, \
+    UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer
 
 from feed.serializers import QuestionAnonymousSerializer
 from feed.models import Question
@@ -56,6 +57,87 @@ class CustomTokenObtainPairView(TokenViewBase):
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
+class UserEmailCheck(generics.CreateAPIView):
+    serializer_class = UserEmailSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        serializer = self.get_serializer(data=request.data)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            if 'email' in e.detail:
+                if 'unique' in e.get_codes()['email']:
+                    raise ExistingEmail()
+                if 'invalid' in e.get_codes()['email']:
+                    raise InvalidEmail()
+            raise e
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+    
+
+class UserPasswordCheck(generics.CreateAPIView):
+    serializer_class = UserPasswordSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        serializer = self.get_serializer(data=request.data)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            raise e
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+    
+
+class UserUsernameCheck(generics.CreateAPIView):
+    serializer_class = UserUsernameSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        serializer = self.get_serializer(data=request.data)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            if 'username' in e.detail:
+                if 'unique' in e.get_codes()['username']:
+                    user = User.objects.get(username=request.data['username'])
+                    if not user.is_active:
+                        raise InActiveUser()
+                    raise ExistingUsername()
+                if 'invalid' in e.get_codes()['username']:
+                    raise InvalidUsername()
+                if 'max_length' in e.get_codes()['username']:
+                    raise LongUsername()
+            raise e
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+        
+
 class UserSignup(generics.CreateAPIView):
     serializer_class = UserProfileSerializer
     parser_classes = (MultiPartParser, FormParser)
@@ -73,21 +155,6 @@ class UserSignup(generics.CreateAPIView):
         try:
             serializer.is_valid(raise_exception=True)
         except ValidationError as e:
-            if 'username' in e.detail:
-                if 'unique' in e.get_codes()['username']:
-                    user = User.objects.get(username=request.data['username'])
-                    if not user.is_active:
-                        raise InActiveUser()
-                    raise ExistingUsername()
-                if 'invalid' in e.get_codes()['username']:
-                    raise InvalidUsername()
-                if 'max_length' in e.get_codes()['username']:
-                    raise LongUsername()
-            if 'email' in e.detail:
-                if 'unique' in e.get_codes()['email']:
-                    raise ExistingEmail()
-                if 'invalid' in e.get_codes()['email']:
-                    raise InvalidEmail()
             raise e
 
         self.perform_create(serializer)
