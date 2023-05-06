@@ -124,9 +124,6 @@ class UserUsernameCheck(generics.CreateAPIView):
         except ValidationError as e:
             if 'username' in e.detail:
                 if 'unique' in e.get_codes()['username']:
-                    user = User.objects.get(username=request.data['username'])
-                    if not user.is_active:
-                        raise InActiveUser()
                     raise ExistingUsername()
                 if 'invalid' in e.get_codes()['username']:
                     raise InvalidUsername()
@@ -217,7 +214,7 @@ class SendResetPasswordEmail(generics.CreateAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        if user and user.is_active:
+        if user:
             email_manager.send_reset_password_email(user)
             
         return HttpResponse(status=200) # whether email is valid or not, response will be always success-response

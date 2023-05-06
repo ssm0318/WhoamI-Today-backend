@@ -71,8 +71,6 @@ class CustomTokenObtainPairSerializer(TokenObtainSerializer):
                 user = User.objects.get(Q(username=username) | Q(email=username))
             except:
                 raise NoUsername()
-            if not user.is_active:
-                raise InActiveUser()
             raise WrongPassword()
 
         data = {}
