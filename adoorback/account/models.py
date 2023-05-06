@@ -20,6 +20,7 @@ from django.db.models import Q
 
 from adoorback.models import AdoorTimestampedModel
 
+from django_countries.fields import CountryField
 from safedelete import DELETED_INVISIBLE
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
@@ -104,7 +105,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     gender = models.IntegerField(choices=GENDER_CHOICES, null=True)
     date_of_birth = models.DateField(null=True)
     ethnicity = models.IntegerField(choices=ETHNICITY_CHOICES, null=True)
+    nationality = CountryField(null=True)
     research_agreement = models.BooleanField(default=False)
+    signature = models.CharField(null=True, max_length=100)
+    date_of_signature = models.DateField(null=True)
     language = models.CharField(max_length=10,
                                 choices=settings.LANGUAGES,
                                 default=settings.LANGUAGE_CODE)

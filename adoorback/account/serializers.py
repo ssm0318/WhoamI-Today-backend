@@ -30,7 +30,8 @@ class UserProfileSerializer(serializers.HyperlinkedModelSerializer):
         fields = ['id', 'username', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
-                  'ethnicity', 'research_agreement']
+                  'ethnicity', 'nationality', 'research_agreement',
+                  'signature', 'date_of_signature']
         extra_kwargs = {'password': {'write_only': True}}
 
     @transaction.atomic

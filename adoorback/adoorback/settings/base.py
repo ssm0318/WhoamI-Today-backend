@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     'polymorphic',
     'admin_honeypot',
     'django_cron',
+    'django_countries',
     'corsheaders',
     'import_export',
     'trackstats',
