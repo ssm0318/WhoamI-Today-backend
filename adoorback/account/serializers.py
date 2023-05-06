@@ -87,6 +87,24 @@ class CustomTokenObtainPairSerializer(TokenObtainSerializer):
         return data
 
 
+class UserEmailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['email']
+
+
+class UserPasswordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['password']
+
+
+class UserUsernameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username']
+
+
 class AuthorFriendSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
 
