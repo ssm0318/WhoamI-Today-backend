@@ -44,48 +44,6 @@ class UserProfileSerializer(serializers.HyperlinkedModelSerializer):
         return user
 
 
-class CustomTokenObtainPairSerializer(TokenObtainSerializer):
-    @classmethod
-    def get_token(cls, user):
-        return RefreshToken.for_user(user)
-
-    def validate(self, attrs):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.context['request'].META:
-            lang = self.context['request'].META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-            
-        authenticate_kwargs = {
-            self.username_field: attrs[self.username_field],
-            "password": attrs["password"],
-        }
-        try:
-            authenticate_kwargs["request"] = self.context["request"]
-        except KeyError:
-            pass
-
-        self.user = authenticate(**authenticate_kwargs)
-
-        if not api_settings.USER_AUTHENTICATION_RULE(self.user):
-            try:
-                username = authenticate_kwargs["username"]
-                user = User.objects.get(Q(username=username) | Q(email=username))
-            except:
-                raise NoUsername()
-            raise WrongPassword()
-
-        data = {}
-            
-        refresh = self.get_token(self.user)
-
-        data['refresh'] = str(refresh)
-        data['access'] = str(refresh.access_token)
-
-        if api_settings.UPDATE_LAST_LOGIN:
-            update_last_login(None, self.user)
-
-        return data
-
-
 class UserEmailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

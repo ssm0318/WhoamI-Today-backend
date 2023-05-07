@@ -88,24 +88,7 @@ class UserLogin(APIView):
         else:
             raise WrongPassword()
         
-
-# class CustomTokenObtainPairView(TokenViewBase):
-#     """
-#     https://github.com/jazzband/djangorestframework-simplejwt/issues/368#issuecomment-778686307
-#     Takes a set of user credentials and returns an access and refresh JSON web
-#     token pair to prove the authentication of those credentials.
-
-#     Returns HTTP 406 when user is inactive and HTTP 401 when login credentials are invalid.
-#     """
-#     serializer_class = CustomTokenObtainPairSerializer
-
-#     def post(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-
-#         serializer.is_valid(raise_exception=True)
-#         return Response(serializer.validated_data, status=status.HTTP_200_OK)
-
-
+        
 class UserEmailCheck(generics.CreateAPIView):
     serializer_class = UserEmailSerializer
     parser_classes = (MultiPartParser, FormParser)
