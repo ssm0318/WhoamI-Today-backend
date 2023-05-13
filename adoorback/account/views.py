@@ -2,31 +2,38 @@ import json
 # import sentry_sdk
 
 from django.apps import apps
-from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.models import update_last_login
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseBadRequest
+from django.middleware import csrf
 from django.utils import translation
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenViewBase
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from account.models import FriendRequest
 from account.serializers import UserProfileSerializer, \
     UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
-    UserFriendshipStatusSerializer, AuthorFriendSerializer, CustomTokenObtainPairSerializer
+    UserFriendshipStatusSerializer, AuthorFriendSerializer, \
+    UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer
 
-from feed.serializers import QuestionAnonymousSerializer
-from feed.models import Question
-from adoorback.utils.validators import adoor_exception_handler
-from.email import email_manager
+from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, NoUsername, WrongPassword
 from adoorback.utils.permissions import IsNotBlocked
-from rest_framework.parsers import MultiPartParser, FormParser
-from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, InActiveUser
+from adoorback.utils.validators import adoor_exception_handler
+from .email import email_manager
+from feed.models import Question
+from feed.serializers import QuestionAnonymousSerializer
 
 User = get_user_model()
 
@@ -39,22 +46,126 @@ def token_anonymous(request):
         return HttpResponseNotAllowed(['GET'])
 
 
-class CustomTokenObtainPairView(TokenViewBase):
-    """
-    https://github.com/jazzband/djangorestframework-simplejwt/issues/368#issuecomment-778686307
-    Takes a set of user credentials and returns an access and refresh JSON web
-    token pair to prove the authentication of those credentials.
+def get_tokens_for_user(user):
+    refresh = RefreshToken.for_user(user)
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+    }
 
-    Returns HTTP 406 when user is inactive and HTTP 401 when login credentials are invalid.
-    """
-    serializer_class = CustomTokenObtainPairSerializer
 
-    def post(self, request, *args, **kwargs):
+class UserLogin(APIView):
+    def post(self, request, format=None):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        data = request.data
+        response = Response()        
+        username = data.get('username', None)
+        password = data.get('password', None)
+        try:
+            user = User.objects.get(Q(username=username) | Q(email=username))
+        except:
+            raise NoUsername()
+        
+        user = authenticate(username=username, password=password)
+        if user is not None:
+            data = get_tokens_for_user(user)
+            response.set_cookie(
+                key = settings.SIMPLE_JWT['AUTH_COOKIE'], 
+                value = data["access"],
+                expires = settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'],
+                secure = settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+                httponly = settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
+                samesite = settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
+            )
+            csrf.get_token(request)
+            response.data = {"Success": "Login successfully", "data": data}
+            if api_settings.UPDATE_LAST_LOGIN:
+                update_last_login(None, user)
+            return response
+        else:
+            raise WrongPassword()
+        
+        
+class UserEmailCheck(generics.CreateAPIView):
+    serializer_class = UserEmailSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         serializer = self.get_serializer(data=request.data)
 
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            if 'email' in e.detail:
+                if 'unique' in e.get_codes()['email']:
+                    raise ExistingEmail()
+                if 'invalid' in e.get_codes()['email']:
+                    raise InvalidEmail()
+            raise e
 
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+    
+
+class UserPasswordCheck(generics.CreateAPIView):
+    serializer_class = UserPasswordSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        serializer = self.get_serializer(data=request.data)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            raise e
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+    
+
+class UserUsernameCheck(generics.CreateAPIView):
+    serializer_class = UserUsernameSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        serializer = self.get_serializer(data=request.data)
+
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            if 'username' in e.detail:
+                if 'unique' in e.get_codes()['username']:
+                    raise ExistingUsername()
+                if 'invalid' in e.get_codes()['username']:
+                    raise InvalidUsername()
+                if 'max_length' in e.get_codes()['username']:
+                    raise LongUsername()
+            raise e
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+        
 
 class UserSignup(generics.CreateAPIView):
     serializer_class = UserProfileSerializer
@@ -73,21 +184,6 @@ class UserSignup(generics.CreateAPIView):
         try:
             serializer.is_valid(raise_exception=True)
         except ValidationError as e:
-            if 'username' in e.detail:
-                if 'unique' in e.get_codes()['username']:
-                    user = User.objects.get(username=request.data['username'])
-                    if not user.is_active:
-                        raise InActiveUser()
-                    raise ExistingUsername()
-                if 'invalid' in e.get_codes()['username']:
-                    raise InvalidUsername()
-                if 'max_length' in e.get_codes()['username']:
-                    raise LongUsername()
-            if 'email' in e.detail:
-                if 'unique' in e.get_codes()['email']:
-                    raise ExistingEmail()
-                if 'invalid' in e.get_codes()['email']:
-                    raise InvalidEmail()
             raise e
 
         self.perform_create(serializer)
@@ -150,7 +246,7 @@ class SendResetPasswordEmail(generics.CreateAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        if user and user.is_active:
+        if user:
             email_manager.send_reset_password_email(user)
             
         return HttpResponse(status=200) # whether email is valid or not, response will be always success-response
