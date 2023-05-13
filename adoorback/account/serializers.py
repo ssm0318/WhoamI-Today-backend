@@ -9,17 +9,19 @@ from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.settings import api_settings
 from django.contrib.auth.models import update_last_login
+from django.db.models import Q
 
 from account.models import FriendRequest
 from adoorback.settings.base import BASE_URL
 from adoorback.utils.exceptions import InActiveUser, NoUsername, WrongPassword
 
-from django.db.models import Q
+from django_countries.serializers import CountryFieldMixin
+
 
 User = get_user_model()
 
 
-class UserProfileSerializer(serializers.HyperlinkedModelSerializer):
+class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
     """
     Serializer for auth and profile update
     """
