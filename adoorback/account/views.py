@@ -3,7 +3,7 @@ import json
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import get_user_model, authenticate, logout
 from django.contrib.auth.models import update_last_login
 from django.core import exceptions
 from django.contrib.auth import get_user_model
@@ -87,8 +87,16 @@ class UserLogin(APIView):
             return response
         else:
             raise WrongPassword()
-        
-        
+
+
+class UserLogout(APIView):
+    def get(self, request):
+        logout(request)
+        response = Response()
+        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
+        return response
+    
+
 class UserEmailCheck(generics.CreateAPIView):
     serializer_class = UserEmailSerializer
     parser_classes = (MultiPartParser, FormParser)

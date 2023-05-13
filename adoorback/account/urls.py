@@ -4,6 +4,7 @@ from account import views
 urlpatterns = [
     # Auth related
     path('login/', views.UserLogin.as_view(), name='login'),
+    path('logout/', views.UserLogout.as_view(), name='logout'),
     path('signup/email/', views.UserEmailCheck.as_view(), name='user-email-check'),
     path('signup/password/', views.UserPasswordCheck.as_view(), name='user-password-check'),
     path('signup/username/', views.UserUsernameCheck.as_view(), name='user-username-check'),
