@@ -6,7 +6,6 @@ from content_report.models import ContentReport
 from content_report.serializers import ContentReportSerializer
 from feed.models import Post
 
-from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 

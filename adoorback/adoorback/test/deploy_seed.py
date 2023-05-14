@@ -86,10 +86,3 @@ def set_mock_seed():
                                            share_anonymously=False)
     logging.info(
         f"{Response.objects.count()} Responses created!") if DEBUG else None
-
-    # Seed Feed Like
-    for i in range(5000):
-        user = random.choice(users)
-        question = Question.objects.get(id=i % 1000 + 1)
-        Like.objects.get_or_create(user=user, content_type=get_question_type(), object_id=question.id)
-    logging.info(f"{Like.objects.count()} Likes created!") if DEBUG else None

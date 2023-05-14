@@ -23,7 +23,6 @@ class FeedTestCase(TestCase):
     def test_feed_count(self):
         self.assertEqual(Article.objects.count(), N)
         self.assertEqual(Question.objects.admin_questions_only().count(), N)
-        self.assertEqual(Question.objects.custom_questions_only().count(), N)
         self.assertLessEqual(Question.objects.daily_questions().count(), 30)
         self.assertEqual(Response.objects.count(), N)
         self.assertEqual(Post.objects.count(), N * 4)
@@ -38,23 +37,19 @@ class FeedTestCase(TestCase):
         user = User.objects.get(id=2)
         articles_cnt = user.article_set.all().count()
         responses_cnt = user.response_set.all().count()
-        questions_cnt = user.question_set.all().count()
         self.assertGreater(articles_cnt, 0)
         self.assertGreater(responses_cnt, 0)
-        self.assertGreater(questions_cnt, 0)
 
         user.delete()
         self.assertEqual(User.objects.filter(id=2).count(), 0)
         self.assertEqual(Article.objects.filter(author_id=2).count(), 0)
         self.assertEqual(Response.objects.filter(author_id=2).count(), 0)
-        self.assertEqual(Question.objects.filter(author_id=2).count(), 0)
 
         # undelete
         user.undelete()
         self.assertEqual(User.objects.filter(id=2).count(), 1)
         self.assertEqual(Article.objects.filter(author_id=2).count(), articles_cnt)
         self.assertEqual(Response.objects.filter(author_id=2).count(), responses_cnt)
-        self.assertEqual(Question.objects.filter(author_id=2).count(), questions_cnt)
 
     # response must be deleted along with question
     def test_on_delete_undelete_question_cascade(self):
@@ -162,7 +157,7 @@ class PostAPITestCase(APITestCase):
         friend_user.friends.add(current_user)
 
         question = Question.objects.create(author_id=current_user.id, content="test_question",
-                                           is_admin_question=False)
+                                           is_admin_question=True)
         Response.objects.create(author_id=current_user.id, content="test_response",
                                 question_id=question.id,
                                 share_with_friends=True, share_anonymously=True)
@@ -254,7 +249,7 @@ class UserFeedTestCase(APITestCase):
         friend_user = self.make_user(username='friend_user')
 
         fid = friend_user.id
-        Question.objects.create(author_id=fid, content="test_question", is_admin_question=False)
+        Question.objects.create(author_id=1, content="test_question", is_admin_question=True)
         Response.objects.create(author_id=fid, content="test_response", question_id=1)
         Article.objects.create(author_id=fid, content="test_article")
         Article.objects.create(author_id=fid, content="test_article", share_with_friends=False)
@@ -391,7 +386,7 @@ class ResponseAPITestCase(APITestCase):
         spy_user = self.make_user(username='spy_user')
 
         with self.login(username=current_user.username, password='password'):
-            question = Question.objects.create(author_id=1, content="test_question", is_admin_question=False)
+            question = Question.objects.create(author_id=1, content="test_question", is_admin_question=True)
             data = {"content": "test content", "question_id": question.id, "share_anonymously": True}
             response = self.post('response-list', data=data, extra={'format': 'json'})
             self.assertEqual(response.status_code, 201)
@@ -424,7 +419,7 @@ class DailyQuestionTestCase(APITestCase):
         current_user = self.make_user(username='current_user')
 
         for _ in range(50):
-            Question.objects.create(author_id=1, content="test_question", is_admin_question=False)
+            Question.objects.create(author_id=1, content="test_question", is_admin_question=True)
 
         with self.login(username=current_user.username, password='password'):
             response = self.get('daily-question-list')
@@ -436,7 +431,7 @@ class DailyQuestionTestCase(APITestCase):
         current_user = self.make_user(username='current_user')
 
         for _ in range(50):
-            Question.objects.create(author_id=1, content="test_question", is_admin_question=False)
+            Question.objects.create(author_id=1, content="test_question", is_admin_question=True)
 
         with self.login(username=current_user.username, password='password'):
             response = self.get('daily-question-list')
@@ -460,10 +455,10 @@ class ResponseRequestAPITestCase(APITestCase):
         friend_user_1 = self.make_user(username='friend_user_1')
         friend_user_2 = self.make_user(username='friend_user_2')
 
-        question_1 = Question.objects.create(author_id=current_user.id,
-                                             content="test_question", is_admin_question=False)
-        question_2 = Question.objects.create(author_id=current_user.id,
-                                             content="test_question", is_admin_question=False)
+        question_1 = Question.objects.create(author_id=1,
+                                             content="test_question", is_admin_question=True)
+        question_2 = Question.objects.create(author_id=1,
+                                             content="test_question", is_admin_question=True)
 
         prev_noti_count = Notification.objects.count()
         ResponseRequest.objects.create(requester=current_user, requestee=friend_user_1, question=question_1)
@@ -482,7 +477,7 @@ class ResponseRequestAPITestCase(APITestCase):
         friend_user = self.make_user(username='friend_user')
         user_adoor = User.objects.get(username='adoor')
 
-        question = Question.objects.create(author_id=current_user.id, content="test_question", is_admin_question=False)
+        question = Question.objects.create(author_id=1, content="test_question", is_admin_question=True)
         ResponseRequest.objects.create(requester=friend_user, requestee=current_user, question=question)
         current_user.friends.add(friend_user)
 
@@ -535,8 +530,8 @@ class ResponseRequestNotiAPITestCase(APITestCase):
         current_user = self.make_user(username='current_user')
         friend_user = self.make_user(username='friend_user')
 
-        question = Question.objects.create(author_id=current_user.id,
-                                           content="test_question", is_admin_question=False)
+        question = Question.objects.create(author_id=1,
+                                           content="test_question", is_admin_question=True)
 
         # POST - send response request (current_user -> friend_user)
         data = {"requester_id": current_user.id, "requestee_id": friend_user.id, "question_id": question.id}
