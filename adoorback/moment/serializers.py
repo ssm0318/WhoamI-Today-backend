@@ -5,10 +5,7 @@ from account.serializers import AuthorFriendSerializer
 from comment.serializers import CommentFriendSerializer, CommentResponsiveSerializer, CommentAnonymousSerializer
 
 
-class MomentSerializer(serializers.ModelSerializer):
-    author = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
-    author_detail = AuthorFriendSerializer(source='author', read_only=True)
+class MyMomentSerializer(serializers.ModelSerializer):
     comments = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField(read_only=True)
     current_user_liked = serializers.SerializerMethodField(read_only=True)
@@ -37,5 +34,5 @@ class MomentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Moment
         fields = ['id', 'type', 'like_count', 'current_user_liked', 'created_at', 
-                  'date', 'mood', 'photo', 'description', 'author', 'author_detail', 'comments']
+                  'date', 'mood', 'photo', 'description', 'comments']
 

@@ -23,11 +23,11 @@ class OverwriteStorage(FileSystemStorage):
 
 
 def to_profile_images(instance, filename):
-    return 'moment/{username}-{data}.png'.format(username=instance, date=instance.date)
+    return 'moment/{username}-{date}.png'.format(username=instance.author, date=instance.date)
 
 class Moment(AdoorTimestampedModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='moment_set', on_delete=models.CASCADE)
-    date = models.CharField(max_length=20)
+    date = models.CharField(max_length=10, blank=True)
     mood = models.CharField(blank=True, null=True, max_length=20)
     photo = models.ImageField(storage=OverwriteStorage(), upload_to=to_profile_images, blank=True, null=True)
     description = models.CharField(blank=True, null=True, max_length=20)
