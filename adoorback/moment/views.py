@@ -78,3 +78,16 @@ class MomentToday(generics.ListCreateAPIView, generics.UpdateAPIView):
 
         return Response(serializer.data)
 
+class MomentMonthly(generics.ListAPIView):
+    serializer_class = ms.MyMomentSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        current_user = self.request.user
+        year = self.kwargs.get('year')
+        month = self.kwargs.get('month')
+        formatted_date = f"{year}-{month:02d}"
+        print(formatted_date)
+        
+        queryset = Moment.objects.filter(Q(author=current_user) & Q(date__startswith=formatted_date)).order_by('date')
+        return queryset
