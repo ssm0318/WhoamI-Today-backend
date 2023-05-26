@@ -159,7 +159,53 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
+    
 
+class MultiQuestionManager(SafeDeleteManager):
+    def daily_questions(self, **kwargs):
+        return self.filter(selected_date__date=datetime.date.today(), **kwargs)
+    
+
+class MultiQuestion(AdoorModel, SafeDeleteModel):
+    selected_date = models.DateTimeField(null=True)
+
+    objects = MultiQuestionManager()
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+    class Meta:
+        ordering = ['id']
+
+
+class Choice(AdoorModel, SafeDeleteModel):
+    multi_question = models.ForeignKey(MultiQuestion, related_name='choice_set', on_delete=models.CASCADE)
+    position = models.IntegerField("position")
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        unique_together = [
+            ("multi_question", "content"),
+            ("multi_question", "position")
+        ]
+        ordering = ("position",)
+    
+
+class MultiResponse(AdoorModel, SafeDeleteModel):
+    multi_question = models.ForeignKey(MultiQuestion, related_name='multi_response_set', on_delete=models.CASCADE)
+    author = models.ForeignKey(User, related_name='multi_response_set', on_delete=models.CASCADE)
+    choices = models.ManyToManyField(Choice, related_name='multi_response_set')
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+    
 
 class PostManager(SafeDeleteManager):
 
