@@ -8,7 +8,7 @@ from feed.models import Article
 from notification.models import Notification
 
 from adoorback.test.seed import set_seed, fill_data
-from adoorback.utils.content_types import get_article_type, get_question_type, get_comment_type
+from adoorback.utils.content_types import get_article_type, get_comment_type
 
 User = get_user_model()
 N = 10
@@ -44,26 +44,17 @@ class LikeTestCase(TestCase):
     # like must be deleted along with target Feed
     def test_on_delete_undelete_feed_cascade(self):
         article_model = get_article_type()
-        question_model = get_question_type()
         article = Like.objects.filter(content_type=article_model).last().target
-        question = Like.objects.filter(content_type=question_model).last().target
         article_id = article.id
-        question_id = question.id
         article_like_cnt = Like.objects.filter(content_type=article_model, object_id=article_id).count()
-        question_like_cnt = Like.objects.filter(content_type=question_model, object_id=question_id).count()
         self.assertGreater(article.article_likes.count(), 0)
-        self.assertGreater(question.question_likes.count(), 0)
 
         article.delete()
-        question.delete()
         self.assertEqual(Like.objects.filter(content_type=article_model, object_id=article_id).count(), 0)
-        self.assertEqual(Like.objects.filter(content_type=question_model, object_id=question_id).count(), 0)
 
         # undelete
         article.undelete()
-        question.undelete()
         self.assertEqual(Like.objects.filter(content_type=article_model, object_id=article_id).count(), article_like_cnt)
-        self.assertEqual(Like.objects.filter(content_type=question_model, object_id=question_id).count(), question_like_cnt)
 
     # like must be deleted along with target Comment
     def test_delete_undelete_comment_cascade(self):
@@ -155,14 +146,6 @@ class LikeNotiAPITestCase(APITestCase):
             self.assertEqual(response.status_code, 201)
 
             self.assertEqual(Notification.objects.first().redirect_url, "/responses/1?anonymous=True")
-
-        # create like (current_user -> author of Response with id=1)
-        with self.login(username=current_user.username, password='password'):
-            data = {"target_type": "Question", "target_id": 1, "is_anonymous": True}
-            response = self.post('like-list', data=data, extra={'format': 'json'})
-            self.assertEqual(response.status_code, 201)
-
-            self.assertEqual(Notification.objects.first().redirect_url, "/questions/1?anonymous=True")
 
         # create comment (current_user -> current_user): no new notification
         with self.login(username=current_user.username, password='password'):

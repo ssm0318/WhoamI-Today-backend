@@ -22,9 +22,6 @@ class PostFriendSerializer(serializers.ModelSerializer):
         if isinstance(obj.target, Article):
             self.Meta.model = Article
             return ArticleFriendSerializer(obj.target, context=self.context).to_representation(obj.target)
-        elif isinstance(obj.target, Question):
-            self.Meta.model = Question
-            return QuestionFriendSerializer(obj.target, context=self.context).to_representation(obj.target)
         elif isinstance(obj.target, Response):
             self.Meta.model = Response
             return ResponseFriendSerializer(obj.target, context=self.context).to_representation(obj.target)
@@ -40,9 +37,6 @@ class PostAnonymousSerializer(serializers.ModelSerializer):
         if isinstance(obj.target, Article):
             self.Meta.model = Article
             return ArticleAnonymousSerializer(obj.target, context=self.context).to_representation(obj.target)
-        elif isinstance(obj.target, Question):
-            self.Meta.model = Question
-            return QuestionAnonymousSerializer(obj.target, context=self.context).to_representation(obj.target)
         elif isinstance(obj.target, Response):
             self.Meta.model = Response
             return ResponseAnonymousSerializer(obj.target, context=self.context).to_representation(obj.target)

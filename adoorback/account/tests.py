@@ -279,16 +279,6 @@ class AuthAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 406)
         self.assertEqual(response.data['detail'].code, 'wrong_password')
 
-        # inactive user
-        test_user = User.objects.get(username='test_username')
-        test_user.is_active = False
-        test_user.save()
-        login_data = {'username': 'test_username', 'password': 'test_password'}
-        response = self.client.post(
-            '/api/user/token/', json.dumps(login_data), content_type='application/json')
-        self.assertEqual(response.status_code, 406)
-        self.assertEqual(response.data['detail'].code, 'user_is_inactive')
-
     def test_user_list(self):
         current_user = self.make_user(username='current_user')
         admin_user = self.make_user(username='admin_user')

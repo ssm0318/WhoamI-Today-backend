@@ -55,8 +55,6 @@ def set_seed(n):
             article.save()
         Question.objects.create(
             author=admin, is_admin_question=True, content=faker.word())
-        Question.objects.create(
-            author=user, is_admin_question=False, content=faker.word())
     logging.info(
         f"{Article.objects.count()} Article(s) created!") if DEBUG else None
     logging.info(f"{Question.objects.count()} Question(s) created!") \
@@ -164,8 +162,6 @@ def fill_data():
     for user in users:
         Article.objects.create(author=user, content=faker.catch_phrase()) \
             if user.article_set.count() == 0 else None
-        Question.objects.create(author=user, content=faker.catch_phrase(), is_admin_question=False) \
-            if user.question_set.count() == 0 else None
         Response.objects.create(author=user, content=faker.catch_phrase(), question=random.choice(questions)) \
             if user.response_set.count() == 0 else None
         ResponseRequest.objects.create(requester=random.choice(users.exclude(id=user.id)),

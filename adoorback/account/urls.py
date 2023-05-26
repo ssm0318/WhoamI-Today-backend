@@ -5,12 +5,11 @@ from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from account import views
 
 urlpatterns = [
-    # Token related
-    path('token/', ensure_csrf_cookie(views.CustomTokenObtainPairView.as_view()), name='token-obtain-pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
-    path('token/verify/', TokenVerifyView.as_view(), name='token-verify'),
-
     # Auth related
+    path('login/', views.UserLogin.as_view(), name='login'),
+    path('signup/email/', views.UserEmailCheck.as_view(), name='user-email-check'),
+    path('signup/password/', views.UserPasswordCheck.as_view(), name='user-password-check'),
+    path('signup/username/', views.UserUsernameCheck.as_view(), name='user-username-check'),
     path('signup/', views.UserSignup.as_view(), name='user-signup'),
     path('activate/<int:pk>/<str:token>/', views.UserActivate.as_view(), name='user-activate'),
     path('select-questions/', views.SignupQuestions.as_view(),

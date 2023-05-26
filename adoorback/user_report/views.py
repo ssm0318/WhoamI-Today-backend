@@ -5,8 +5,6 @@ from rest_framework.permissions import IsAuthenticated
 from user_report.models import UserReport
 from user_report.serializers import UserReportSerializer
 
-from adoorback.utils.permissions import IsNotBlocked
-from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 
 

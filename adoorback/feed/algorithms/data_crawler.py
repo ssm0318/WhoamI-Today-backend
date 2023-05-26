@@ -60,11 +60,6 @@ def create_user_csv():
         row = "CREATED," + str(question.id) + "," + str(question.author.id)
         writer.writerow([c.strip() for c in row.strip(',').split(',')])
 
-    for question in Question.objects.prefetch_related('question_likes'):
-        for like_obj in question.question_likes.all():
-            row = "LIKED," + str(question.id) + "," + str(like_obj.user.id)
-            writer.writerow([c.strip() for c in row.strip(',').split(',')])
-
     for notification in Notification.objects.prefetch_related('origin').filter(
             target_type=get_response_request_type()):
         row = "REQUESTED," + str(notification.origin_id) + "," + str(notification.actor_id)
