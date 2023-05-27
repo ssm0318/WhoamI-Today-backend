@@ -1,7 +1,8 @@
+import os
 from datetime import date
 
 from django.shortcuts import render
-
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 
@@ -9,6 +10,7 @@ from rest_framework import generics, exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
+from safedelete.models import SOFT_DELETE_CASCADE
 
 from adoorback.utils.validators import adoor_exception_handler
 
@@ -91,3 +93,47 @@ class MomentMonthly(generics.ListAPIView):
         
         queryset = Moment.objects.filter(Q(author=current_user) & Q(date__startswith=formatted_date)).order_by('date')
         return queryset
+    
+class MomentDelete(generics.DestroyAPIView):
+    serializer_class = ms.MyMomentSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_object(self):
+        try:
+            moment = Moment.objects.get(id=self.kwargs.get('pk'))
+        except Moment.DoesNotExist:
+            raise exceptions.NotFound("Moment not found")
+        
+        if moment.author != self.request.user:
+            raise exceptions.PermissionDenied("You do not have permission to delete this moment")
+        return moment
+    
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        instance.delete(force_policy=SOFT_DELETE_CASCADE)
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        field_name = self.kwargs.get('field')
+
+        if field_name == 'mood':
+            instance.mood = None
+        elif field_name == 'photo':
+            if instance.photo:
+                file_path = os.path.join(settings.MEDIA_ROOT, instance.photo.name)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            instance.photo = None
+        elif field_name == 'description':
+            instance.description = None
+        else:
+            return Response("Wrong field name to delete.", status=status.HTTP_400_BAD_REQUEST)
+
+        instance.save()
+        
+        if not instance.mood and not instance.photo and not instance.description:
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        
+        return Response(self.get_serializer(instance).data)
+    
