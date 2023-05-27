@@ -191,30 +191,20 @@ class UserSignup(generics.CreateAPIView):
         self.perform_create(serializer)
 
         headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=201, headers=headers)
 
-
-class UserActivate(generics.UpdateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserProfileSerializer
-
-    def get_exception_handler(self):
-        print(self.request.headers)
-        return adoor_exception_handler
-
-    def update(self, request, *args, **kwargs):
-        token = self.kwargs.get('token')
-        user = self.get_object()
-        if email_manager.check_activate_token(user, token):
-            self.activate(user)
-            return HttpResponse(status=204)
-        else:
-            return HttpResponse(status=400)
-
-    @transaction.atomic
-    def activate(self, user):
-        user.is_active = True
-        user.save()
+        response = Response(serializer.data, status=201, headers=headers)     
+        user = User.objects.get(username=request.data.get('username'))
+        access_token = get_access_token_for_user(user)
+        response.set_cookie(
+            key = settings.SIMPLE_JWT['AUTH_COOKIE'], 
+            value = access_token, 
+            max_age = settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
+            secure = settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+            httponly = settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
+            samesite = settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
+        )
+        csrf.get_token(request)
+        return response
 
 
 class SendResetPasswordEmail(generics.CreateAPIView):
