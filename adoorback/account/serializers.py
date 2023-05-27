@@ -46,7 +46,7 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         return user
 
     def validate(self, attrs):
-        user = User(**attrs)         
+        user = User(**attrs)
         errors = dict() 
         try:
             validate_password(password=attrs.get('password'), user=user)
@@ -68,11 +68,11 @@ class UserEmailSerializer(serializers.ModelSerializer):
 class UserPasswordSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['password']
+        fields = ['password', 'username', 'email']
 
     def validate(self, attrs):
-        user = User(**attrs)         
-        errors = dict() 
+        user = User(**attrs)
+        errors = dict()
         try:
             validate_password(password=attrs.get('password'), user=user)
 

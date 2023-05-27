@@ -132,7 +132,6 @@ class UserPasswordCheck(generics.CreateAPIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
         serializer = self.get_serializer(data=request.data)
-
         try:
             serializer.is_valid(raise_exception=True)
         except ValidationError as e:
@@ -184,7 +183,6 @@ class UserSignup(generics.CreateAPIView):
             translation.activate(lang)
 
         serializer = self.get_serializer(data=request.data)
-
         try:
             serializer.is_valid(raise_exception=True)
         except ValidationError as e:
