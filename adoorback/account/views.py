@@ -190,25 +190,8 @@ class UserSignup(generics.CreateAPIView):
 
         self.perform_create(serializer)
 
-        user = User.objects.get(username=request.data.get('username'))
-        email_manager.send_verification_email(user)
-
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
-
-    @transaction.atomic
-    def perform_create(self, serializer):
-        obj = serializer.save()
-        Notification = apps.get_model('notification', 'Notification')
-        admin = User.objects.filter(is_superuser=True).first()
-
-        Notification.objects.create(user=obj,
-                                    actor=admin,
-                                    target=admin,
-                                    origin=admin,
-                                    message_ko=f"{obj.username}님, 반갑습니다! :) 먼저 익명피드를 둘러볼까요?",
-                                    message_en=f"Welcome {obj.username}! :) Start with looking around the anonymous feed.",
-                                    redirect_url='/anonymous')
 
 
 class UserActivate(generics.UpdateAPIView):
