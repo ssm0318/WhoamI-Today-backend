@@ -1,5 +1,6 @@
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
+
 
 from django.shortcuts import render
 from django.conf import settings
@@ -79,6 +80,35 @@ class MomentToday(generics.ListCreateAPIView, generics.UpdateAPIView):
         self.perform_update(serializer)
 
         return Response(serializer.data)
+    
+
+class MomentWeekly(generics.ListAPIView):
+    serializer_class = ms.MyMomentSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_next_seven_days(self, start_date):
+        next_seven_days = []
+        next_seven_days.append(start_date)
+        
+        start_date = datetime.strptime(start_date, '%Y-%m-%d')
+
+        for i in range(6):
+            next_day = start_date + timedelta(days=i + 1)
+            next_seven_days.append(next_day.strftime('%Y-%m-%d'))
+
+        return next_seven_days
+    
+    def get_queryset(self):
+        current_user = self.request.user
+        year = self.kwargs.get('year')
+        month = self.kwargs.get('month')
+        day = self.kwargs.get('day')
+        formatted_date = f"{year}-{month:02d}-{day:02d}"
+        
+        next_seven_days = self.get_next_seven_days(formatted_date)
+        
+        queryset = Moment.objects.filter(Q(author=current_user) & Q(date__in=next_seven_days)).order_by('date')
+        return queryset
 
 class MomentMonthly(generics.ListAPIView):
     serializer_class = ms.MyMomentSerializer
@@ -89,7 +119,6 @@ class MomentMonthly(generics.ListAPIView):
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         formatted_date = f"{year}-{month:02d}"
-        print(formatted_date)
         
         queryset = Moment.objects.filter(Q(author=current_user) & Q(date__startswith=formatted_date)).order_by('date')
         return queryset
