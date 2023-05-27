@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-05-27 16:18+0900\n"
+"POT-Creation-Date: 2023-05-27 20:23+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -95,11 +95,11 @@ msgstr "필수 항목. 20자 이하. 알파벳/한글, 숫자, _(언더바)만 �
 msgid "A user with that username already exists."
 msgstr "해당 닉네임은 이미 사용 중입니다."
 
-#: adoorback/settings/base.py:188
+#: adoorback/settings/base.py:187
 msgid "한국어"
 msgstr "Korean"
 
-#: adoorback/settings/base.py:189
+#: adoorback/settings/base.py:188
 msgid "영어"
 msgstr "English"
 
@@ -140,44 +140,28 @@ msgstr "An account with this email already exists."
 msgid "유효하지 않은 이메일 형식입니다."
 msgstr "Email format is invalid."
 
-#: adoorback/utils/validators.py:40
+#: adoorback/utils/validators.py:38
 msgid ""
 "유효한 닉네임을 입력해주세요. 영문, 한글, 숫자, 일부 특수문자(_)만 허용합니"
 "다.공백, 한글 자음/모음만 있는 경우는 허용되지 않습니다."
 msgstr ""
 
-#: adoorback/utils/validators.py:50 adoorback/utils/validators.py:56
+#: adoorback/utils/validators.py:48 adoorback/utils/validators.py:54
 msgid "비밀번호는 숫자(0-9)를 한 개 이상 포함해야 합니다."
 msgstr "Your password must contain at least 1 digit, 0-9."
 
-#: adoorback/utils/validators.py:64 adoorback/utils/validators.py:70
+#: adoorback/utils/validators.py:62 adoorback/utils/validators.py:68
 msgid "비밀번호는 알파벳 대문자(A-Z)를 한 개 이상 포함해야 합니다."
 msgstr "Your password must contain at least 1 uppercase letter, A-Z."
 
-#: adoorback/utils/validators.py:78 adoorback/utils/validators.py:84
+#: adoorback/utils/validators.py:76 adoorback/utils/validators.py:82
 msgid "비밀번호는 알파벳 소문자(a-z)를 한 개 이상 포함해야 합니다."
 msgstr "Your password must contain at least 1 lowercase letter, a-z."
 
-#: adoorback/utils/validators.py:92 adoorback/utils/validators.py:99
+#: adoorback/utils/validators.py:90 adoorback/utils/validators.py:97
 msgid ""
 "비밀번호는 특수문자를 한 개 이상 포함해야 합니다: ()[]{}|\\`~!@#$%^&*_-"
 "+=;:'\",<>./?"
 msgstr ""
 "Your password must contain at least 1 symbol: ()[]{}|\\`~!@#$%^&*_-+=;:'\","
 "<>./?"
-
-#: adoorback/utils/validators.py:121
-msgid "비밀번호가 이메일과 너무 유사합니다."
-msgstr "The password is too similar to the email."
-
-#: adoorback/utils/validators.py:123
-msgid "비밀번호가 닉네임과 너무 유사합니다."
-msgstr "The password is too similar to the username."
-
-#: adoorback/utils/validators.py:129
-msgid "비밀번호가 "
-msgstr "The password is too similar to the"
-
-#: adoorback/utils/validators.py:129
-msgid "와 너무 유사합니다."
-msgstr "."
