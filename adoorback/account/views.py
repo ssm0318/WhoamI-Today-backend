@@ -4,7 +4,6 @@ import json
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model, authenticate, logout
-from django.contrib.auth.models import update_last_login
 from django.core import exceptions
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -81,9 +80,6 @@ class UserLogin(APIView):
                 samesite = settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
             csrf.get_token(request)
-            return response
-            if api_settings.UPDATE_LAST_LOGIN:
-                update_last_login(None, user)
             return response
         else:
             raise WrongPassword()
