@@ -9,7 +9,8 @@ from rest_framework_simplejwt.serializers import TokenObtainSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.settings import api_settings
 from django.contrib.auth.models import update_last_login
-from django.db.models import Q
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 from account.models import FriendRequest
 from adoorback.settings.base import BASE_URL
@@ -44,6 +45,19 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         user.is_active = False
         user.save()
         return user
+
+    def validate(self, attrs):
+        user = User(**attrs)         
+        errors = dict() 
+        try:
+            validate_password(password=attrs.get('password'), user=user)
+
+        except ValidationError as e:
+            errors['password'] = [list(e.messages)[0]]
+
+        if errors:
+            raise serializers.ValidationError(errors)
+        return super(UserProfileSerializer, self).validate(attrs)
 
 
 class UserEmailSerializer(serializers.ModelSerializer):

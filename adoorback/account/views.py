@@ -5,6 +5,9 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.models import update_last_login
+from django.core import exceptions
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseBadRequest
@@ -269,6 +272,10 @@ class ResetPassword(generics.UpdateAPIView):
 
     @transaction.atomic
     def update_password(self, user, raw_password):
+        try:
+            validate_password(password=raw_password, user=user)
+        except exceptions.ValidationError as e:
+            raise e
         user.set_password(raw_password)
         user.save()
 
