@@ -6,6 +6,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
 
 from comment.models import Comment
@@ -161,13 +162,33 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
         return self.__class__.__name__
     
 
+class TopicManager(SafeDeleteManager):
+    def daily_topic(self, **kwargs):
+        return self.filter(selected_dates__contains=datetime.date.today(), **kwargs)
+    
+
+class Topic(AdoorModel, SafeDeleteModel):
+    selected_dates = ArrayField(models.DateField(), blank=True, default=list)
+
+    objects = TopicManager()
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+    
+    class Meta:
+        ordering = ['id']
+
+
 class MultiQuestionManager(SafeDeleteManager):
     def daily_questions(self, **kwargs):
-        return self.filter(selected_date__date=datetime.date.today(), **kwargs)
+        return self.filter(topic__selected_dates__contains=datetime.date.today(), **kwargs)
     
 
 class MultiQuestion(AdoorModel, SafeDeleteModel):
-    selected_date = models.DateTimeField(null=True)
+    topic = models.ForeignKey(Topic, related_name='multi_question_set', on_delete=models.CASCADE)
 
     objects = MultiQuestionManager()
 
