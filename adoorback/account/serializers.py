@@ -71,6 +71,19 @@ class UserPasswordSerializer(serializers.ModelSerializer):
         model = User
         fields = ['password']
 
+    def validate(self, attrs):
+        user = User(**attrs)         
+        errors = dict() 
+        try:
+            validate_password(password=attrs.get('password'), user=user)
+
+        except ValidationError as e:
+            errors['password'] = [list(e.messages)[0]]
+
+        if errors:
+            raise serializers.ValidationError(errors)
+        return super(UserPasswordSerializer, self).validate(attrs)
+
 
 class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
