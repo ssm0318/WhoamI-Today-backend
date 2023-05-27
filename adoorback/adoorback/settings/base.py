@@ -174,7 +174,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'adoorback.utils.validators.UppercaseValidator', },
     {'NAME': 'adoorback.utils.validators.LowercaseValidator', },
     {'NAME': 'adoorback.utils.validators.SymbolValidator', },
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
+    {'NAME': 'adoorback.utils.validators.CustomUserAttributeSimilarityValidator', },
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
 ]
 

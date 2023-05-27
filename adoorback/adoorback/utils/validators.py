@@ -1,11 +1,11 @@
 # import sentry_sdk
 import re
+from difflib import SequenceMatcher
 
-from django.core.exceptions import ValidationError
-from django.utils.translation import gettext_lazy as _
+from django.contrib.auth.password_validation import UserAttributeSimilarityValidator, exceeds_maximum_length_ratio
 from django.core import validators
-
-# from rest_framework import status
+from django.core.exceptions import ValidationError, FieldDoesNotExist
+from django.utils.translation import gettext_lazy as _
 from rest_framework.views import exception_handler
 
 
@@ -99,3 +99,36 @@ class SymbolValidator(object):
             "비밀번호는 특수문자를 한 개 이상 포함해야 합니다: " +
             "()[]{}|\`~!@#$%^&*_-+=;:'\",<>./?"
         )
+    
+
+class CustomUserAttributeSimilarityValidator(UserAttributeSimilarityValidator):
+    def validate(self, password, user=None):
+        if not user:
+            return
+
+        password = password.lower()
+        for attribute_name in self.user_attributes:
+            value = getattr(user, attribute_name, None)
+            if not value or not isinstance(value, str):
+                continue
+            value_lower = value.lower()
+            value_parts = re.split(r'\W+', value_lower) + [value_lower]
+            for value_part in value_parts:
+                if exceeds_maximum_length_ratio(password, self.max_similarity, value_part):
+                    continue
+                if SequenceMatcher(a=password, b=value_part).quick_ratio() >= self.max_similarity:
+                    if attribute_name == 'email':
+                        message = _("비밀번호가 이메일과 너무 유사합니다.")
+                    elif attribute_name == 'username':
+                        message = _("비밀번호가 닉네임과 너무 유사합니다.")
+                    else:
+                        try:
+                            verbose_name = str(user._meta.get_field(attribute_name).verbose_name)
+                        except FieldDoesNotExist:
+                            verbose_name = attribute_name
+                        message = _("비밀번호가 ") + verbose_name + _("와 너무 유사합니다.")
+                    raise ValidationError(
+                        message,
+                        code='password_too_similar',
+                        params={'verbose_name': attribute_name},
+                    )
