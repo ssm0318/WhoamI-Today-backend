@@ -105,6 +105,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     gender = models.IntegerField(choices=GENDER_CHOICES, null=True)
     date_of_birth = models.DateField(null=True)
     ethnicity = models.IntegerField(choices=ETHNICITY_CHOICES, null=True)
+    research_agreement = models.BooleanField(default=False)
     nationality = CountryField(null=True)
     research_agreement = models.BooleanField(default=False)
     signature = models.CharField(null=True, max_length=100)

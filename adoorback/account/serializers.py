@@ -18,7 +18,6 @@ from adoorback.utils.exceptions import InActiveUser, NoUsername, WrongPassword
 
 from django_countries.serializers import CountryFieldMixin
 
-
 User = get_user_model()
 
 

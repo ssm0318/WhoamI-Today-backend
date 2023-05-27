@@ -80,9 +80,10 @@ class UserReportTestCase(TestCase):
         user1 = self.make_user(username='user1')
         user2 = self.make_user(username='user2')
         user3 = self.make_user(username='user3')
+        admin = User.objects.get(username='adoor')
 
         # test notification
-        question = Question.objects.create(author=user1, content='test question', is_admin_question=True)
+        question = Question.objects.create(author=admin, content='test question', is_admin_question=True)
         article = Article.objects.create(author=user3, content='test article')
 
         with self.login(username=user3.username, password='password'):

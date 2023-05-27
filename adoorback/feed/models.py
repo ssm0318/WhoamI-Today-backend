@@ -71,10 +71,7 @@ class Question(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='question_set', on_delete=models.CASCADE)
 
     selected_date = models.DateTimeField(null=True)
-    is_admin_question = models.BooleanField(default=False)
-
-    question_comments = GenericRelation(Comment)
-    question_likes = GenericRelation(Like)
+    is_admin_question = models.BooleanField(default=True)
 
     question_targetted_notis = GenericRelation(Notification,
                                                content_type_field='target_type',
@@ -90,10 +87,6 @@ class Question(AdoorModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
-
-    @property
-    def liked_user_ids(self):
-        return self.question_likes.values_list('user_id', flat=True)
 
     class Meta:
         ordering = ['id']
@@ -166,7 +159,53 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
+    
 
+class MultiQuestionManager(SafeDeleteManager):
+    def daily_questions(self, **kwargs):
+        return self.filter(selected_date__date=datetime.date.today(), **kwargs)
+    
+
+class MultiQuestion(AdoorModel, SafeDeleteModel):
+    selected_date = models.DateTimeField(null=True)
+
+    objects = MultiQuestionManager()
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+    class Meta:
+        ordering = ['id']
+
+
+class Choice(AdoorModel, SafeDeleteModel):
+    multi_question = models.ForeignKey(MultiQuestion, related_name='choice_set', on_delete=models.CASCADE)
+    position = models.IntegerField("position")
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        unique_together = [
+            ("multi_question", "content"),
+            ("multi_question", "position")
+        ]
+        ordering = ("position",)
+    
+
+class MultiResponse(AdoorModel, SafeDeleteModel):
+    multi_question = models.ForeignKey(MultiQuestion, related_name='multi_response_set', on_delete=models.CASCADE)
+    author = models.ForeignKey(User, related_name='multi_response_set', on_delete=models.CASCADE)
+    choices = models.ManyToManyField(Choice, related_name='multi_response_set')
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+    
 
 class PostManager(SafeDeleteManager):
 
@@ -204,7 +243,6 @@ class Post(AdoorModel, SafeDeleteModel):
 
 @transaction.atomic
 @receiver(post_save, sender=User)
-@receiver(post_save, sender=Question)
 @receiver(post_save, sender=Response)
 @receiver(post_save, sender=Article)
 def softdelete_post(sender, instance, **kwargs):
@@ -223,7 +261,6 @@ def softdelete_post(sender, instance, **kwargs):
 
 
 @transaction.atomic
-@receiver(post_save, sender=Question)
 @receiver(post_save, sender=Response)
 @receiver(post_save, sender=Article)
 def create_post(sender, instance, **kwargs):
@@ -235,9 +272,8 @@ def create_post(sender, instance, **kwargs):
         post = Post.objects.get(content_type=content_type, object_id=instance.id)
     except Post.DoesNotExist:
         post = Post(content_type=content_type, object_id=instance.id)
-    if instance.type != 'Question':
-        post.share_with_friends = instance.share_with_friends
-        post.share_anonymously = instance.share_anonymously
+    post.share_with_friends = instance.share_with_friends
+    post.share_anonymously = instance.share_anonymously
     post.author_id = instance.author.id
     post.content = instance.content
     post.created_at = instance.created_at
@@ -247,7 +283,6 @@ def create_post(sender, instance, **kwargs):
 
 @transaction.atomic
 @receiver(post_delete, sender=User)
-@receiver(post_delete, sender=Question)
 @receiver(post_delete, sender=Response)
 @receiver(post_delete, sender=Article)
 def harddelete_post(sender, instance, **kwargs):
