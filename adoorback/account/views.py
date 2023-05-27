@@ -3,8 +3,7 @@ import json
 
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth import get_user_model, authenticate
-from django.contrib.auth.models import update_last_login
+from django.contrib.auth import get_user_model, authenticate, logout
 from django.core import exceptions
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -49,12 +48,9 @@ def token_anonymous(request):
         return HttpResponseNotAllowed(['GET'])
 
 
-def get_tokens_for_user(user):
+def get_access_token_for_user(user):
     refresh = RefreshToken.for_user(user)
-    return {
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
-    }
+    return str(refresh.access_token)
 
 
 class UserLogin(APIView):
@@ -74,24 +70,29 @@ class UserLogin(APIView):
         
         user = authenticate(username=username, password=password)
         if user is not None:
-            data = get_tokens_for_user(user)
+            access_token = get_access_token_for_user(user)
             response.set_cookie(
                 key = settings.SIMPLE_JWT['AUTH_COOKIE'], 
-                value = data["access"],
-                expires = settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'],
+                value = access_token, 
+                max_age = settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
                 secure = settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
                 httponly = settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
                 samesite = settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
             csrf.get_token(request)
-            response.data = {"Success": "Login successfully", "data": data}
-            if api_settings.UPDATE_LAST_LOGIN:
-                update_last_login(None, user)
             return response
         else:
             raise WrongPassword()
-        
-        
+
+
+class UserLogout(APIView):
+    def get(self, request):
+        logout(request)
+        response = Response()
+        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
+        return response
+    
+
 class UserEmailCheck(generics.CreateAPIView):
     serializer_class = UserEmailSerializer
     parser_classes = (MultiPartParser, FormParser)
