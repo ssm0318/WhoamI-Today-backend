@@ -1,11 +1,9 @@
 # import sentry_sdk
 import re
 
+from django.core import validators
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django.core import validators
-
-# from rest_framework import status
 from rest_framework.views import exception_handler
 
 
@@ -99,3 +97,4 @@ class SymbolValidator(object):
             "비밀번호는 특수문자를 한 개 이상 포함해야 합니다: " +
             "()[]{}|\`~!@#$%^&*_-+=;:'\",<>./?"
         )
+    

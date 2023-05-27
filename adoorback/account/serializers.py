@@ -41,12 +41,11 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         password = validated_data.pop('password')
         user = User(**validated_data)
         user.set_password(password)
-        user.is_active = False
         user.save()
         return user
 
     def validate(self, attrs):
-        user = User(**attrs)         
+        user = User(**attrs)
         errors = dict() 
         try:
             validate_password(password=attrs.get('password'), user=user)
@@ -71,8 +70,8 @@ class UserPasswordSerializer(serializers.ModelSerializer):
         fields = ['password']
 
     def validate(self, attrs):
-        user = User(**attrs)         
-        errors = dict() 
+        user = User(**attrs)
+        errors = dict()
         try:
             validate_password(password=attrs.get('password'), user=user)
 

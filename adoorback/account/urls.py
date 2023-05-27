@@ -9,7 +9,6 @@ urlpatterns = [
     path('signup/password/', views.UserPasswordCheck.as_view(), name='user-password-check'),
     path('signup/username/', views.UserUsernameCheck.as_view(), name='user-username-check'),
     path('signup/', views.UserSignup.as_view(), name='user-signup'),
-    path('activate/<int:pk>/<str:token>/', views.UserActivate.as_view(), name='user-activate'),
     path('select-questions/', views.SignupQuestions.as_view(),
          name='signup-questions'),
     path('send-reset-password-email/', views.SendResetPasswordEmail.as_view(), name='user-send-reset-password-email'),
