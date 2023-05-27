@@ -184,7 +184,7 @@ class Topic(AdoorModel, SafeDeleteModel):
 
 class MultiQuestionManager(SafeDeleteManager):
     def daily_questions(self, **kwargs):
-        return self.filter(topic__selected_dates__contains=datetime.date.today(), **kwargs)
+        return self.filter(topic__selected_dates__contains=[datetime.date.today()], **kwargs)
     
 
 class MultiQuestion(AdoorModel, SafeDeleteModel):
