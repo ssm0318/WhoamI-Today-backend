@@ -164,7 +164,7 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
 
 class TopicManager(SafeDeleteManager):
     def daily_topic(self, **kwargs):
-        return self.filter(selected_dates__contains=datetime.date.today(), **kwargs)
+        return self.filter(selected_dates__contains=[datetime.date.today()], **kwargs)
     
 
 class Topic(AdoorModel, SafeDeleteModel):
