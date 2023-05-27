@@ -212,9 +212,6 @@ class AuthAPITestCase(APITestCase):
         self.assertEqual(response.data['detail'].code, 'user_is_inactive')
 
         # existing username
-        test_user = User.objects.get(username='test_username')
-        test_user.is_active = True
-        test_user.save()
         signup_data = {
             'username': 'test_username',
             'password': 'test_existing_username',
@@ -441,10 +438,6 @@ class UserNotisAPITestCase(APITestCase):
 
         self.assertEqual(Notification.objects.first().message_ko,
                          'test_username님, 반갑습니다! :) 먼저 익명피드를 둘러볼까요?')
-
-        test_user = User.objects.get(username='test_username')
-        test_user.is_active = True
-        test_user.save()
 
         data = {"my_bad": '1, 2, 3'}
         with self.login(username='test_username', password='test_password'):

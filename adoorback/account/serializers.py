@@ -41,7 +41,6 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         password = validated_data.pop('password')
         user = User(**validated_data)
         user.set_password(password)
-        user.is_active = False
         user.save()
         return user
 
