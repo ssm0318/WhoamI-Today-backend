@@ -8,6 +8,7 @@ from faker import Faker
 
 from adoorback.utils.content_types import get_comment_type
 from account.models import FriendRequest
+from feed.algorithms.data_crawler import select_daily_questions
 from feed.models import Article, Response, Question, ResponseRequest
 from comment.models import Comment
 from like.models import Like
@@ -61,11 +62,7 @@ def set_seed(n):
         if DEBUG else None
 
     # Select Daily Questions
-    daily_questions = Question.objects.filter(
-        selected_date__isnull=True).order_by('?')[:30]
-    for question in daily_questions:
-        question.selected_date = timezone.now()
-        question.save()
+    select_daily_questions()
 
     # Seed Response
     questions = Question.objects.all()

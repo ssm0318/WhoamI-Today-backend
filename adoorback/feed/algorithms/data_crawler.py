@@ -1,4 +1,5 @@
 import csv
+import datetime
 
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -8,16 +9,18 @@ from notification.models import Notification
 from adoorback.utils.content_types import get_response_request_type
 
 
+NUM_DAILY_QUESTIONS = 1
+
+
 def select_daily_questions():
-    questions = Question.objects.filter(
-        selected_date__isnull=True).order_by('?')[:30]
+    questions = Question.objects.filter(selected=False).order_by('?')[:NUM_DAILY_QUESTIONS]
+    
     # if we run out of questions to select from
-    if questions.count() < 30:
-        Question.objects.update(selected_date=None)
-    questions |= Question.objects.filter(
-        selected_date__isnull=True).order_by('?')[:(30 - questions.count())]
+    if questions.count() < NUM_DAILY_QUESTIONS:
+        Question.objects.update(selected=False)
+        questions |= Question.objects.filter(selected=False).order_by('?')[:(NUM_DAILY_QUESTIONS - questions.count())]
     for question in questions:
-        question.selected_date = timezone.now()
+        question.selected_dates.append(datetime.date.today())
         question.save()
 
 

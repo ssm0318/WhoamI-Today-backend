@@ -65,13 +65,15 @@ class QuestionManager(SafeDeleteManager):
         return self.filter(is_admin_question=False, **kwargs)
 
     def daily_questions(self, **kwargs):
-        return self.filter(selected_date__date=datetime.date.today(), **kwargs)
+        return self.filter(selected_dates__contains=[datetime.date.today()], **kwargs)
 
 
 class Question(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='question_set', on_delete=models.CASCADE)
 
-    selected_date = models.DateTimeField(null=True)
+    selected_date = models.DateTimeField(null=True)  # obsolete
+    selected_dates = ArrayField(models.DateField(), blank=True, default=list)
+    selected = models.BooleanField(default=False)
     is_admin_question = models.BooleanField(default=True)
 
     question_targetted_notis = GenericRelation(Notification,

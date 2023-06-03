@@ -15,21 +15,8 @@ class DailyQuestionCronJob(CronJobBase):
 
     def do(self):
         print('=========================')
-        print("Selecting daily questions...............")
+        print("Checking for daily questions...............")
         select_daily_questions()
-        print('=========================')
-        print("Sending daily question notifications...............")
-        User = get_user_model()
-        admin = User.objects.filter(is_superuser=True).first()
-
-        for user in User.objects.all():
-            Notification.objects.create(user=user,
-                                        actor=admin,
-                                        target=admin,
-                                        origin=admin,
-                                        message="딩동! 오늘의 질문 배달 왔습니다~ 지금 구경하러 가볼까요?",
-                                        redirect_url='/questions')
-        print('=========================')
         print("Cron job complete...............")
         print('=========================')
 

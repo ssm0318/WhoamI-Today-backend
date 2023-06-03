@@ -307,8 +307,6 @@ class DailyQuestionList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        if Question.objects.daily_questions().count() < 30:
-            select_daily_questions()
         return Question.objects.daily_questions()
 
 
