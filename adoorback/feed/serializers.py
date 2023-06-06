@@ -124,23 +124,11 @@ class ResponseFriendSerializer(ResponseBaseSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
     author_detail = AuthorFriendSerializer(source='author', read_only=True)
-    comments = serializers.SerializerMethodField()
-
-    def get_comments(self, obj):
-        current_user = self.context.get('request', None).user
-        comments = obj.response_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
-        if obj.author == current_user:
-            comments = comments.order_by('is_anonymous', 'id')
-            return CommentResponsiveSerializer(comments, many=True, read_only=True, context=self.context).data
-        else:
-            comments = comments.filter(is_anonymous=False, is_private=False) | \
-                       comments.filter(author=current_user, is_anonymous=False).order_by('id')
-            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
     class Meta(ResponseBaseSerializer.Meta):
         model = Response
         fields = ResponseBaseSerializer.Meta.fields + \
-                 ['author', 'author_detail', 'comments']
+                 ['author', 'author_detail']
 
 
 class ResponseAnonymousSerializer(ResponseBaseSerializer):
