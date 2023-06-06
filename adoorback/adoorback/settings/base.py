@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
     'feed.apps.FeedConfig',
+    'moment.apps.MomentConfig',
     'like.apps.LikeConfig',
     'comment.apps.CommentConfig',
     'notification.apps.NotificationConfig',

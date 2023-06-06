@@ -31,6 +31,7 @@ urlpatterns = i18n_patterns(
     path('api/comments/', include('comment.urls')),
     path('api/notifications/', include('notification.urls')),
     path('api/feed/', include('feed.urls')),
+    path('api/moment/', include('moment.urls')),
     path('api/user/', include('account.urls')),
     path('api/admin/', include('admin_honeypot.urls', namespace='admin_honeypot')),
     path('api/secret/', admin.site.urls),
