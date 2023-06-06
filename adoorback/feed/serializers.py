@@ -99,16 +99,15 @@ class ArticleAnonymousSerializer(AdoorBaseSerializer):
                                                     'author', 'author_detail', 'comments']
 
 
-class QuestionBaseSerializer(AdoorBaseSerializer):
+class QuestionBaseSerializer(serializers.ModelSerializer):
     is_admin_question = serializers.SerializerMethodField(read_only=True)
 
     def get_is_admin_question(self, obj):
         return obj.author.is_superuser
 
-    class Meta(AdoorBaseSerializer.Meta):
+    class Meta:
         model = Question
-        fields = AdoorBaseSerializer.Meta.fields + \
-                 ['selected_date', 'is_admin_question']
+        fields = ['id', 'type', 'content', 'created_at', 'is_admin_question']
 
 
 class ResponseBaseSerializer(AdoorBaseSerializer):
