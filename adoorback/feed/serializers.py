@@ -107,7 +107,8 @@ class QuestionBaseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
-        fields = ['id', 'type', 'content', 'created_at', 'is_admin_question']
+        fields = ['id', 'type', 'content', 'created_at', 'selected_dates', 
+                  'selected', 'is_admin_question']
 
 
 class ResponseBaseSerializer(AdoorBaseSerializer):

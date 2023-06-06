@@ -1,3 +1,4 @@
+import datetime
 import os
 import pandas as pd
 
@@ -169,7 +170,11 @@ class QuestionList(generics.ListCreateAPIView):
     """
     List all questions, or create a new question.
     """
-    queryset = Question.objects.order_by('-id')
+    queryset = Question.objects.raw("""
+        SELECT * FROM feed_question
+        WHERE array_length(selected_dates, 1) IS NOT NULL
+        ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC;
+    """)
     serializer_class = fs.QuestionResponsiveSerializer
     permission_classes = [IsAuthenticated]
 
@@ -308,6 +313,21 @@ class DailyQuestionList(generics.ListAPIView):
 
     def get_queryset(self):
         return Question.objects.daily_questions()
+
+
+class DateQuestionList(generics.ListAPIView):
+    serializer_class = fs.DailyQuestionSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        year = self.kwargs.get('year')
+        month = self.kwargs.get('month')
+        day = self.kwargs.get('day')
+        return Question.objects.date_questions(date=datetime.date(year=year, month=month, day=day))
 
 
 class RecommendedQuestionList(generics.ListAPIView):

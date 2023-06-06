@@ -66,6 +66,9 @@ class QuestionManager(SafeDeleteManager):
 
     def daily_questions(self, **kwargs):
         return self.filter(selected_dates__contains=[datetime.date.today()], **kwargs)
+    
+    def date_questions(self, date, **kwargs):
+        return self.filter(selected_dates__contains=[date], **kwargs)
 
 
 class Question(AdoorModel, SafeDeleteModel):
@@ -90,6 +93,10 @@ class Question(AdoorModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
+    
+    @property
+    def last_selected_date(self):
+        return self.selected_dates[-1] if self.selected_dates else None
 
     class Meta:
         ordering = ['id']
