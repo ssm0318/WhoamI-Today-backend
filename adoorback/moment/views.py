@@ -13,8 +13,10 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from safedelete.models import SOFT_DELETE_CASCADE
 
+from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 
+import comment.serializers as cs
 import moment.serializers as ms
 from moment.models import Moment
 
@@ -176,4 +178,15 @@ class MomentDelete(generics.DestroyAPIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         
         return Response(self.get_serializer(instance).data)
+    
+
+class MomentComments(generics.ListAPIView):
+    serializer_class = cs.PostCommentsSerializer
+    permission_classes = [IsAuthenticated, IsNotBlocked]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return Moment.objects.filter(id=self.kwargs.get('pk'))
     

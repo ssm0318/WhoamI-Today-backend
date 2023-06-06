@@ -7,6 +7,8 @@ from comment.models import Comment
 from adoorback.serializers import AdoorBaseSerializer
 from adoorback.settings.base import BASE_URL
 from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
+from feed.models import Response
+from moment.models import Moment
 from user_tag.serializers import UserTagSerializer
 
 User = get_user_model()
@@ -121,6 +123,29 @@ class CommentResponsiveSerializer(CommentBaseSerializer):
     class Meta(CommentBaseSerializer.Meta):
         model = Comment
         fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail', 'replies']
+
+
+class PostCommentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = '__all__'
+
+    def to_representation(self, obj):
+        current_user = self.context.get('request', None).user
+        if isinstance(obj, Response):
+            comments = obj.response_comments
+        elif isinstance(obj, Moment):
+            comments = obj.moment_comments
+        else:
+            return None
+        comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)
+        if obj.author == current_user:
+            comments = comments.order_by('is_anonymous', 'id')
+            return CommentResponsiveSerializer(comments, many=True, read_only=True, context=self.context).data
+        else:
+            comments = comments.filter(is_anonymous=False, is_private=False) | \
+                       comments.filter(author=current_user, is_anonymous=False).order_by('id')
+            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
 
 class ReplySerializer(CommentResponsiveSerializer):
