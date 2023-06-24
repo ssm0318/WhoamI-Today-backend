@@ -14,6 +14,7 @@ urlpatterns = [
     # Response related
     path('responses/', views.ResponseList.as_view(), name='response-list'),
     path('responses/<int:pk>/', views.ResponseDetail.as_view(), name='response-detail'),
+    path('responses/comments/<int:pk>/', views.ResponseComments.as_view(), name='response-comments'),
 
     # Question related
     path('questions/daily/', views.DailyQuestionList.as_view(), name='daily-question-list'),

@@ -13,6 +13,7 @@ from rest_framework.exceptions import PermissionDenied
 
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
+import comment.serializers as cs
 import feed.serializers as fs
 from feed.algorithms.data_crawler import select_daily_questions
 from feed.models import Article, Response, Question, Post, ResponseRequest
@@ -151,6 +152,17 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
         if User.are_friends(self.request.user, response.author) and response.share_with_friends:
             return fs.ResponseFriendSerializer
         return fs.ResponseAnonymousSerializer
+    
+
+class ResponseComments(generics.ListAPIView):
+    serializer_class = cs.PostCommentsSerializer
+    permission_classes = [IsAuthenticated, IsNotBlocked]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return Response.objects.filter(id=self.kwargs.get('pk'))
 
 
 class QuestionList(generics.ListCreateAPIView):

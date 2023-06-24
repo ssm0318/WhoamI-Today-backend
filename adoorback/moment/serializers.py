@@ -6,20 +6,8 @@ from comment.serializers import CommentFriendSerializer, CommentResponsiveSerial
 
 
 class MyMomentSerializer(serializers.ModelSerializer):
-    comments = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField(read_only=True)
     current_user_liked = serializers.SerializerMethodField(read_only=True)
-
-    def get_comments(self, obj):
-        current_user = self.context.get('request', None).user
-        comments = obj.moment_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
-        if obj.author == current_user:
-            comments = comments.order_by('is_anonymous', 'id')
-            return CommentResponsiveSerializer(comments, many=True, read_only=True, context=self.context).data
-        else: 
-            comments = comments.filter(is_anonymous=False, is_private=False) | \
-                       comments.filter(author=current_user, is_anonymous=False).order_by('id')
-            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
     def get_like_count(self, obj):
         current_user = self.context['request'].user
@@ -34,5 +22,5 @@ class MyMomentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Moment
         fields = ['id', 'type', 'like_count', 'current_user_liked', 'created_at', 
-                  'date', 'mood', 'photo', 'description', 'comments']
+                  'date', 'mood', 'photo', 'description']
 

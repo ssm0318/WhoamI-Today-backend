@@ -4,11 +4,11 @@ from rest_framework import serializers
 from rest_framework.exceptions import NotAcceptable
 from django.urls import reverse
 
-from feed.models import Article, Response, Question, Post, ResponseRequest
+from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
 from adoorback.serializers import AdoorBaseSerializer
 from adoorback.settings.base import BASE_URL
 from comment.serializers import CommentFriendSerializer, CommentResponsiveSerializer, CommentAnonymousSerializer
-from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
+from feed.models import Article, Response, Question, Post, ResponseRequest
 
 User = get_user_model()
 
@@ -99,16 +99,15 @@ class ArticleAnonymousSerializer(AdoorBaseSerializer):
                                                     'author', 'author_detail', 'comments']
 
 
-class QuestionBaseSerializer(AdoorBaseSerializer):
+class QuestionBaseSerializer(serializers.ModelSerializer):
     is_admin_question = serializers.SerializerMethodField(read_only=True)
 
     def get_is_admin_question(self, obj):
         return obj.author.is_superuser
 
-    class Meta(AdoorBaseSerializer.Meta):
+    class Meta:
         model = Question
-        fields = AdoorBaseSerializer.Meta.fields + \
-                 ['selected_date', 'is_admin_question']
+        fields = ['id', 'type', 'content', 'created_at', 'is_admin_question']
 
 
 class ResponseBaseSerializer(AdoorBaseSerializer):
@@ -125,23 +124,11 @@ class ResponseFriendSerializer(ResponseBaseSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
     author_detail = AuthorFriendSerializer(source='author', read_only=True)
-    comments = serializers.SerializerMethodField()
-
-    def get_comments(self, obj):
-        current_user = self.context.get('request', None).user
-        comments = obj.response_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
-        if obj.author == current_user:
-            comments = comments.order_by('is_anonymous', 'id')
-            return CommentResponsiveSerializer(comments, many=True, read_only=True, context=self.context).data
-        else:
-            comments = comments.filter(is_anonymous=False, is_private=False) | \
-                       comments.filter(author=current_user, is_anonymous=False).order_by('id')
-            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
     class Meta(ResponseBaseSerializer.Meta):
         model = Response
         fields = ResponseBaseSerializer.Meta.fields + \
-                 ['author', 'author_detail', 'comments']
+                 ['author', 'author_detail']
 
 
 class ResponseAnonymousSerializer(ResponseBaseSerializer):
