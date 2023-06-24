@@ -86,7 +86,7 @@ def create_noti(instance, created, **kwargs):
 
     # if is_reply
     if origin.type == 'Comment':
-        redirect_url = f'/{origin.target.type.lower()}s/{origin.target.id}?anonymous={instance.is_anonymous}'
+        redirect_url = f'/{origin.target.type.lower()}s/{origin.target.id}'
         # send a notification to the author of the origin comment
         if origin_author == actor:
             pass
@@ -145,7 +145,7 @@ def create_noti(instance, created, **kwargs):
 
     # if not reply
     else:
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}?anonymous={instance.is_anonymous}'
+        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
         # send a notification to the author of the origin feed
         origin_target_name_ko = '게시글' if origin.type == 'Article' else '답변'
         origin_target_name_en = 'post' if origin.type == 'Article' else 'answer'

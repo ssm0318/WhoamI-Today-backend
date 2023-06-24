@@ -137,7 +137,7 @@ class LikeNotiAPITestCase(APITestCase):
             self.assertIn("익명의 사용자가 회원님의 게시글을 좋아합니다", like_noti.message_ko)
             self.assertIn(first_article.content.split()[0], like_noti.message_ko)
             self.assertEqual(like_noti.user, first_article.author)
-            self.assertEqual(Notification.objects.first().redirect_url, "/articles/1?anonymous=True")
+            self.assertEqual(Notification.objects.first().redirect_url, "/articles/1")
 
         # create like (current_user -> author of Response with id=1)
         with self.login(username=current_user.username, password='password'):
@@ -145,7 +145,7 @@ class LikeNotiAPITestCase(APITestCase):
             response = self.post('like-list', data=data, extra={'format': 'json'})
             self.assertEqual(response.status_code, 201)
 
-            self.assertEqual(Notification.objects.first().redirect_url, "/responses/1?anonymous=True")
+            self.assertEqual(Notification.objects.first().redirect_url, "/responses/1")
 
         # create comment (current_user -> current_user): no new notification
         with self.login(username=current_user.username, password='password'):

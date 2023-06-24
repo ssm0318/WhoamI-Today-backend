@@ -24,3 +24,14 @@ class MyMomentSerializer(serializers.ModelSerializer):
         fields = ['id', 'type', 'like_count', 'current_user_liked', 'created_at', 
                   'date', 'mood', 'photo', 'description']
 
+
+class MomentDetailSerializer(MyMomentSerializer):
+    author = serializers.HyperlinkedIdentityField(
+        view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
+    author_detail = AuthorFriendSerializer(source='author', read_only=True)
+
+    class Meta:
+        model = Moment
+        fields = MyMomentSerializer.Meta.fields + \
+                 ['author', 'author_detail']
+        

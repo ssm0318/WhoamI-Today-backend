@@ -20,6 +20,7 @@ import comment.serializers as cs
 import moment.serializers as ms
 from moment.models import Moment
 
+
 class MomentToday(generics.CreateAPIView, generics.RetrieveUpdateAPIView):
     """
     Get today's moment of request user, create a new moment for today, or update today's moment.
@@ -93,7 +94,7 @@ class MomentToday(generics.CreateAPIView, generics.RetrieveUpdateAPIView):
         self.perform_update(serializer)
 
         return Response(serializer.data)
-    
+
 
 class MomentWeekly(generics.ListAPIView):
     serializer_class = ms.MyMomentSerializer
@@ -122,6 +123,7 @@ class MomentWeekly(generics.ListAPIView):
         
         queryset = Moment.objects.filter(Q(author=current_user) & Q(date__in=next_seven_days)).order_by('date')
         return queryset
+    
 
 class MomentMonthly(generics.ListAPIView):
     serializer_class = ms.MyMomentSerializer
@@ -136,6 +138,17 @@ class MomentMonthly(generics.ListAPIView):
         queryset = Moment.objects.filter(Q(author=current_user) & Q(date__startswith=formatted_date)).order_by('date')
         return queryset
     
+
+
+class MomentDetail(generics.RetrieveAPIView):
+    queryset = Moment.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = ms.MomentDetailSerializer
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+
 class MomentDelete(generics.DestroyAPIView):
     serializer_class = ms.MyMomentSerializer
     permission_classes = [IsAuthenticated]

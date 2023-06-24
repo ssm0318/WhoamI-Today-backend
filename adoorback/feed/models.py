@@ -265,7 +265,7 @@ def create_response_request_noti(instance, created, **kwargs):
         return
     message_ko = f'똑똑똑~ {requester.username}님으로부터 질문이 왔어요!'
     message_en = f'Knock knock~ {requester.username} has sent you a question!'
-    redirect_url = f'/questions/{origin.id}'
+    redirect_url = f'/questions/{origin.id}/short-answer'
     Notification.objects.create(actor=requester, user=requestee,
                                 origin=origin, target=target,
                                 message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
@@ -287,7 +287,7 @@ def create_request_answered_noti(instance, created, **kwargs):
     actor = instance.author
     related_requests = ResponseRequest.objects.filter(
         requestee_id=author_id, question_id=question_id)
-    redirect_url = f'/questions/{question_id}'
+    redirect_url = f'/responses/{instance.id}'
 
     for request in related_requests:
         user = request.requester
