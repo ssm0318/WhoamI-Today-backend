@@ -21,6 +21,7 @@ def select_daily_questions():
         questions |= Question.objects.filter(selected=False).order_by('?')[:(NUM_DAILY_QUESTIONS - questions.count())]
     for question in questions:
         question.selected_dates.append(datetime.date.today())
+        question.selected = True
         question.save()
 
 
