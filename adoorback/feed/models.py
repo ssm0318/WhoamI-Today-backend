@@ -104,6 +104,7 @@ class Question(AdoorModel, SafeDeleteModel):
 
 class Response(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='response_set', on_delete=models.CASCADE)
+    date = models.CharField(max_length=10, blank=True)
     share_with_friends = models.BooleanField(default=True)
     share_anonymously = models.BooleanField(default=True)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)

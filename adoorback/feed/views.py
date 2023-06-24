@@ -1,6 +1,7 @@
 import datetime
 import os
 import pandas as pd
+import json
 
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError
@@ -8,7 +9,8 @@ from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.core.cache import cache
 
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
@@ -136,6 +138,52 @@ class ResponseList(generics.ListCreateAPIView):
         # cache.delete('friend-{}'.format(self.request.user.id))
         # cache.delete('anonymous')
         serializer.save(author=self.request.user)
+        
+class ResponseDaily(generics.ListCreateAPIView):
+    serializer_class = fs.ResponseBaseSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_date(self):
+        year = self.kwargs.get('year')
+        month = self.kwargs.get('month')
+        day = self.kwargs.get('day')
+        formatted_date = f"{year}-{month:02d}-{day:02d}"
+        
+        return formatted_date
+    
+    @transaction.atomic
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user, date=self.get_date())
+        
+    def get_queryset(self):
+        current_user = self.request.user
+        current_date = self.get_date()
+        return Response.objects.filter(author=current_user, date=current_date).order_by('question')
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+
+        combined_responses = []
+        last_question_id = 0
+
+        for response in serializer.data:
+            question = response["question"]
+            copied_response = response.copy()
+            del copied_response["question"]
+
+            if question["id"] != last_question_id:
+                copied_question = question.copy()
+                copied_question["responses"] = [copied_response]
+                combined_responses.append(copied_question)
+                last_question_id = question["id"]
+            else:
+                combined_responses[-1]["responses"].append(copied_response)
+
+        return DjangoResponse(combined_responses)
+    
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
 
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
