@@ -114,8 +114,9 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     language = models.CharField(max_length=10,
                                 choices=settings.LANGUAGES,
                                 default=settings.LANGUAGE_CODE)
-    noti_time = models.TimeField(default=time(16, 0))
+    noti_time = models.TimeField(blank=True, null=True)
     noti_on = models.BooleanField(default=False)
+    daily_noti_on = models.BooleanField(default=False)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
