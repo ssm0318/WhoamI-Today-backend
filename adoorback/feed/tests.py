@@ -547,7 +547,7 @@ class ResponseRequestNotiAPITestCase(APITestCase):
             response_request_noti = Notification.objects.first()
             self.assertEqual(response_request_noti.user, friend_user)
             self.assertEqual(response_request_noti.actor, current_user)
-            self.assertEqual(response_request_noti.message_ko, "똑똑똑~ current_user님으로부터 질문이 왔어요!")
+            self.assertEqual(response_request_noti.message_ko, f"똑똑똑~ {current_user}님으로부터 질문이 왔어요!")
             self.assertEqual(response_request_noti.redirect_url, f'/questions/{question.id}')
 
         # mutliple response requests to a user on a question

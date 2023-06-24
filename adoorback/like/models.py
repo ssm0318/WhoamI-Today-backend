@@ -83,16 +83,16 @@ def create_like_noti(instance, created, **kwargs):
         message_ko = f'{actor_name_ko} 회원님의 댓글을 좋아합니다: "{content_preview}"'
         message_en = f'{actor_name_en} likes your comment: "{content_preview}"'
         redirect_url = f'/{origin.target.target.type.lower()}s/' \
-                       f'{origin.target.target.id}?anonymous={instance.is_anonymous}'
+                       f'{origin.target.target.id}'
     elif origin.type == 'Comment':  # if is comment
         message_ko = f'{actor_name_ko} 회원님의 댓글을 좋아합니다: "{content_preview}"'
         message_en = f'{actor_name_en} likes your comment: "{content_preview}"'
         redirect_url = f'/{origin.target.type.lower()}s/' \
-                       f'{origin.target.id}?anonymous={instance.is_anonymous}'
+                       f'{origin.target.id}'
     else:  # if is post
         message_ko = f'{actor_name_ko} 회원님의 게시글을 좋아합니다: "{content_preview}"'
         message_en = f'{actor_name_en} liked your post: "{content_preview}"'
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}?anonymous={instance.is_anonymous}'
+        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
 
     Notification.objects.create(actor=actor, user=user,
                                 origin=origin, target=target,

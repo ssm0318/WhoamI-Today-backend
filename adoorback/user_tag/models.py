@@ -83,7 +83,7 @@ def create_user_tag_noti(instance, **kwargs):
         if origin.is_anonymous or not User.are_friends(user, post.author):
             return  # do not create noti for anonymous comment or post that tagged user has no permission to see
         redirect_url = f'/{post.type.lower()}s/' \
-                       f'{post.id}?anonymous=False'
+                       f'{post.id}'
     else:
         print("UserTag can only be created in comment or reply for now.")
         return
