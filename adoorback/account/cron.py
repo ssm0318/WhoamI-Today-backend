@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, time, datetime
 
 from django.utils.timezone import make_aware
 from django.contrib.auth import get_user_model
@@ -80,7 +80,10 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
     def do(self):
         print('=========================')
         print("Creating daily notifications for WhoAmI...............")
-        users = User.objects.filter(noti_time=datetime.now().time())
+        current_time = datetime.now().time()
+        users = User.objects.filter(noti_time=time(current_time.hour, current_time.minute))
+        if current_time == time(16, 0):
+            users |= User.objects.filter(noti_time=None)
         admin = User.objects.filter(is_superuser=True).first()
         try:
             daily_question = Question.objects.daily_questions[0].content
