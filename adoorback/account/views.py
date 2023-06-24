@@ -35,7 +35,11 @@ from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 from .email import email_manager
 from feed.models import Question
+from feed.models import Response as ResponseModel
 from feed.serializers import QuestionAnonymousSerializer
+import feed.serializers as fs
+from moment.models import Moment
+import moment.serializers as ms
 
 User = get_user_model()
 
@@ -492,3 +496,96 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
     @transaction.atomic
     def perform_update(self, serializer):
         return serializer.save()
+
+
+class TodayFriends(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get_date(self):
+        year = self.kwargs.get('year')
+        month = self.kwargs.get('month')
+        day = self.kwargs.get('day')
+        formatted_date = f"{year}-{month:02d}-{day:02d}"
+        
+        return formatted_date
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def list(self, request, *args, **kwargs):    
+        response_queryset = self.filter_queryset(
+            ResponseModel.objects
+            .filter(date=self.get_date(), author__in=self.request.user.friends.all())
+            .order_by('author')
+        )
+
+        self.serializer_class = fs.ResponseFriendSerializer
+        response_serializer = self.get_serializer(response_queryset, many=True)
+        response_data = response_serializer.data
+        
+        friends_with_responses = []
+        last_author_id = 0
+        author_ids = []
+
+        for response in response_data:
+            author = response["author_detail"]
+            copied_response = response.copy()
+            del copied_response["author_detail"]
+            author_id = author["id"]
+
+            if author_id != last_author_id:
+                copied_author = author.copy()
+                copied_author["responses"] = [copied_response]
+                friends_with_responses.append(copied_author)
+                last_author_id = author_id
+                author_ids.append(author_id)
+            else:
+                friends_with_responses[-1]["responses"].append(copied_response)
+        
+        moment_queryset = self.filter_queryset(
+            Moment.objects
+            .filter(date=self.get_date(), author__in=self.request.user.friends.all())
+            .order_by('author')
+        )
+
+        self.serializer_class = ms.MomentDetailSerializer
+        moment_serializer = self.get_serializer(moment_queryset, many=True)
+        moment_data = moment_serializer.data
+        
+        for moment in moment_data:
+            author = moment["author_detail"]
+            copied_moment = moment.copy()
+            del copied_moment["author_detail"]
+            author_id = author["id"]
+
+            if author_id not in author_ids:
+                copied_author = author.copy()
+                copied_author["moment"] = copied_moment
+                friends_with_responses.append(copied_author)
+            else:
+                idx = author_ids.index(author_id)
+                friends_with_responses[idx]["moment"] = copied_moment
+                
+        for friend in friends_with_responses:
+            if "responses" in friend:
+                responses = friend["responses"].copy()
+                del friend["responses"]
+                combined_responses = []
+                last_question_id = 0
+
+                for response in responses:
+                    question = response["question"]
+                    copied_response = response.copy()
+                    del copied_response["question"]
+
+                    if question["id"] != last_question_id:
+                        copied_question = question.copy()
+                        copied_question["responses"] = [copied_response]
+                        combined_responses.append(copied_question)
+                        last_question_id = question["id"]
+                    else:
+                        combined_responses[-1]["responses"].append(copied_response)
+                friend["responses"] = combined_responses
+        
+        return Response(friends_with_responses)
+        
