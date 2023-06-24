@@ -106,5 +106,3 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         print('=========================')
         print("Cron job complete...............")
         print('=========================')
-
->>>>>>> 12af4db (feat: #26 add noti_time field to user model and add SendDailyWhoAmINotiCronJob)
