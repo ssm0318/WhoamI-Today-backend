@@ -226,18 +226,18 @@ class DeleteFeedNotificationTestCase(TestCase):
         question_noti_cnt = Notification.objects.visible_only().filter(
             origin_type=get_question_type(), origin_id=origin_id).count()
         question_redirect_cnt = Notification.objects.visible_only().filter(
-            redirect_url__icontains=f'/questions/{origin_id}').count()
+            redirect_url__icontains=f'/questions/{origin_id}/short-answer').count()
         origin.delete()
         self.assertEqual(Notification.objects.visible_only().filter(
             origin_type=get_question_type(), origin_id=origin_id).count(), 0)
         self.assertEqual(Notification.objects.visible_only().filter(
-            redirect_url__icontains=f'/questions/{origin_id}').count(), 0)
+            redirect_url__icontains=f'/questions/{origin_id}/short-answer').count(), 0)
         # undelete
         origin.undelete()
         self.assertEqual(Notification.objects.visible_only().filter(
             origin_type=get_question_type(), origin_id=origin_id).count(), question_noti_cnt)
         self.assertEqual(Notification.objects.visible_only().filter(
-            redirect_url__icontains=f'/questions/{origin_id}').count(), question_redirect_cnt)
+            redirect_url__icontains=f'/questions/{origin_id}/short-answer').count(), question_redirect_cnt)
 
 
 class APITestCase(TestCase):
