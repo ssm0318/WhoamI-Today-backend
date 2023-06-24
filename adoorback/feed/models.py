@@ -6,6 +6,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
 
 from comment.models import Comment
@@ -155,52 +156,6 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return f'{self.requester} sent ({self.question}) to {self.requestee}'
-
-    @property
-    def type(self):
-        return self.__class__.__name__
-    
-
-class MultiQuestionManager(SafeDeleteManager):
-    def daily_questions(self, **kwargs):
-        return self.filter(selected_date__date=datetime.date.today(), **kwargs)
-    
-
-class MultiQuestion(AdoorModel, SafeDeleteModel):
-    selected_date = models.DateTimeField(null=True)
-
-    objects = MultiQuestionManager()
-
-    _safedelete_policy = SOFT_DELETE_CASCADE
-
-    @property
-    def type(self):
-        return self.__class__.__name__
-
-    class Meta:
-        ordering = ['id']
-
-
-class Choice(AdoorModel, SafeDeleteModel):
-    multi_question = models.ForeignKey(MultiQuestion, related_name='choice_set', on_delete=models.CASCADE)
-    position = models.IntegerField("position")
-
-    _safedelete_policy = SOFT_DELETE_CASCADE
-
-    class Meta:
-        unique_together = [
-            ("multi_question", "content"),
-            ("multi_question", "position")
-        ]
-        ordering = ("position",)
-    
-
-class MultiResponse(AdoorModel, SafeDeleteModel):
-    multi_question = models.ForeignKey(MultiQuestion, related_name='multi_response_set', on_delete=models.CASCADE)
-    author = models.ForeignKey(User, related_name='multi_response_set', on_delete=models.CASCADE)
-    choices = models.ManyToManyField(Choice, related_name='multi_response_set')
-
-    _safedelete_policy = SOFT_DELETE_CASCADE
 
     @property
     def type(self):
