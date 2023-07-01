@@ -34,7 +34,7 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement',
-                  'signature', 'date_of_signature', 'unread_noti']
+                  'signature', 'date_of_signature', 'unread_noti', 'noti_time']
         extra_kwargs = {'password': {'write_only': True}}
 
     @transaction.atomic
