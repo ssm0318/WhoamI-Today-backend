@@ -83,7 +83,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         current_time = datetime.now().time()
         users = User.objects.filter(noti_time=time(current_time.hour, current_time.minute))
         if current_time == time(16, 0):
-            users |= User.objects.filter(noti_time=None)
+            users |= User.objects.filter(noti_time=None)  # add users who did not set noti_time
         admin = User.objects.filter(is_superuser=True).first()
         try:
             daily_question = Question.objects.daily_questions[0].content
