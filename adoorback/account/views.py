@@ -585,7 +585,7 @@ class TodayFriends(generics.ListAPIView):
                         last_question_id = question["id"]
                     else:
                         combined_responses[-1]["responses"].append(copied_response)
-                friend["responses"] = combined_responses
+                friend["questions"] = combined_responses
         
         return Response(friends_with_responses)
         
