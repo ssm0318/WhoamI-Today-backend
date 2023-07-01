@@ -18,6 +18,7 @@ urlpatterns = [
 
     # Question related
     path('questions/daily/', views.DailyQuestionList.as_view(), name='daily-question-list'),
+    path('questions/daily/<int:year>/<int:month>/<int:day>/', views.DateQuestionList.as_view(), name='date-question-list'),
     path('questions/daily/recommended/',
          views.RecommendedQuestionList.as_view(), name='recommended-question-list'),
     path('questions/', views.QuestionList.as_view(), name='question-list'),

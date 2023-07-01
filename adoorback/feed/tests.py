@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 from django.contrib.auth import get_user_model
 
 from comment.models import Comment
+from feed.algorithms.data_crawler import NUM_DAILY_QUESTIONS
 from feed.models import Article, Response, Question, Post, ResponseRequest
 from notification.models import Notification
 
@@ -23,7 +24,7 @@ class FeedTestCase(TestCase):
     def test_feed_count(self):
         self.assertEqual(Article.objects.count(), N)
         self.assertEqual(Question.objects.admin_questions_only().count(), N)
-        self.assertLessEqual(Question.objects.daily_questions().count(), 30)
+        self.assertLessEqual(Question.objects.daily_questions().count(), NUM_DAILY_QUESTIONS)
         self.assertEqual(Response.objects.count(), N)
         self.assertEqual(Post.objects.count(), N * 4)
 
@@ -424,7 +425,7 @@ class DailyQuestionTestCase(APITestCase):
         with self.login(username=current_user.username, password='password'):
             response = self.get('daily-question-list')
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.data), 30)
+            self.assertEqual(len(response.data), NUM_DAILY_QUESTIONS)
             self.assertTrue(response.data[1]['selected_date'])
 
     def test_recommended_questions_call(self):
