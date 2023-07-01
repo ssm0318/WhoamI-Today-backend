@@ -491,4 +491,26 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
-        return serializer.save()
+        friend_request = self.get_object()
+        requester = User.objects.get(id=friend_request.requester_id)
+        requestee = User.objects.get(id=friend_request.requestee_id)
+
+        serializer.save()
+
+        send_users = []
+        if len(requester.friend_ids) == 1 and not requester.noti_on:
+            send_users.append(requester)
+        if len(requestee.friend_ids) == 1 and not requestee.noti_on:
+            send_users.append(requestee)
+
+        for user in send_users:
+            Notification = apps.get_model('notification', 'Notification')
+            admin = User.objects.filter(is_superuser=True).first()
+
+            Notification.objects.create(user=user,
+                                        actor=admin,
+                                        target=admin,
+                                        origin=admin,
+                                        message_ko=f"{user.username}님, 하루에 한 번 알림을 받아 친구와 후엠아이를 나눠보아요. 알림을 설정히러 가볼까요?",
+                                        message_en=f"{user.username}, do you want to share your whoami with your friends? Set daily notifcations for whoami!",
+                                        redirect_url='/settings')
