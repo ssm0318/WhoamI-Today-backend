@@ -25,17 +25,6 @@ DATABASES = {
     },
 }
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'diivers',
-        'USER': 'postgres',
-        'PASSWORD': 'postgres',
-        'HOST': 'localhost',
-        'PORT': '',
-    },
-}
-
 # sentry_sdk.init(
 #     dsn="https://3525cb8e094e49fe9973fd92ccbf456b@o486285.ingest.sentry.io/5543025",
 #     integrations=[DjangoIntegration()],
