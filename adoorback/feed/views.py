@@ -203,7 +203,7 @@ class QuestionResponseList(generics.ListAPIView):
 
     def get_queryset(self):
         current_user = self.request.user
-        return Response.objects.filter(question__id=self.kwargs.get('pk'), author=current_user)
+        return Response.objects.filter(question__id=self.kwargs.get('pk'), author=current_user).order_by('-created_at')
 
 
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
