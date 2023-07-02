@@ -191,6 +191,21 @@ class ResponseDaily(generics.ListCreateAPIView):
         return adoor_exception_handler
 
 
+class QuestionResponseList(generics.ListAPIView):
+    """
+    List responses for a question
+    """
+    serializer_class = fs.ResponseBaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        current_user = self.request.user
+        return Response.objects.filter(question__id=self.kwargs.get('pk'), author=current_user)
+
+
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a response.

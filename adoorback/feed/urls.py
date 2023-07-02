@@ -23,6 +23,7 @@ urlpatterns = [
     path('questions/daily/recommended/',
          views.RecommendedQuestionList.as_view(), name='recommended-question-list'),
     path('questions/', views.QuestionList.as_view(), name='question-list'),
+    path('questions/<int:pk>/responses/', views.QuestionResponseList.as_view(), name='question-response-list'),
 
     # Question Detail Page related
     path('questions/<int:pk>/', views.QuestionAllResponsesDetail.as_view(), name='question-detail'),
