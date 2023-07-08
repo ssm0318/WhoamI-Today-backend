@@ -19,8 +19,6 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 
-from adoorback.models import AdoorTimestampedModel
-
 from django_countries.fields import CountryField
 from safedelete import DELETED_INVISIBLE
 from safedelete.models import SafeDeleteModel
@@ -254,3 +252,21 @@ def create_friend_noti(created, instance, **kwargs):
     instance.friend_request_targetted_notis.filter(user=requestee,
                                                    actor=requester).update(is_read=True,
                                                                            is_visible=False)
+
+
+@transaction.atomic
+@receiver(post_save, sender=User)
+def create_friend_noti(created, instance, **kwargs):
+    if instance.deleted:
+        return
+    
+    if created:
+        from notification.models import Notification
+        admin = User.objects.filter(is_superuser=True).first()
+        Notification.objects.create(user=instance,
+                                    actor=admin,
+                                    target=admin,
+                                    origin=admin,
+                                    message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
+                                    message_en=f"{instance.username}, try making friends to share your whoami!",
+                                    redirect_url='/')
