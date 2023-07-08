@@ -511,6 +511,6 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
                                         actor=admin,
                                         target=admin,
                                         origin=admin,
-                                        message_ko=f"{user.username}님, 하루에 한 번 알림을 받아 친구와 후엠아이를 나눠보아요. 알림을 설정히러 가볼까요?",
-                                        message_en=f"{user.username}, do you want to share your whoami with your friends? Set daily notifcations for whoami!",
+                                        message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                                        message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
                                         redirect_url='/settings')
