@@ -181,7 +181,8 @@ class QuestionList(generics.ListCreateAPIView):
         queryset = Question.objects.raw("""
                 SELECT * FROM feed_question
                 WHERE array_length(selected_dates, 1) IS NOT NULL
-                ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC;
+                ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
+                LIMIT 30;
             """)
         return queryset
     
