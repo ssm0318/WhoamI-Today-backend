@@ -1,20 +1,16 @@
 import secrets
 
 from django.db import transaction
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.urls import reverse
-from django.utils import translation
-from rest_framework_simplejwt.serializers import TokenObtainSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.settings import api_settings
-from django.contrib.auth.models import update_last_login
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from account.models import FriendRequest
 from adoorback.settings.base import BASE_URL
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
+from notification.models import Notification
 
 from django_countries.serializers import CountryFieldMixin
 
@@ -26,14 +22,19 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     Serializer for auth and profile update
     """
     url = serializers.HyperlinkedIdentityField(view_name='user-detail', read_only=True, lookup_field='username')
+    unread_noti = serializers.SerializerMethodField(read_only=True)
 
+    def get_unread_noti(self, obj):
+        unread_notis = Notification.objects.filter(user=obj, is_read=False)
+        return True if unread_notis else False
+    
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement',
-                  'signature', 'date_of_signature']
+                  'signature', 'date_of_signature', 'unread_noti']
         extra_kwargs = {'password': {'write_only': True}}
 
     @transaction.atomic
