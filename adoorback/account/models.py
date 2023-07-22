@@ -38,27 +38,12 @@ class OverwriteStorage(FileSystemStorage):
 
 def to_profile_images(instance, filename):
     return 'profile_images/{username}.png'.format(username=instance)
-GENDER_CHOICES = (
-    (0, _('여성')),
-    (1, _('남성')),
-    (2, _('트랜스젠더 (transgender)')),
-    (3, _('논바이너리 (non-binary/non-conforming)')),
-    (4, _('응답하고 싶지 않음')),
-)
-
-ETHNICITY_CHOICES = (
-    (0, _('미국 원주민/알래스카 원주민 (American Indian/Alaska Native)')),
-    (1, _('아시아인 (Asian)')),
-    (2, _('흑인/아프리카계 미국인 (Black/African American)')),
-    (3, _('히스패닉/라틴계 미국인 (Hispanic/Latino)')),
-    (4, _('하와이 원주민/다른 태평양 섬 주민 (Native Hawaiian/Other Pacific Islander)')),
-    (5, _('백인 (White)')),
-)
 
 
 def random_profile_color():
     # use random int so that initial users get different colors
     return '#{0:06X}'.format(secrets.randbelow(16777216))
+
 GENDER_CHOICES = (
     (0, _('여성')),
     (1, _('남성')),
@@ -113,6 +98,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     language = models.CharField(max_length=10,
                                 choices=settings.LANGUAGES,
                                 default=settings.LANGUAGE_CODE)
+    timezone = models.CharField(default=settings.TIME_ZONE, max_length=50)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
