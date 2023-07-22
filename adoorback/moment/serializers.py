@@ -1,13 +1,15 @@
 from rest_framework import serializers
 
-from moment.models import Moment
 from account.serializers import AuthorFriendSerializer
+from adoorback.utils.content_types import get_generic_relation_type
 from comment.serializers import CommentFriendSerializer, CommentResponsiveSerializer, CommentAnonymousSerializer
+from like.models import Like
+from moment.models import Moment
 
 
 class MyMomentSerializer(serializers.ModelSerializer):
     like_count = serializers.SerializerMethodField(read_only=True)
-    current_user_liked = serializers.SerializerMethodField(read_only=True)
+    current_user_like_id = serializers.SerializerMethodField(read_only=True)
 
     def get_like_count(self, obj):
         current_user = self.context['request'].user
@@ -15,13 +17,15 @@ class MyMomentSerializer(serializers.ModelSerializer):
             return None
         return obj.liked_user_ids.count()
 
-    def get_current_user_liked(self, obj):
+    def get_current_user_like_id(self, obj):
         current_user_id = self.context['request'].user.id
-        return current_user_id in obj.liked_user_ids
+        content_type_id = get_generic_relation_type(obj.type).id
+        like = Like.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
+        return like[0].id if like else None
     
     class Meta:
         model = Moment
-        fields = ['id', 'type', 'like_count', 'current_user_liked', 'created_at', 
+        fields = ['id', 'type', 'like_count', 'current_user_like_id', 'created_at', 
                   'date', 'mood', 'photo', 'description']
 
 
