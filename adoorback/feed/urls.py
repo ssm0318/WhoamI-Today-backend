@@ -26,7 +26,7 @@ urlpatterns = [
     path('questions/<int:pk>/responses/', views.QuestionResponseList.as_view(), name='question-response-list'),
 
     # Question Detail Page related
-    path('questions/<int:pk>/', views.QuestionAllResponsesDetail.as_view(), name='question-detail'),
+    path('questions/<int:pk>/', views.QuestionDetail.as_view(), name='question-detail'),
     path('questions/<int:pk>/friend/',
          views.QuestionFriendResponsesDetail.as_view(), name='question-detail-friend'),
     path('questions/<int:pk>/anonymous/',

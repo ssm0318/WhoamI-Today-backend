@@ -262,19 +262,13 @@ class QuestionList(generics.ListCreateAPIView):
         serializer.save(author=self.request.user)
 
 
-class QuestionAllResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
+class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a question.
     """
-    serializer_class = fs.QuestionDetailAllResponsesSerializer
+    queryset = Question.objects.all()
+    serializer_class = fs.QuestionResponsiveSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
-
-    def get_queryset(self):
-        # queryset = cache.get('questions')
-        # if not queryset:
-        queryset = Question.objects.all()
-        cache.set('questions', queryset)
-        return queryset
 
     def get_exception_handler(self):
         return adoor_exception_handler
