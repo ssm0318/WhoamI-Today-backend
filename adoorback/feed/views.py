@@ -141,7 +141,7 @@ class ResponseList(generics.ListCreateAPIView):
         serializer.save(author=self.request.user)
         
 class ResponseDaily(generics.ListCreateAPIView):
-    serializer_class = fs.ResponseBaseSerializer
+    serializer_class = fs.ResponseQuestionSerializer
     permission_classes = [IsAuthenticated]
     
     def get_date(self):
