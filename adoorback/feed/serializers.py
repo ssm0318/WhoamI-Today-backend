@@ -223,6 +223,18 @@ class ResponseResponsiveSerializer(ResponseBaseSerializer):
         model = Article
         fields = ResponseBaseSerializer.Meta.fields + ['comments', 'author', 'author_detail']
 
+class QuestionResponseSerializer(QuestionBaseSerializer):
+    response_set = serializers.SerializerMethodField()
+    
+    def get_response_set(self, obj):
+        current_user = self.context.get('request', None).user
+        question_id = self.context.get('kwargs', None).get('pk')
+        responses = Response.objects.filter(question__id=question_id, author=current_user).order_by('-created_at')
+        return ResponseBaseSerializer(responses, many=True, read_only=True, context=self.context).data
+    
+    class Meta(QuestionBaseSerializer.Meta):
+        model = Question
+        fields = QuestionBaseSerializer.Meta.fields + ['response_set']
 
 class QuestionResponsiveSerializer(QuestionBaseSerializer):
     """

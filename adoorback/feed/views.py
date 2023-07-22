@@ -191,19 +191,24 @@ class ResponseDaily(generics.ListCreateAPIView):
         return adoor_exception_handler
 
 
-class QuestionResponseList(generics.ListAPIView):
+class QuestionResponseList(generics.RetrieveAPIView):
     """
     List responses for a question
     """
-    serializer_class = fs.ResponseBaseSerializer
+    serializer_class = fs.QuestionResponseSerializer
     permission_classes = [IsAuthenticated]
+    queryset = Question.objects.all()
+    
+    def get_serializer_context(self):
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'kwargs': self.kwargs,
+        }
 
     def get_exception_handler(self):
         return adoor_exception_handler
-
-    def get_queryset(self):
-        current_user = self.request.user
-        return Response.objects.filter(question__id=self.kwargs.get('pk'), author=current_user).order_by('-created_at')
 
 
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
