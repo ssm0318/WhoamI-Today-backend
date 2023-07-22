@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.core.cache import cache
@@ -291,7 +291,13 @@ class ResponseRequestCreate(generics.CreateAPIView):
             raise PermissionDenied("requester가 본인이 아닙니다...")
         if not User.are_friends(requestee, current_user):
             raise PermissionDenied("친구에게만 response request를 보낼 수 있습니다...")
-        serializer.save()
+        try:
+            serializer.save()
+        except IntegrityError as e:
+            if 'unique constraint' in e.args[0]:
+                return
+            else:
+                raise e
 
 
 class ResponseRequestDestroy(generics.DestroyAPIView):
