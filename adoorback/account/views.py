@@ -276,6 +276,7 @@ class UserList(generics.ListAPIView):
             queryset = User.objects.all()
         return queryset
 
+
 class CurrentUserDelete(generics.DestroyAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
@@ -293,6 +294,14 @@ class CurrentUserDelete(generics.DestroyAPIView):
         instance.save()
         # user is soft-deleted, contents user created will be cascade-deleted
         instance.delete(force_policy=SOFT_DELETE_CASCADE)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
+        return response
+
 
 class CurrentUserFriendList(generics.ListAPIView):
     serializer_class = AuthorFriendSerializer
