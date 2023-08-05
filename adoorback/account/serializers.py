@@ -115,7 +115,11 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField()
     requestee_id = serializers.IntegerField()
     accepted = serializers.BooleanField(allow_null=True, required=False)
+    requester_detail = serializers.SerializerMethodField(read_only=True)
 
+    def get_requester_detail(self, obj):
+        return AuthorFriendSerializer(User.objects.get(id=obj.requester_id)).data
+    
     def validate(self, data):
         if data.get('requester_id') == data.get('requestee_id'):
             raise serializers.ValidationError('본인과는 친구가 될 수 없어요...')
@@ -123,7 +127,8 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted']
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail']
+
 
 
 class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
