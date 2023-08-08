@@ -14,7 +14,7 @@ from django.core.exceptions import ValidationError
 
 from account.models import FriendRequest
 from adoorback.settings.base import BASE_URL
-from adoorback.utils.exceptions import InActiveUser, NoUsername, WrongPassword
+from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 
 from django_countries.serializers import CountryFieldMixin
 
@@ -63,6 +63,12 @@ class UserEmailSerializer(serializers.ModelSerializer):
         model = User
         fields = ['email']
 
+    def validate(self, attrs):
+        for user in User.deleted_objects.all():
+            if attrs['email'] == user.email:
+                raise ExistingEmail()
+        return super(UserEmailSerializer, self).validate(attrs)
+
 
 class UserPasswordSerializer(serializers.ModelSerializer):
     class Meta:
@@ -87,6 +93,12 @@ class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username']
+
+    def validate(self, attrs):
+        for user in User.deleted_objects.all():
+            if attrs['username'] == user.username:
+                raise ExistingUsername()
+        return super(UserUsernameSerializer, self).validate(attrs)
 
 
 class AuthorFriendSerializer(serializers.ModelSerializer):
