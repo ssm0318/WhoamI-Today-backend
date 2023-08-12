@@ -396,7 +396,7 @@ class UserFriendRequestList(generics.ListCreateAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        return FriendRequest.objects.filter(requestee=self.request.user)
+        return FriendRequest.objects.filter(requestee=self.request.user).filter(accepted__isnull=True)
 
     @transaction.atomic
     def perform_create(self, serializer):
