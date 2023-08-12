@@ -12,7 +12,9 @@ urlpatterns = [
     path('select-questions/', views.SignupQuestions.as_view(),
          name='signup-questions'),
     path('send-reset-password-email/', views.SendResetPasswordEmail.as_view(), name='user-send-reset-password-email'),
-    path('reset-password/<int:pk>/<str:token>/', views.ResetPassword.as_view(), name='user-reset-password'),
+    path('reset-password/<int:pk>/<str:token>/', views.ResetPasswordWithToken.as_view(), name='user-reset-password-with-token'),
+    path('reset-password/<int:pk>/', views.ResetPassword.as_view(), name='user-reset-password'),
+    path('password-confirm/', views.UserPasswordConfirm.as_view(), name='user-password-confirm'),
 
     # User Profile related
     path('', views.UserList.as_view(), name='user-list'),
