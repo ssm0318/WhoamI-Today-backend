@@ -284,6 +284,10 @@ class ResetPassword(generics.UpdateAPIView):
 
     @transaction.atomic
     def update_password(self, user, raw_password):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
         errors = dict()
         try:
             validate_password(password=raw_password, user=user)
