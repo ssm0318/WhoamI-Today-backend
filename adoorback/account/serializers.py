@@ -169,11 +169,11 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
 
     def get_received_friend_request_from(self, obj):
         return self.context.get('request', None).user.id in \
-               list(obj.sent_friend_requests.values_list('requestee_id', flat=True))
+               list(obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True))
 
     def get_sent_friend_request_to(self, obj):
         return self.context.get('request', None).user.id in \
-               list(obj.received_friend_requests.values_list('requester_id', flat=True))
+               list(obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True))
 
     def get_are_friends(self, obj):
         user = self.context.get('request', None).user
