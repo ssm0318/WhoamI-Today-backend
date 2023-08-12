@@ -400,7 +400,7 @@ class UserFriendRequestList(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        if self.request.data.get('requester_id') != str(self.request.user.id):
+        if int(self.request.data.get('requester_id')) != int(self.request.user.id):
             raise PermissionDenied("requester가 본인이 아닙니다...")
         serializer.save(accepted=None)
 

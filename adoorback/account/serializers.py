@@ -159,7 +159,7 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
-        fields = UserFriendRequestCreateSerializer.Meta.fields
+        fields = ['requester_id', 'requestee_id', 'accepted']
 
 
 class UserFriendshipStatusSerializer(AuthorFriendSerializer):
