@@ -106,6 +106,7 @@ LOGIN_REDIRECT_URL = '/api/user/'
 
 CRON_CLASSES = [
     "feed.cron.DailyQuestionCronJob",
+    "account.cron.SendDailyWhoAmINotiCronJob",
 ]
 
 # reference: https://github.com/jazzband/django-redis
