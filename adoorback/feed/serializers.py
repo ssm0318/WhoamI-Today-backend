@@ -154,6 +154,7 @@ class ResponseFriendSerializer(ResponseBaseSerializer):
         fields = ResponseBaseSerializer.Meta.fields + \
                  ['author', 'author_detail']
 
+
 class ResponseAnonymousSerializer(ResponseBaseSerializer):
     comments = serializers.SerializerMethodField()
     author = serializers.SerializerMethodField(read_only=True)
@@ -223,6 +224,7 @@ class ResponseResponsiveSerializer(ResponseBaseSerializer):
         model = Article
         fields = ResponseBaseSerializer.Meta.fields + ['comments', 'author', 'author_detail']
 
+
 class QuestionResponseSerializer(QuestionBaseSerializer):
     response_set = serializers.SerializerMethodField()
     
@@ -235,6 +237,7 @@ class QuestionResponseSerializer(QuestionBaseSerializer):
     class Meta(QuestionBaseSerializer.Meta):
         model = Question
         fields = QuestionBaseSerializer.Meta.fields + ['response_set']
+
 
 class QuestionResponsiveSerializer(QuestionBaseSerializer):
     """
