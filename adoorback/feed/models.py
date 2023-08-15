@@ -72,7 +72,7 @@ class QuestionManager(SafeDeleteManager):
 
 
 class Question(AdoorModel, SafeDeleteModel):
-    author = models.ForeignKey(User, related_name='question_set', blank=True, null=True, on_delete=models.CASCADE)
+    author = models.ForeignKey(User, related_name='question_set', on_delete=models.CASCADE)
 
     selected_date = models.DateTimeField(null=True)  # obsolete
     selected_dates = ArrayField(models.DateField(), blank=True, default=list)
