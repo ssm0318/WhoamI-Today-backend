@@ -39,7 +39,7 @@ def set_seed(n):
                 elements=range(1, 1501),
                 length=random.randint(3, 10),
                 unique=True))))
-    admin = User.objects.get(username='adoor')
+    admin = User.objects.filter(is_superuser=True).first()
     logging.info("Superuser created!") if DEBUG else None
 
     # Seed Article/AdminQuestion/CustomQuestionPost

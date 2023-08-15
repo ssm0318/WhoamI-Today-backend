@@ -80,7 +80,7 @@ class UserReportTestCase(TestCase):
         user1 = self.make_user(username='user1')
         user2 = self.make_user(username='user2')
         user3 = self.make_user(username='user3')
-        admin = User.objects.get(username='adoor')
+        admin = User.objects.filter(is_superuser=True).first()
 
         # test notification
         question = Question.objects.create(author=admin, content='test question', is_admin_question=True)
