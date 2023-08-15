@@ -227,7 +227,7 @@ class SendResetPasswordEmail(generics.CreateAPIView):
         return HttpResponse(status=200) # whether email is valid or not, response will be always success-response
 
 
-class ResetPassword(generics.UpdateAPIView):
+class ResetPasswordWithToken(generics.UpdateAPIView):
     serializer_class = UserProfileSerializer
     queryset = User.objects.all()
 
@@ -248,6 +248,53 @@ class ResetPassword(generics.UpdateAPIView):
             validate_password(password=raw_password, user=user)
         except exceptions.ValidationError as e:
             raise e
+        user.set_password(raw_password)
+        user.save()
+
+
+class UserPasswordConfirm(APIView):
+    def post(self, request, format=None):
+        user = request.user
+
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        response = Response()        
+        password = request.data.get('password', None)
+        
+        auth_user = authenticate(username=user.username, password=password)
+        if auth_user is not None:
+            return response
+        else:
+            raise WrongPassword()
+        
+
+class ResetPassword(generics.UpdateAPIView):
+    serializer_class = UserProfileSerializer
+    queryset = User.objects.all()
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def update(self, request, *args, **kwargs):
+        user = self.get_object()
+        self.update_password(user, self.request.data['password'])
+        return HttpResponse(status=200)
+
+    @transaction.atomic
+    def update_password(self, user, raw_password):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        errors = dict()
+        try:
+            validate_password(password=raw_password, user=user)
+        except exceptions.ValidationError as e:
+            errors['password'] = [list(e.messages)[0]]
+        if errors:
+            raise ValidationError(errors)
         user.set_password(raw_password)
         user.save()
 
