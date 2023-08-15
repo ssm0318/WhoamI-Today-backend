@@ -1,6 +1,6 @@
-import datetime
 import os
 import pandas as pd
+from datetime import date, datetime, timedelta
 import json
 
 from django.contrib.auth import get_user_model
@@ -8,6 +8,7 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.core.cache import cache
+from django.utils import timezone
 
 from rest_framework import generics, status
 from rest_framework.response import Response as DjangoResponse
@@ -147,13 +148,17 @@ class ResponseDaily(generics.ListCreateAPIView):
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         day = self.kwargs.get('day')
-        formatted_date = f"{year}-{month:02d}-{day:02d}"
-        
-        return formatted_date
+        created_date = date(year, month, day)
+
+        return created_date
     
     @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user, date=self.get_date())
+        created_date = self.get_date()
+        next_day = created_date + timedelta(days=1)
+        available_limit = timezone.make_aware(datetime(next_day.year, next_day.month, next_day.day, 23, 59, 59),
+                                              timezone.get_current_timezone())
+        serializer.save(author=self.request.user, date=self.get_date(), available_limit=available_limit)
         
     def get_queryset(self):
         current_user = self.request.user
@@ -386,7 +391,7 @@ class DateQuestionList(generics.ListAPIView):
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         day = self.kwargs.get('day')
-        return Question.objects.date_questions(date=datetime.date(year=year, month=month, day=day))
+        return Question.objects.date_questions(date=date(year=year, month=month, day=day))
 
 
 class RecommendedQuestionList(generics.ListAPIView):

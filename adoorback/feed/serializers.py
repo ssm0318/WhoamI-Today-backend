@@ -118,7 +118,7 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['share_with_friends', 'share_anonymously',
-                                                    'question', 'question_id']
+                                                    'question', 'question_id', 'date', 'available_limit']
 
 
 class ResponseFriendSerializer(ResponseBaseSerializer):
