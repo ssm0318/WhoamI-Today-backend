@@ -13,8 +13,8 @@ from like.models import Like
 DEBUG = True
 
 
-def set_question_seed():
-    df = pd.read_csv('adoorback/assets/questions.csv')
+def set_question_seed(filename='questions.csv'):
+    df = pd.read_csv(f'adoorback/assets/{filename}')
 
     User = get_user_model()
     admin = User.objects.filter(is_superuser=True).first()
