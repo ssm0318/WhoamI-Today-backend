@@ -16,12 +16,12 @@ DEBUG = True
 def set_question_seed():
     df = pd.read_csv('adoorback/assets/questions.csv')
 
-    User = get_user_model()
-    admin = User.objects.get(username='adoor')
-
+    languages = ['en', 'ko']
     for i in df.index:
-        content = df.at[i, 'content']
-        Question.objects.create(author=admin, is_admin_question=True, content=content)
+        content = dict()
+        for lang in languages:
+            content[f'content_{lang}'] = df.at[i, f'content_{lang}']
+        Question.objects.create(**content)
 
 
 def set_mock_seed():
