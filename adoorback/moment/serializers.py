@@ -25,7 +25,7 @@ class MyMomentSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Moment
-        fields = ['id', 'type', 'like_count', 'current_user_like_id', 'created_at', 
+        fields = ['id', 'type', 'like_count', 'current_user_like_id', 'created_at', 'available_limit',
                   'date', 'mood', 'photo', 'description']
 
 
