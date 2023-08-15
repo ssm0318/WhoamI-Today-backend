@@ -7,8 +7,10 @@ from django.urls import reverse
 from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
 from adoorback.serializers import AdoorBaseSerializer
 from adoorback.settings.base import BASE_URL
+from adoorback.utils.content_types import get_generic_relation_type
 from comment.serializers import CommentFriendSerializer, CommentResponsiveSerializer, CommentAnonymousSerializer
 from feed.models import Article, Response, Question, Post, ResponseRequest
+from like.models import Like
 
 User = get_user_model()
 
@@ -99,6 +101,12 @@ class ArticleAnonymousSerializer(AdoorBaseSerializer):
                                                     'author', 'author_detail', 'comments']
 
 
+class QuestionMinimumSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Question
+        fields = ['id', 'type', 'content']
+
+
 class QuestionBaseSerializer(serializers.ModelSerializer):
     is_admin_question = serializers.SerializerMethodField(read_only=True)
 
@@ -109,6 +117,21 @@ class QuestionBaseSerializer(serializers.ModelSerializer):
         model = Question
         fields = ['id', 'type', 'content', 'created_at', 'selected_dates', 
                   'selected', 'is_admin_question']
+
+
+class ResponseMinimumSerializer(serializers.ModelSerializer):
+    question = QuestionMinimumSerializer(read_only=True)
+    current_user_like_id = serializers.SerializerMethodField(read_only=True)
+
+    def get_current_user_like_id(self, obj):
+        current_user_id = self.context['request'].user.id
+        content_type_id = get_generic_relation_type(obj.type).id
+        like = Like.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
+        return like[0].id if like else None
+
+    class Meta(AdoorBaseSerializer.Meta):
+        model = Response
+        fields = ['id', 'type', 'content', 'current_user_like_id', 'question', 'date', 'available_limit']
 
 
 class ResponseBaseSerializer(AdoorBaseSerializer):
@@ -130,7 +153,6 @@ class ResponseFriendSerializer(ResponseBaseSerializer):
         model = Response
         fields = ResponseBaseSerializer.Meta.fields + \
                  ['author', 'author_detail']
-
 
 class ResponseAnonymousSerializer(ResponseBaseSerializer):
     comments = serializers.SerializerMethodField()
