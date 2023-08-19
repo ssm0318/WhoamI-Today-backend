@@ -27,7 +27,7 @@ class ContentReportTestCase(TestCase):
         user3 = self.make_user(username='user3')
 
         article = Article.objects.create(author=user2, content='test article')
-        admin = User.objects.get(username='adoor')
+        admin = User.objects.filter(is_superuser=True).first()
         question = Question.objects.create(author=admin, is_admin_question=True, content='test question')
         response1 = Response.objects.create(author=user2, content='test response1', question=question)
         response2 = Response.objects.create(author=user3, content='test response2', question=question)
@@ -66,7 +66,7 @@ class ContentReportAPITestCase(APITestCase):
         user1 = self.make_user(username='user1')
         user2 = self.make_user(username='user2')
         user3 = self.make_user(username='user3')
-        admin = User.objects.get(username='adoor')
+        admin = User.objects.filter(is_superuser=True).first()
 
         article = Article.objects.create(author=user2, content='test article')
         question = Question.objects.create(author=admin, is_admin_question=True, content='test question')
@@ -94,7 +94,7 @@ class ContentReportAPITestCase(APITestCase):
         user1 = self.make_user(username='user1')
         user2 = self.make_user(username='user2')
         user3 = self.make_user(username='user3')
-        admin = User.objects.get(username='adoor')
+        admin = User.objects.filter(is_superuser=True).first()
 
         UserReport.objects.all().delete()
         ContentReport.objects.all().delete()

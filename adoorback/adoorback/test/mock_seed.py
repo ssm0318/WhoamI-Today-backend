@@ -22,7 +22,7 @@ def set_question_seed():
     df = pd.read_csv('adoorback/assets/questions.csv')
 
     User = get_user_model()
-    admin = User.objects.get(username='adoor')
+    admin = User.objects.filter(is_superuser=True).first()
 
     for i in df.index:
         content = df.at[i, 'content']
