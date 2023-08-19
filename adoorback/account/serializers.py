@@ -46,6 +46,8 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         return user
 
     def validate(self, attrs):
+        if self.partial:
+            return super(UserProfileSerializer, self).validate(attrs)
         user = User(**attrs)
         errors = dict() 
         try:
