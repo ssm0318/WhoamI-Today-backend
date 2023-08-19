@@ -26,6 +26,7 @@ from safedelete.managers import SafeDeleteManager
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.validators import AdoorUsernameValidator
 
+
 GENDER_CHOICES = (
     (0, _('여성')),
     (1, _('남성')),
@@ -98,6 +99,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     language = models.CharField(max_length=10,
                                 choices=settings.LANGUAGES,
                                 default=settings.LANGUAGE_CODE)
+    timezone = models.CharField(default=settings.TIME_ZONE, max_length=50)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',

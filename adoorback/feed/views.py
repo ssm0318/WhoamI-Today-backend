@@ -1,14 +1,17 @@
-import datetime
 import os
 import pandas as pd
+from datetime import date, datetime, timedelta
+import json
 
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.core.cache import cache
+from django.utils import timezone
 
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
@@ -136,6 +139,76 @@ class ResponseList(generics.ListCreateAPIView):
         # cache.delete('friend-{}'.format(self.request.user.id))
         # cache.delete('anonymous')
         serializer.save(author=self.request.user)
+        
+class ResponseDaily(generics.ListCreateAPIView):
+    serializer_class = fs.ResponseBaseSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_date(self):
+        year = self.kwargs.get('year')
+        month = self.kwargs.get('month')
+        day = self.kwargs.get('day')
+        created_date = date(year, month, day)
+
+        return created_date
+    
+    @transaction.atomic
+    def perform_create(self, serializer):
+        created_date = self.get_date()
+        next_day = created_date + timedelta(days=1)
+        available_limit = timezone.make_aware(datetime(next_day.year, next_day.month, next_day.day, 23, 59, 59),
+                                              timezone.get_current_timezone())
+        serializer.save(author=self.request.user, date=self.get_date(), available_limit=available_limit)
+        
+    def get_queryset(self):
+        current_user = self.request.user
+        current_date = self.get_date()
+        return Response.objects.filter(author=current_user, date=current_date).order_by('question')
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+
+        combined_responses = []
+        last_question_id = 0
+
+        for response in serializer.data:
+            question = response["question"]
+            copied_response = response.copy()
+            del copied_response["question"]
+
+            if question["id"] != last_question_id:
+                copied_question = question.copy()
+                copied_question["responses"] = [copied_response]
+                combined_responses.append(copied_question)
+                last_question_id = question["id"]
+            else:
+                combined_responses[-1]["responses"].append(copied_response)
+
+        return DjangoResponse(combined_responses)
+    
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+
+class QuestionResponseList(generics.RetrieveAPIView):
+    """
+    List responses for a question
+    """
+    serializer_class = fs.QuestionResponseSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Question.objects.all()
+    
+    def get_serializer_context(self):
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'kwargs': self.kwargs,
+        }
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
 
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -194,19 +267,13 @@ class QuestionList(generics.ListCreateAPIView):
         serializer.save(author=self.request.user)
 
 
-class QuestionAllResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
+class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a question.
     """
-    serializer_class = fs.QuestionDetailAllResponsesSerializer
+    queryset = Question.objects.all()
+    serializer_class = fs.QuestionResponsiveSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
-
-    def get_queryset(self):
-        # queryset = cache.get('questions')
-        # if not queryset:
-        queryset = Question.objects.all()
-        cache.set('questions', queryset)
-        return queryset
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -338,7 +405,7 @@ class DateQuestionList(generics.ListAPIView):
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         day = self.kwargs.get('day')
-        return Question.objects.date_questions(date=datetime.date(year=year, month=month, day=day))
+        return Question.objects.date_questions(date=date(year=year, month=month, day=day))
 
 
 class RecommendedQuestionList(generics.ListAPIView):

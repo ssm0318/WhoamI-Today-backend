@@ -42,7 +42,6 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'adoorback.utils.authentication.CustomAuthentication',
         'adoorback.utils.authentication.SessionAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
 }
@@ -184,7 +183,7 @@ LANGUAGES = (
    ('en', gettext('영어')),
 )
 
-TIME_ZONE = 'Asia/Seoul'
+TIME_ZONE = 'America/Los_Angeles'
 
 USE_I18N = True
 

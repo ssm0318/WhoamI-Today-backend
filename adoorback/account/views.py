@@ -1,15 +1,12 @@
-import json
-# import sentry_sdk
-
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth import get_user_model, authenticate, logout
+from django.contrib.auth import authenticate, logout
 from django.core import exceptions
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseNotAllowed
 from django.middleware import csrf
 from django.utils import translation
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -19,16 +16,15 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.views import TokenViewBase
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from account.models import FriendRequest
 from account.serializers import UserProfileSerializer, \
     UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
     UserFriendshipStatusSerializer, AuthorFriendSerializer, \
-    UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer
+    UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer, \
+    TodayFriendsSerializer
 
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, NoUsername, WrongPassword
 from adoorback.utils.permissions import IsNotBlocked
@@ -492,3 +488,14 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
     @transaction.atomic
     def perform_update(self, serializer):
         return serializer.save()
+
+
+class TodayFriends(generics.ListAPIView):
+    serializer_class = TodayFriendsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return self.request.user.friends.all()
