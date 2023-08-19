@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from rest_framework import generics, exceptions, status
 from rest_framework.permissions import IsAuthenticated
@@ -33,9 +34,9 @@ class MomentToday(generics.CreateAPIView, generics.RetrieveUpdateAPIView):
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         day = self.kwargs.get('day')
-        formatted_date = f"{year}-{month:02d}-{day:02d}"
+        created_date = date(year, month, day)
         
-        return formatted_date
+        return created_date
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -62,7 +63,10 @@ class MomentToday(generics.CreateAPIView, generics.RetrieveUpdateAPIView):
     
     @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user, date=self.get_date())
+        created_date = self.get_date()
+        next_day = created_date + timedelta(days=1)
+        available_limit = timezone.make_aware(datetime(next_day.year, next_day.month, next_day.day, 23, 59, 59), timezone.get_current_timezone())
+        serializer.save(author=self.request.user, date=created_date, available_limit=available_limit)
     
     def get_object(self):
         current_user = self.request.user
@@ -103,12 +107,10 @@ class MomentWeekly(generics.ListAPIView):
     def get_next_seven_days(self, start_date):
         next_seven_days = []
         next_seven_days.append(start_date)
-        
-        start_date = datetime.strptime(start_date, '%Y-%m-%d')
 
         for i in range(6):
             next_day = start_date + timedelta(days=i + 1)
-            next_seven_days.append(next_day.strftime('%Y-%m-%d'))
+            next_seven_days.append(next_day)
 
         return next_seven_days
     
@@ -117,9 +119,9 @@ class MomentWeekly(generics.ListAPIView):
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         day = self.kwargs.get('day')
-        formatted_date = f"{year}-{month:02d}-{day:02d}"
+        start_date = date(year, month, day)
         
-        next_seven_days = self.get_next_seven_days(formatted_date)
+        next_seven_days = self.get_next_seven_days(start_date)
         
         queryset = Moment.objects.filter(Q(author=current_user) & Q(date__in=next_seven_days)).order_by('date')
         return queryset
@@ -137,7 +139,6 @@ class MomentMonthly(generics.ListAPIView):
         
         queryset = Moment.objects.filter(Q(author=current_user) & Q(date__startswith=formatted_date)).order_by('date')
         return queryset
-    
 
 
 class MomentDetail(generics.RetrieveAPIView):

@@ -27,7 +27,8 @@ def to_profile_images(instance, filename):
 
 class Moment(AdoorTimestampedModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='moment_set', on_delete=models.CASCADE)
-    date = models.CharField(max_length=10, blank=True)
+    date = models.DateField(blank=False, null=False, default='2008-10-03')
+    available_limit = models.DateTimeField(blank=False, null=False, default='2008-10-03')
     mood = models.CharField(blank=True, null=True, max_length=20)
     photo = models.ImageField(storage=OverwriteStorage(), upload_to=to_profile_images, blank=True, null=True)
     description = models.CharField(blank=True, null=True, max_length=20)

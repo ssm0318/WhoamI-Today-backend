@@ -6,6 +6,7 @@ from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from account.models import FriendRequest
 from adoorback.settings.base import BASE_URL
@@ -188,3 +189,43 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
         fields = AuthorFriendSerializer.Meta.fields + ['sent_friend_request_to',
                                                        'received_friend_request_from',
                                                        'are_friends']
+
+from moment.serializers import MomentBaseSerializer
+from feed.serializers import ResponseMinimumSerializer
+
+
+class TodayFriendsSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+    moments = serializers.SerializerMethodField(read_only=True)
+    questions = serializers.SerializerMethodField(read_only=True)
+
+    def get_url(self, obj):
+        return BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+
+    def get_moments(self, obj):
+        moments = obj.moment_set.filter(available_limit__gt=timezone.now()).order_by('date')
+        return MomentBaseSerializer(moments, many=True, read_only=True, context=self.context).data
+
+    def get_questions(self, obj):
+        response_queryset = obj.response_set.filter(available_limit__gt=timezone.now()).order_by('question__id')
+        responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
+        questions_with_responses = []
+        last_question_id = 0
+
+        for response in responses:
+            question = response["question"]
+            copied_response = response.copy()
+            del copied_response["question"]
+
+            if question["id"] != last_question_id:
+                copied_question = question.copy()
+                copied_question["responses"] = [copied_response]
+                questions_with_responses.append(copied_question)
+                last_question_id = question["id"]
+            else:
+                questions_with_responses[-1]["responses"].append(copied_response)
+        return questions_with_responses
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'moments', 'questions']

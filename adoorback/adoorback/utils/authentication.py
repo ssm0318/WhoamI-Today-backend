@@ -3,6 +3,8 @@ from rest_framework import authentication
 from rest_framework import exceptions
 from rest_framework.authentication import CSRFCheck
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from backports.zoneinfo import ZoneInfo
+from django.utils import timezone
 
 
 class SessionAuthentication(authentication.SessionAuthentication):
@@ -36,9 +38,16 @@ class CustomAuthentication(JWTAuthentication):
         else:
             raw_token = self.get_raw_token(header)
         if raw_token is None:
+            timezone.deactivate()
             return None
 
         validated_token = self.get_validated_token(raw_token)
         enforce_csrf(request)
-        return self.get_user(validated_token), validated_token
+        user = self.get_user(validated_token)
+        if user and user.is_authenticated and user.timezone:
+            timezone.activate(ZoneInfo(user.timezone))
+        else:
+            timezone.deactivate()
+        return user, validated_token
+    
     
