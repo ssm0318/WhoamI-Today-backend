@@ -2,7 +2,9 @@
 # from sentry_sdk.integrations.django import DjangoIntegration
 from .base import *
 
-DEBUG = True
+DEBUG = False
+
+BASE_URL = 'https://diivers.world'
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases

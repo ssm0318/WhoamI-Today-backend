@@ -2,7 +2,9 @@
 # from sentry_sdk.integrations.django import DjangoIntegration
 from .base import *
 
-DEBUG = False
+DEBUG = True
+
+BASE_URL = 'http://localhost:8000'
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases

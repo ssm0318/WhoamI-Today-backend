@@ -5,7 +5,7 @@ from django.urls import reverse
 from comment.models import Comment
 
 from adoorback.serializers import AdoorBaseSerializer
-from adoorback.settings.base import BASE_URL
+from django.conf import settings
 from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
 from feed.models import Response
 from moment.models import Moment
@@ -48,7 +48,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
     replies = serializers.SerializerMethodField()
 
     def get_author(self, obj):
-        return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
 
     def get_replies(self, obj):
         current_user = self.context.get('request', None).user
@@ -78,7 +78,7 @@ class CommentAnonymousSerializer(CommentBaseSerializer):
 
     def get_author(self, obj):
         if obj.author == self.context.get('request', None).user:
-            return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+            return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
         return None
 
     def get_replies(self, obj):
@@ -117,7 +117,7 @@ class CommentResponsiveSerializer(CommentBaseSerializer):
 
     def get_author(self, obj):
         if not obj.is_anonymous or (obj.author == self.context.get('request', None).user):
-            return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+            return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
         return None
 
     class Meta(CommentBaseSerializer.Meta):
