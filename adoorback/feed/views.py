@@ -191,6 +191,26 @@ class ResponseDaily(generics.ListCreateAPIView):
         return adoor_exception_handler
 
 
+class QuestionResponseList(generics.RetrieveAPIView):
+    """
+    List responses for a question
+    """
+    serializer_class = fs.QuestionResponseSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Question.objects.all()
+    
+    def get_serializer_context(self):
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'kwargs': self.kwargs,
+        }
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a response.
@@ -247,19 +267,13 @@ class QuestionList(generics.ListCreateAPIView):
         serializer.save(author=self.request.user)
 
 
-class QuestionAllResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
+class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a question.
     """
-    serializer_class = fs.QuestionDetailAllResponsesSerializer
+    queryset = Question.objects.all()
+    serializer_class = fs.QuestionResponsiveSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
-
-    def get_queryset(self):
-        # queryset = cache.get('questions')
-        # if not queryset:
-        queryset = Question.objects.all()
-        cache.set('questions', queryset)
-        return queryset
 
     def get_exception_handler(self):
         return adoor_exception_handler
