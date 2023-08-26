@@ -3,9 +3,9 @@ Define Models for account APIs
 """
 import secrets
 import os
+import urllib.parse
 
 from django.apps import apps
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericRelation
@@ -14,11 +14,8 @@ from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
-from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
-
-from adoorback.models import AdoorTimestampedModel
 
 from django_countries.fields import CountryField
 from safedelete import DELETED_INVISIBLE
@@ -29,20 +26,6 @@ from safedelete.managers import SafeDeleteManager
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.validators import AdoorUsernameValidator
 
-class OverwriteStorage(FileSystemStorage):
-    def get_available_name(self, name, max_length=None):
-        if self.exists(name):
-            os.remove(os.path.join(settings.MEDIA_ROOT, name))
-        return name
-
-
-def to_profile_images(instance, filename):
-    return 'profile_images/{username}.png'.format(username=instance)
-
-
-def random_profile_color():
-    # use random int so that initial users get different colors
-    return '#{0:06X}'.format(secrets.randbelow(16777216))
 
 GENDER_CHOICES = (
     (0, _('여성')),
@@ -60,6 +43,24 @@ ETHNICITY_CHOICES = (
     (4, _('하와이 원주민/다른 태평양 섬 주민 (Native Hawaiian/Other Pacific Islander)')),
     (5, _('백인 (White)')),
 )
+
+
+class OverwriteStorage(FileSystemStorage):
+    base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
+
+    def get_available_name(self, name, max_length=None):
+        if self.exists(name):
+            os.remove(os.path.join(settings.MEDIA_ROOT, name))
+        return name
+
+
+def to_profile_images(instance, filename):
+    return 'profile_images/{username}.png'.format(username=instance)
+
+
+def random_profile_color():
+    # use random int so that initial users get different colors
+    return '#{0:06X}'.format(secrets.randbelow(16777216))
 
 
 class UserCustomManager(UserManager, SafeDeleteManager):

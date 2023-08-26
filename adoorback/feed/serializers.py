@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
 from adoorback.serializers import AdoorBaseSerializer
-from adoorback.settings.base import BASE_URL
+from django.conf import settings
 from adoorback.utils.content_types import get_generic_relation_type
 from comment.serializers import CommentFriendSerializer, CommentResponsiveSerializer, CommentAnonymousSerializer
 from feed.models import Article, Response, Question, Post, ResponseRequest
@@ -81,7 +81,7 @@ class ArticleAnonymousSerializer(AdoorBaseSerializer):
 
     def get_author(self, obj):
         if obj.author == self.context.get('request', None).user:
-            return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+            return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
         return None
 
     def get_comments(self, obj):
@@ -168,7 +168,7 @@ class ResponseAnonymousSerializer(ResponseBaseSerializer):
 
     def get_author(self, obj):
         if obj.author == self.context.get('request', None).user:
-            return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+            return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
         return None
 
     def get_comments(self, obj):
@@ -202,7 +202,7 @@ class ResponseResponsiveSerializer(ResponseBaseSerializer):
     def get_author(self, obj):
         current_user = self.context.get('request', None).user
         if obj.share_with_friends and (User.are_friends(current_user, obj.author) or obj.author == current_user):
-            return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+            return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
         return None
 
     def get_comments(self, obj):
@@ -255,7 +255,7 @@ class QuestionResponsiveSerializer(QuestionBaseSerializer):
 
     def get_author(self, obj):
         if User.are_friends(self.context.get('request', None).user, obj.author):
-            return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+            return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
         return None
 
     class Meta(QuestionBaseSerializer.Meta):
@@ -320,7 +320,7 @@ class QuestionAnonymousSerializer(QuestionBaseSerializer):
 
     def get_author(self, obj):
         if obj.author == self.context.get('request', None).user:
-            return BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
+            return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
         return None
 
     class Meta(QuestionBaseSerializer.Meta):

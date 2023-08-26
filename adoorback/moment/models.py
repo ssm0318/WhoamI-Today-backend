@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 
 from django.conf import settings
 from django.db import models
@@ -15,7 +16,10 @@ from safedelete.models import SOFT_DELETE_CASCADE
 
 User = get_user_model()
 
+
 class OverwriteStorage(FileSystemStorage):
+    base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
+
     def get_available_name(self, name, max_length=None):
         if self.exists(name):
             os.remove(os.path.join(settings.MEDIA_ROOT, name))

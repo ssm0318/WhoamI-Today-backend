@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from account.models import FriendRequest
-from adoorback.settings.base import BASE_URL
+from django.conf import settings
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from notification.models import Notification
 
@@ -22,8 +22,11 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     """
     Serializer for auth and profile update
     """
-    url = serializers.HyperlinkedIdentityField(view_name='user-detail', read_only=True, lookup_field='username')
+    url = serializers.SerializerMethodField(read_only=True)
     unread_noti = serializers.SerializerMethodField(read_only=True)
+
+    def get_url(self, obj):
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
 
     def get_unread_noti(self, obj):
         unread_notis = Notification.objects.filter(user=obj, is_read=False)
@@ -109,7 +112,7 @@ class AuthorFriendSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
-        return BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
     class Meta:
         model = User
         fields = ['id', 'username', 'profile_pic', 'url', 'profile_image']

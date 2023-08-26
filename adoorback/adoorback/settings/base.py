@@ -62,8 +62,6 @@ CORS_ORIGIN_WHITELIST = [
     "http://localhost:8000",
 ]
 
-BASE_URL = 'http://localhost:8000'
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -202,7 +200,7 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'adoorback', 'static'),
 )
 
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
