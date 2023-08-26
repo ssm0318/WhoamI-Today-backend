@@ -195,6 +195,7 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
 
 from moment.serializers import MomentBaseSerializer
 from feed.serializers import ResponseMinimumSerializer
+from django.conf import settings
 
 
 class TodayFriendsSerializer(serializers.ModelSerializer):
@@ -203,7 +204,7 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
     questions = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
-        return BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
 
     def get_moments(self, obj):
         moments = obj.moment_set.filter(available_limit__gt=timezone.now()).order_by('date')
