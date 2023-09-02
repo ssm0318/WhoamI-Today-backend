@@ -257,6 +257,10 @@ class QuestionList(generics.ListCreateAPIView):
                 ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
                 LIMIT 30;
             """)
+        # exclude tomorrow's question if exists
+        if queryset and queryset[0].selected_dates[-1] > date.today():
+            queryset = queryset[1:]
+
         return queryset
     
     @transaction.atomic

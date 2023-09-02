@@ -12,15 +12,19 @@ from adoorback.utils.content_types import get_response_request_type
 NUM_DAILY_QUESTIONS = 1
 
 
-def select_daily_questions():
+def select_daily_questions(set_date=None):
     questions = Question.objects.filter(selected=False).order_by('?')[:NUM_DAILY_QUESTIONS]
     
     # if we run out of questions to select from
     if questions.count() < NUM_DAILY_QUESTIONS:
         Question.objects.update(selected=False)
         questions |= Question.objects.filter(selected=False).order_by('?')[:(NUM_DAILY_QUESTIONS - questions.count())]
+
+    if not set_date:
+        set_date = datetime.date.today() + datetime.timedelta(days=1)
+        
     for question in questions:
-        question.selected_dates.append(datetime.date.today())
+        question.selected_dates.append(set_date)
         question.selected = True
         question.save()
 
