@@ -37,5 +37,6 @@ urlpatterns = [
     path('friend-requests/<int:pk>/respond/', views.UserFriendRequestUpdate.as_view(),
          name='user-friend-request-update'),
     
-    path('friends/today/', views.TodayFriends.as_view(), name='today-friends')
+    path('friends/today/', views.TodayFriends.as_view(), name='today-friends'),
+    path('friend/<int:pk>/today/', views.TodayFriend.as_view(), name='today-friend')
 ]
