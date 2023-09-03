@@ -8,6 +8,7 @@ from moment.models import Moment
 
 class MomentBaseSerializer(serializers.ModelSerializer):
     current_user_like_id = serializers.SerializerMethodField(read_only=True)
+    current_user_read = serializers.SerializerMethodField(read_only=True)
 
     def get_current_user_like_id(self, obj):
         current_user_id = self.context['request'].user.id
@@ -15,10 +16,14 @@ class MomentBaseSerializer(serializers.ModelSerializer):
         like = Like.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
         return like[0].id if like else None
 
+    def get_current_user_read(self, obj):
+        current_user_id = self.context['request'].user.id
+        return current_user_id in obj.reader_ids
+    
     class Meta:
         model = Moment
         fields = ['id', 'type', 'current_user_like_id', 'available_limit',
-                  'date', 'mood', 'photo', 'description', 'created_at']
+                  'date', 'mood', 'photo', 'description', 'created_at', 'current_user_read']
 
 
 class MyMomentSerializer(MomentBaseSerializer):

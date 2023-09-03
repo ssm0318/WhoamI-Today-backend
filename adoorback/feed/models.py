@@ -112,6 +112,7 @@ class Response(AdoorModel, SafeDeleteModel):
 
     response_comments = GenericRelation(Comment)
     response_likes = GenericRelation(Like)
+    readers = models.ManyToManyField(User, related_name='read_responses')
 
     response_targetted_notis = GenericRelation(Notification,
                                                content_type_field='target_type',
@@ -139,6 +140,10 @@ class Response(AdoorModel, SafeDeleteModel):
     @property
     def participants(self):
         return self.response_comments.values_list('author_id', flat=True).distinct()
+    
+    @property
+    def reader_ids(self):
+        return self.readers.values_list('id', flat=True)
 
 
 class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):

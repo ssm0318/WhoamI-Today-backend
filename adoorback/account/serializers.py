@@ -202,6 +202,7 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     moments = serializers.SerializerMethodField(read_only=True)
     questions = serializers.SerializerMethodField(read_only=True)
+    current_user_read = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -211,8 +212,7 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
         return MomentBaseSerializer(moments, many=True, read_only=True, context=self.context).data
 
     def get_questions(self, obj):
-        response_queryset = obj.response_set.filter(available_limit__gt=timezone.now()).order_by('question__id')
-        responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
+        responses = self.responses(obj)
         questions_with_responses = []
         last_question_id = 0
 
@@ -229,7 +229,20 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
             else:
                 questions_with_responses[-1]["responses"].append(copied_response)
         return questions_with_responses
+    
+    def get_current_user_read(self, obj):
+        moments = self.get_moments(obj)
+        responses = self.responses(obj)
+
+        current_user_read = not any(not response['current_user_read'] for response in responses) \
+            and not any(not moment['current_user_read'] for moment in moments)
+        return current_user_read
+
+    def responses(self, obj):
+        response_queryset = obj.response_set.filter(available_limit__gt=timezone.now()).order_by('question__id')
+        responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
+        return responses
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'moments', 'questions']
+        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'moments', 'questions', 'current_user_read']

@@ -122,16 +122,22 @@ class QuestionBaseSerializer(serializers.ModelSerializer):
 class ResponseMinimumSerializer(serializers.ModelSerializer):
     question = QuestionMinimumSerializer(read_only=True)
     current_user_like_id = serializers.SerializerMethodField(read_only=True)
+    current_user_read = serializers.SerializerMethodField(read_only=True)
 
     def get_current_user_like_id(self, obj):
         current_user_id = self.context['request'].user.id
         content_type_id = get_generic_relation_type(obj.type).id
         like = Like.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
         return like[0].id if like else None
+    
+    def get_current_user_read(self, obj):
+        current_user_id = self.context['request'].user.id
+        return current_user_id in obj.reader_ids
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
-        fields = ['id', 'type', 'content', 'current_user_like_id', 'question', 'date', 'available_limit', 'created_at']
+        fields = ['id', 'type', 'content', 'current_user_like_id', 'question', 'date', 'available_limit', 
+                  'created_at', 'current_user_read']
 
 
 class ResponseBaseSerializer(AdoorBaseSerializer):

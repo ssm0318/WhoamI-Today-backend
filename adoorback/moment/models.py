@@ -39,6 +39,7 @@ class Moment(AdoorTimestampedModel, SafeDeleteModel):
     
     moment_comments = GenericRelation(Comment)
     moment_likes = GenericRelation(Like)
+    readers = models.ManyToManyField(User, related_name='read_moments')
     
     _safedelete_policy = SOFT_DELETE_CASCADE
     
@@ -53,6 +54,10 @@ class Moment(AdoorTimestampedModel, SafeDeleteModel):
     @property
     def participants(self):
         return self.moment_comments.values_list('author_id', flat=True).distinct()
+    
+    @property
+    def reader_ids(self):
+        return self.readers.values_list('id', flat=True)
 
     class Meta:
         indexes = [
