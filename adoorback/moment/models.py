@@ -43,6 +43,11 @@ class Moment(AdoorTimestampedModel, SafeDeleteModel):
     
     _safedelete_policy = SOFT_DELETE_CASCADE
     
+    def save(self, *args, **kwargs):
+        if self.author and not self.readers.filter(pk=self.author.pk).exists():
+            self.readers.add(self.author)
+        super().save(*args, **kwargs)
+    
     @property
     def type(self):
         return self.__class__.__name__
