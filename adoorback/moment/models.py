@@ -2,7 +2,9 @@ import os
 import urllib.parse
 
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.files.storage import FileSystemStorage
@@ -43,14 +45,6 @@ class Moment(AdoorTimestampedModel, SafeDeleteModel):
     
     _safedelete_policy = SOFT_DELETE_CASCADE
     
-    def save(self, *args, **kwargs):
-        if self.author and not self.readers.filter(pk=self.author.pk).exists():
-            self.readers.add(self.author)
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.description
-    
     @property
     def type(self):
         return self.__class__.__name__
@@ -71,3 +65,12 @@ class Moment(AdoorTimestampedModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['-id']),
         ]
+
+
+@transaction.atomic
+@receiver(post_save, sender=Moment)
+def add_author_to_readers(instance, created, **kwargs):
+    if not created:
+        return
+    instance.readers.add(instance.author)
+    instance.save()
