@@ -143,11 +143,16 @@ class ResponseMinimumSerializer(serializers.ModelSerializer):
 class ResponseBaseSerializer(AdoorBaseSerializer):
     question = QuestionBaseSerializer(read_only=True)
     question_id = serializers.IntegerField()
+    current_user_read = serializers.SerializerMethodField(read_only=True)
 
+    def get_current_user_read(self, obj):
+        current_user_id = self.context['request'].user.id
+        return current_user_id in obj.reader_ids
+    
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['share_with_friends', 'share_anonymously',
-                                                    'question', 'question_id', 'date', 'available_limit']
+                                                    'question', 'question_id', 'date', 'available_limit', 'current_user_read']
 
 
 class ResponseFriendSerializer(ResponseBaseSerializer):
