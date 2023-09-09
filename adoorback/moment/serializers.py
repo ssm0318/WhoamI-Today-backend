@@ -18,7 +18,7 @@ class MomentBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Moment
         fields = ['id', 'type', 'current_user_like_id', 'available_limit',
-                  'date', 'mood', 'photo', 'description']
+                  'date', 'mood', 'photo', 'description', 'created_at']
 
 
 class MyMomentSerializer(MomentBaseSerializer):
