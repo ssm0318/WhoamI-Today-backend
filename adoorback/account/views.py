@@ -511,7 +511,6 @@ class TodayFriend(generics.ListAPIView):
     def get_queryset(self):
         selected_user_id = self.kwargs.get('pk')
         current_user = self.request.user
-        print('!!!', current_user)
         if selected_user_id in current_user.user_report_blocked_ids:
             raise PermissionDenied("current user blocked this user")
         if selected_user_id not in current_user.friend_ids:
