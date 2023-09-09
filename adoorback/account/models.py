@@ -1,6 +1,7 @@
 """Django Model
 Define Models for account APIs
 """
+from datetime import time
 import secrets
 import os
 import urllib.parse
@@ -100,6 +101,8 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
                                 choices=settings.LANGUAGES,
                                 default=settings.LANGUAGE_CODE)
     timezone = models.CharField(default=settings.TIME_ZONE, max_length=50)
+    noti_time = models.TimeField(default=time(16, 0))
+    noti_on = models.BooleanField(default=False)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
@@ -238,3 +241,21 @@ def create_friend_noti(created, instance, **kwargs):
     instance.friend_request_targetted_notis.filter(user=requestee,
                                                    actor=requester).update(is_read=True,
                                                                            is_visible=False)
+
+
+@transaction.atomic
+@receiver(post_save, sender=User)
+def create_friend_noti(created, instance, **kwargs):
+    if instance.deleted:
+        return
+    
+    if created:
+        from notification.models import Notification
+        admin = User.objects.filter(is_superuser=True).first()
+        Notification.objects.create(user=instance,
+                                    actor=admin,
+                                    target=admin,
+                                    origin=admin,
+                                    message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
+                                    message_en=f"{instance.username}, try making friends to share your whoami!",
+                                    redirect_url='/')

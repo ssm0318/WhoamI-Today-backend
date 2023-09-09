@@ -487,7 +487,29 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
-        return serializer.save()
+        friend_request = self.get_object()
+        requester = User.objects.get(id=friend_request.requester_id)
+        requestee = User.objects.get(id=friend_request.requestee_id)
+
+        serializer.save()
+
+        send_users = []
+        if len(requester.friend_ids) == 1 and not requester.noti_on:
+            send_users.append(requester)
+        if len(requestee.friend_ids) == 1 and not requestee.noti_on:
+            send_users.append(requestee)
+
+        for user in send_users:
+            Notification = apps.get_model('notification', 'Notification')
+            admin = User.objects.filter(is_superuser=True).first()
+
+            Notification.objects.create(user=user,
+                                        actor=admin,
+                                        target=admin,
+                                        origin=admin,
+                                        message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                                        message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
+                                        redirect_url='/settings')
 
 
 class TodayFriends(generics.ListAPIView):
