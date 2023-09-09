@@ -131,7 +131,7 @@ class ResponseMinimumSerializer(serializers.ModelSerializer):
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
-        fields = ['id', 'type', 'content', 'current_user_like_id', 'question', 'date', 'available_limit']
+        fields = ['id', 'type', 'content', 'current_user_like_id', 'question', 'date', 'available_limit', 'created_at']
 
 
 class ResponseBaseSerializer(AdoorBaseSerializer):
