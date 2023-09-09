@@ -111,8 +111,8 @@ def create_noti(instance, created, **kwargs):
         elif actor.id in feed_author.user_report_blocked_ids:
             pass
         else:
-            feed_type_ko = '게시글' if origin.target.type == 'Article' else '답변'
-            feed_type_en = 'post' if origin.type == 'Article' else 'answer'
+            feed_type_ko = '모먼트' if origin.target.type == 'Moment' else '답변'
+            feed_type_en = 'moment' if origin.target.type == 'Moment' else 'answer'
             Notification.objects.create(actor=actor,
                                         user=feed_author,
                                         origin_id=origin.id,
@@ -147,8 +147,8 @@ def create_noti(instance, created, **kwargs):
     else:
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
         # send a notification to the author of the origin feed
-        origin_target_name_ko = '게시글' if origin.type == 'Article' else '답변'
-        origin_target_name_en = 'post' if origin.type == 'Article' else 'answer'
+        origin_target_name_ko = '모먼트' if origin.type == 'Moment' else '답변'
+        origin_target_name_en = 'moment' if origin.type == 'Moment' else 'answer'
         if origin_author == actor:
             pass
         elif actor.id in origin_author.user_report_blocked_ids:
