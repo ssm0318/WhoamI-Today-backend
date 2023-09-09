@@ -71,8 +71,19 @@ class MomentToday(generics.CreateAPIView, generics.RetrieveUpdateAPIView):
     def get_object(self):
         current_user = self.request.user
         current_date = self.get_date()
-        moment = get_object_or_404(Moment, author=current_user, date=current_date)
+        try:
+            moment = Moment.objects.get(author=current_user, date=current_date)
+        except:
+            moment = None
+        # moment = get_object_or_404(Moment, author=current_user, date=current_date)
         return moment
+    
+    def get(self, request, *args, **kwargs):
+        object = self.get_object()
+        if object is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        serializer = self.get_serializer(object)
+        return Response(serializer.data)
     
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
