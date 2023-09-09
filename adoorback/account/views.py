@@ -498,4 +498,7 @@ class TodayFriends(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         return self.request.user.friends.all()

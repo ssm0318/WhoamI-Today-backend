@@ -8,7 +8,7 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.core.cache import cache
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from rest_framework import generics, status
 from rest_framework.response import Response as DjangoResponse
@@ -36,6 +36,9 @@ class FriendFeedPostList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         current_user = self.request.user
         # queryset = cache.get('friend-{}'.format(current_user.id))
         # if queryset:
@@ -54,6 +57,9 @@ class AnonymousFeedPostList(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         current_user = self.request.user
         # queryset = cache.get('anonymous')
         # if not queryset:
@@ -76,6 +82,9 @@ class UserFeedPostList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         selected_user_id = self.kwargs.get('pk')
         current_user = self.request.user
         if selected_user_id in current_user.user_report_blocked_ids:
@@ -126,12 +135,18 @@ class ResponseList(generics.ListCreateAPIView):
     """
     List all responses, or create a new response.
     """
-    queryset = Response.objects.all()
     serializer_class = fs.ResponseFriendSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
+    
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        queryset = Response.objects.all()
+        return queryset
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -161,6 +176,9 @@ class ResponseDaily(generics.ListCreateAPIView):
         serializer.save(author=self.request.user, date=self.get_date(), available_limit=available_limit)
         
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         current_user = self.request.user
         current_date = self.get_date()
         return Response.objects.filter(author=current_user, date=current_date).order_by('question')
@@ -197,7 +215,6 @@ class QuestionResponseList(generics.RetrieveAPIView):
     """
     serializer_class = fs.QuestionResponseSerializer
     permission_classes = [IsAuthenticated]
-    queryset = Question.objects.all()
     
     def get_serializer_context(self):
         return {
@@ -207,6 +224,13 @@ class QuestionResponseList(generics.RetrieveAPIView):
             'kwargs': self.kwargs,
         }
 
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        queryset = Question.objects.all()
+        return queryset
+    
     def get_exception_handler(self):
         return adoor_exception_handler
 
@@ -215,11 +239,17 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a response.
     """
-    queryset = Response.objects.all()
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
+    
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        queryset = Response.objects.all()
+        return queryset
 
     def get_serializer_class(self):
         response = Response.objects.get(id=self.kwargs.get('pk'))
@@ -251,6 +281,9 @@ class QuestionList(generics.ListCreateAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         queryset = Question.objects.raw("""
                 SELECT * FROM feed_question
                 WHERE array_length(selected_dates, 1) IS NOT NULL
@@ -271,12 +304,18 @@ class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a question.
     """
-    queryset = Question.objects.all()
     serializer_class = fs.QuestionResponsiveSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
+    
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        queryset = Question.objects.all()
+        return queryset
 
 
 class QuestionFriendResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -287,8 +326,9 @@ class QuestionFriendResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_queryset(self):
-        # queryset = cache.get('questions')
-        # if not queryset:
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         queryset = Question.objects.all()
         cache.set('questions', queryset)
         return queryset
@@ -305,8 +345,9 @@ class QuestionAnonymousResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_queryset(self):
-        # queryset = cache.get('questions')
-        # if not queryset:
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         queryset = Question.objects.all()
         cache.set('questions', queryset)
         return queryset
@@ -329,6 +370,9 @@ class ResponseRequestList(generics.ListAPIView):
 
     @transaction.atomic
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         try:
             question = Question.objects.get(id=self.kwargs['qid'])
         except Question.DoesNotExist:
@@ -390,6 +434,9 @@ class DailyQuestionList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         return Question.objects.daily_questions()
 
 
@@ -402,6 +449,9 @@ class DateQuestionList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
         day = self.kwargs.get('day')
@@ -417,6 +467,9 @@ class RecommendedQuestionList(generics.ListAPIView):
 
     @transaction.atomic
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         try:
             dir_name = os.path.dirname(os.path.abspath(__file__))
             path = os.path.join(dir_name, 'algorithms', 'recommendations.csv')
