@@ -129,6 +129,11 @@ class Response(AdoorModel, SafeDeleteModel):
             models.Index(fields=['-id']),
         ]
 
+    def save(self, *args, **kwargs):
+        if self.author and not self.readers.filter(pk=self.author.pk).exists():
+            self.readers.add(self.author)
+        super().save(*args, **kwargs)
+        
     @property
     def type(self):
         return self.__class__.__name__
