@@ -10,7 +10,7 @@ from django.http import HttpResponseBadRequest
 from django.core.cache import cache
 from django.utils import timezone, translation
 
-from rest_framework import generics, status
+from rest_framework import generics, exceptions
 from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
@@ -243,6 +243,18 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def get_exception_handler(self):
         return adoor_exception_handler
+
+    def get_object(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        try:
+            response = Response.objects.get(id=self.kwargs.get('pk'))
+        except Response.DoesNotExist:
+            raise exceptions.NotFound("Response not found")
+        if response.author != self.request.user and response.available_limit < timezone.now():
+            raise exceptions.PermissionDenied("This response is not available anymore")
+        return response
     
     def get_queryset(self):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
