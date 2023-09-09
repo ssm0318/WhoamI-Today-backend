@@ -75,7 +75,6 @@ class MomentToday(generics.CreateAPIView, generics.RetrieveUpdateAPIView):
             moment = Moment.objects.get(author=current_user, date=current_date)
         except:
             moment = None
-        # moment = get_object_or_404(Moment, author=current_user, date=current_date)
         return moment
     
     def get(self, request, *args, **kwargs):
