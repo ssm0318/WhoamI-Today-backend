@@ -156,6 +156,15 @@ class MomentDetail(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ms.MomentDetailSerializer
 
+    def get_object(self):
+        try:
+            moment = Moment.objects.get(id=self.kwargs.get('pk'))
+        except Moment.DoesNotExist:
+            raise exceptions.NotFound("Moment not found")
+        if moment.author != self.request.user and moment.available_limit < timezone.now():
+            raise exceptions.PermissionDenied("This moment is not available anymore")
+        return moment
+
     def get_exception_handler(self):
         return adoor_exception_handler
 
