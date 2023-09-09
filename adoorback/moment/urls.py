@@ -8,4 +8,5 @@ urlpatterns = [
     path('comments/<int:pk>/', views.MomentComments.as_view(), name='moment-comments'),
     path('<int:pk>/', views.MomentDetail.as_view(), name='moment-detail'),
     path('<int:pk>/<str:field>/', views.MomentDelete.as_view(), name='moment-delete'),
+    path('read/', views.MomentRead.as_view(), name='moment-read'),
 ]

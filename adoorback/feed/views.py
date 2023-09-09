@@ -269,6 +269,25 @@ class ResponseComments(generics.ListAPIView):
         return Response.objects.filter(id=self.kwargs.get('pk'))
 
 
+class ResponseRead(generics.UpdateAPIView):
+    queryset = Response.objects.all()
+    serializer_class = fs.ResponseMinimumSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request, *args, **kwargs):
+        current_user = self.request.user
+        ids = request.data.get('ids', [])
+        queryset = Response.objects.filter(id__in=ids)
+        for response in queryset:
+            response.readers.add(current_user)
+        serializer = self.get_serializer(queryset, many=True)
+
+        return DjangoResponse(serializer.data)
+
+
 class QuestionList(generics.ListCreateAPIView):
     """
     List all questions, or create a new question.

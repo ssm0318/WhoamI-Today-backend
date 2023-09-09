@@ -16,6 +16,7 @@ urlpatterns = [
     path('responses/<int:year>/<int:month>/<int:day>/', views.ResponseDaily.as_view(), name='response-daily'),
     path('responses/<int:pk>/', views.ResponseDetail.as_view(), name='response-detail'),
     path('responses/comments/<int:pk>/', views.ResponseComments.as_view(), name='response-comments'),
+    path('responses/read', views.ResponseRead.as_view(), name='response-read'),
 
     # Question related
     path('questions/daily/', views.DailyQuestionList.as_view(), name='daily-question-list'),
