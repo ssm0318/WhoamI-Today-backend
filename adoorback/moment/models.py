@@ -31,6 +31,7 @@ class OverwriteStorage(FileSystemStorage):
 def to_profile_images(instance, filename):
     return 'moment/{username}-{date}.png'.format(username=instance.author, date=instance.date)
 
+
 class Moment(AdoorTimestampedModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='moment_set', on_delete=models.CASCADE)
     date = models.DateField(blank=False, null=False, default='2008-10-03')
@@ -44,6 +45,9 @@ class Moment(AdoorTimestampedModel, SafeDeleteModel):
     readers = models.ManyToManyField(User, related_name='read_moments')
     
     _safedelete_policy = SOFT_DELETE_CASCADE
+
+    def __str__(self):
+        return self.description
     
     @property
     def type(self):
