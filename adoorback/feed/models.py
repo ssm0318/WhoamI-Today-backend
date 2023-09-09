@@ -128,11 +128,6 @@ class Response(AdoorModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['-id']),
         ]
-
-    def save(self, *args, **kwargs):
-        if self.author and not self.readers.filter(pk=self.author.pk).exists():
-            self.readers.add(self.author)
-        super().save(*args, **kwargs)
         
     @property
     def type(self):
@@ -319,3 +314,11 @@ def create_request_answered_noti(instance, created, **kwargs):
         Notification.objects.create(actor=actor, user=user,
                                     origin=origin, target=target,
                                     message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
+
+@transaction.atomic
+@receiver(post_save, sender=Response)
+def add_author_to_readers(instance, created, **kwargs):
+    if not created:
+        return
+    instance.readers.add(instance.author)
+    instance.save()
