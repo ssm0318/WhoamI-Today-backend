@@ -91,7 +91,7 @@ def create_like_noti(instance, created, **kwargs):
                        f'{origin.target.id}'
     elif origin.type == 'Moment':  # if is moment
         message_ko = f'{actor_name_ko} 회원님의 모먼트를 좋아합니다' + (f': "{content_preview}"' if content_preview else '.')
-        message_en = f'{actor_name_en} liked your moment'
+        message_en = f'{actor_name_en} liked your moment' + (f': "{content_preview}"' if content_preview else '.')
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
     else:  # if is response
         message_ko = f'{actor_name_ko} 회원님의 답변을 좋아합니다: "{content_preview}"'
