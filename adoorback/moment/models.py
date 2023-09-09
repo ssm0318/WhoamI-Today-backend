@@ -47,6 +47,9 @@ class Moment(AdoorTimestampedModel, SafeDeleteModel):
         if self.author and not self.readers.filter(pk=self.author.pk).exists():
             self.readers.add(self.author)
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.description
     
     @property
     def type(self):
