@@ -214,3 +214,22 @@ class MomentComments(generics.ListAPIView):
     def get_queryset(self):
         return Moment.objects.filter(id=self.kwargs.get('pk'))
     
+
+class MomentRead(generics.UpdateAPIView):
+    queryset = Moment.objects.all()
+    serializer_class = ms.MomentBaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request, *args, **kwargs):
+        current_user = self.request.user
+        ids = request.data.get('ids', [])
+        queryset = Moment.objects.filter(id__in=ids)
+        for response in queryset:
+            response.readers.add(current_user)
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response(serializer.data)
+    
