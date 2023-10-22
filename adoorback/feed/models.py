@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
 
+from account.models import FriendGroup
 from comment.models import Comment
 from like.models import Like
 from adoorback.models import AdoorModel, AdoorTimestampedModel
@@ -113,6 +114,9 @@ class Response(AdoorModel, SafeDeleteModel):
     response_comments = GenericRelation(Comment)
     response_likes = GenericRelation(Like)
     readers = models.ManyToManyField(User, related_name='read_responses')
+
+    share_groups = models.ManyToManyField(FriendGroup, related_name='shared_responses')
+    share_friends = models.ManyToManyField(User, related_name='shared_responses')
 
     response_targetted_notis = GenericRelation(Notification,
                                                content_type_field='target_type',
