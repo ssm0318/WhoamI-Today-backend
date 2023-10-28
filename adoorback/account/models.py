@@ -186,10 +186,13 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
         return self.__class__.__name__
 
 
-class FriendGroup(models.Model):
+class FriendGroup(SafeDeleteModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friend_groups')
     name = models.CharField(max_length=255)
     friends = models.ManyToManyField(User, blank=True)
+    order = models.IntegerField(default=0)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
 
     def __str__(self):
         return f'group "{self.name}" of user "{self.user.username}"'

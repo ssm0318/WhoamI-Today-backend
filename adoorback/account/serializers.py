@@ -8,7 +8,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from account.models import FriendRequest
+from account.models import FriendRequest, FriendGroup
 from django.conf import settings
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from notification.models import Notification
@@ -192,6 +192,30 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
         fields = AuthorFriendSerializer.Meta.fields + ['sent_friend_request_to',
                                                        'received_friend_request_from',
                                                        'are_friends']
+
+
+class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FriendGroup
+        fields = ['name', 'order', 'id']
+
+
+class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
+    friends = AuthorFriendSerializer(many=True)
+
+    class Meta(UserFriendGroupBaseSerializer.Meta):
+        model = FriendGroup
+        fields = UserFriendGroupBaseSerializer.Meta.fields + ['friends']
+
+
+class UserFriendGroupOrderSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField())
+
+    def validate(self, attrs):
+        if 'ids' not in attrs:
+            raise serializers.ValidationError("ids field is required.")
+        return attrs
+
 
 from moment.serializers import MomentBaseSerializer
 from feed.serializers import ResponseMinimumSerializer
