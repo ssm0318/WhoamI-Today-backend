@@ -197,15 +197,26 @@ class FriendGroup(models.Model):
 
 
 @transaction.atomic
-@receiver(m2m_changed)
-def delete_friend_noti(action, pk_set, instance, **kwargs):
+@receiver(m2m_changed, sender=User.friends.through)
+def friend_removed(action, pk_set, instance, **kwargs):
+    '''
+    when Friendship is destroyed, 
+    1) remove related notis
+    2) remove friend from all share_friends of all posts
+    '''
     if action == "post_remove":
-        friend = User.objects.get(id=pk_set.pop())
-        # remove friendship related notis from both users
-        friend.friendship_targetted_notis.filter(user=instance).delete(force_policy=HARD_DELETE)
-        instance.friendship_targetted_notis.filter(user=friend).delete(force_policy=HARD_DELETE)
-        FriendRequest.objects.filter(requester=instance, requestee=friend).delete(force_policy=HARD_DELETE)
-        FriendRequest.objects.filter(requester=friend, requestee=instance).delete(force_policy=HARD_DELETE)
+        for friend_id in pk_set:
+            friend = User.objects.get(id=friend_id)
+
+            # remove friendship related notis from both users
+            friend.friendship_targetted_notis.filter(user=instance).delete(force_policy=HARD_DELETE)
+            instance.friendship_targetted_notis.filter(user=friend).delete(force_policy=HARD_DELETE)
+            FriendRequest.objects.filter(requester=instance, requestee=friend).delete(force_policy=HARD_DELETE)
+            FriendRequest.objects.filter(requester=friend, requestee=instance).delete(force_policy=HARD_DELETE)
+
+            # remove from share_friends (TODO: if 'Note' model is added, add related logic here)
+            friend.shared_responses.filter(author=instance).shared_friends.remove(friend)
+            instance.shared_responses.filter(author=friend).shared_friends.remove(instance)
 
 
 @transaction.atomic

@@ -427,7 +427,7 @@ class UserFriendDestroy(generics.DestroyAPIView):
 
     @transaction.atomic
     def perform_destroy(self, obj):
-        obj.friends.remove(self.request.user)
+        self.request.user.friends.remove(obj)
 
 
 class UserFriendRequestList(generics.ListCreateAPIView):
