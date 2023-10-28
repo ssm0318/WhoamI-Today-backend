@@ -191,9 +191,8 @@ class FriendGroup(models.Model):
     name = models.CharField(max_length=255)
     friends = models.ManyToManyField(User, blank=True)
 
-    @property
     def __str__(self):
-        return self.name
+        return f'group "{self.name}" of user "{self.user.username}"'
 
 
 @transaction.atomic
@@ -265,11 +264,17 @@ def create_friend_noti(created, instance, **kwargs):
 
 @transaction.atomic
 @receiver(post_save, sender=User)
-def create_friend_noti(created, instance, **kwargs):
+def user_created(created, instance, **kwargs):
+    '''
+    when User is created, 
+    1) send notification
+    2) add default friend group 'close friends'
+    '''
     if instance.deleted:
         return
     
     if created:
+        # send notification
         from notification.models import Notification
         admin = User.objects.filter(is_superuser=True).first()
         Notification.objects.create(user=instance,
@@ -279,3 +284,10 @@ def create_friend_noti(created, instance, **kwargs):
                                     message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
                                     message_en=f"{instance.username}, try making friends to share your whoami!",
                                     redirect_url='/')
+        
+        # add default FriendGroup (close_friends)
+        default_group, created = FriendGroup.objects.get_or_create(
+            name='close friends',
+            user=instance
+        )
+        instance.friend_groups.add(default_group)
