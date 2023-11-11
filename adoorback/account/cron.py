@@ -39,8 +39,6 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         all_users = User.objects.all()
 
         for user in all_users:
-            if not user.noti_on:
-                continue
             if user.noti_time is None:
                 continue
             if user.noti_time == time(timezone.now().astimezone(ZoneInfo(user.timezone)).hour, 0):

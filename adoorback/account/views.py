@@ -494,9 +494,9 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
         serializer.save()
 
         send_users = []
-        if len(requester.friend_ids) == 1 and not requester.noti_on:
+        if len(requester.friend_ids) == 1:  # 디바이스 노티 설정이 켜져있는지 확인 필요 없을지?
             send_users.append(requester)
-        if len(requestee.friend_ids) == 1 and not requestee.noti_on:
+        if len(requestee.friend_ids) == 1:
             send_users.append(requestee)
 
         for user in send_users:
