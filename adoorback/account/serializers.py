@@ -11,7 +11,6 @@ from django.db.models import Q
 from django.utils import timezone
 
 from account.models import FriendRequest, FriendGroup
-from django.conf import settings
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from feed.models import Response
