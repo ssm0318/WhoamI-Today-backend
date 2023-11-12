@@ -1,16 +1,18 @@
 import secrets
 
 from django.db import transaction
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils import timezone
 
 from account.models import FriendRequest, FriendGroup
-from django.conf import settings
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
+from feed.models import Response
 from notification.models import Notification
 
 from django_countries.serializers import CountryFieldMixin
@@ -268,7 +270,10 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
         return current_user_read
 
     def responses(self, obj):
-        response_queryset = obj.response_set.filter(available_limit__gt=timezone.now()).order_by('question__id')
+        user = self.context.get('request', None).user
+        response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
+        response_queryset = Response.objects.filter(id__in=response_ids)
+        response_queryset = response_queryset.filter(available_limit__gt=timezone.now()).order_by('question__id', 'created_at')
         responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
         return responses
 
