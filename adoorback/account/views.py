@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import F, Q, Max
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.middleware import csrf
+from django.shortcuts import get_object_or_404
 from django.utils import translation
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
@@ -575,7 +576,9 @@ class UserFriendGroupCreate(generics.CreateAPIView):
         user = self.request.user
         max_order = user.friend_groups.aggregate(max_order=Max('order'))['max_order']
         name = self.request.data.get('name')
-        friends = self.request.data.get('friends', [])
+        friend_ids = self.request.data.get('friends', [])
+        friends = [get_object_or_404(User, id=friend_id) for friend_id in friend_ids]
+
         serializer.save(user=user, name=name, order=max_order+1, friends=friends)
 
 

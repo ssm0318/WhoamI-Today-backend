@@ -205,11 +205,12 @@ class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
 
 
 class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
-    friends = AuthorFriendSerializer(many=True)
+    friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    friends_details = AuthorFriendSerializer(source='friends', read_only=True, many=True)
 
     class Meta(UserFriendGroupBaseSerializer.Meta):
         model = FriendGroup
-        fields = UserFriendGroupBaseSerializer.Meta.fields + ['friends']
+        fields = UserFriendGroupBaseSerializer.Meta.fields + ['friends', 'friends_details']
 
 
 class UserFriendGroupOrderSerializer(serializers.Serializer):
