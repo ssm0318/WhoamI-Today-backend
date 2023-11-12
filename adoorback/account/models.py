@@ -217,8 +217,10 @@ def friend_removed(action, pk_set, instance, **kwargs):
             FriendRequest.objects.filter(requester=friend, requestee=instance).delete(force_policy=HARD_DELETE)
 
             # remove from share_friends (TODO: if 'Note' model is added, add related logic here)
-            friend.shared_responses.filter(author=instance).shared_friends.remove(friend)
-            instance.shared_responses.filter(author=friend).shared_friends.remove(instance)
+            for response in friend.shared_responses.filter(author=instance):
+                response.share_friends.remove(friend)
+            for response in instance.shared_responses.filter(author=friend):
+                response.share_friends.remove(instance)
 
 
 @transaction.atomic
