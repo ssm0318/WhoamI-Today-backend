@@ -149,7 +149,6 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
         fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail']
 
 
-
 class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField(required=False)
     requestee_id = serializers.IntegerField(required=False)
@@ -195,9 +194,14 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
 
 
 class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
+    member_cnt = serializers.SerializerMethodField(read_only=True)
+
+    def get_member_cnt(self, obj):
+        return len(obj.friends.all())
+
     class Meta:
         model = FriendGroup
-        fields = ['name', 'order', 'id']
+        fields = ['name', 'order', 'id', 'member_cnt']
 
 
 class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
