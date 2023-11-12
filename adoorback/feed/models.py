@@ -115,8 +115,9 @@ class Response(AdoorModel, SafeDeleteModel):
     response_likes = GenericRelation(Like)
     readers = models.ManyToManyField(User, related_name='read_responses')
 
-    share_groups = models.ManyToManyField(FriendGroup, related_name='shared_responses')
-    share_friends = models.ManyToManyField(User, related_name='shared_responses')
+    share_everyone = models.BooleanField(default=True)
+    share_groups = models.ManyToManyField(FriendGroup, related_name='shared_responses', blank=True)
+    share_friends = models.ManyToManyField(User, related_name='shared_responses', blank=True)
 
     response_targetted_notis = GenericRelation(Notification,
                                                content_type_field='target_type',
