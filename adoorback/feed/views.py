@@ -8,6 +8,7 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.http import HttpResponseBadRequest
 from django.core.cache import cache
+from django.shortcuts import get_object_or_404
 from django.utils import timezone, translation
 
 from rest_framework import generics, exceptions
@@ -15,11 +16,11 @@ from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
+from account.models import FriendGroup
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
 import feed.serializers as fs
-from feed.algorithms.data_crawler import select_daily_questions
 from feed.models import Article, Response, Question, Post, ResponseRequest
 
 User = get_user_model()
@@ -166,15 +167,21 @@ class ResponseDaily(generics.ListCreateAPIView):
         created_date = date(year, month, day)
 
         return created_date
-    
+
     @transaction.atomic
     def perform_create(self, serializer):
         created_date = self.get_date()
         next_day = created_date + timedelta(days=1)
         available_limit = timezone.make_aware(datetime(next_day.year, next_day.month, next_day.day, 23, 59, 59),
                                               timezone.get_current_timezone())
-        serializer.save(author=self.request.user, date=self.get_date(), available_limit=available_limit)
-        
+        share_group_ids = self.request.data.get('share_groups', [])
+        share_groups = [get_object_or_404(FriendGroup, id=id_) for id_ in share_group_ids]
+        share_friend_ids = self.request.data.get('share_friends', [])
+        share_friends = [get_object_or_404(User, id=id_) for id_ in share_friend_ids]
+        share_everyone = self.request.data.get('share_everyone', False)
+        serializer.save(author=self.request.user, date=self.get_date(), available_limit=available_limit,
+                        share_friends=share_friends, share_groups=share_groups, share_everyone=share_everyone)
+
     def get_queryset(self):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
@@ -239,6 +246,7 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a response.
     """
+    serializer_class = fs.ResponseFriendSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -263,12 +271,6 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
         queryset = Response.objects.all()
         return queryset
 
-    def get_serializer_class(self):
-        response = Response.objects.get(id=self.kwargs.get('pk'))
-        if User.are_friends(self.request.user, response.author) and response.share_with_friends:
-            return fs.ResponseFriendSerializer
-        return fs.ResponseAnonymousSerializer
-    
 
 class ResponseComments(generics.ListAPIView):
     serializer_class = cs.PostCommentsSerializer
