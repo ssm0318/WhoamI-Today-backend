@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'notification.apps.NotificationConfig',
     'account.apps.AccountConfig',
     'user_tag.apps.UserTagConfig',
+    'reaction.apps.ReactionConfig',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
