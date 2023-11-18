@@ -188,7 +188,7 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
 
 class FriendGroup(SafeDeleteModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friend_groups')
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=30)
     friends = models.ManyToManyField(User, blank=True)
     order = models.IntegerField(default=0)
 
