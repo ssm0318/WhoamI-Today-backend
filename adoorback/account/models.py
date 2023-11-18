@@ -221,9 +221,9 @@ def friend_removed(action, pk_set, instance, **kwargs):
                 response.share_friends.remove(friend)
             for response in instance.shared_responses.filter(author=friend):
                 response.share_friends.remove(instance)
-            for check_in in friend.shared_check_ins.filter(author=instance):
+            for check_in in friend.shared_check_ins.filter(is_active=True, user=instance):
                 check_in.share_friends.remove(friend)
-            for check_in in instance.shared_check_ins.filter(author=friend):
+            for check_in in instance.shared_check_ins.filter(is_active=True, user=friend):
                 check_in.share_friends.remove(instance)
 
 
