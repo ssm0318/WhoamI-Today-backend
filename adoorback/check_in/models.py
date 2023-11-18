@@ -25,7 +25,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     mood = models.CharField(blank=True, null=True, max_length=5)
     availability = models.CharField(max_length=20, choices=AVAILABILITY_CHOICES, default='no_status')
     description = models.CharField(blank=True, null=True, max_length=88)
-    # song = SpotifySongField()
+    track_id = models.CharField(blank=True, null=True, max_length=50)
 
     share_everyone = models.BooleanField(default=True)
     share_groups = models.ManyToManyField(FriendGroup, related_name='shared_check_ins', blank=True)
