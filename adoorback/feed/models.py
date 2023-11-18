@@ -12,6 +12,7 @@ from django.db.models import Q
 from account.models import FriendGroup
 from comment.models import Comment
 from like.models import Like
+from reaction.models import Reaction
 from adoorback.models import AdoorModel, AdoorTimestampedModel
 from notification.models import Notification
 
@@ -112,7 +113,9 @@ class Response(AdoorModel, SafeDeleteModel):
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
 
     response_comments = GenericRelation(Comment)
+    # to be deleted
     response_likes = GenericRelation(Like)
+    response_reactions = GenericRelation(Reaction)
     readers = models.ManyToManyField(User, related_name='read_responses')
 
     share_everyone = models.BooleanField(default=True)
@@ -138,6 +141,7 @@ class Response(AdoorModel, SafeDeleteModel):
     def type(self):
         return self.__class__.__name__
 
+    # to be deleted
     @property
     def liked_user_ids(self):
         return self.response_likes.values_list('user_id', flat=True)
