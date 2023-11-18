@@ -42,6 +42,24 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     def reader_ids(self):
         return self.readers.values_list('id', flat=True)
     
+    def is_audience(self, user):
+        """
+        Returns True if the given user is in the audience that can view this check_in.
+        """
+        if not User.are_friends(self.user, user):
+            return False
+        
+        if self.share_everyone:
+            return True
+
+        if self.share_groups.filter(friends=user).exists():
+            return True
+
+        if self.share_friends.filter(pk=user.pk).exists():
+            return True
+
+        return False
+
     class Meta:
         indexes = [
             models.Index(fields=['is_active']),

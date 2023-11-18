@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from account.models import FriendRequest, FriendGroup
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
+from check_in.models import CheckIn
 from feed.models import Response
 from notification.models import Notification
 
@@ -243,6 +244,7 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     moments = serializers.SerializerMethodField(read_only=True)
     questions = serializers.SerializerMethodField(read_only=True)
+    check_in = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
@@ -271,12 +273,22 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
                 questions_with_responses[-1]["responses"].append(copied_response)
         return questions_with_responses
     
+    def get_check_in(self, obj):
+        from check_in.serializers import CheckInBaseSerializer
+        user = self.context.get('request', None).user
+        check_in = obj.check_in_set.filter(is_active=True).first()
+        if check_in and CheckIn.is_audience(check_in, user):
+            return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
+        return {}
+    
     def get_current_user_read(self, obj):
         moments = self.get_moments(obj)
         responses = self.responses(obj)
+        check_in = self.get_check_in(obj)
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
-            and not any(not moment['current_user_read'] for moment in moments)
+            and not any(not moment['current_user_read'] for moment in moments) \
+            and not (check_in and not check_in['current_user_read'])
         return current_user_read
 
     def responses(self, obj):
@@ -289,4 +301,4 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'moments', 'questions', 'current_user_read']
+        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'moments', 'questions', 'check_in', 'current_user_read']
