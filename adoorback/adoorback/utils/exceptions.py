@@ -50,3 +50,21 @@ class InvalidEmail(APIException):
     status_code = status.HTTP_406_NOT_ACCEPTABLE
     default_detail = _("유효하지 않은 이메일 형식입니다.")
     default_code = 'email_invalid'
+
+
+class ExistingReaction(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("이미 같은 게시물에 같은 이모지로 반응하였습니다.")
+    default_code = 'same_reaction_exists'
+
+
+class NoSuchTarget(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("존재하지 않는 게시물입니다.")
+    default_code = 'no_such_target'
+
+
+class NotFriend(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("친구가 아닙니다.")
+    default_code = 'not_friend'
