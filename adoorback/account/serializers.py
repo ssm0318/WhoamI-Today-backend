@@ -210,6 +210,16 @@ class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
     friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
     friends_details = AuthorFriendSerializer(source='friends', read_only=True, many=True)
 
+    def validate_friends(self, value):
+        user = self.context['request'].user
+        friends = User.objects.filter(id__in=value)
+
+        for friend in friends:
+            if (not User.are_friends(user, friend)) or (user == friend):
+                raise serializers.ValidationError("One or more of the specified users are not friends of the current user.")
+
+        return value
+
     class Meta(UserFriendGroupBaseSerializer.Meta):
         model = FriendGroup
         fields = UserFriendGroupBaseSerializer.Meta.fields + ['friends', 'friends_details']
