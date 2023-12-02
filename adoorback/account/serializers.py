@@ -1,16 +1,18 @@
 import secrets
 
 from django.db import transaction
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.utils import timezone
 
-from account.models import FriendRequest
-from django.conf import settings
+from account.models import FriendRequest, FriendGroup
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
+from feed.models import Response
 from notification.models import Notification
 
 from django_countries.serializers import CountryFieldMixin
@@ -149,7 +151,6 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
         fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail']
 
 
-
 class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField(required=False)
     requestee_id = serializers.IntegerField(required=False)
@@ -192,6 +193,46 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
         fields = AuthorFriendSerializer.Meta.fields + ['sent_friend_request_to',
                                                        'received_friend_request_from',
                                                        'are_friends']
+
+
+class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
+    member_cnt = serializers.SerializerMethodField(read_only=True)
+
+    def get_member_cnt(self, obj):
+        return len(obj.friends.all())
+
+    class Meta:
+        model = FriendGroup
+        fields = ['name', 'order', 'id', 'member_cnt']
+
+
+class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
+    friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    friends_details = AuthorFriendSerializer(source='friends', read_only=True, many=True)
+
+    def validate_friends(self, value):
+        user = self.context['request'].user
+        friends = User.objects.filter(id__in=value)
+
+        for friend in friends:
+            if (not User.are_friends(user, friend)) or (user == friend):
+                raise serializers.ValidationError("One or more of the specified users are not friends of the current user.")
+
+        return value
+
+    class Meta(UserFriendGroupBaseSerializer.Meta):
+        model = FriendGroup
+        fields = UserFriendGroupBaseSerializer.Meta.fields + ['friends', 'friends_details']
+
+
+class UserFriendGroupOrderSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField())
+
+    def validate(self, attrs):
+        if 'ids' not in attrs:
+            raise serializers.ValidationError("ids field is required.")
+        return attrs
+
 
 from moment.serializers import MomentBaseSerializer
 from feed.serializers import ResponseMinimumSerializer
@@ -239,7 +280,10 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
         return current_user_read
 
     def responses(self, obj):
-        response_queryset = obj.response_set.filter(available_limit__gt=timezone.now()).order_by('question__id')
+        user = self.context.get('request', None).user
+        response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
+        response_queryset = Response.objects.filter(id__in=response_ids)
+        response_queryset = response_queryset.filter(available_limit__gt=timezone.now()).order_by('question__id', 'created_at')
         responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
         return responses
 

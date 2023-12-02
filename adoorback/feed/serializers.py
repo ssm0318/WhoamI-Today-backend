@@ -4,7 +4,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import NotAcceptable
 from django.urls import reverse
 
-from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
+from account.models import FriendGroup
+from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer, UserFriendGroupBaseSerializer
 from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
 from adoorback.utils.content_types import get_generic_relation_type
@@ -144,6 +145,10 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
     question = QuestionBaseSerializer(read_only=True)
     question_id = serializers.IntegerField()
     current_user_read = serializers.SerializerMethodField(read_only=True)
+    share_groups = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    share_groups_details = UserFriendGroupBaseSerializer(source='share_groups', read_only=True, many=True)
+    share_friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    share_friends_details = AuthorFriendSerializer(source='share_friends', read_only=True, many=True)
 
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
@@ -151,8 +156,9 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
     
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
-        fields = AdoorBaseSerializer.Meta.fields + ['share_with_friends', 'share_anonymously',
-                                                    'question', 'question_id', 'date', 'available_limit', 'current_user_read']
+        fields = AdoorBaseSerializer.Meta.fields + ['question', 'question_id', 'date', 'available_limit', 'current_user_read',
+                                                    'share_friends', 'share_friends_details', 
+                                                    'share_groups', 'share_groups_details', 'share_everyone']
 
 
 class ResponseFriendSerializer(ResponseBaseSerializer):

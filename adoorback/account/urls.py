@@ -36,7 +36,17 @@ urlpatterns = [
          name='user-friend-request-destroy'),
     path('friend-requests/<int:pk>/respond/', views.UserFriendRequestUpdate.as_view(),
          name='user-friend-request-update'),
-    
+
+    #FriendGroup related
+    path('friend-groups/', views.UserFriendGroupList.as_view(),
+         name='user-friend-group-list'),
+    path('friend-groups/create/', views.UserFriendGroupCreate.as_view(),
+         name='user-friend-group-create'),
+    path('friend-groups/order/', views.UserFriendGroupOrderUpdate.as_view(),
+         name='user-friend-group-order-update'),
+    path('friend-groups/<int:pk>/', views.UserFriendGroupDetail.as_view(),
+         name='user-friend-request-detail'),
+
     path('friends/today/', views.TodayFriends.as_view(), name='today-friends'),
     path('friend/<int:pk>/today/', views.TodayFriend.as_view(), name='today-friend')
 ]

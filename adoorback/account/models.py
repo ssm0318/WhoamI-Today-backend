@@ -186,16 +186,41 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
         return self.__class__.__name__
 
 
+class FriendGroup(SafeDeleteModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friend_groups')
+    name = models.CharField(max_length=30)
+    friends = models.ManyToManyField(User, blank=True)
+    order = models.IntegerField(default=0)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    def __str__(self):
+        return f'group "{self.name}" of user "{self.user.username}"'
+
+
 @transaction.atomic
-@receiver(m2m_changed)
-def delete_friend_noti(action, pk_set, instance, **kwargs):
+@receiver(m2m_changed, sender=User.friends.through)
+def friend_removed(action, pk_set, instance, **kwargs):
+    '''
+    when Friendship is destroyed, 
+    1) remove related notis
+    2) remove friend from all share_friends of all posts
+    '''
     if action == "post_remove":
-        friend = User.objects.get(id=pk_set.pop())
-        # remove friendship related notis from both users
-        friend.friendship_targetted_notis.filter(user=instance).delete(force_policy=HARD_DELETE)
-        instance.friendship_targetted_notis.filter(user=friend).delete(force_policy=HARD_DELETE)
-        FriendRequest.objects.filter(requester=instance, requestee=friend).delete(force_policy=HARD_DELETE)
-        FriendRequest.objects.filter(requester=friend, requestee=instance).delete(force_policy=HARD_DELETE)
+        for friend_id in pk_set:
+            friend = User.objects.get(id=friend_id)
+
+            # remove friendship related notis from both users
+            friend.friendship_targetted_notis.filter(user=instance).delete(force_policy=HARD_DELETE)
+            instance.friendship_targetted_notis.filter(user=friend).delete(force_policy=HARD_DELETE)
+            FriendRequest.objects.filter(requester=instance, requestee=friend).delete(force_policy=HARD_DELETE)
+            FriendRequest.objects.filter(requester=friend, requestee=instance).delete(force_policy=HARD_DELETE)
+
+            # remove from share_friends (TODO: if 'Note' model is added, add related logic here)
+            for response in friend.shared_responses.filter(author=instance):
+                response.share_friends.remove(friend)
+            for response in instance.shared_responses.filter(author=friend):
+                response.share_friends.remove(instance)
 
 
 @transaction.atomic
@@ -244,11 +269,17 @@ def create_friend_noti(created, instance, **kwargs):
 
 @transaction.atomic
 @receiver(post_save, sender=User)
-def create_friend_noti(created, instance, **kwargs):
+def user_created(created, instance, **kwargs):
+    '''
+    when User is created, 
+    1) send notification
+    2) add default friend group 'close friends'
+    '''
     if instance.deleted:
         return
     
     if created:
+        # send notification
         from notification.models import Notification
         admin = User.objects.filter(is_superuser=True).first()
         Notification.objects.create(user=instance,
@@ -258,3 +289,10 @@ def create_friend_noti(created, instance, **kwargs):
                                     message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
                                     message_en=f"{instance.username}, try making friends to share your whoami!",
                                     redirect_url='/')
+        
+        # add default FriendGroup (close_friends)
+        default_group, created = FriendGroup.objects.get_or_create(
+            name='close friends',
+            user=instance
+        )
+        instance.friend_groups.add(default_group)

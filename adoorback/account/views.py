@@ -5,9 +5,10 @@ from django.core import exceptions
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q, Max
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.middleware import csrf
+from django.shortcuts import get_object_or_404
 from django.utils import translation
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
@@ -19,12 +20,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
-from account.models import FriendRequest
+from account.models import FriendRequest, FriendGroup
 from account.serializers import UserProfileSerializer, \
     UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
     UserFriendshipStatusSerializer, AuthorFriendSerializer, \
     UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer, \
-    TodayFriendsSerializer
+    TodayFriendsSerializer, UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
+    UserFriendGroupOrderSerializer
 
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, NoUsername, WrongPassword
 from adoorback.utils.permissions import IsNotBlocked
@@ -427,7 +429,7 @@ class UserFriendDestroy(generics.DestroyAPIView):
 
     @transaction.atomic
     def perform_destroy(self, obj):
-        obj.friends.remove(self.request.user)
+        self.request.user.friends.remove(obj)
 
 
 class UserFriendRequestList(generics.ListCreateAPIView):
@@ -541,4 +543,107 @@ class TodayFriend(generics.ListAPIView):
         if selected_user_id not in current_user.friend_ids:
             raise PermissionDenied("you're not his/her friend")
         return User.objects.filter(id=selected_user_id)
-    
+
+
+class UserFriendGroupList(generics.ListAPIView):
+    """
+    List all friend groups of a user
+    """
+    queryset = FriendGroup.objects.all()
+    serializer_class = UserFriendGroupBaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return FriendGroup.objects.filter(user=self.request.user).order_by('order')
+
+
+class UserFriendGroupCreate(generics.CreateAPIView):
+    """
+    Create a new friend group.
+    """
+    queryset = FriendGroup.objects.all()
+    serializer_class = UserFriendGroupMemberSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        user = self.request.user
+        max_order = user.friend_groups.aggregate(max_order=Max('order'))['max_order']
+        name = self.request.data.get('name')
+        friend_ids = self.request.data.get('friends', [])
+        friends = [get_object_or_404(User, id=friend_id) for friend_id in friend_ids]
+
+        serializer.save(user=user, name=name, order=max_order+1, friends=friends)
+
+
+class UserFriendGroupDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update, or destroy a friend group.
+    """
+    queryset = FriendGroup.objects.all()
+    serializer_class = UserFriendGroupMemberSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        friend_group = FriendGroup.objects.get(id=self.kwargs.get('pk'))
+        if friend_group.user != self.request.user:
+            raise exceptions.PermissionDenied("You cannot view other users' friend groups.")
+        return friend_group
+
+    def update(self, request, *args, **kwargs):
+        friend_group = self.get_object()
+
+        if 'friends' in request.data or 'name' in request.data:
+            serializer = self.get_serializer(instance=friend_group, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response({"detail": "No data provided for update."}, status=status.HTTP_400_BAD_REQUEST)
+
+    @transaction.atomic
+    def perform_destroy(self, obj):
+        order_to_delete = obj.order
+        obj.delete(force_policy=SOFT_DELETE_CASCADE)
+        # update order of remaining FriendGroup instances
+        FriendGroup.objects.filter(user=self.request.user).filter(order__gt=order_to_delete) \
+            .update(order=F('order') - 1)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserFriendGroupOrderUpdate(generics.UpdateAPIView):
+    queryset = FriendGroup.objects.all()
+    serializer_class = UserFriendGroupOrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ids = serializer.validated_data['ids']
+        order_mapping = {group_id: idx+1 for idx, group_id in enumerate(ids)}
+
+        user = self.request.user
+        queryset = FriendGroup.objects.filter(user=user)
+
+        for group in queryset:
+            try:
+                group.order = order_mapping[group.id]
+            except KeyError:
+                raise ValidationError({'ids': "'ids' must include all id's of a user's friend groups."})
+
+        FriendGroup.objects.bulk_update(queryset, ['order'])
+        return Response("Friend group orders updated.", status=status.HTTP_200_OK)
