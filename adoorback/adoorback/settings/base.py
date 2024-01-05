@@ -63,6 +63,9 @@ CORS_ORIGIN_WHITELIST = [
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
+    'chat.apps.ChatConfig',
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
     'qna.apps.QnaConfig',
@@ -160,6 +163,15 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'adoorback.wsgi.application'
+ASGI_APPLICATION = 'adoorback.asgi.application'
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/3.1/ref/settings/#auth-password-validators
