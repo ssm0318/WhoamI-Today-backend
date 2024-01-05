@@ -41,13 +41,6 @@ class ChatConsumer(WebsocketConsumer):
         from chat.models import Message
         Message.objects.create(sender_id=user_id, content=message, chat_room_id=self.room_id, timestamp=timestamp)
 
-        from chat.models import ChatRoom
-        chat_room = ChatRoom.objects.get(id=self.room_id)
-        print(chat_room)
-        print(chat_room.last_message_content)
-        print(chat_room.last_message_time)
-
-
     # Receive message from room group
     def chat_message(self, event):
         message = event["message"]
