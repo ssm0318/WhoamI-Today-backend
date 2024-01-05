@@ -288,7 +288,11 @@ def friend_removed(action, pk_set, instance, **kwargs):
     1) remove related notis
     2) remove friend from all share_friends of all posts
     3) remove friend from favorites & hidden
+<<<<<<< HEAD
     4) inactivate chat room
+=======
+    4) delete chat room
+>>>>>>> 1e4ce35 (feat: create ChatRoom and Message Model)
     '''
     if action == "post_remove":
         friends = User.objects.filter(id__in=pk_set)
