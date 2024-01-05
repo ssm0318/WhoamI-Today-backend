@@ -30,7 +30,7 @@ class ChatConsumer(WebsocketConsumer):
         user_id = text_data_json["userId"]
         user_name = text_data_json["userName"]
         timestamp = datetime.utcnow()
-        timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp_str = timestamp.strftime("%Y-%m-%dT%H:%M:%S.000+00:00")
 
         # Send message to room group
         async_to_sync(self.channel_layer.group_send)(
