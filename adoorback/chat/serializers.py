@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from chat.models import ChatRoom
+from chat.models import ChatRoom, Message
 from account.serializers import AuthorFriendSerializer
 
 
@@ -17,3 +17,10 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatRoom
         fields = ['participants', 'last_message_content', 'last_message_time']
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender = AuthorFriendSerializer(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ['id', 'sender', 'content', 'timestamp']
