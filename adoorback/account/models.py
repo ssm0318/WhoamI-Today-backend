@@ -288,6 +288,7 @@ def friend_removed(action, pk_set, instance, **kwargs):
     1) remove related notis
     2) remove friend from all share_friends of all posts
     3) remove friend from favorites & hidden
+    4) delete chat room
     '''
     if action == "post_remove":
         for friend_id in pk_set:
@@ -318,6 +319,11 @@ def friend_removed(action, pk_set, instance, **kwargs):
                 instance.hidden.remove(friend)
             except IntegrityError:
                 pass
+
+            # delete chat room
+            from chat.models import ChatRoom
+            chat_room = ChatRoom.objects.filter(users__in=[instance, friend])
+            chat_room.delete()
 
 
 @transaction.atomic
@@ -360,6 +366,12 @@ def create_friend_noti(created, instance, **kwargs):
         noti.actors.add(requestee)
         # add friendship
         requester.friends.add(requestee)
+
+        # make chat room
+        from chat.models import ChatRoom
+        chat_room = ChatRoom()
+        chat_room.save()
+        chat_room.users.add(requester, requestee)
 
     # make friend request notification invisible once requestee has responded
     instance.friend_request_targetted_notis.filter(user=requestee,
