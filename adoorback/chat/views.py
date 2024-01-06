@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 from chat.models import Message, ChatRoom
 from collections import OrderedDict
+from account.models import User
 
 import chat.serializers as cs
 
@@ -31,6 +32,28 @@ class ReversePagination(PageNumberPagination):
             ('previous', self.get_previous_link()),
             ('results', list(reversed(data)))
         ]))
+
+
+class ChatRoomFriendList(generics.ListAPIView):
+    """
+    Get chat room with a friend.
+    """
+    serializer_class = cs.ChatRoomSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        current_user = self.request.user
+        friend_id = self.kwargs.get('pk')
+        friend = User.objects.get(id=friend_id)
+
+        if (friend not in current_user.friends.all()):
+            raise exceptions.PermissionDenied("You are not friend with this user")
+
+        if (friend == current_user):
+            raise exceptions.PermissionDenied("You cannot chat with yourself")
+
+        chat_room = ChatRoom.objects.filter(users=current_user).filter(users=friend)
+        return chat_room
 
 
 class ChatMessagesListView(generics.ListAPIView):
