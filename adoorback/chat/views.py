@@ -1,9 +1,9 @@
-from rest_framework import generics
+from rest_framework import generics, exceptions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
-from chat.models import Message
+from chat.models import Message, ChatRoom
 from collections import OrderedDict
 
 import chat.serializers as cs
@@ -32,10 +32,18 @@ class ReversePagination(PageNumberPagination):
             ('results', list(reversed(data)))
         ]))
 
+
 class ChatMessagesListView(generics.ListAPIView):
     serializer_class = cs.MessageSerializer
     pagination_class = ReversePagination
 
     def get_queryset(self):
+        try:
+            chat_room = ChatRoom.objects.get(id=self.kwargs.get('pk'))
+            if self.request.user not in chat_room.users.all():
+                raise exceptions.PermissionDenied("You are not in this chat room")
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Chat room not found")
+
         chat_messages = Message.objects.filter(chat_room__id=self.kwargs.get('pk')).order_by('-id')
         return chat_messages
