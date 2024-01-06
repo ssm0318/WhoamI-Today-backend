@@ -16,7 +16,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChatRoom
-        fields = ['participants', 'last_message_content', 'last_message_time']
+        fields = ['id', 'participants', 'last_message_content', 'last_message_time']
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = AuthorFriendSerializer(read_only=True)
