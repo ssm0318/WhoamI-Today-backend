@@ -58,6 +58,7 @@ def get_moment_type():
 
 
 def get_generic_relation_type(model):
+    model = model.capitalize()
     if model == 'Comment':
         return get_comment_type()
     elif model == 'Article':
