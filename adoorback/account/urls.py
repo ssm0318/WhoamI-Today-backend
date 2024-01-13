@@ -24,10 +24,22 @@ urlpatterns = [
     # Current User Related
     path('me/', views.CurrentUserProfile.as_view(), name='current-user'),
     path('me/friends/', views.CurrentUserFriendList.as_view(), name='current-user-friends'),
+    path('me/friends/all/', views.CurrentUserFriendDetailList.as_view(), name='current-user-friends-detail'),
+    path('me/friends/edit/', views.CurrentUserFriendEditList.as_view(), name='current-user-friends-edit'),
+    path('me/friends/updated/', views.CurrentUserFriendUpdatedList.as_view(), name='current-user-friends-updated'),
+    path('me/favorites/', views.CurrentUserFavoritesList.as_view(), name='current-user-favorites'),
+    path('me/friends/update/', views.CurrentUserFriendsUpdate.as_view(), name='current-user-friends-update'),
     path('me/delete/', views.CurrentUserDelete.as_view() , name='current-user-delete'),
- 
+
     # Friendship related
     path('friend/<int:pk>/', views.UserFriendDestroy.as_view(), name='user-friend-destroy'),
+
+    # Favorites related
+    path('favorite/add/', views.UserFavoriteAdd.as_view(), name='user-favorite-add'),
+    path('favorite/<int:pk>/', views.UserFavoriteDestroy.as_view(), name='user-favorite-destroy'),
+
+    # Hidden related
+    path('hidden/add/', views.UserHiddenAdd.as_view(), name='user-hidden-add'),
 
     # FriendRequest related
     path('friend-requests/', views.UserFriendRequestList.as_view(),
@@ -37,7 +49,7 @@ urlpatterns = [
     path('friend-requests/<int:pk>/respond/', views.UserFriendRequestUpdate.as_view(),
          name='user-friend-request-update'),
 
-    #FriendGroup related
+    # FriendGroup related
     path('friend-groups/', views.UserFriendGroupList.as_view(),
          name='user-friend-group-list'),
     path('friend-groups/create/', views.UserFriendGroupCreate.as_view(),

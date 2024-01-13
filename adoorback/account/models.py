@@ -12,11 +12,13 @@ from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models, transaction
 from django.db.models.signals import post_save, m2m_changed
+from django.db.utils import IntegrityError
 from django.dispatch import receiver
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Q
+from django.db.models import Max, Q
 
 from django_countries.fields import CountryField
 from safedelete import DELETED_INVISIBLE
@@ -88,7 +90,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     question_history = models.CharField(null=True, max_length=500)
     profile_pic = models.CharField(default=random_profile_color, max_length=7)
     profile_image = models.ImageField(storage=OverwriteStorage(), upload_to=to_profile_images, blank=True, null=True)
-    friends = models.ManyToManyField('self', symmetrical=True, blank=True)
     gender = models.IntegerField(choices=GENDER_CHOICES, null=True)
     date_of_birth = models.DateField(null=True)
     ethnicity = models.IntegerField(choices=ETHNICITY_CHOICES, null=True)
@@ -102,6 +103,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
                                 default=settings.LANGUAGE_CODE)
     timezone = models.CharField(default=settings.TIME_ZONE, max_length=50)
     noti_time = models.TimeField(default=time(16, 0))
+
+    friends = models.ManyToManyField('self', symmetrical=True, blank=True)
+    favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
+    hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
@@ -121,9 +126,35 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         ]
         ordering = ['id']
 
+    def save(self, *args, **kwargs):
+        # Ensure that only friends can be added to favorites or hidden
+        if self.id is not None:  # Existing user
+            current_friends = set(self.friends.all())
+            new_favorites = set(self.favorites.all())
+            new_hidden = set(self.hidden.all())
+
+            if not new_favorites.issubset(current_friends) or not new_hidden.issubset(current_friends):
+                raise ValueError("Favorites and hidden friends must be among the user's friends.")
+
+        super().save(*args, **kwargs)
+
     @classmethod
     def are_friends(cls, user1, user2):
         return user2.id in user1.friend_ids or user1 == user2
+
+    @classmethod
+    def user_read(cls, user1, user2):
+        # Check if user1 has read all of user2's responses
+        user2_response_queryset = user1.can_access_response_set(user2)
+        if any(user1.id not in response.reader_ids for response in user2_response_queryset):
+            return False
+
+        # Check if user1 has read user2's current check-in
+        user2_check_in = user1.can_access_check_in(user2)
+        if user2_check_in and user1.id not in user2_check_in.reader_ids:
+            return False
+
+        return True
 
     @property
     def type(self):
@@ -147,6 +178,32 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     def content_report_blocked_ids(self): # returns ids of posts
         from content_report.models import ContentReport
         return list(ContentReport.objects.filter(user=self).values_list('post_id', flat=True))
+
+    def most_recent_update(self, user):
+        # most recent update time of self (among self's content that user can access)
+        most_recent_response = user.can_access_response_set(self).aggregate(Max('created_at'))['created_at__max']
+        most_recent_check_in = user.can_access_check_in(self)
+        if not most_recent_check_in:
+            return most_recent_response
+        most_recent_check_in = most_recent_check_in.created_at
+        if not most_recent_response:
+            return most_recent_check_in
+        return max(most_recent_response, most_recent_check_in)
+
+    def can_access_response_set(self, user):
+        # return responses of user that self can access
+        from feed.models import Response
+        response_ids = [response.id for response in user.response_set.all() if Response.is_audience(response, self)]
+        response_queryset = Response.objects.filter(id__in=response_ids).filter(available_limit__gt=timezone.now())
+        return response_queryset
+
+    def can_access_check_in(self, user):
+        # return check-in of user that self can access
+        from check_in.models import CheckIn
+        check_in = user.check_in_set.filter(is_active=True).first()
+        if check_in and CheckIn.is_audience(check_in, self):
+            return check_in
+        return None
 
 
 class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
@@ -205,6 +262,7 @@ def friend_removed(action, pk_set, instance, **kwargs):
     when Friendship is destroyed, 
     1) remove related notis
     2) remove friend from all share_friends of all posts
+    3) remove friend from favorites & hidden
     '''
     if action == "post_remove":
         for friend_id in pk_set:
@@ -225,6 +283,16 @@ def friend_removed(action, pk_set, instance, **kwargs):
                 check_in.share_friends.remove(friend)
             for check_in in instance.shared_check_ins.filter(is_active=True, user=friend):
                 check_in.share_friends.remove(instance)
+
+            # remove friend from favorites and hidden
+            try:
+                instance.favorites.remove(friend)
+            except IntegrityError:
+                pass
+            try:
+                instance.hidden.remove(friend)
+            except IntegrityError:
+                pass
 
 
 @transaction.atomic
