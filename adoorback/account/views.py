@@ -4,8 +4,8 @@ from django.contrib.auth import authenticate, logout
 from django.core import exceptions
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from django.db import transaction
-from django.db.models import F, Q, Max
+from django.db import transaction, IntegrityError
+from django.db.models import F, Q, Max, Case, When, Value, IntegerField
 from django.http import HttpResponse, HttpResponseNotAllowed
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
@@ -20,14 +20,14 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
-from account.models import FriendRequest, FriendGroup
+from account.models import FriendRequest, FriendGroup, BlockRec
 from account.serializers import UserProfileSerializer, \
     UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
     UserFriendshipStatusSerializer, AuthorFriendSerializer, \
     UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer, \
     TodayFriendsSerializer, UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
     UserFriendGroupOrderSerializer, AddFriendFavoriteHiddenSerializer, FriendDetailSerializer, \
-    UserFriendsUpdateSerializer
+    UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, UserSentFriendRequestSerializer
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, NoUsername, WrongPassword
 from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
@@ -566,11 +566,37 @@ class UserSearch(generics.ListAPIView):
 
     def get_queryset(self):
         query = self.request.GET.get('query')
-        queryset = User.objects.none()
+        user = self.request.user
+        user_id = user.id
+        friend_ids = user.friends.all().values_list('id', flat=True)
+
+        qs = User.objects.none()
         if query:
-            queryset = User.objects.filter(
-                username__icontains=self.request.GET.get('query'))
-        return queryset.order_by('username')
+            # username starts with query
+            start_users = User.objects.filter(username__startswith=query).order_by('username').exclude(id=user_id)
+            friend_start_ids = list(start_users.filter(id__in=friend_ids).values_list('id', flat=True))
+            nonfriend_start_ids = list(start_users.exclude(id__in=friend_ids).values_list('id', flat=True))
+
+            # username contains query
+            contain_users = User.objects.filter(username__icontains=query).order_by('username').exclude(id=user_id)
+            friend_contain_ids = list(contain_users.filter(id__in=friend_ids).values_list('id', flat=True))
+            nonfriend_contain_ids = list(contain_users.exclude(id__in=friend_ids).values_list('id', flat=True))
+
+            # all friend users
+            qs_ids = friend_start_ids + friend_contain_ids
+
+            # only 10 non-friend users
+            nonfriend_qs_ids = nonfriend_start_ids[:10]
+            if len(nonfriend_qs_ids) < 10:
+                nonfriend_qs_ids += nonfriend_contain_ids[:10 - len(nonfriend_qs_ids)]
+
+            # merge querysets while preserving order
+            qs_ids += nonfriend_qs_ids
+            cases = [When(id=x, then=Value(i)) for i,x in enumerate(qs_ids)]
+            case = Case(*cases, output_field=IntegerField())
+            qs = User.objects.filter(id__in=qs_ids).annotate(my_order=case).order_by('my_order')
+
+        return qs
 
 
 class UserFriendDestroy(generics.DestroyAPIView):
@@ -604,6 +630,18 @@ class UserFriendRequestList(generics.ListCreateAPIView):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
             raise PermissionDenied("requester가 본인이 아닙니다...")
         serializer.save(accepted=None)
+
+
+class UserSentFriendRequestList(generics.ListAPIView):
+    queryset = FriendRequest.objects.all()
+    serializer_class = UserSentFriendRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return FriendRequest.objects.filter(requester=self.request.user).filter(Q(accepted__isnull=True) | Q(accepted=False))
 
 
 class UserFriendRequestDestroy(generics.DestroyAPIView):
@@ -668,6 +706,57 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
                                         message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
                                         message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
                                         redirect_url='/settings')
+
+
+class UserRecommendedFriendsList(generics.ListAPIView):
+    serializer_class = UserMinimumSerializer
+
+    def get_queryset(self):
+        user_id = self.request.user.id
+        user = get_object_or_404(User, id=user_id)
+        user_friends = user.friends.all()
+
+        user_friend_ids = user_friends.values_list('id', flat=True)
+        user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
+        mutual_friends_count_dict = {}
+        for friend in user_friends:
+            potential_friends = friend.friends.exclude(id__in=user_friend_ids) \
+                .exclude(id=user_id).exclude(id__in=user_block_rec_ids)
+
+            for potential_friend in potential_friends:
+                if potential_friend.id not in mutual_friends_count_dict:
+                    mutual_friends_count_dict[potential_friend.id] = 1
+                mutual_friends_count_dict[potential_friend.id] += 1
+
+        # Sort the by number of mutual friends
+        sorted_friends = sorted(mutual_friends_count_dict.items(), key=lambda x: x[1], reverse=True)[:25]
+        sorted_friend_ids = [friend_id for friend_id, _ in sorted_friends]
+        recommended_friends = User.objects.filter(id__in=sorted_friend_ids) \
+            .order_by(Case(*[When(id=id_, then=pos) for pos, id_ in enumerate(sorted_friend_ids)], default=0))
+
+        return recommended_friends
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class BlockRecCreate(generics.CreateAPIView):
+    queryset = BlockRec.objects.all()
+    serializer_class = BlockRecSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        try:
+            serializer.save(user=self.request.user,
+                            blocked_user_id=self.request.data['blocked_user_id'])
+        except IntegrityError:
+            pass
 
 
 class TodayFriends(generics.ListAPIView):

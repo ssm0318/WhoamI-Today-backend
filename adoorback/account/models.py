@@ -255,6 +255,27 @@ class FriendGroup(SafeDeleteModel):
         return f'group "{self.name}" of user "{self.user.username}"'
 
 
+class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
+    user = models.ForeignKey(
+        get_user_model(), related_name='block_recs', on_delete=models.CASCADE)
+    blocked_user = models.ForeignKey(
+        get_user_model(), related_name='received_block_recs', on_delete=models.CASCADE)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'blocked_user'], condition=Q(deleted__isnull=True), name='unique_block_rec'),
+        ]
+
+    def __str__(self):
+        return f'{self.user} blocked recommendation of {self.blocked_user}'
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+
 @transaction.atomic
 @receiver(m2m_changed, sender=User.friends.through)
 def friend_removed(action, pk_set, instance, **kwargs):

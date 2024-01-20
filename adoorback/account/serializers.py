@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from account.models import FriendRequest, FriendGroup
+from account.models import FriendRequest, FriendGroup, BlockRec
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from feed.models import Response
@@ -215,8 +215,6 @@ class UserFriendsUpdateSerializer(serializers.ModelSerializer):
 
 
 class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
-    requester_id = serializers.IntegerField()
-    requestee_id = serializers.IntegerField()
     accepted = serializers.BooleanField(allow_null=True, required=False)
     requester_detail = serializers.SerializerMethodField(read_only=True)
 
@@ -275,6 +273,36 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
         fields = AuthorFriendSerializer.Meta.fields + ['sent_friend_request_to',
                                                        'received_friend_request_from',
                                                        'are_friends']
+
+
+class UserSentFriendRequestSerializer(serializers.ModelSerializer):
+    requestee_detail = serializers.SerializerMethodField(read_only=True)
+
+    def get_requestee_detail(self, obj):
+        return AuthorFriendSerializer(User.objects.get(id=obj.requestee_id)).data
+
+    class Meta:
+        model = FriendRequest
+        fields = ['requester_id', 'requestee_id', 'requestee_detail']
+
+
+class UserMinimumSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+
+    def get_url(self, obj):
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'profile_image', 'url']
+
+
+class BlockRecSerializer(serializers.ModelSerializer):
+    blocked_user_id = serializers.IntegerField()
+
+    class Meta:
+        model = BlockRec
+        fields = ['blocked_user_id']
 
 
 class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
