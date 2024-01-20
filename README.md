@@ -5,8 +5,13 @@
 - Python: set environment variables such as `SECRET_KEY`, `DB_PASSWORD`, `EMAIL_HOST_PASSWORD` inside `.zshrc`, `.bashrc`, or `.bash_profile`
 - FCM: `backend/adoorback/adoorback/serviceAccountKey.json`
 
-
 ## Run Server
+```
+# install redis
+brew install redis
+brew services start redis
+```
+
 ```
 cd adoorback
 pip install -r requirements.txt
