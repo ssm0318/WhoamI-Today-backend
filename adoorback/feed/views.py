@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from django.utils import timezone, translation
 
-from rest_framework import generics, exceptions
+from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
@@ -295,6 +295,8 @@ class ResponseRead(generics.UpdateAPIView):
         current_user = self.request.user
         ids = request.data.get('ids', [])
         queryset = Response.objects.filter(id__in=ids)
+        if len(ids) != queryset.count():
+            return DjangoResponse({'error': 'Response with provided IDs does not exist.'}, status=status.HTTP_404_NOT_FOUND)
         for response in queryset:
             response.readers.add(current_user)
         serializer = self.get_serializer(queryset, many=True)

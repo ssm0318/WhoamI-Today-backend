@@ -26,13 +26,15 @@ from account.serializers import UserProfileSerializer, \
     UserFriendshipStatusSerializer, AuthorFriendSerializer, \
     UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer, \
     TodayFriendsSerializer, UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
-    UserFriendGroupOrderSerializer
-
+    UserFriendGroupOrderSerializer, AddFriendFavoriteHiddenSerializer, FriendDetailSerializer, \
+    UserFriendsUpdateSerializer
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, NoUsername, WrongPassword
 from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
+from check_in.models import CheckIn
 from .email import email_manager
 from feed.models import Question
+from feed.models import Response as _Response
 from feed.serializers import QuestionAnonymousSerializer
 
 User = get_user_model()
@@ -357,6 +359,160 @@ class CurrentUserFriendList(generics.ListAPIView):
 
     def get_queryset(self):
         return self.request.user.friends.all()
+
+
+class CurrentUserFriendDetailList(generics.ListAPIView):
+    serializer_class = FriendDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        return self.request.user.friends.all().exclude(hidden=True).order_by('username')
+
+
+class CurrentUserFriendEditList(generics.ListAPIView):
+    serializer_class = FriendDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        return self.request.user.friends.all().order_by('username')
+
+
+class CurrentUserFriendUpdatedList(generics.ListAPIView):
+    serializer_class = FriendDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        user = self.request.user
+        friends = user.friends.all().exclude(hidden=True)
+        friends = User.objects.filter(id__in=[
+            friend.id for friend in friends if not User.user_read(user, friend)
+        ])
+
+        # sort in recent order
+        friends = sorted(friends, key=lambda x: x.most_recent_update(user), reverse=True)
+
+        return friends
+
+
+class CurrentUserFavoritesList(generics.ListAPIView):
+    serializer_class = FriendDetailSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return self.request.user.favorites.all().order_by('username')
+
+
+class UserFavoriteAdd(generics.CreateAPIView):
+    serializer_class = AddFriendFavoriteHiddenSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        friend_id = serializer.validated_data.get('friend_id')
+
+        if request.user.favorites.filter(id=friend_id).exists():
+            return Response({'error': 'Friend is already in favorites.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.friends.filter(id=friend_id).exists():
+            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_to_add = User.objects.get(id=friend_id)
+            self.perform_create(user_to_add)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    def perform_create(self, user_to_add):
+        self.request.user.favorites.add(user_to_add)
+
+
+class UserFavoriteDestroy(generics.DestroyAPIView):
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_destroy(self, obj):
+        self.request.user.favorites.remove(obj)
+
+
+class UserHiddenAdd(generics.CreateAPIView):
+    serializer_class = AddFriendFavoriteHiddenSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        friend_id = serializer.validated_data.get('friend_id')
+
+        if request.user.hidden.filter(id=friend_id).exists():
+            return Response({'error': 'Friend is already in hidden.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.friends.filter(id=friend_id).exists():
+            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_to_add = User.objects.get(id=friend_id)
+            # Remove the user from favorites if the user is in favorites
+            if request.user.favorites.filter(id=friend_id).exists():
+                request.user.favorites.remove(user_to_add)
+            self.perform_create(user_to_add)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    def perform_create(self, user_to_add):
+        self.request.user.hidden.add(user_to_add)
+
+
+class CurrentUserFriendsUpdate(generics.UpdateAPIView):
+    serializer_class = UserFriendsUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class CurrentUserProfile(generics.RetrieveUpdateAPIView):

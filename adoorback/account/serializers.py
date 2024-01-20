@@ -133,6 +133,87 @@ class AuthorAnonymousSerializer(serializers.ModelSerializer):
         fields = ['color_hex']
 
 
+class FriendDetailSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+    is_favorite = serializers.SerializerMethodField(read_only=True)
+    is_hidden = serializers.SerializerMethodField(read_only=True)
+    current_user_read = serializers.SerializerMethodField(read_only=True)
+
+    def get_url(self, obj):
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+
+    def get_is_favorite(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj in request.user.favorites.all()
+        return False
+
+    def get_is_hidden(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj in request.user.hidden.all()
+        return False
+
+    def get_current_user_read(self, obj):
+        responses = self.responses(obj)
+        check_in = self.check_in(obj)
+
+        current_user_read = not any(not response['current_user_read'] for response in responses) \
+            and not (check_in and not check_in['current_user_read'])
+        return current_user_read
+
+    def check_in(self, obj):
+        from check_in.serializers import CheckInBaseSerializer
+        user = self.context.get('request', None).user
+        check_in = obj.check_in_set.filter(is_active=True).first()
+        if check_in and CheckIn.is_audience(check_in, user):
+            return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
+        return {}
+
+    def responses(self, obj):
+        user = self.context.get('request', None).user
+        response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
+        response_queryset = Response.objects.filter(id__in=response_ids)
+        response_queryset = response_queryset.filter(available_limit__gt=timezone.now()).order_by('question__id', 'created_at')
+        responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
+        return responses
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'is_favorite', 'is_hidden', 'current_user_read']
+
+
+class AddFriendFavoriteHiddenSerializer(serializers.ModelSerializer):
+    friend_id = serializers.IntegerField()
+
+    class Meta:
+        model = User
+        fields = ['friend_id']
+
+
+class UserFriendsUpdateSerializer(serializers.ModelSerializer):
+    favorites = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    hidden = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+    unfriend_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['favorites', 'hidden', 'unfriend_ids']
+
+    def update(self, instance, validated_data):
+        if 'favorites' in validated_data:
+            instance.favorites.set(validated_data['favorites'])
+
+        if 'hidden' in validated_data:
+            instance.hidden.set(validated_data['hidden'])
+
+        if 'unfriend_ids' in validated_data:
+            instance.friends.remove(*validated_data['unfriend_ids'])
+
+        instance.save()
+        return instance
+
+
 class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField()
     requestee_id = serializers.IntegerField()
