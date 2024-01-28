@@ -215,6 +215,8 @@ class UserFriendsUpdateSerializer(serializers.ModelSerializer):
 
 
 class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
+    requester_id = serializers.IntegerField()
+    requestee_id = serializers.IntegerField()
     accepted = serializers.BooleanField(allow_null=True, required=False)
     requester_detail = serializers.SerializerMethodField(read_only=True)
 
