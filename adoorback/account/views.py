@@ -718,10 +718,13 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         user_friend_ids = user_friends.values_list('id', flat=True)
         user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
+        sent_friend_request_ids = FriendRequest.objects.filter(requester=user).values_list('requestee__id', flat=True)
+
         mutual_friends_count_dict = {}
         for friend in user_friends:
             potential_friends = friend.friends.exclude(id__in=user_friend_ids) \
-                .exclude(id=user_id).exclude(id__in=user_block_rec_ids)
+                .exclude(id=user_id).exclude(id__in=user_block_rec_ids) \
+                .exclude(id__in=sent_friend_request_ids)
 
             for potential_friend in potential_friends:
                 if potential_friend.id not in mutual_friends_count_dict:
