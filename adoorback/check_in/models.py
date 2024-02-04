@@ -14,10 +14,15 @@ User = get_user_model()
 
 class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     AVAILABILITY_CHOICES = [
-        ('no_status', 'No Status'),
-        ('not_available', 'Not Available'),
-        ('may_be_slow', 'May Be Slow'),
         ('available', 'Available'),
+        ('busy', 'Busy'),
+        ('might_get_distracted', 'Might get distracted'),
+        ('urgent_only', 'Urgent only'),
+        ('about_to_sleep', 'About to sleep'),
+        ('studying', 'Studying'),
+        ('in_transit', 'In transit'),
+        ('feeling_social', 'Feeling social'),
+        ('feeling_quiet', 'Feeling quiet'),
     ]
 
     user = models.ForeignKey(User, related_name='check_in_set', on_delete=models.CASCADE)
