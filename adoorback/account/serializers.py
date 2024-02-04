@@ -40,7 +40,7 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         fields = ['id', 'username', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
-                  'ethnicity', 'nationality', 'research_agreement',
+                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio',
                   'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'timezone']
         extra_kwargs = {'password': {'write_only': True}}
 
