@@ -31,3 +31,7 @@ class CheckInDetailSerializer(MyCheckInSerializer):
     class Meta:
         model = CheckIn
         fields = MyCheckInSerializer.Meta.fields + ['user', 'user_detail']
+
+
+class TrackSerializer(serializers.Serializer):
+    track_ids = serializers.ListField(child=serializers.CharField())
