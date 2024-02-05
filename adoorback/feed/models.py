@@ -14,11 +14,13 @@ from comment.models import Comment
 from like.models import Like
 from reaction.models import Reaction
 from adoorback.models import AdoorModel, AdoorTimestampedModel
+from adoorback.utils.helpers import wrap_content
 from notification.models import Notification
 
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
+
 
 User = get_user_model()
 
@@ -304,10 +306,13 @@ def create_response_request_noti(instance, created, **kwargs):
     origin = instance.question
     requester = instance.requester
     requestee = instance.requestee
+
+    content_preview = wrap_content(origin.content)
+
     if requester.id in requestee.user_report_blocked_ids: # do not create notification from/for blocked user
         return
-    message_ko = f'똑똑똑~ {requester.username}님으로부터 질문이 왔어요!'
-    message_en = f'Knock knock~ {requester.username} has sent you a question!'
+    message_ko = f'똑똑똑~ {requester.username}님으로부터 질문이 왔어요!: "{content_preview}"'
+    message_en = f'Knock knock! {requester.username} has sent you a question: "{content_preview}"'
     redirect_url = f'/questions/{origin.id}/short-answer'
     Notification.objects.create(actor=requester, user=requestee,
                                 origin=origin, target=target,
@@ -332,12 +337,14 @@ def create_request_answered_noti(instance, created, **kwargs):
         requestee_id=author_id, question_id=question_id)
     redirect_url = f'/responses/{instance.id}'
 
+    content_preview = wrap_content(origin)
+
     for request in related_requests:
         user = request.requester
         if actor.id in user.user_report_blocked_ids: # do not create notification from/for blocked user
             return
-        message_ko = f'{actor.username}님이 회원님이 보낸 질문에 답했습니다.'
-        message_en = f'{actor.username} has responded to your question.'
+        message_ko = f'{actor.username}님이 회원님이 보낸 질문에 답했습니다: "{content_preview}"'
+        message_en = f'{actor.username} has responded to your question: "{content_preview}"'
         Notification.objects.create(actor=actor, user=user,
                                     origin=origin, target=target,
                                     message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
