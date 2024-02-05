@@ -21,6 +21,7 @@ from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
 
+
 User = get_user_model()
 
 
