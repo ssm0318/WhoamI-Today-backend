@@ -41,7 +41,7 @@ class UserTag(AdoorTimestampedModel):
             models.UniqueConstraint(
                 fields=['tagging_user', 'tagged_user', 'content_type', 'object_id', 'offset'],
                 name='unique_user_tag'
-                )
+            )
         ]
         ordering = ['id']
 
@@ -64,7 +64,7 @@ def create_user_tag_noti(instance, **kwargs):
     if user == actor:
         return
 
-    if actor.id in user.user_report_blocked_ids: # do not create notification from/for blocked user
+    if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
 
     actor_name = f'{actor.username}님이'
@@ -88,12 +88,13 @@ def create_user_tag_noti(instance, **kwargs):
         print("UserTag can only be created in comment or reply for now.")
         return
 
-    notification = Notification.objects.filter(actor=actor,
+    notification = Notification.objects.filter(actors__id=actor.id,
                                                user=user,
                                                origin_id=origin.id,
                                                origin_type=get_generic_relation_type(origin.type))
 
     if notification.count() == 0:  # create only one notification when user was tagged twice in the same comment
-        Notification.objects.create(actor=actor, user=user,
-                                    origin=origin, target=target,
-                                    message=message, redirect_url=redirect_url)
+        noti = Notification.objects.create(user=user,
+                                           origin=origin, target=target,
+                                           message=message, redirect_url=redirect_url)
+        noti.actors.add(actor)

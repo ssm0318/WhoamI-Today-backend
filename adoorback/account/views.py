@@ -28,7 +28,8 @@ from account.serializers import UserProfileSerializer, \
     TodayFriendsSerializer, UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
     UserFriendGroupOrderSerializer, AddFriendFavoriteHiddenSerializer, FriendDetailSerializer, \
     UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, UserSentFriendRequestSerializer
-from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, NoUsername, WrongPassword
+from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
+    NoUsername, WrongPassword
 from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 from check_in.models import CheckIn
@@ -38,6 +39,7 @@ from feed.models import Response as _Response
 from feed.serializers import QuestionAnonymousSerializer
 
 User = get_user_model()
+
 
 @transaction.atomic
 @ensure_csrf_cookie
@@ -60,24 +62,24 @@ class UserLogin(APIView):
             translation.activate(lang)
 
         data = request.data
-        response = Response()        
+        response = Response()
         username = data.get('username', None)
         password = data.get('password', None)
         try:
             user = User.objects.get(Q(username=username) | Q(email=username))
         except:
             raise NoUsername()
-        
+
         user = authenticate(username=username, password=password)
         if user is not None:
             access_token = get_access_token_for_user(user)
             response.set_cookie(
-                key = settings.SIMPLE_JWT['AUTH_COOKIE'], 
-                value = access_token, 
-                max_age = settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
-                secure = settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                httponly = settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-                samesite = settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
+                key=settings.SIMPLE_JWT['AUTH_COOKIE'],
+                value=access_token,
+                max_age=settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
+                secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+                httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
+                samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
             csrf.get_token(request)
             return response
@@ -91,7 +93,7 @@ class UserLogout(APIView):
         response = Response()
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
         return response
-    
+
 
 class UserEmailCheck(generics.CreateAPIView):
     serializer_class = UserEmailSerializer
@@ -118,7 +120,7 @@ class UserEmailCheck(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
-    
+
 
 class UserPasswordCheck(generics.CreateAPIView):
     serializer_class = UserPasswordSerializer
@@ -139,7 +141,7 @@ class UserPasswordCheck(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
-    
+
 
 class UserUsernameCheck(generics.CreateAPIView):
     serializer_class = UserUsernameSerializer
@@ -168,7 +170,7 @@ class UserUsernameCheck(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
-        
+
 
 class UserSignup(generics.CreateAPIView):
     serializer_class = UserProfileSerializer
@@ -192,16 +194,16 @@ class UserSignup(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
 
-        response = Response(serializer.data, status=201, headers=headers)     
+        response = Response(serializer.data, status=201, headers=headers)
         user = User.objects.get(username=request.data.get('username'))
         access_token = get_access_token_for_user(user)
         response.set_cookie(
-            key = settings.SIMPLE_JWT['AUTH_COOKIE'], 
-            value = access_token, 
-            max_age = settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
-            secure = settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            httponly = settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-            samesite = settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
+            key=settings.SIMPLE_JWT['AUTH_COOKIE'],
+            value=access_token,
+            max_age=settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
+            secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
+            httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
+            samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
         )
         csrf.get_token(request)
         return response
@@ -212,7 +214,7 @@ class SendResetPasswordEmail(generics.CreateAPIView):
 
     def get_exception_handler(self):
         return adoor_exception_handler
-    
+
     def get_object(self):
         return User.objects.filter(email=self.request.data['email']).first()
 
@@ -223,8 +225,8 @@ class SendResetPasswordEmail(generics.CreateAPIView):
             translation.activate(lang)
         if user:
             email_manager.send_reset_password_email(user)
-            
-        return HttpResponse(status=200) # whether email is valid or not, response will be always success-response
+
+        return HttpResponse(status=200)  # whether email is valid or not, response will be always success-response
 
 
 class ResetPasswordWithToken(generics.UpdateAPIView):
@@ -260,15 +262,15 @@ class UserPasswordConfirm(APIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
 
-        response = Response()        
+        response = Response()
         password = request.data.get('password', None)
-        
+
         auth_user = authenticate(username=user.username, password=password)
         if auth_user is not None:
             return response
         else:
             raise WrongPassword()
-        
+
 
 class ResetPassword(generics.UpdateAPIView):
     serializer_class = UserProfileSerializer
@@ -538,13 +540,13 @@ class CurrentUserProfile(generics.RetrieveUpdateAPIView):
             Notification = apps.get_model('notification', 'Notification')
             admin = User.objects.filter(is_superuser=True).first()
 
-            Notification.objects.create(user=obj,
-                                        actor=admin,
-                                        target=admin,
-                                        origin=admin,
-                                        message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
-                                        message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
-                                        redirect_url='/questions')
+            noti = Notification.objects.create(user=obj,
+                                               target=admin,
+                                               origin=admin,
+                                               message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
+                                               message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
+                                               redirect_url='/questions')
+            noti.actors.add(admin)
 
 
 class UserDetail(generics.RetrieveAPIView):
@@ -592,7 +594,7 @@ class UserSearch(generics.ListAPIView):
 
             # merge querysets while preserving order
             qs_ids += nonfriend_qs_ids
-            cases = [When(id=x, then=Value(i)) for i,x in enumerate(qs_ids)]
+            cases = [When(id=x, then=Value(i)) for i, x in enumerate(qs_ids)]
             case = Case(*cases, output_field=IntegerField())
             qs = User.objects.filter(id__in=qs_ids).annotate(my_order=case).order_by('my_order')
 
@@ -641,7 +643,8 @@ class UserSentFriendRequestList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        return FriendRequest.objects.filter(requester=self.request.user).filter(Q(accepted__isnull=True) | Q(accepted=False))
+        return FriendRequest.objects.filter(requester=self.request.user).filter(
+            Q(accepted__isnull=True) | Q(accepted=False))
 
 
 class UserFriendRequestDestroy(generics.DestroyAPIView):
@@ -699,13 +702,13 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
             Notification = apps.get_model('notification', 'Notification')
             admin = User.objects.filter(is_superuser=True).first()
 
-            Notification.objects.create(user=user,
-                                        actor=admin,
-                                        target=admin,
-                                        origin=admin,
-                                        message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
-                                        message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
-                                        redirect_url='/settings')
+            noti = Notification.objects.create(user=user,
+                                               target=admin,
+                                               origin=admin,
+                                               message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                                               message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
+                                               redirect_url='/settings')
+            noti.actors.add(admin)
 
 
 class UserRecommendedFriendsList(generics.ListAPIView):
@@ -827,7 +830,7 @@ class UserFriendGroupCreate(generics.CreateAPIView):
         friend_ids = self.request.data.get('friends', [])
         friends = [get_object_or_404(User, id=friend_id) for friend_id in friend_ids]
 
-        serializer.save(user=user, name=name, order=max_order+1, friends=friends)
+        serializer.save(user=user, name=name, order=max_order + 1, friends=friends)
 
 
 class UserFriendGroupDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -882,7 +885,7 @@ class UserFriendGroupOrderUpdate(generics.UpdateAPIView):
         serializer.is_valid(raise_exception=True)
 
         ids = serializer.validated_data['ids']
-        order_mapping = {group_id: idx+1 for idx, group_id in enumerate(ids)}
+        order_mapping = {group_id: idx + 1 for idx, group_id in enumerate(ids)}
 
         user = self.request.user
         queryset = FriendGroup.objects.filter(user=user)

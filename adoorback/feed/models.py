@@ -1,6 +1,6 @@
 import datetime
 from django.db import models, transaction
-from django.db.models.signals import post_save, post_delete, pre_delete, pre_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
@@ -20,7 +20,6 @@ from notification.models import Notification
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
-
 
 User = get_user_model()
 
@@ -70,7 +69,7 @@ class QuestionManager(SafeDeleteManager):
 
     def daily_questions(self, **kwargs):
         return self.filter(selected_dates__contains=[datetime.date.today()], **kwargs)
-    
+
     def date_questions(self, date, **kwargs):
         return self.filter(selected_dates__contains=[date], **kwargs)
 
@@ -97,7 +96,7 @@ class Question(AdoorModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
-    
+
     @property
     def last_selected_date(self):
         return self.selected_dates[-1] if self.selected_dates else None
@@ -138,7 +137,7 @@ class Response(AdoorModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['-id']),
         ]
-        
+
     @property
     def type(self):
         return self.__class__.__name__
@@ -151,7 +150,7 @@ class Response(AdoorModel, SafeDeleteModel):
     @property
     def participants(self):
         return self.response_comments.values_list('author_id', flat=True).distinct()
-    
+
     @property
     def reader_ids(self):
         return self.readers.values_list('id', flat=True)
@@ -162,7 +161,7 @@ class Response(AdoorModel, SafeDeleteModel):
         """
         if not User.are_friends(self.author, user):
             return False
-        
+
         if self.share_everyone:
             return True
 
@@ -192,7 +191,7 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=['requester', 'requestee', 'question'], condition=Q(deleted__isnull=True), 
+                fields=['requester', 'requestee', 'question'], condition=Q(deleted__isnull=True),
                 name='unique_response_request'),
         ]
         indexes = [
@@ -205,7 +204,7 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
-    
+
 
 class PostManager(SafeDeleteManager):
 
@@ -239,7 +238,7 @@ class Post(AdoorModel, SafeDeleteModel):
     @property
     def target_type(self):
         return self.target.type
- 
+
 
 @transaction.atomic
 @receiver(post_save, sender=User)
@@ -298,7 +297,7 @@ def harddelete_post(sender, instance, **kwargs):
 def create_response_request_noti(instance, created, **kwargs):
     if instance.deleted:
         return
-    
+
     if not created:
         return
 
@@ -309,14 +308,12 @@ def create_response_request_noti(instance, created, **kwargs):
 
     content_preview = wrap_content(origin.content)
 
-    if requester.id in requestee.user_report_blocked_ids: # do not create notification from/for blocked user
+    if requester.id in requestee.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
-    message_ko = f'똑똑똑~ {requester.username}님으로부터 질문이 왔어요!: "{content_preview}"'
-    message_en = f'Knock knock! {requester.username} has sent you a question: "{content_preview}"'
     redirect_url = f'/questions/{origin.id}/short-answer'
-    Notification.objects.create(actor=requester, user=requestee,
-                                origin=origin, target=target,
-                                message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
+    Notification.objects.create_or_update_notification(user=requestee, actor=requester,
+                                                       origin=origin, target=target, noti_type="response_request_noti",
+                                                       redirect_url=redirect_url, content_preview=content_preview)
 
 
 @transaction.atomic
@@ -341,13 +338,15 @@ def create_request_answered_noti(instance, created, **kwargs):
 
     for request in related_requests:
         user = request.requester
-        if actor.id in user.user_report_blocked_ids: # do not create notification from/for blocked user
+        if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
             return
         message_ko = f'{actor.username}님이 회원님이 보낸 질문에 답했습니다: "{content_preview}"'
         message_en = f'{actor.username} has responded to your question: "{content_preview}"'
-        Notification.objects.create(actor=actor, user=user,
-                                    origin=origin, target=target,
-                                    message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
+        noti = Notification.objects.create(user=user,
+                                           origin=origin, target=target,
+                                           message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
+        noti.actors.add(actor)
+
 
 @transaction.atomic
 @receiver(post_save, sender=Response)

@@ -27,6 +27,7 @@ class LikeList(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        print("perform_create")
         content_type_id = get_generic_relation_type(self.request.data['target_type']).id
         try:
             serializer.save(user=self.request.user,
