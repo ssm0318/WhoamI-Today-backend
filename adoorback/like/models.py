@@ -62,7 +62,6 @@ class Like(AdoorTimestampedModel, SafeDeleteModel):
 @transaction.atomic
 @receiver(post_save, sender=Like)
 def create_like_noti(instance, created, **kwargs):
-    print("like noti created")
     if instance.deleted or not created:
         return
 

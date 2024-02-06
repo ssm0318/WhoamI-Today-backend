@@ -17,9 +17,7 @@ from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
 from safedelete.managers import SafeDeleteManager
 
-
 User = get_user_model()
-
 
 
 class NotificationManager(SafeDeleteManager):
