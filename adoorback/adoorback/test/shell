@@ -5,6 +5,7 @@ from feed.models import Question, Article, Response, Post, ResponseRequest
 from comment.models import Comment
 from like.models import Like
 from notification.models import Notification
+from reaction.models import Reaction
 from adoorback.test.seed import set_seed
 from adoorback.utils.content_types import get_article_type, get_question_type, get_comment_type
 from django.contrib.auth import get_user_model
