@@ -21,7 +21,6 @@ from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
 
-
 User = get_user_model()
 
 
@@ -219,17 +218,11 @@ def create_request_answered_noti(instance, created, **kwargs):
             return
         message_ko = f'{actor.username}님이 회원님이 보낸 질문에 답했습니다: "{content_preview}"'
         message_en = f'{actor.username} has responded to your question: "{content_preview}"'
-<<<<<<< HEAD:adoorback/qna/models.py
         noti = Notification.objects.create(user=user,
                                            origin=origin, target=target,
                                            message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
         noti.actors.add(actor)
 
-=======
-        Notification.objects.create(actor=actor, user=user,
-                                    origin=origin, target=target,
-                                    message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
->>>>>>> 637fac0 (feat: #110 add content preview to response request notifications):adoorback/feed/models.py
 
 @transaction.atomic
 @receiver(post_save, sender=Response)

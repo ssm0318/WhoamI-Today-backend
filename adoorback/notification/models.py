@@ -5,8 +5,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
-from django.db.models import Count
 
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.content_types import get_response_request_type, get_question_type
@@ -19,7 +17,9 @@ from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
 from safedelete.managers import SafeDeleteManager
 
+
 User = get_user_model()
+
 
 
 class NotificationManager(SafeDeleteManager):
