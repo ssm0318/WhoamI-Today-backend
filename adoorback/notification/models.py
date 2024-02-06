@@ -17,9 +17,7 @@ from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
 from safedelete.managers import SafeDeleteManager
 
-
 User = get_user_model()
-
 
 
 class NotificationManager(SafeDeleteManager):
@@ -66,6 +64,7 @@ class NotificationManager(SafeDeleteManager):
                                                                        N,
                                                                        content_preview,
                                                                        emoji)
+
             noti_to_update.message_ko = updated_message_ko
             noti_to_update.message_en = updated_message_en
             noti_to_update.is_visible = True
