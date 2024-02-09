@@ -15,6 +15,7 @@ from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from qna.models import Response
 from notification.models import Notification
+from qna.serializers import ResponseMinimumSerializer
 
 from django_countries.serializers import CountryFieldMixin
 
