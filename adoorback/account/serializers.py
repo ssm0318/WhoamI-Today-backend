@@ -346,7 +346,6 @@ class UserFriendGroupOrderSerializer(serializers.Serializer):
         return attrs
 
 
-from moment.serializers import MomentBaseSerializer
 from qna.serializers import ResponseMinimumSerializer
 from django.conf import settings
 
@@ -393,12 +392,10 @@ class TodayFriendsSerializer(serializers.ModelSerializer):
         return {}
     
     def get_current_user_read(self, obj):
-        moments = self.get_moments(obj)
         responses = self.responses(obj)
         check_in = self.get_check_in(obj)
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
-            and not any(not moment['current_user_read'] for moment in moments) \
             and not (check_in and not check_in['current_user_read'])
         return current_user_read
 

@@ -147,8 +147,8 @@ def create_noti(instance, created, **kwargs):
     else:
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
         # send a notification to the author of the origin qna
-        origin_target_name_ko = '모먼트' if origin.type == 'Moment' else '답변'
-        origin_target_name_en = 'moment' if origin.type == 'Moment' else 'answer'
+        origin_target_name_ko = '노트' if origin.type == 'Note' else '답변'
+        origin_target_name_en = 'note' if origin.type == 'Note' else 'answer'
         if origin_author == actor:
             pass
         elif actor.id in origin_author.user_report_blocked_ids:

@@ -52,11 +52,6 @@ def get_user_tag_type():
     return ContentType.objects.get_for_model(UserTag)
 
 
-def get_moment_type():
-    from moment.models import Moment
-    return ContentType.objects.get_for_model(Moment)
-
-
 def get_reaction_type():
     from reaction.models import Reaction
     return ContentType.objects.get_for_model(Reaction)
@@ -72,7 +67,5 @@ def get_generic_relation_type(model):
         return get_response_type()
     elif model == 'Question':
         return get_question_type()
-    elif model == 'Moment':
-        return get_moment_type()
     else:
         return None

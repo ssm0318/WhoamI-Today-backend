@@ -31,7 +31,6 @@ urlpatterns = i18n_patterns(
     path('api/comments/', include('comment.urls')),
     path('api/notifications/', include('notification.urls')),
     path('api/qna/', include('qna.urls')),
-    path('api/moment/', include('moment.urls')),
     path('api/user/', include('account.urls')),
     path('api/reactions/', include('reaction.urls')),
     path('api/check_in/', include('check_in.urls')),

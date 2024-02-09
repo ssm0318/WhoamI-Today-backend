@@ -8,7 +8,6 @@ from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
 from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
 from qna.models import Response
-from moment.models import Moment
 from user_tag.serializers import UserTagSerializer
 
 User = get_user_model()
@@ -134,8 +133,6 @@ class PostCommentsSerializer(serializers.ModelSerializer):
         current_user = self.context.get('request', None).user
         if isinstance(obj, Response):
             comments = obj.response_comments
-        elif isinstance(obj, Moment):
-            comments = obj.moment_comments
         else:
             return None
         comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)
