@@ -1,7 +1,11 @@
 python manage.py shell
 
 from account.models import FriendRequest
+<<<<<<< HEAD
 from qna.models import Question, Response, ResponseRequest
+=======
+from qna.models import Question, Article, Response, Post, ResponseRequest
+>>>>>>> 7c39621 (refactor #135: feed -> qna, remove post/article/feed related code)
 from comment.models import Comment
 from like.models import Like
 from notification.models import Notification
