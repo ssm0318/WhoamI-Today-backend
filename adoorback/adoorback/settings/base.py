@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'user_tag.apps.UserTagConfig',
     'reaction.apps.ReactionConfig',
     'check_in.apps.CheckInConfig',
+    'note.apps.NoteConfig',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
