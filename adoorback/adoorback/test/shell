@@ -25,6 +25,10 @@ like = Like.objects.last()
 
 feed_comment = Comment.objects.comments_only().last()
 reply = Comment.objects.replies_only().last()
+<<<<<<< HEAD
+=======
+feed_like = Like.objects.post_likes_only().last()
+>>>>>>> 7c39621 (refactor #135: feed -> qna, remove post/article/feed related code)
 comment_like = Like.objects.comment_likes_only().last()
 user1 = User.objects.get(id=1)
 user2 = User.objects.get(id=2)

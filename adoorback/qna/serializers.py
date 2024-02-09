@@ -125,8 +125,6 @@ class QuestionFriendSerializer(QuestionBaseSerializer):
 
 class DailyQuestionSerializer(QuestionBaseSerializer):
     """
-    for questions in question
-
     (all profiles are anonymized, including that of the current user)
     """
     author = serializers.SerializerMethodField(read_only=True)

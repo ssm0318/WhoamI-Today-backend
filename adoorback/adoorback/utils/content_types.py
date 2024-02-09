@@ -22,6 +22,14 @@ def get_like_type():
     return ContentType.objects.get_for_model(Like)
 
 
+<<<<<<< HEAD
+=======
+def get_article_type():
+    from qna.models import Article
+    return ContentType.objects.get_for_model(Article)
+
+
+>>>>>>> 7c39621 (refactor #135: feed -> qna, remove post/article/feed related code)
 def get_question_type():
     from qna.models import Question
     return ContentType.objects.get_for_model(Question)
@@ -50,11 +58,6 @@ def get_reaction_type():
 def get_note_type():
     from note.models import Note
     return ContentType.objects.get_for_model(Note)
-
-
-def get_reaction_type():
-    from reaction.models import Reaction
-    return ContentType.objects.get_for_model(Reaction)
 
 
 def get_generic_relation_type(model):
