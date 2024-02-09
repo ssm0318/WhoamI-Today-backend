@@ -65,7 +65,7 @@ CORS_ORIGIN_WHITELIST = [
 INSTALLED_APPS = [
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
-    'feed.apps.FeedConfig',
+    'qna.apps.QnaConfig',
     'moment.apps.MomentConfig',
     'like.apps.LikeConfig',
     'comment.apps.CommentConfig',
@@ -74,7 +74,6 @@ INSTALLED_APPS = [
     'user_tag.apps.UserTagConfig',
     'reaction.apps.ReactionConfig',
     'check_in.apps.CheckInConfig',
-    'note.apps.NoteConfig',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -103,7 +102,7 @@ AUTH_USER_MODEL = 'account.User'
 LOGIN_REDIRECT_URL = '/api/user/'
 
 CRON_CLASSES = [
-    "feed.cron.DailyQuestionCronJob",
+    "qna.cron.DailyQuestionCronJob",
     "account.cron.SendDailyWhoAmINotiCronJob",
 ]
 

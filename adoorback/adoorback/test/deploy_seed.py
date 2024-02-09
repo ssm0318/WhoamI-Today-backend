@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from faker import Faker
 
 from adoorback.utils.content_types import get_question_type
-from feed.models import Question, ResponseRequest, Response
+from qna.models import Question, ResponseRequest, Response
 from like.models import Like
 
 DEBUG = True

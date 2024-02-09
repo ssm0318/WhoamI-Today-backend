@@ -54,7 +54,7 @@ def delete_blocked_user_friendship(instance, created, **kwargs):
         user.friends.remove(reported_user)
     
     from account.models import FriendRequest
-    from feed.models import ResponseRequest
+    from qna.models import ResponseRequest
     FriendRequest.objects.filter(requester=user, requestee=reported_user).delete(force_policy=SOFT_DELETE_CASCADE)
     FriendRequest.objects.filter(requester=reported_user, requestee=user).delete(force_policy=SOFT_DELETE_CASCADE)
     ResponseRequest.objects.filter(requester=user, requestee=reported_user).delete(force_policy=SOFT_DELETE_CASCADE)

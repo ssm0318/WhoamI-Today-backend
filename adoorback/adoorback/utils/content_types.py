@@ -23,27 +23,27 @@ def get_like_type():
 
 
 def get_article_type():
-    from feed.models import Article
+    from qna.models import Article
     return ContentType.objects.get_for_model(Article)
 
 
 def get_question_type():
-    from feed.models import Question
+    from qna.models import Question
     return ContentType.objects.get_for_model(Question)
 
 
 def get_response_type():
-    from feed.models import Response
+    from qna.models import Response
     return ContentType.objects.get_for_model(Response)
 
 
 def get_response_request_type():
-    from feed.models import ResponseRequest
+    from qna.models import ResponseRequest
     return ContentType.objects.get_for_model(ResponseRequest)
 
 
 def get_post_type():
-    from feed.models import Post
+    from qna.models import Post
     return ContentType.objects.get_for_model(Post)
 
 

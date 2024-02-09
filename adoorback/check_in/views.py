@@ -11,7 +11,7 @@ from adoorback.utils.validators import adoor_exception_handler
 
 from check_in.models import CheckIn
 import check_in.serializers as cs
-from feed.models import FriendGroup
+from qna.models import FriendGroup
 
 User = get_user_model()
 

@@ -38,15 +38,15 @@ class WebsiteUser(HttpUser):
 
     @task
     def get_recommended_questions(self):
-        response = self.client.get("/api/feed/questions/daily/recommended/")
+        response = self.client.get("/api/qna/questions/daily/recommended/")
         if response.status_code != 200:
-            print(str(response.status_code) + " get friend feed")
+            print(str(response.status_code) + " get friend qna")
 
     @task
     def get_daily_questions(self):
-        response = self.client.get("/api/feed/questions/daily/")
+        response = self.client.get("/api/qna/questions/daily/")
         if response.status_code != 200:
-            print(str(response.status_code) + " get friend feed")
+            print(str(response.status_code) + " get friend qna")
 
     @task(20)
     def get_notifications(self):
@@ -56,27 +56,27 @@ class WebsiteUser(HttpUser):
 
     @task(5)
     def get_friend_feed(self):
-        response = self.client.get("/api/feed/friend/")
+        response = self.client.get("/api/qna/friend/")
         if response.status_code != 200:
-            print(str(response.status_code) + " get friend feed")
+            print(str(response.status_code) + " get friend qna")
 
     # Anonymous Feed Related
     @task(3)
     def get_anonymous_feed(self):
-        response = self.client.get("/api/feed/anonymous/")
+        response = self.client.get("/api/qna/anonymous/")
         if response.status_code != 200:
-            print(str(response.status_code) + " get anonymous feed")
+            print(str(response.status_code) + " get anonymous qna")
 
     # Question Feed Related
     @task
     def get_questions_feed(self):
-        response = self.client.get("/api/feed/questions/")
+        response = self.client.get("/api/qna/questions/")
         if response.status_code != 200:
-            print(str(response.status_code) + " get questions feed")
+            print(str(response.status_code) + " get questions qna")
 
     @task(3)
     def get_questions_detail(self):
-        response = self.client.get("/api/feed/questions/5/")
+        response = self.client.get("/api/qna/questions/5/")
         if response.status_code != 200:
             print(str(response.status_code) + " get questions detail")
 
@@ -86,7 +86,7 @@ class WebsiteUser(HttpUser):
         response = self.client.get('/api/user/token/anonymous/')
         csrf_token = response.cookies['csrftoken']
 
-        response = self.client.post("/api/feed/questions/",
+        response = self.client.post("/api/qna/questions/",
                                     json={"content": "test content",
                                           "share_anonymously": random.choice([True, False])},
                                     headers={"X-CSRFToken": csrf_token})
@@ -98,7 +98,7 @@ class WebsiteUser(HttpUser):
         response = self.client.get('/api/user/token/anonymous/')
         csrf_token = response.cookies['csrftoken']
 
-        response = self.client.post("/api/feed/responses/",
+        response = self.client.post("/api/qna/responses/",
                                     json={"content": "test content",
                                           "question_id": 5,
                                           "share_anonymously": random.choice([True, False])},
@@ -111,7 +111,7 @@ class WebsiteUser(HttpUser):
         response = self.client.get('/api/user/token/anonymous/')
         csrf_token = response.cookies['csrftoken']
 
-        response = self.client.post("/api/feed/articles/",
+        response = self.client.post("/api/qna/articles/",
                                     json={"content": "test content",
                                           "share_anonymously": random.choice([True, False])},
                                     headers={"X-CSRFToken": csrf_token})
@@ -181,7 +181,7 @@ class WebsiteUser(HttpUser):
         User = get_user_model()
         current_user = User.objects.get(username="adoor_user")
 
-        response = self.client.post("/api/feed/questions/response-request/",
+        response = self.client.post("/api/qna/questions/response-request/",
                                     json={"question_id": 5,
                                           "requester_id": current_user.id,
                                           "requestee_id": random.choice(current_user.friend_ids)},

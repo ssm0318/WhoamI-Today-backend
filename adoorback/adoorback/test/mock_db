@@ -23,7 +23,7 @@ admin_question = Question.objects.admin_questions_only().last()
 custom_question = Question.objects.custom_questions_only().last()
 feed_comment = Comment.objects.comments_only().last()
 reply = Comment.objects.replies_only().last()
-feed_like = Like.objects.feed_likes_only().last()
+feed_like = Like.objects.post_likes_only().last()
 comment_like = Like.objects.comment_likes_only().last()
 
 from feed.algorithms.recommender import create_ranks_csv

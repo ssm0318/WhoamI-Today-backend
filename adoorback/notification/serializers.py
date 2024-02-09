@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
 from notification.models import Notification
-from feed.models import Question
+from qna.models import Question
 from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
 
 User = get_user_model()

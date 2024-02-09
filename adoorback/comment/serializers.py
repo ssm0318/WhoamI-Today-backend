@@ -7,7 +7,7 @@ from comment.models import Comment
 from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
 from account.serializers import AuthorFriendSerializer, AuthorAnonymousSerializer
-from feed.models import Response
+from qna.models import Response
 from moment.models import Moment
 from user_tag.serializers import UserTagSerializer
 

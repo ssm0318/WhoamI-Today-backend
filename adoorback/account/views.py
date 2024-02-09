@@ -34,9 +34,9 @@ from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 from check_in.models import CheckIn
 from .email import email_manager
-from feed.models import Question
-from feed.models import Response as _Response
-from feed.serializers import QuestionAnonymousSerializer
+from qna.models import Question
+from qna.models import Response as _Response
+from qna.serializers import QuestionAnonymousSerializer
 
 User = get_user_model()
 

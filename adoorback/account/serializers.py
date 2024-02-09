@@ -13,7 +13,7 @@ from django.utils import timezone
 from account.models import FriendRequest, FriendGroup, BlockRec
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
-from feed.models import Response
+from qna.models import Response
 from notification.models import Notification
 
 from django_countries.serializers import CountryFieldMixin
@@ -347,7 +347,7 @@ class UserFriendGroupOrderSerializer(serializers.Serializer):
 
 
 from moment.serializers import MomentBaseSerializer
-from feed.serializers import ResponseMinimumSerializer
+from qna.serializers import ResponseMinimumSerializer
 from django.conf import settings
 
 

@@ -6,7 +6,7 @@ from test_plus.test import TestCase
 
 from account.models import FriendRequest
 from user_report.models import UserReport
-from feed.models import Article, Question, Response, ResponseRequest
+from qna.models import Article, Question, Response, ResponseRequest
 from comment.models import Comment
 from like.models import Like
 from notification.models import Notification
@@ -54,19 +54,19 @@ class UserReportTestCase(TestCase):
             user_report = UserReport.objects.create(user_id=user3.id, reported_user_id=user1.id)
 
         with self.login(username=user3.username, password='password'):
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 2) # article of user1 is blocked
             self.assertEqual(len(response.data['results'][1]['comments']), 2) # comment of user1 is blocked
 
         with self.login(username=user2.username, password='password'):
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 3)
             self.assertEqual(len(response.data['results'][1]['comments']), 3)
 
         with self.login(username=user1.username, password='password'):
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 2) # article of user3 does not show
             self.assertEqual(len(response.data['results'][0]['comments']), 2) # comment of user3 is blocked

@@ -26,7 +26,7 @@ class LikeManager(SafeDeleteManager):
     def comment_likes_only(self, **kwargs):
         return self.filter(content_type=get_comment_type(), **kwargs)
 
-    def feed_likes_only(self, **kwargs):
+    def post_likes_only(self, **kwargs):
         return self.exclude(content_type=get_comment_type(), **kwargs)
 
 

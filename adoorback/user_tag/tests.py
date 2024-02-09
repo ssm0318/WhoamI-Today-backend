@@ -5,7 +5,7 @@ from rest_framework.test import APIClient
 from comment.models import Comment
 from notification.models import Notification
 from user_tag.models import UserTag
-from feed.models import Article, Question, Response
+from qna.models import Article, Question, Response
 
 from adoorback.utils.seed import set_seed
 from adoorback.content_types import get_comment_type, get_user_tag_type

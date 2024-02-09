@@ -11,7 +11,7 @@ from faker import Faker
 from adoorback.utils.content_types import get_article_type, get_question_type, \
     get_response_type, get_comment_type
 from account.models import FriendRequest
-from feed.models import Article, Response, Question, ResponseRequest
+from qna.models import Article, Response, Question, ResponseRequest
 from comment.models import Comment
 from like.models import Like
 

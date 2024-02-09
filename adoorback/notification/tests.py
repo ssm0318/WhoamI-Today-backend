@@ -5,7 +5,7 @@ from rest_framework.test import APIClient
 from comment.models import Comment
 from like.models import Like
 from notification.models import Notification
-from feed.models import Article
+from qna.models import Article
 
 from adoorback.test.seed import set_seed, fill_data
 from adoorback.utils.content_types import get_comment_type, get_like_type, \

@@ -8,8 +8,8 @@ from faker import Faker
 
 from adoorback.utils.content_types import get_comment_type
 from account.models import FriendRequest
-from feed.algorithms.data_crawler import select_daily_questions
-from feed.models import Article, Response, Question, ResponseRequest
+from qna.algorithms.data_crawler import select_daily_questions
+from qna.models import Article, Response, Question, ResponseRequest
 from comment.models import Comment
 from like.models import Like
 
@@ -169,6 +169,6 @@ def fill_data():
         Comment.objects.create(author=user, content=faker.catch_phrase(), target=random.choice(comments)) \
             if Comment.objects.replies_only().filter(author=user).count() == 0 else None
         Like.objects.create(user=user, target=random.choice(posts)) \
-            if Like.objects.feed_likes_only().filter(user=user).count() == 0 else None
+            if Like.objects.post_likes_only().filter(user=user).count() == 0 else None
         Like.objects.create(user=user, target=random.choice(comments)) \
             if Like.objects.comment_likes_only().filter(user=user).count() == 0 else None

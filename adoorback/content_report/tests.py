@@ -5,7 +5,7 @@ from test_plus.test import TestCase
 from account.models import FriendRequest
 from content_report.models import ContentReport
 from user_report.models import UserReport
-from feed.models import Article, Question, Response, Post
+from qna.models import Article, Question, Response, Post
 from adoorback.test.seed import set_seed
 from adoorback.utils.content_types import get_question_type, get_response_type
 
@@ -33,19 +33,19 @@ class ContentReportTestCase(TestCase):
         response2 = Response.objects.create(author=user3, content='test response2', question=question)
         
         with self.login(username=user1.username, password='password'):
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 4)
 
         with self.login(username=user1.username, password='password'):
             post2 = Post.objects.get(content_type=get_response_type(), object_id=response2.id)
             ContentReport.objects.create(user=user1, post=post2)
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 0)
 
         with self.login(username=user2.username, password='password'):
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 4)
 
@@ -74,7 +74,7 @@ class ContentReportAPITestCase(APITestCase):
         response2 = Response.objects.create(author=user3, content='test response2', question=question)
 
         with self.login(username=user1.username, password='password'):
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 4)
 
@@ -84,7 +84,7 @@ class ContentReportAPITestCase(APITestCase):
             self.assertEqual(response.status_code, 201)
 
         with self.login(username=user1.username, password='password'):
-            response = self.get('anonymous-feed-post-list')
+            response = self.get('anonymous-qna-post-list')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['count'], 2)        
             self.assertEqual(response.data['results'][0]['content'], 'test response1')

@@ -103,24 +103,22 @@ def create_noti(instance, created, **kwargs):
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
-        # send a notification to the author of the feed where the origin comment commented
-        feed_author = origin.target.author
-        if feed_author == origin_author:
+        # send a notification to the author of the qna where the origin comment commented
+        post_author = origin.target.author
+        if post_author == origin_author:
             pass
-        elif feed_author == actor:
+        elif post_author == actor:
             pass
-        elif actor.id in feed_author.user_report_blocked_ids:
+        elif actor.id in post_author.user_report_blocked_ids:
             pass
         else:
-            feed_type_ko = '모먼트' if origin.target.type == 'Moment' else '답변'
-            feed_type_en = 'moment' if origin.target.type == 'Moment' else 'answer'
-            noti = Notification.objects.create(user=feed_author,
+            noti = Notification.objects.create(user=post_author,
                                                origin_id=origin.id,
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'회원님의 {feed_type_ko}에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
-                                               message_en=f'There\'s a new reply to the comment on your {feed_type_en}: "{content_preview}"',
+                                               message_ko=f'회원님의 답변에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
+                                               message_en=f'There\'s a new reply to the comment on your response: "{content_preview}"',
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
@@ -128,7 +126,7 @@ def create_noti(instance, created, **kwargs):
         for participant_id in origin.participants:
             if participant_id == origin_author.id:
                 continue
-            if participant_id == feed_author.id:
+            if participant_id == post_author.id:
                 continue
             if participant_id == actor.id:
                 continue
@@ -148,7 +146,7 @@ def create_noti(instance, created, **kwargs):
     # if not reply
     else:
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-        # send a notification to the author of the origin feed
+        # send a notification to the author of the origin qna
         origin_target_name_ko = '모먼트' if origin.type == 'Moment' else '답변'
         origin_target_name_en = 'moment' if origin.type == 'Moment' else 'answer'
         if origin_author == actor:
@@ -166,7 +164,7 @@ def create_noti(instance, created, **kwargs):
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
-        # send notifications to participants of the origin feed
+        # send notifications to participants of the origin qna
         for participant_id in origin.participants:
             if participant_id == origin_author.id:
                 continue
