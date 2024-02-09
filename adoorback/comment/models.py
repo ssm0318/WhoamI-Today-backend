@@ -95,7 +95,6 @@ def create_noti(instance, created, **kwargs):
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-<<<<<<< HEAD
                                                message_ko=f'{actor.username}이 회원님의 댓글에 답글을 남겼습니다: "{content_preview}"',
                                                message_en=f'{actor.username} has replied to your comment: "{content_preview}"',
                                                redirect_url=redirect_url)
@@ -104,40 +103,19 @@ def create_noti(instance, created, **kwargs):
         # send a notification to the author of the qna where the origin comment commented
         post_author = origin.target.author
         if post_author == origin_author:
-=======
-                                               message_ko=f'{actor_name_ko} 회원님의 댓글에 답글을 남겼습니다: "{content_preview}"',
-                                               message_en=f'{actor_name_en} has replied to your comment: "{content_preview}"',
-                                               redirect_url=redirect_url)
-            noti.actors.add(actor)
-
-        # send a notification to the author of the feed where the origin comment commented
-        feed_author = origin.target.author
-        if feed_author == origin_author:
->>>>>>> ad4a091 (feat: #110 aggregate notifications for likes and response requests)
             pass
         elif post_author == actor:
             pass
         elif actor.id in post_author.user_report_blocked_ids:
             pass
         else:
-<<<<<<< HEAD
             noti = Notification.objects.create(user=post_author,
-=======
-            feed_type_ko = '모먼트' if origin.target.type == 'Moment' else '답변'
-            feed_type_en = 'moment' if origin.target.type == 'Moment' else 'answer'
-            noti = Notification.objects.create(user=feed_author,
->>>>>>> ad4a091 (feat: #110 aggregate notifications for likes and response requests)
                                                origin_id=origin.id,
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-<<<<<<< HEAD
                                                message_ko=f'회원님의 답변에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
                                                message_en=f'There\'s a new reply to the comment on your response: "{content_preview}"',
-=======
-                                               message_ko=f'회원님의 {feed_type_ko}에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
-                                               message_en=f'There\'s a new reply to the comment on your {feed_type_en}: "{content_preview}"',
->>>>>>> ad4a091 (feat: #110 aggregate notifications for likes and response requests)
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
