@@ -35,7 +35,7 @@ class ResponseList(generics.ListCreateAPIView):
 
     def get_exception_handler(self):
         return adoor_exception_handler
-    
+
     def get_queryset(self):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
@@ -46,11 +46,12 @@ class ResponseList(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
-        
+
+
 class ResponseDaily(generics.ListCreateAPIView):
     serializer_class = fs.ResponseBaseSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_date(self):
         year = self.kwargs.get('year')
         month = self.kwargs.get('month')
@@ -61,16 +62,12 @@ class ResponseDaily(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        created_date = self.get_date()
-        next_day = created_date + timedelta(days=1)
-        available_limit = timezone.make_aware(datetime(next_day.year, next_day.month, next_day.day, 23, 59, 59),
-                                              timezone.get_current_timezone())
         share_group_ids = self.request.data.get('share_groups', [])
         share_groups = [get_object_or_404(FriendGroup, id=id_) for id_ in share_group_ids]
         share_friend_ids = self.request.data.get('share_friends', [])
         share_friends = [get_object_or_404(User, id=id_) for id_ in share_friend_ids]
         share_everyone = self.request.data.get('share_everyone', False)
-        serializer.save(author=self.request.user, date=self.get_date(), available_limit=available_limit,
+        serializer.save(author=self.request.user,
                         share_friends=share_friends, share_groups=share_groups, share_everyone=share_everyone)
 
     def get_queryset(self):
@@ -80,7 +77,7 @@ class ResponseDaily(generics.ListCreateAPIView):
         current_user = self.request.user
         current_date = self.get_date()
         return Response.objects.filter(author=current_user, date=current_date).order_by('question')
-    
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
@@ -102,7 +99,7 @@ class ResponseDaily(generics.ListCreateAPIView):
                 combined_responses[-1]["responses"].append(copied_response)
 
         return DjangoResponse(combined_responses)
-    
+
     def get_exception_handler(self):
         return adoor_exception_handler
 
@@ -113,7 +110,7 @@ class QuestionResponseList(generics.RetrieveAPIView):
     """
     serializer_class = fs.QuestionResponseSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_serializer_context(self):
         return {
             'request': self.request,
@@ -128,7 +125,7 @@ class QuestionResponseList(generics.RetrieveAPIView):
             translation.activate(lang)
         queryset = Question.objects.all()
         return queryset
-    
+
     def get_exception_handler(self):
         return adoor_exception_handler
 
@@ -151,10 +148,10 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
             response = Response.objects.get(id=self.kwargs.get('pk'))
         except Response.DoesNotExist:
             raise exceptions.NotFound("Response not found")
-        if response.author != self.request.user and response.available_limit < timezone.now():
+        if response.author != self.request.user and response.available_limit < timezone.now(): #TODO check if this is correct
             raise exceptions.PermissionDenied("This response is not available anymore")
         return response
-    
+
     def get_queryset(self):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
@@ -187,7 +184,8 @@ class ResponseRead(generics.UpdateAPIView):
         ids = request.data.get('ids', [])
         queryset = Response.objects.filter(id__in=ids)
         if len(ids) != queryset.count():
-            return DjangoResponse({'error': 'Response with provided IDs does not exist.'}, status=status.HTTP_404_NOT_FOUND)
+            return DjangoResponse({'error': 'Response with provided IDs does not exist.'},
+                                  status=status.HTTP_404_NOT_FOUND)
         for response in queryset:
             response.readers.add(current_user)
         serializer = self.get_serializer(queryset, many=True)
@@ -199,7 +197,7 @@ class QuestionList(generics.ListCreateAPIView):
     """
     List all questions, or create a new question.
     """
-    
+
     serializer_class = fs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated]
 
@@ -221,7 +219,7 @@ class QuestionList(generics.ListCreateAPIView):
             queryset = queryset[1:]
 
         return queryset
-    
+
     @transaction.atomic
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -236,7 +234,7 @@ class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def get_exception_handler(self):
         return adoor_exception_handler
-    
+
     def get_queryset(self):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']

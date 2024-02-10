@@ -25,7 +25,7 @@ from account.serializers import UserProfileSerializer, \
     UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
     UserFriendshipStatusSerializer, AuthorFriendSerializer, \
     UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer, \
-    TodayFriendsSerializer, UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
+    UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
     UserFriendGroupOrderSerializer, AddFriendFavoriteHiddenSerializer, FriendDetailSerializer, \
     UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, UserSentFriendRequestSerializer
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
@@ -763,37 +763,6 @@ class BlockRecCreate(generics.CreateAPIView):
                             blocked_user_id=self.request.data['blocked_user_id'])
         except IntegrityError:
             pass
-
-
-class TodayFriends(generics.ListAPIView):
-    serializer_class = TodayFriendsSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        return self.request.user.friends.all()
-
-
-class TodayFriend(generics.ListAPIView):
-    serializer_class = TodayFriendsSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        selected_user_id = self.kwargs.get('pk')
-        current_user = self.request.user
-        if selected_user_id in current_user.user_report_blocked_ids:
-            raise PermissionDenied("current user blocked this user")
-        if selected_user_id not in current_user.friend_ids:
-            raise PermissionDenied("you're not his/her friend")
-        return User.objects.filter(id=selected_user_id)
 
 
 class UserFriendGroupList(generics.ListAPIView):
