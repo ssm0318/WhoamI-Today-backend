@@ -7,6 +7,7 @@ from comment.models import Comment
 from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
 from account.serializers import AuthorFriendSerializer
+from note.models import Note
 from qna.models import Response
 from user_tag.serializers import UserTagSerializer
 
@@ -37,7 +38,6 @@ class CommentBaseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Comment
         fields = AdoorBaseSerializer.Meta.fields + ['is_reply', 'is_private', 'target_id', 'user_tags']
-<<<<<<< HEAD
 
 
 class PostCommentsSerializer(serializers.ModelSerializer):
@@ -59,8 +59,6 @@ class PostCommentsSerializer(serializers.ModelSerializer):
             comments = comments.filter(is_private=False) | \
                        comments.filter(author=current_user).order_by('id')
             return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
-=======
->>>>>>> a4ea5a6 (refactor #135: remove is_anonymous and fix minor errors)
 
 
 class PostCommentsSerializer(serializers.ModelSerializer):
@@ -72,6 +70,8 @@ class PostCommentsSerializer(serializers.ModelSerializer):
         current_user = self.context.get('request', None).user
         if isinstance(obj, Response):
             comments = obj.response_comments
+        elif isinstance(obj, Note):
+            comments = obj.note_comments
         else:
             return None
         comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)

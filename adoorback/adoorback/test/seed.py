@@ -7,6 +7,7 @@ from faker import Faker
 
 from adoorback.utils.content_types import get_comment_type, get_response_type
 from account.models import FriendRequest
+from note.models import Note
 from qna.algorithms.data_crawler import select_daily_questions
 from qna.models import Response, Question, ResponseRequest
 from comment.models import Comment
@@ -80,6 +81,13 @@ def set_seed(n):
                                          track_id=faker.text(max_nb_chars=10))
     logging.info(
         f"{CheckIn.objects.count()} Check-in(s) created!") if DEBUG else None
+
+    # Seed Note
+    for _ in range(n):
+        note = Note.objects.create(author=user,
+                                   content=faker.text(max_nb_chars=50))
+    logging.info(
+        f"{Note.objects.count()} Note(s) created!") if DEBUG else None
 
     # Seed Friend Request
     user_1 = User.objects.get(username="adoor_1")

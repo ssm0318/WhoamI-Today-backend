@@ -7,7 +7,7 @@ from like.models import Like
 from notification.models import Notification
 from reaction.models import Reaction
 from adoorback.utils.content_types import get_question_type, get_comment_type, get_response_type
-from adoorback.test.seed import set_seed
+from note.models import Note
 from django.contrib.auth import get_user_model
 User = get_user_model()
 User.objects.values_list('email', flat=True)
