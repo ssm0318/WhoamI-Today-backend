@@ -15,6 +15,18 @@ from notification.models import Notification
 
 User = get_user_model()
 
+class OverwriteStorage(FileSystemStorage):
+    base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
+
+    def get_available_name(self, name, max_length=None):
+        if self.exists(name):
+            self.delete(name)
+        return name
+
+
+def note_image_path(instance, filename):
+    return f'note_images/{instance.author_id}/{filename}'
+
 
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
