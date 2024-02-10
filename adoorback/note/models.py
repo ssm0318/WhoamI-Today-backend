@@ -64,3 +64,4 @@ class Note(AdoorModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['-id']),
         ]
+
