@@ -1,9 +1,13 @@
+import urllib
+
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.core.files.storage import FileSystemStorage
 from safedelete import SOFT_DELETE_CASCADE
 from safedelete.models import SafeDeleteModel
 
+from adoorback import settings
 from adoorback.models import AdoorModel
 from comment.models import Comment
 from like.models import Like
@@ -11,10 +15,22 @@ from notification.models import Notification
 
 User = get_user_model()
 
+class OverwriteStorage(FileSystemStorage):
+    base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
+
+    def get_available_name(self, name, max_length=None):
+        if self.exists(name):
+            self.delete(name)
+        return name
+
+
+def note_image_path(instance, filename):
+    return f'note_images/{instance.author_id}/{filename}'
+
 
 class Note(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='note_set', on_delete=models.CASCADE)
-    image = models.ImageField(upload_to='images/', blank=True, null=True)
+    image = models.ImageField(upload_to=note_image_path, storage=OverwriteStorage(), null=True, blank=True)
 
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
