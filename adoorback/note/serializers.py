@@ -16,4 +16,3 @@ class NoteSerializer(AdoorBaseSerializer):
         model = Note
         fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'image']
 
-
