@@ -84,6 +84,7 @@ class PostCommentsSerializer(serializers.ModelSerializer):
             return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
 
+
 class CommentFriendSerializer(CommentBaseSerializer):
     author = serializers.SerializerMethodField(read_only=True)
     author_detail = AuthorFriendSerializer(source='author', read_only=True)
@@ -102,6 +103,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
             replies = obj.replies.filter(is_private=False) | \
                       obj.replies.filter(author=current_user).order_by('id')
         return self.__class__(replies, many=True, read_only=True, context=self.context).data
+
     class Meta(CommentBaseSerializer.Meta):
         model = Comment
         fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail', 'replies']
