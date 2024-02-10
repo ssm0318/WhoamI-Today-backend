@@ -47,7 +47,7 @@ def parse_message_ko(msg, actor_count):
 
 def parse_message_en(msg, actor_count):
     if actor_count > 2:
-        pattern_c = re.compile(r"(Knock knock! |)(\w+), (\w+), and (\d+) other friends")
+        pattern_c = re.compile(r"(Knock knock! |)(\w+), (\w+), and (\d+) other friend\(s\)")
         match_c = pattern_c.search(msg)
         return {
             'user_a': match_c.group(2),
