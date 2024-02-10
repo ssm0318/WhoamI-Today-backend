@@ -33,10 +33,10 @@ from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUs
 from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 from check_in.models import CheckIn
+from qna.serializers import QuestionBaseSerializer
 from .email import email_manager
 from qna.models import Question
 from qna.models import Response as _Response
-from qna.serializers import QuestionAnonymousSerializer
 
 User = get_user_model()
 
@@ -303,7 +303,7 @@ class ResetPassword(generics.UpdateAPIView):
 
 class SignupQuestions(generics.ListAPIView):
     queryset = Question.objects.order_by('?')[:10]
-    serializer_class = QuestionAnonymousSerializer
+    serializer_class = QuestionBaseSerializer
     model = serializer_class.Meta.model
     permission_classes = [IsAuthenticated]
 

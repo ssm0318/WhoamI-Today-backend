@@ -32,7 +32,6 @@ class LikeManager(SafeDeleteManager):
 
 class Like(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(User, related_name='like_set', on_delete=models.CASCADE)
-    is_anonymous = models.BooleanField(default=False)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.IntegerField()

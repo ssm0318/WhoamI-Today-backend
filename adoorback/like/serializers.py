@@ -29,4 +29,4 @@ class LikeSerializer(serializers.ModelSerializer):
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Like
-        fields = ['id', 'type', 'user', 'user_detail', 'is_anonymous', 'target_type', 'target_id']
+        fields = ['id', 'type', 'user', 'user_detail', 'target_type', 'target_id']

@@ -121,18 +121,6 @@ class AuthorFriendSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'profile_pic', 'url', 'profile_image']
 
 
-class AuthorAnonymousSerializer(serializers.ModelSerializer):
-    color_hex = serializers.SerializerMethodField(read_only=True)
-
-    def get_color_hex(self, obj):
-        author_hash = obj.id * secrets.randbelow(63872) * secrets.randbelow(98574)
-        return '#{0:06X}'.format(author_hash % 16777215)  # mod max color HEX
-
-    class Meta:
-        model = User
-        fields = ['color_hex']
-
-
 class FriendDetailSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)

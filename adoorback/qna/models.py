@@ -75,7 +75,6 @@ class Response(AdoorModel, SafeDeleteModel):
     date = models.DateField(blank=False, null=False, default='2008-10-03')
     available_limit = models.DateTimeField(blank=False, null=False, default='3000-10-03')
     share_with_friends = models.BooleanField(default=True)
-    share_anonymously = models.BooleanField(default=True)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
 
     response_comments = GenericRelation(Comment)

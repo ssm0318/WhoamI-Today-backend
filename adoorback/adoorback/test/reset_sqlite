@@ -1,4 +1,0 @@
-rm -f tmp.db adoorback/db.sqlite3
-rm -r */migrations
-python manage.py makemigrations account feed comment like notification user_report content_report
-python manage.py migrate

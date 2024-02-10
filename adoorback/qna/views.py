@@ -45,9 +45,6 @@ class ResponseList(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        # cache.delete('questions')
-        # cache.delete('friend-{}'.format(self.request.user.id))
-        # cache.delete('anonymous')
         serializer.save(author=self.request.user)
         
 class ResponseDaily(generics.ListCreateAPIView):
@@ -203,7 +200,7 @@ class QuestionList(generics.ListCreateAPIView):
     List all questions, or create a new question.
     """
     
-    serializer_class = fs.QuestionResponsiveSerializer
+    serializer_class = fs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
@@ -214,7 +211,7 @@ class QuestionList(generics.ListCreateAPIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
         queryset = Question.objects.raw("""
-                SELECT * FROM feed_question
+                SELECT * FROM qna_question
                 WHERE array_length(selected_dates, 1) IS NOT NULL
                 ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
                 LIMIT 30;
@@ -227,9 +224,6 @@ class QuestionList(generics.ListCreateAPIView):
     
     @transaction.atomic
     def perform_create(self, serializer):
-        # cache.delete('friend-{}'.format(self.request.user.id))
-        # cache.delete('anonymous')
-        # cache.delete('questions')
         serializer.save(author=self.request.user)
 
 
@@ -237,7 +231,7 @@ class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
     """
     Retrieve, update, or destroy a question.
     """
-    serializer_class = fs.QuestionResponsiveSerializer
+    serializer_class = fs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -256,25 +250,6 @@ class QuestionFriendResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
     Retrieve, update, or destroy a question.
     """
     serializer_class = fs.QuestionDetailFriendResponsesSerializer
-    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        queryset = Question.objects.all()
-        cache.set('questions', queryset)
-        return queryset
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-
-class QuestionAnonymousResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
-    """
-    Retrieve, update, or destroy a question.
-    """
-    serializer_class = fs.QuestionDetailAnonymousResponsesSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_queryset(self):

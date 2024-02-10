@@ -4,7 +4,6 @@ from qna import views
 urlpatterns = [
     # Response related
     path('responses/', views.ResponseList.as_view(), name='response-list'),
-    path('responses/<int:year>/<int:month>/<int:day>/', views.ResponseDaily.as_view(), name='response-daily'),
     path('responses/<int:pk>/', views.ResponseDetail.as_view(), name='response-detail'),
     path('responses/comments/<int:pk>/', views.ResponseComments.as_view(), name='response-comments'),
     path('responses/read', views.ResponseRead.as_view(), name='response-read'),
@@ -19,10 +18,6 @@ urlpatterns = [
 
     # Question Detail Page related
     path('questions/<int:pk>/', views.QuestionDetail.as_view(), name='question-detail'),
-    path('questions/<int:pk>/friend/',
-         views.QuestionFriendResponsesDetail.as_view(), name='question-detail-friend'),
-    path('questions/<int:pk>/anonymous/',
-         views.QuestionAnonymousResponsesDetail.as_view(), name='question-detail-anonymous'),
 
     # Response Request related
     path('questions/response-request/', views.ResponseRequestCreate.as_view(),

@@ -36,7 +36,6 @@ class CommentManager(SafeDeleteManager):
 class Comment(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='comment_set', on_delete=models.CASCADE)
     is_private = models.BooleanField(default=False)
-    is_anonymous = models.BooleanField(default=False)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.IntegerField()
@@ -80,8 +79,6 @@ def create_noti(instance, created, **kwargs):
     origin = instance.target
     target = instance
 
-    actor_name_ko = '익명의 사용자가' if instance.is_anonymous else f'{actor.username}님이'
-    actor_name_en = 'An anonymous user' if instance.is_anonymous else f'{actor.username}'
     content_preview = wrap_content(instance.content)
 
     # if is_reply
@@ -98,8 +95,8 @@ def create_noti(instance, created, **kwargs):
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'{actor_name_ko} 회원님의 댓글에 답글을 남겼습니다: "{content_preview}"',
-                                               message_en=f'{actor_name_en} has replied to your comment: "{content_preview}"',
+                                               message_ko=f'{actor.username}이 회원님의 댓글에 답글을 남겼습니다: "{content_preview}"',
+                                               message_en=f'{actor.username} has replied to your comment: "{content_preview}"',
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
@@ -159,8 +156,8 @@ def create_noti(instance, created, **kwargs):
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'{actor_name_ko} 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다: "{content_preview}"',
-                                               message_en=f'{actor_name_en} has commented on your {origin_target_name_en}: "{content_preview}"',
+                                               message_ko=f'{actor.username}님이 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다: "{content_preview}"',
+                                               message_en=f'{actor.username} has commented on your {origin_target_name_en}: "{content_preview}"',
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
@@ -191,9 +188,6 @@ def create_user_tag(instance, **kwargs):
     tagging_user = instance.author
     object_id = instance.id
     content_type = get_generic_relation_type(instance.type)
-
-    if instance.is_anonymous:
-        return
 
     tagged_users, word_indices = parse_user_tag_from_content(content)
 

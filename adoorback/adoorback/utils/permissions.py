@@ -34,9 +34,9 @@ class IsShared(permissions.BasePermission):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
-        if obj.type == 'Question' or obj.share_anonymously:
+        if obj.type == 'Question':
             return True
-        elif obj.share_with_friends and User.are_friends(request.user, obj.author):
+        elif User.are_friends(request.user, obj.author):
             return True
         else:
             return obj.author == request.user
