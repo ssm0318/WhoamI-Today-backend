@@ -11,9 +11,6 @@ from adoorback.utils.validators import adoor_exception_handler
 
 
 class LikeList(generics.ListCreateAPIView):
-    """
-    List all likes, or create a new like.
-    """
     queryset = Like.objects.all()
     serializer_class = LikeSerializer
     permission_classes = [IsAuthenticated]
@@ -38,9 +35,6 @@ class LikeList(generics.ListCreateAPIView):
 
 
 class LikeDestroy(generics.DestroyAPIView):
-    """
-    Destroy a like.
-    """
     queryset = Like.objects.all()
     serializer_class = LikeSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]

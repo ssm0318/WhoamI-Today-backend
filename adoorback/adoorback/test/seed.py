@@ -41,7 +41,8 @@ def set_seed(n):
             User.objects.create_user(username=username,
                                      email=faker.email(),
                                      password="Adoor2020:)")
-    User.objects.create_user(username="tester2", email=faker.email(), password="Test1234!")
+    if not User.objects.get(username="tester2"):
+        User.objects.create_user(username="tester2", email=faker.email(), password="Test1234!")
     logging.info(
         f"{User.objects.count()} User(s) created!") if DEBUG else None
 
@@ -109,29 +110,43 @@ def set_seed(n):
     user_2.friends.add(user_1, user_3, user_4, user_5, user_6)
 
     # Test Notifications
-    r = Response.objects.get(id=1)
+    response = Response.objects.first()
+    note = Note.objects.first()
+
     Like.objects.all().delete()
-    Like.objects.create(user=user_1, target=r)
-    Like.objects.create(user=user_3, target=r)
-    Like.objects.create(user=user_4, target=r)
-    Like.objects.create(user=user_5, target=r)
-    Like.objects.create(user=user_6, target=r)
-    Like.objects.create(user=user_7, target=r)
+    Like.objects.create(user=user_1, target=response)
+    Like.objects.create(user=user_3, target=response)
+    Like.objects.create(user=user_4, target=response)
+    Like.objects.create(user=user_5, target=response)
+    Like.objects.create(user=user_6, target=response)
+    Like.objects.create(user=user_7, target=response)
+    Like.objects.create(user=user_1, target=note)
+    Like.objects.create(user=user_3, target=note)
+    Like.objects.create(user=user_4, target=note)
+    Like.objects.create(user=user_5, target=note)
+    Like.objects.create(user=user_6, target=note)
+    Like.objects.create(user=user_7, target=note)
     Like.objects.all().delete()
     Comment.objects.all().delete()
-    Comment.objects.create(author=user_1, target=r, content="test")
-    Comment.objects.create(author=user_3, target=r, content="test")
-    Comment.objects.create(author=user_4, target=r, content="test")
-    Comment.objects.create(author=user_5, target=r, content="test")
-    Comment.objects.create(author=user_6, target=r, content="test")
-    Comment.objects.create(author=user_7, target=r, content="test")
+    Comment.objects.create(author=user_1, target=response, content="test comment noti")
+    Comment.objects.create(author=user_3, target=response, content="test comment noti")
+    Comment.objects.create(author=user_4, target=response, content="test comment noti")
+    Comment.objects.create(author=user_5, target=response, content="test comment noti")
+    Comment.objects.create(author=user_6, target=response, content="test comment noti")
+    Comment.objects.create(author=user_7, target=response, content="test comment noti")
+    Comment.objects.create(author=user_1, target=note, content="test note noti")
+    Comment.objects.create(author=user_3, target=note, content="test note noti")
+    Comment.objects.create(author=user_4, target=note, content="test note noti")
+    Comment.objects.create(author=user_5, target=note, content="test note noti")
+    Comment.objects.create(author=user_6, target=note, content="test note noti")
+    Comment.objects.create(author=user_7, target=note, content="test note noti")
     Comment.objects.all().delete()
     ResponseRequest.objects.all().delete()
-    ResponseRequest.objects.create(requester=user_1, requestee=user_3, question=r.question)
-    ResponseRequest.objects.create(requester=user_4, requestee=user_3, question=r.question)
-    ResponseRequest.objects.create(requester=user_5, requestee=user_3, question=r.question)
-    ResponseRequest.objects.create(requester=user_6, requestee=user_3, question=r.question)
-    ResponseRequest.objects.create(requester=user_7, requestee=user_3, question=r.question)
+    ResponseRequest.objects.create(requester=user_1, requestee=user_3, question=response.question)
+    ResponseRequest.objects.create(requester=user_4, requestee=user_3, question=response.question)
+    ResponseRequest.objects.create(requester=user_5, requestee=user_3, question=response.question)
+    ResponseRequest.objects.create(requester=user_6, requestee=user_3, question=response.question)
+    ResponseRequest.objects.create(requester=user_7, requestee=user_3, question=response.question)
     ResponseRequest.objects.all().delete()
 
     # Seed Response Request
@@ -188,8 +203,8 @@ def set_seed(n):
     # Seed Like
     for i in range(n):
         user = random.choice(users)
-        question = Question.objects.get(id=i + 1)
-        response = Response.objects.get(id=i + 1)
+        question = Question.objects.all()[i:i+1].first()
+        response = Response.objects.all()[i:i+1].first()
         comment = Comment.objects.comments_only()[i]
         reply = Comment.objects.replies_only()[i]
         Like.objects.create(user=user, target=question)
