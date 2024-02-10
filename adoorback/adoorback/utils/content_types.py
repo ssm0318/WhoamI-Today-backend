@@ -47,6 +47,11 @@ def get_reaction_type():
     return ContentType.objects.get_for_model(Reaction)
 
 
+def get_note_type():
+    from note.models import Note
+    return ContentType.objects.get_for_model(Note)
+
+
 def get_generic_relation_type(model):
     model = model.capitalize()
     if model == 'Comment':
@@ -55,5 +60,7 @@ def get_generic_relation_type(model):
         return get_response_type()
     elif model == 'Question':
         return get_question_type()
+    elif model == 'Note':
+        return get_note_type()
     else:
         return None
