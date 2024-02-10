@@ -37,6 +37,7 @@ class CommentBaseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Comment
         fields = AdoorBaseSerializer.Meta.fields + ['is_reply', 'is_private', 'target_id', 'user_tags']
+<<<<<<< HEAD
 
 
 class PostCommentsSerializer(serializers.ModelSerializer):
@@ -58,6 +59,8 @@ class PostCommentsSerializer(serializers.ModelSerializer):
             comments = comments.filter(is_private=False) | \
                        comments.filter(author=current_user).order_by('id')
             return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
+=======
+>>>>>>> a4ea5a6 (refactor #135: remove is_anonymous and fix minor errors)
 
 
 class CommentFriendSerializer(CommentBaseSerializer):
@@ -78,7 +81,6 @@ class CommentFriendSerializer(CommentBaseSerializer):
             replies = obj.replies.filter(is_private=False) | \
                       obj.replies.filter(author=current_user).order_by('id')
         return self.__class__(replies, many=True, read_only=True, context=self.context).data
-
     class Meta(CommentBaseSerializer.Meta):
         model = Comment
         fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail', 'replies']

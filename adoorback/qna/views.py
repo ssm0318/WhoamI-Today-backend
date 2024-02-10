@@ -197,7 +197,6 @@ class QuestionList(generics.ListCreateAPIView):
     """
     List all questions, or create a new question.
     """
-
     serializer_class = fs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated]
 
