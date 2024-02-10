@@ -1,6 +1,3 @@
-"""Django Model
-Define Models for account APIs
-"""
 from datetime import time
 import secrets
 import os
@@ -70,9 +67,6 @@ class UserCustomManager(UserManager, SafeDeleteManager):
 
 
 class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
-    """User Model
-    This model extends the Django Abstract User model
-    """
     username_validator = AdoorUsernameValidator()
 
     username = models.CharField(
@@ -209,9 +203,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
 
 class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
-    """FriendRequest Model
-    This model describes FriendRequest between users
-    """
     requester = models.ForeignKey(
         get_user_model(), related_name='sent_friend_requests', on_delete=models.CASCADE)
     requestee = models.ForeignKey(

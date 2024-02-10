@@ -2,15 +2,15 @@ import re
 
 from django.core.exceptions import ValidationError
 
-from adoorback.utils.content_types import get_comment_type, get_like_type, get_response_type, get_reaction_type
+from adoorback.utils.content_types import get_comment_type, get_like_type, get_response_type, get_reaction_type, \
+    get_note_type
 
 
 def parse_message_ko(msg, actor_count):
-    print(msg, actor_count)
     if actor_count > 2:
         pattern_c = re.compile(
             r"똑똑똑! (\w+)님, (\w+)님, 외 (\d+)명의 친구로부터 질문이 왔어요|"
-            r"(\w+)님, (\w+)님, 외 (\d+)명의 친구가 회원님의 (댓글을|답변을) 좋아합니다|"
+            r"(\w+)님, (\w+)님, 외 (\d+)명의 친구가 회원님의 (댓글을|답변을|노트를) 좋아합니다|"
             r"(\w+)님, (\w+)님, 외 (\d+)명의 친구가 회원님의 답변에 .+ 반응을 남겼습니다"
         )
         match_c = pattern_c.search(msg)
@@ -22,7 +22,7 @@ def parse_message_ko(msg, actor_count):
     if actor_count == 2:
         pattern_b = re.compile(
             r"똑똑똑! (\w+)님과 (\w+)님으로부터 질문이 왔어요|"
-            r"(\w+)님과 (\w+)님이 회원님의 (댓글을|답변을) 좋아합니다|"
+            r"(\w+)님과 (\w+)님이 회원님의 (댓글을|답변을|노트를) 좋아합니다|"
             r"(\w+)님과 (\w+)님이 회원님의 답변에 .+ 반응을 남겼습니다"
         )
         match_b = pattern_b.search(msg)
@@ -34,7 +34,7 @@ def parse_message_ko(msg, actor_count):
     if actor_count == 1:
         pattern_a = re.compile(
             r"똑똑똑! (\w+)님으로부터 질문이 왔어요|"
-            r"(\w+)님이 회원님의 (댓글을|답변을) 좋아합니다|"
+            r"(\w+)님이 회원님의 (댓글을|답변을|노트를) 좋아합니다|"
             r"(\w+)님이 회원님의 답변에 .+ 반응을 남겼습니다"
         )
         match_a = pattern_a.search(msg)
@@ -85,14 +85,13 @@ def find_like_noti(user, origin, noti_type):
 
     if noti_type == "like_reply_noti":
         existing_notifications = existing_notifications.filter(origin_type=get_comment_type(), origin_id__in=reply_ids)
-
     elif noti_type == "like_comment_noti":
         existing_notifications = existing_notifications.filter(origin_type=get_comment_type()).exclude(
             origin_id__in=reply_ids)
     elif noti_type == "like_response_noti":
         existing_notifications = existing_notifications.filter(origin_type=get_response_type())
-    elif noti_type == "reaction_response_noti":
-        existing_notifications = existing_notifications.filter(origin_type=get_reaction_type())
+    elif noti_type == "like_note_noti":
+        existing_notifications = existing_notifications.filter(origin_type=get_note_type())
 
     if existing_notifications.count() > 1:
         raise ValidationError("There are more than one notifications that satisfy this condition.")
@@ -121,6 +120,16 @@ def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, 
         else:
             return f'{user_a_ko}, {user_b_ko}, 외 {N - 1}명의 친구가 회원님의 답변을 좋아합니다: {content_preview}', \
                 f'{user_a_en}, {user_b_en}, and {N - 1} other friend(s) liked your response: {content_preview}'
+    elif noti_type == "like_note_noti":
+        if N == 0:
+            return f'{user_a_ko}이 회원님의 노트를 좋아합니다: {content_preview}', \
+                f'{user_a_en} liked your note: {content_preview}'
+        elif N == 1:
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 노트를 좋아합니다: {content_preview}', \
+                f'{user_a_en} and {user_b_en} liked your note: {content_preview}'
+        else:
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 1}명의 친구가 회원님의 노트를 좋아합니다: {content_preview}', \
+                f'{user_a_en}, {user_b_en}, and {N - 1} other friend(s) liked your note: {content_preview}'
     elif noti_type == "response_request_noti":
         if N == 0:
             return f'똑똑똑! {user_a_ko}으로부터 질문이 왔어요: {content_preview}', \

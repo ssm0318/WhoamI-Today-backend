@@ -602,9 +602,6 @@ class UserSearch(generics.ListAPIView):
 
 
 class UserFriendDestroy(generics.DestroyAPIView):
-    """
-    Destroy a friendship.
-    """
     queryset = User.objects.all()
     permission_classes = [IsAuthenticated]
 
