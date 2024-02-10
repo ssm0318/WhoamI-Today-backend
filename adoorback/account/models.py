@@ -190,7 +190,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         # return responses of user that self can access
         from qna.models import Response
         response_ids = [response.id for response in user.response_set.all() if Response.is_audience(response, self)]
-        response_queryset = Response.objects.filter(id__in=response_ids).filter(available_limit__gt=timezone.now())
+        response_queryset = Response.objects.filter(id__in=response_ids)
         return response_queryset
 
     def can_access_check_in(self, user):

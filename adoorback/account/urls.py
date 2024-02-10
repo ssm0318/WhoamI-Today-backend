@@ -64,7 +64,4 @@ urlpatterns = [
          name='user-friend-group-order-update'),
     path('friend-groups/<int:pk>/', views.UserFriendGroupDetail.as_view(),
          name='user-friend-request-detail'),
-
-    path('friends/today/', views.TodayFriends.as_view(), name='today-friends'),
-    path('friend/<int:pk>/today/', views.TodayFriend.as_view(), name='today-friend')
 ]

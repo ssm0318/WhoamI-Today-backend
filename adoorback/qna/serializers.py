@@ -51,7 +51,7 @@ class ResponseMinimumSerializer(serializers.ModelSerializer):
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
-        fields = ['id', 'type', 'content', 'current_user_like_id', 'question', 'date', 'available_limit', 
+        fields = ['id', 'type', 'content', 'current_user_like_id', 'question',
                   'created_at', 'current_user_read']
 
 
@@ -82,7 +82,7 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
     
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
-        fields = AdoorBaseSerializer.Meta.fields + ['question', 'question_id', 'date', 'available_limit', 'current_user_read',
+        fields = AdoorBaseSerializer.Meta.fields + ['question', 'question_id', 'current_user_read',
                                                     'reaction_preview', 'share_friends', 'share_friends_details', 
                                                     'share_groups', 'share_groups_details', 'share_everyone']
 
