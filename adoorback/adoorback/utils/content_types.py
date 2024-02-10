@@ -22,11 +22,6 @@ def get_like_type():
     return ContentType.objects.get_for_model(Like)
 
 
-def get_article_type():
-    from qna.models import Article
-    return ContentType.objects.get_for_model(Article)
-
-
 def get_question_type():
     from qna.models import Question
     return ContentType.objects.get_for_model(Question)
@@ -40,11 +35,6 @@ def get_response_type():
 def get_response_request_type():
     from qna.models import ResponseRequest
     return ContentType.objects.get_for_model(ResponseRequest)
-
-
-def get_post_type():
-    from qna.models import Post
-    return ContentType.objects.get_for_model(Post)
 
 
 def get_user_tag_type():
@@ -61,8 +51,6 @@ def get_generic_relation_type(model):
     model = model.capitalize()
     if model == 'Comment':
         return get_comment_type()
-    elif model == 'Article':
-        return get_article_type()
     elif model == 'Response':
         return get_response_type()
     elif model == 'Question':

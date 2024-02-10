@@ -39,6 +39,27 @@ class CommentBaseSerializer(AdoorBaseSerializer):
         fields = AdoorBaseSerializer.Meta.fields + ['is_reply', 'is_private', 'target_id', 'user_tags']
 
 
+class PostCommentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = '__all__'
+
+    def to_representation(self, obj):
+        current_user = self.context.get('request', None).user
+        if isinstance(obj, Response):
+            comments = obj.response_comments
+        else:
+            return None
+        comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)
+        if obj.author == current_user:
+            comments = comments.order_by('id')
+            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
+        else:
+            comments = comments.filter(is_private=False) | \
+                       comments.filter(author=current_user).order_by('id')
+            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
+
+
 class CommentFriendSerializer(CommentBaseSerializer):
     author = serializers.SerializerMethodField(read_only=True)
     author_detail = AuthorFriendSerializer(source='author', read_only=True)
@@ -63,54 +84,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
         fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail', 'replies']
 
 
-class CommentResponsiveSerializer(CommentBaseSerializer):
-    author = serializers.SerializerMethodField(read_only=True)
-    author_detail = serializers.SerializerMethodField(
-        source='author', read_only=True)
-    replies = serializers.SerializerMethodField()
+class ReplySerializer(CommentFriendSerializer):
 
-    def get_replies(self, obj):
-        current_user = self.context.get('request', None).user
-        if obj.target.author == current_user:
-            replies = obj.replies.order_by('id')
-        else:
-            replies = obj.replies.filter(is_private=False) | \
-                      obj.replies.filter(author_id=current_user.id).order_by('id')
-        return self.__class__(replies, many=True, read_only=True, context=self.context).data  # responsive serializer
-
-    def get_author_detail(self, obj):
-        return AuthorFriendSerializer(obj.author).data
-
-    def get_author(self, obj):
-        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
-
-    class Meta(CommentBaseSerializer.Meta):
-        model = Comment
-        fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail', 'replies']
-
-
-class PostCommentsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        fields = '__all__'
-
-    def to_representation(self, obj):
-        current_user = self.context.get('request', None).user
-        if isinstance(obj, Response):
-            comments = obj.response_comments
-        else:
-            return None
-        comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)
-        if obj.author == current_user:
-            comments = comments.order_by('id')
-            return CommentResponsiveSerializer(comments, many=True, read_only=True, context=self.context).data
-        else:
-            comments = comments.filter(is_private=False) | \
-                       comments.filter(author=current_user).order_by('id')
-            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
-
-
-class ReplySerializer(CommentResponsiveSerializer):
-
-    class Meta(CommentResponsiveSerializer.Meta):
+    class Meta(CommentFriendSerializer.Meta):
         model = Comment
