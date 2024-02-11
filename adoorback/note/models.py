@@ -7,13 +7,14 @@ from django.core.files.storage import FileSystemStorage
 from safedelete import SOFT_DELETE_CASCADE
 from safedelete.models import SafeDeleteModel
 
-from adoorback import settings
+from django.conf import settings
 from adoorback.models import AdoorModel
 from comment.models import Comment
 from like.models import Like
 from notification.models import Notification
 
 User = get_user_model()
+
 
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
