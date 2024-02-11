@@ -15,6 +15,7 @@ from notification.models import Notification
 
 User = get_user_model()
 
+
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
 
