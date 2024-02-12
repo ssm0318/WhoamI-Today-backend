@@ -6,7 +6,7 @@ from comment.models import Comment
 
 from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
-from account.serializers import AuthorFriendSerializer
+from account.serializers import UserMinimalSerializer
 from note.models import Note
 from qna.models import Response
 from user_tag.serializers import UserTagSerializer
@@ -65,7 +65,7 @@ class PostCommentsSerializer(serializers.ModelSerializer):
 
 class CommentFriendSerializer(CommentBaseSerializer):
     author = serializers.SerializerMethodField(read_only=True)
-    author_detail = AuthorFriendSerializer(source='author', read_only=True)
+    author_detail = UserMinimalSerializer(source='author', read_only=True)
     replies = serializers.SerializerMethodField()
 
     def get_author(self, obj):
