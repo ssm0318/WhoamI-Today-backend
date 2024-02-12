@@ -8,6 +8,8 @@ from safedelete import SOFT_DELETE_CASCADE
 from safedelete.models import SafeDeleteModel
 
 from django.conf import settings
+
+from account.models import FriendGroup
 from adoorback.models import AdoorModel
 from comment.models import Comment
 from like.models import Like
@@ -49,6 +51,10 @@ class Note(AdoorModel, SafeDeleteModel):
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
 
+    share_everyone = models.BooleanField(default=True)
+    share_groups = models.ManyToManyField(FriendGroup, related_name='shared_notes', blank=True)
+    share_friends = models.ManyToManyField(User, related_name='shared_notes', blank=True)
+
     note_targetted_notis = GenericRelation(Notification,
                                            content_type_field='target_type',
                                            object_id_field='target_id')
@@ -72,6 +78,27 @@ class Note(AdoorModel, SafeDeleteModel):
     @property
     def participants(self):
         return self.note_comments.values_list('author_id', flat=True).distinct()
+
+    def is_audience(self, user):
+        """
+        Returns True if the given user is in the audience that can view this response.
+        """
+        if self.author == user:
+            return True
+
+        if not User.are_friends(self.author, user):
+            return False
+
+        if self.share_everyone:
+            return True
+
+        if self.share_groups.filter(friends=user).exists():
+            return True
+
+        if self.share_friends.filter(pk=user.pk).exists():
+            return True
+
+        return False
 
     class Meta:
         indexes = [

@@ -9,42 +9,42 @@ urlpatterns = [
     path('signup/password/', views.UserPasswordCheck.as_view(), name='user-password-check'),
     path('signup/username/', views.UserUsernameCheck.as_view(), name='user-username-check'),
     path('signup/', views.UserSignup.as_view(), name='user-signup'),
-    path('select-questions/', views.SignupQuestions.as_view(),
+    path('signup/questions/', views.SignupQuestions.as_view(),
          name='signup-questions'),
     path('send-reset-password-email/', views.SendResetPasswordEmail.as_view(), name='user-send-reset-password-email'),
     path('reset-password/<int:pk>/<str:token>/', views.ResetPasswordWithToken.as_view(), name='user-reset-password-with-token'),
     path('reset-password/<int:pk>/', views.ResetPassword.as_view(), name='user-reset-password'),
     path('password-confirm/', views.UserPasswordConfirm.as_view(), name='user-password-confirm'),
 
-    # User Profile related
-    path('', views.UserList.as_view(), name='user-list'),
-    path(r'search/', views.UserSearch.as_view(), name='user-search'),
-    path('profile/<str:username>/', views.UserDetail.as_view(), name='user-detail'),
-
     # Current User Related
-    path('me/', views.CurrentUserProfile.as_view(), name='current-user'),
-    path('me/friends/', views.CurrentUserFriendList.as_view(), name='current-user-friends'),
-    path('me/friends/all/', views.CurrentUserFriendDetailList.as_view(), name='current-user-friends-detail'),
-    path('me/friends/edit/', views.CurrentUserFriendEditList.as_view(), name='current-user-friends-edit'),
-    path('me/friends/updated/', views.CurrentUserFriendUpdatedList.as_view(), name='current-user-friends-updated'),
-    path('me/favorites/', views.CurrentUserFavoritesList.as_view(), name='current-user-favorites'),
-    path('me/friends/update/', views.CurrentUserFriendsUpdate.as_view(), name='current-user-friends-update'),
-    path('me/delete/', views.CurrentUserDelete.as_view() , name='current-user-delete'),
+    path('me/', views.CurrentUserDetail.as_view(), name='current-user-detail'),
+    path('me/', views.CurrentUserDelete.as_view(), name='current-user-delete'),
+    path('me/profile/', views.CurrentUserProfile.as_view(), name='current-user-profile'),
+    path('me/notes/', views.CurrentUserNoteList.as_view(), name='current-user-note-list'),
+    path('me/responses/', views.CurrentUserResponseList.as_view(), name='current-user-response-list'),
+
+    # User Profile related
+    path(r'search/', views.UserSearch.as_view(), name='user-search'),
+    path('<str:username>/profile/', views.UserProfile.as_view(), name='user-detail'),
+    path('<str:username>/notes/', views.UserNoteList.as_view(), name='user-note-list'),
+    path('<str:username>/responses/', views.UserResponseList.as_view(), name='user-response-list'),
+
+    # Friend List related
+    path('friends/', views.FriendListUpdate.as_view(), name='current-user-friends-update'),
+    path('friends/', views.FriendList.as_view(), name='friend-list'),
+
+    path('friends/favorites/', views.UserFavoriteAdd.as_view(), name='user-favorite-add'),
+    path('friends/<int:pk>/favorites/', views.UserFavoriteDestroy.as_view(), name='user-favorite-destroy'),
+
+    path('friends/hidden/', views.UserHiddenAdd.as_view(), name='user-hidden-add'),
 
     # Friendship related
-    path('friend/<int:pk>/', views.UserFriendDestroy.as_view(), name='user-friend-destroy'),
-
-    # Favorites related
-    path('favorite/add/', views.UserFavoriteAdd.as_view(), name='user-favorite-add'),
-    path('favorite/<int:pk>/', views.UserFavoriteDestroy.as_view(), name='user-favorite-destroy'),
-
-    # Hidden related
-    path('hidden/add/', views.UserHiddenAdd.as_view(), name='user-hidden-add'),
+    path('friends/<int:pk>/', views.UserFriendDestroy.as_view(), name='user-friend-destroy'),
 
     # FriendRequest related
-    path('friend-requests/', views.UserFriendRequestList.as_view(),
+    path('friend-requests/', views.UserFriendRequestListCreate.as_view(),
          name='user-friend-request-list'),
-    path('sent-friend-requests/', views.UserSentFriendRequestList.as_view(),
+    path('friend-requests/sent/', views.UserSentFriendRequestList.as_view(),
          name='user-sent-friend-request-list'),
     path('friend-requests/<int:pk>/', views.UserFriendRequestDestroy.as_view(),
          name='user-friend-request-destroy'),

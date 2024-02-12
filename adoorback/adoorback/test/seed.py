@@ -66,6 +66,7 @@ def set_seed(n):
     # Seed Response
     questions = Question.objects.all()
     for _ in range(n):
+        user = random.choice(users)
         question = random.choice(questions)
         response = Response.objects.create(author=user,
                                            content=faker.text(max_nb_chars=50),
@@ -75,6 +76,7 @@ def set_seed(n):
 
     # Seed Check-in
     for _ in range(n):
+        user = random.choice(users)
         checkin = CheckIn.objects.create(user=user,
                                          availability=faker.text(max_nb_chars=10),
                                          mood=faker.text(max_nb_chars=5),
@@ -85,6 +87,7 @@ def set_seed(n):
 
     # Seed Note
     for _ in range(n):
+        user = random.choice(users)
         note = Note.objects.create(author=user,
                                    content=faker.text(max_nb_chars=50))
     logging.info(
@@ -142,11 +145,11 @@ def set_seed(n):
     Comment.objects.create(author=user_7, target=note, content="test note noti")
     Comment.objects.all().delete()
     ResponseRequest.objects.all().delete()
-    ResponseRequest.objects.create(requester=user_1, requestee=user_3, question=response.question)
-    ResponseRequest.objects.create(requester=user_4, requestee=user_3, question=response.question)
-    ResponseRequest.objects.create(requester=user_5, requestee=user_3, question=response.question)
-    ResponseRequest.objects.create(requester=user_6, requestee=user_3, question=response.question)
-    ResponseRequest.objects.create(requester=user_7, requestee=user_3, question=response.question)
+    ResponseRequest.objects.create(requester=user_1, requestee=user_3, question=response.question, message="test")
+    ResponseRequest.objects.create(requester=user_4, requestee=user_3, question=response.question, message="test")
+    ResponseRequest.objects.create(requester=user_5, requestee=user_3, question=response.question, message="test")
+    ResponseRequest.objects.create(requester=user_6, requestee=user_3, question=response.question, message="test")
+    ResponseRequest.objects.create(requester=user_7, requestee=user_3, question=response.question, message="test")
     ResponseRequest.objects.all().delete()
 
     # Seed Response Request
@@ -154,7 +157,8 @@ def set_seed(n):
         question = random.choice(questions)
         requester = random.choice(users)
         requestee = random.choice(users.exclude(id=requester.id))
-        ResponseRequest.objects.create(requester=requester, requestee=requestee, question=question)
+        ResponseRequest.objects.create(requester=requester, requestee=requestee, question=question,
+                                       message=faker.catch_phrase())
     logging.info(
         f"{ResponseRequest.objects.count()} ResponseRequest(s) created!") if DEBUG else None
 
@@ -203,8 +207,8 @@ def set_seed(n):
     # Seed Like
     for i in range(n):
         user = random.choice(users)
-        question = Question.objects.all()[i:i+1].first()
-        response = Response.objects.all()[i:i+1].first()
+        question = Question.objects.all()[i:i + 1].first()
+        response = Response.objects.all()[i:i + 1].first()
         comment = Comment.objects.comments_only()[i]
         reply = Comment.objects.replies_only()[i]
         Like.objects.create(user=user, target=question)

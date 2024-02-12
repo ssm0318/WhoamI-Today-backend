@@ -51,6 +51,9 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         """
         Returns True if the given user is in the audience that can view this check_in.
         """
+        if self.user == user:
+            return True
+
         if not User.are_friends(self.user, user):
             return False
         

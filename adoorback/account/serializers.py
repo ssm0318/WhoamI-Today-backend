@@ -13,6 +13,7 @@ from django.utils import timezone
 from account.models import FriendRequest, FriendGroup, BlockRec
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
+from note.models import Note
 from qna.models import Response
 from notification.models import Notification
 from qna.serializers import ResponseMinimumSerializer
@@ -22,7 +23,7 @@ from django_countries.serializers import CountryFieldMixin
 User = get_user_model()
 
 
-class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
+class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     unread_noti = serializers.SerializerMethodField(read_only=True)
 
@@ -32,7 +33,7 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     def get_unread_noti(self, obj):
         unread_notis = Notification.objects.filter(user=obj, is_read=False)
         return True if unread_notis else False
-    
+
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password',
@@ -52,9 +53,9 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
 
     def validate(self, attrs):
         if self.partial:
-            return super(UserProfileSerializer, self).validate(attrs)
+            return super(CurrentUserSerializer, self).validate(attrs)
         user = User(**attrs)
-        errors = dict() 
+        errors = dict()
         try:
             validate_password(password=attrs.get('password'), user=user)
 
@@ -63,19 +64,18 @@ class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
 
         if errors:
             raise serializers.ValidationError(errors)
-        return super(UserProfileSerializer, self).validate(attrs)
+        return super(CurrentUserSerializer, self).validate(attrs)
 
 
-class UserEmailSerializer(serializers.ModelSerializer):
+class UserMinimalSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+
+    def get_url(self, obj):
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+
     class Meta:
         model = User
-        fields = ['email']
-
-    def validate(self, attrs):
-        for user in User.deleted_objects.all():
-            if attrs['email'] == user.email:
-                raise ExistingEmail()
-        return super(UserEmailSerializer, self).validate(attrs)
+        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image']
 
 
 class UserPasswordSerializer(serializers.ModelSerializer):
@@ -97,6 +97,18 @@ class UserPasswordSerializer(serializers.ModelSerializer):
         return super(UserPasswordSerializer, self).validate(attrs)
 
 
+class UserEmailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['email']
+
+    def validate(self, attrs):
+        for user in User.deleted_objects.all():
+            if attrs['email'] == user.email:
+                raise ExistingEmail()
+        return super(UserEmailSerializer, self).validate(attrs)
+
+
 class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -109,17 +121,39 @@ class UserUsernameSerializer(serializers.ModelSerializer):
         return super(UserUsernameSerializer, self).validate(attrs)
 
 
-class AuthorFriendSerializer(serializers.ModelSerializer):
-    url = serializers.SerializerMethodField(read_only=True)
+class UserProfileSerializer(UserMinimalSerializer):
+    check_in = serializers.SerializerMethodField(read_only=True)
+    notes = serializers.SerializerMethodField(read_only=True)
+    is_favorite = serializers.SerializerMethodField(read_only=True)
 
-    def get_url(self, obj):
-        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
-    class Meta:
+    def get_is_favorite(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj in request.user.favorites.all()
+        return False
+
+    def get_check_in(self, obj):
+        from check_in.serializers import CheckInBaseSerializer
+        user = self.context.get('request', None).user
+        check_in = obj.check_in_set.filter(is_active=True).first()
+        if check_in and CheckIn.is_audience(check_in, user):
+            return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
+        return {}
+
+    def get_notes(self, obj):
+        from note.serializers import NoteSerializer
+        user = self.context.get('request', None).user
+        note_ids = [note.id for note in obj.note_set.all() if Note.is_audience(note, user)]
+        note_queryset = Note.objects.filter(id__in=note_ids).order_by('-created_at')[:10]
+        notes = NoteSerializer(note_queryset, many=True, read_only=True, context=self.context).data
+        return notes
+
+    class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image']
+        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'notes', 'is_favorite']
 
 
-class FriendDetailSerializer(serializers.ModelSerializer):
+class FriendListSerializer(UserMinimalSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
     is_hidden = serializers.SerializerMethodField(read_only=True)
@@ -145,7 +179,7 @@ class FriendDetailSerializer(serializers.ModelSerializer):
         check_in = self.check_in(obj)
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
-            and not (check_in and not check_in['current_user_read'])
+                            and not (check_in and not check_in['current_user_read'])
         return current_user_read
 
     def check_in(self, obj):
@@ -163,17 +197,9 @@ class FriendDetailSerializer(serializers.ModelSerializer):
         responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
         return responses
 
-    class Meta:
+    class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'is_favorite', 'is_hidden', 'current_user_read']
-
-
-class AddFriendFavoriteHiddenSerializer(serializers.ModelSerializer):
-    friend_id = serializers.IntegerField()
-
-    class Meta:
-        model = User
-        fields = ['friend_id']
+        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):
@@ -206,8 +232,8 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     requester_detail = serializers.SerializerMethodField(read_only=True)
 
     def get_requester_detail(self, obj):
-        return AuthorFriendSerializer(User.objects.get(id=obj.requester_id)).data
-    
+        return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
+
     def validate(self, data):
         if data.get('requester_id') == data.get('requestee_id'):
             raise serializers.ValidationError('본인과는 친구가 될 수 없어요...')
@@ -236,18 +262,18 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
         fields = ['requester_id', 'requestee_id', 'accepted']
 
 
-class UserFriendshipStatusSerializer(AuthorFriendSerializer):
+class UserFriendshipStatusSerializer(UserMinimalSerializer):
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     are_friends = serializers.SerializerMethodField(read_only=True, allow_null=True)
 
     def get_received_friend_request_from(self, obj):
         return self.context.get('request', None).user.id in \
-               list(obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True))
+            list(obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True))
 
     def get_sent_friend_request_to(self, obj):
         return self.context.get('request', None).user.id in \
-               list(obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True))
+            list(obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True))
 
     def get_are_friends(self, obj):
         user = self.context.get('request', None).user
@@ -255,18 +281,18 @@ class UserFriendshipStatusSerializer(AuthorFriendSerializer):
             return None
         return User.are_friends(user, obj)
 
-    class Meta(AuthorFriendSerializer.Meta):
+    class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = AuthorFriendSerializer.Meta.fields + ['sent_friend_request_to',
-                                                       'received_friend_request_from',
-                                                       'are_friends']
+        fields = UserMinimalSerializer.Meta.fields + ['sent_friend_request_to',
+                                                      'received_friend_request_from',
+                                                      'are_friends']
 
 
-class UserSentFriendRequestSerializer(serializers.ModelSerializer):
+class UserFriendRequestSerializer(serializers.ModelSerializer):
     requestee_detail = serializers.SerializerMethodField(read_only=True)
 
     def get_requestee_detail(self, obj):
-        return AuthorFriendSerializer(User.objects.get(id=obj.requestee_id)).data
+        return UserMinimalSerializer(User.objects.get(id=obj.requestee_id)).data
 
     class Meta:
         model = FriendRequest
@@ -305,7 +331,7 @@ class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
 
 class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
     friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    friends_details = AuthorFriendSerializer(source='friends', read_only=True, many=True)
+    friends_details = UserMinimalSerializer(source='friends', read_only=True, many=True)
 
     def validate_friends(self, value):
         user = self.context['request'].user
@@ -313,7 +339,8 @@ class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
 
         for friend in friends:
             if (not User.are_friends(user, friend)) or (user == friend):
-                raise serializers.ValidationError("One or more of the specified users are not friends of the current user.")
+                raise serializers.ValidationError(
+                    "One or more of the specified users are not friends of the current user.")
 
         return value
 

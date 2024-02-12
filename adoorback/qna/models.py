@@ -67,12 +67,11 @@ class Question(AdoorModel, SafeDeleteModel):
         return self.selected_dates[-1] if self.selected_dates else None
 
     class Meta:
-        ordering = ['id']
+        ordering = ['-id']
 
 
 class Response(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='response_set', on_delete=models.CASCADE)
-    share_with_friends = models.BooleanField(default=True)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
 
     response_comments = GenericRelation(Comment)
@@ -121,6 +120,9 @@ class Response(AdoorModel, SafeDeleteModel):
         """
         Returns True if the given user is in the audience that can view this response.
         """
+        if self.author == user:
+            return True
+
         if not User.are_friends(self.author, user):
             return False
 
@@ -140,6 +142,7 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
     requester = models.ForeignKey(User, related_name='sent_response_request_set', on_delete=models.CASCADE)
     requestee = models.ForeignKey(User, related_name='received_response_request_set', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    message = models.TextField(blank=True, null=True)
 
     response_request_targetted_notis = GenericRelation('notification.Notification',
                                                        content_type_field='target_type',

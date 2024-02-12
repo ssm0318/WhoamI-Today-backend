@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
 from django.db.models import F, Q, Max, Case, When, Value, IntegerField
-from django.http import HttpResponse, HttpResponseNotAllowed
+from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse, Http404
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation
@@ -21,19 +21,22 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from account.models import FriendRequest, FriendGroup, BlockRec
-from account.serializers import UserProfileSerializer, \
-    UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
-    UserFriendshipStatusSerializer, AuthorFriendSerializer, \
-    UserEmailSerializer, UserPasswordSerializer, UserUsernameSerializer, \
-    UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
-    UserFriendGroupOrderSerializer, AddFriendFavoriteHiddenSerializer, FriendDetailSerializer, \
-    UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, UserSentFriendRequestSerializer
+from account.serializers import (CurrentUserSerializer, \
+                                 UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
+                                 UserFriendshipStatusSerializer, \
+                                 UserEmailSerializer, UserUsernameSerializer, \
+                                 UserFriendGroupBaseSerializer, UserFriendGroupMemberSerializer, \
+                                 UserFriendGroupOrderSerializer, FriendListSerializer, \
+                                 UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
+                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword
 from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 from check_in.models import CheckIn
-from qna.serializers import QuestionBaseSerializer
+from note.models import Note
+from note.serializers import NoteSerializer
+from qna.serializers import QuestionBaseSerializer, ResponseMinimumSerializer
 from .email import email_manager
 from qna.models import Question
 from qna.models import Response as _Response
@@ -122,6 +125,7 @@ class UserEmailCheck(generics.CreateAPIView):
         return Response(serializer.data, status=201, headers=headers)
 
 
+
 class UserPasswordCheck(generics.CreateAPIView):
     serializer_class = UserPasswordSerializer
     parser_classes = (MultiPartParser, FormParser)
@@ -173,7 +177,7 @@ class UserUsernameCheck(generics.CreateAPIView):
 
 
 class UserSignup(generics.CreateAPIView):
-    serializer_class = UserProfileSerializer
+    serializer_class = CurrentUserSerializer
     parser_classes = (MultiPartParser, FormParser)
 
     def get_exception_handler(self):
@@ -209,8 +213,18 @@ class UserSignup(generics.CreateAPIView):
         return response
 
 
+class SignupQuestions(generics.ListAPIView):
+    queryset = Question.objects.order_by('?')[:10]
+    serializer_class = QuestionBaseSerializer
+    model = serializer_class.Meta.model
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+
 class SendResetPasswordEmail(generics.CreateAPIView):
-    serializer_class = UserProfileSerializer
+    serializer_class = CurrentUserSerializer
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -230,7 +244,7 @@ class SendResetPasswordEmail(generics.CreateAPIView):
 
 
 class ResetPasswordWithToken(generics.UpdateAPIView):
-    serializer_class = UserProfileSerializer
+    serializer_class = CurrentUserSerializer
     queryset = User.objects.all()
 
     def get_exception_handler(self):
@@ -254,26 +268,8 @@ class ResetPasswordWithToken(generics.UpdateAPIView):
         user.save()
 
 
-class UserPasswordConfirm(APIView):
-    def post(self, request, format=None):
-        user = request.user
-
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-
-        response = Response()
-        password = request.data.get('password', None)
-
-        auth_user = authenticate(username=user.username, password=password)
-        if auth_user is not None:
-            return response
-        else:
-            raise WrongPassword()
-
-
 class ResetPassword(generics.UpdateAPIView):
-    serializer_class = UserProfileSerializer
+    serializer_class = CurrentUserSerializer
     queryset = User.objects.all()
 
     def get_exception_handler(self):
@@ -301,262 +297,22 @@ class ResetPassword(generics.UpdateAPIView):
         user.save()
 
 
-class SignupQuestions(generics.ListAPIView):
-    queryset = Question.objects.order_by('?')[:10]
-    serializer_class = QuestionBaseSerializer
-    model = serializer_class.Meta.model
-    permission_classes = [IsAuthenticated]
+class UserPasswordConfirm(APIView):
+    def post(self, request, format=None):
+        user = request.user
 
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-
-class UserList(generics.ListAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserProfileSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        queryset = User.objects.filter(id=self.request.user.id)
-        if self.request.user.is_superuser:
-            queryset = User.objects.all()
-        return queryset
-
-
-class CurrentUserDelete(generics.DestroyAPIView):
-    serializer_class = UserProfileSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self):
-        return self.request.user
-
-    @transaction.atomic
-    def perform_destroy(self, instance):
-        # email cannot be null, so set it to a dummy value
-        instance.email = f"{instance.username}@{instance.username}"
-        instance.gender = None
-        instance.ethnicity = None
-        instance.date_of_birth = None
-        instance.save()
-        # user is soft-deleted, contents user created will be cascade-deleted
-        instance.delete(force_policy=SOFT_DELETE_CASCADE)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        response = Response(status=status.HTTP_204_NO_CONTENT)
-        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
-        return response
-
-
-class CurrentUserFriendList(generics.ListAPIView):
-    serializer_class = AuthorFriendSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        return self.request.user.friends.all()
-
-
-class CurrentUserFriendDetailList(generics.ListAPIView):
-    serializer_class = FriendDetailSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        return self.request.user.friends.all().exclude(hidden=True).order_by('username')
-
-
-class CurrentUserFriendEditList(generics.ListAPIView):
-    serializer_class = FriendDetailSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        return self.request.user.friends.all().order_by('username')
-
-
-class CurrentUserFriendUpdatedList(generics.ListAPIView):
-    serializer_class = FriendDetailSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
 
-        user = self.request.user
-        friends = user.friends.all().exclude(hidden=True)
-        friends = User.objects.filter(id__in=[
-            friend.id for friend in friends if not User.user_read(user, friend)
-        ])
+        response = Response()
+        password = request.data.get('password', None)
 
-        # sort in recent order
-        friends = sorted(friends, key=lambda x: x.most_recent_update(user), reverse=True)
-
-        return friends
-
-
-class CurrentUserFavoritesList(generics.ListAPIView):
-    serializer_class = FriendDetailSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        return self.request.user.favorites.all().order_by('username')
-
-
-class UserFavoriteAdd(generics.CreateAPIView):
-    serializer_class = AddFriendFavoriteHiddenSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        friend_id = serializer.validated_data.get('friend_id')
-
-        if request.user.favorites.filter(id=friend_id).exists():
-            return Response({'error': 'Friend is already in favorites.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not request.user.friends.filter(id=friend_id).exists():
-            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user_to_add = User.objects.get(id=friend_id)
-            self.perform_create(user_to_add)
-            headers = self.get_success_headers(serializer.data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    def perform_create(self, user_to_add):
-        self.request.user.favorites.add(user_to_add)
-
-
-class UserFavoriteDestroy(generics.DestroyAPIView):
-    queryset = User.objects.all()
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    @transaction.atomic
-    def perform_destroy(self, obj):
-        self.request.user.favorites.remove(obj)
-
-
-class UserHiddenAdd(generics.CreateAPIView):
-    serializer_class = AddFriendFavoriteHiddenSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        friend_id = serializer.validated_data.get('friend_id')
-
-        if request.user.hidden.filter(id=friend_id).exists():
-            return Response({'error': 'Friend is already in hidden.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not request.user.friends.filter(id=friend_id).exists():
-            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user_to_add = User.objects.get(id=friend_id)
-            # Remove the user from favorites if the user is in favorites
-            if request.user.favorites.filter(id=friend_id).exists():
-                request.user.favorites.remove(user_to_add)
-            self.perform_create(user_to_add)
-            headers = self.get_success_headers(serializer.data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    def perform_create(self, user_to_add):
-        self.request.user.hidden.add(user_to_add)
-
-
-class CurrentUserFriendsUpdate(generics.UpdateAPIView):
-    serializer_class = UserFriendsUpdateSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_object(self):
-        return self.request.user
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class CurrentUserProfile(generics.RetrieveUpdateAPIView):
-    serializer_class = UserProfileSerializer
-    permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser)
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_object(self):
-        # since the obtained user object is the authenticated user,
-        # no further permission checking unnecessary
-        return User.objects.get(id=self.request.user.id)
-
-    @transaction.atomic
-    def perform_update(self, serializer):
-        if serializer.is_valid(raise_exception=True):
-            serializer.save()
-        updating_data = list(self.request.data.keys())
-        if len(updating_data) == 1 and updating_data[0] == 'question_history':
-            obj = serializer.save()
-            Notification = apps.get_model('notification', 'Notification')
-            admin = User.objects.filter(is_superuser=True).first()
-
-            noti = Notification.objects.create(user=obj,
-                                               target=admin,
-                                               origin=admin,
-                                               message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
-                                               message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
-                                               redirect_url='/questions')
-            noti.actors.add(admin)
-
-
-class UserDetail(generics.RetrieveAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserFriendshipStatusSerializer
-    permission_classes = [IsAuthenticated, IsNotBlocked]
-    lookup_field = 'username'
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
+        auth_user = authenticate(username=user.username, password=password)
+        if auth_user is not None:
+            return response
+        else:
+            raise WrongPassword()
 
 
 class UserSearch(generics.ListAPIView):
@@ -601,6 +357,273 @@ class UserSearch(generics.ListAPIView):
         return qs
 
 
+class UserProfile(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+
+class UserNoteList(generics.ListAPIView):
+    queryset = Note.objects.all().order_by('-created_at')
+    serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        all_notes = Note.objects.all().order_by('-created_at')
+        note_ids = [note.id for note in all_notes if note.is_audience(user)]
+        return Note.objects.filter(id__in=note_ids)
+
+
+class UserResponseList(generics.ListAPIView):
+    queryset = _Response.objects.all().order_by('-created_at')
+    serializer_class = ResponseMinimumSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        all_responses = _Response.objects.all().order_by('-created_at')
+        response_ids = [response.id for response in all_responses if response.is_audience(user)]
+        return _Response.objects.filter(id__in=response_ids)
+
+
+class CurrentUserDetail(generics.RetrieveUpdateAPIView):
+    serializer_class = CurrentUserSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        # since the obtained user object is the authenticated user,
+        # no further permission checking unnecessary
+        return User.objects.get(id=self.request.user.id)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+        updating_data = list(self.request.data.keys())
+        if len(updating_data) == 1 and updating_data[0] == 'question_history':
+            obj = serializer.save()
+            Notification = apps.get_model('notification', 'Notification')
+            admin = User.objects.filter(is_superuser=True).first()
+
+            noti = Notification.objects.create(user=obj,
+                                               target=admin,
+                                               origin=admin,
+                                               message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
+                                               message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
+                                               redirect_url='/questions')
+            noti.actors.add(admin)
+
+
+class CurrentUserDelete(generics.DestroyAPIView):
+    serializer_class = CurrentUserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        # email cannot be null, so set it to a dummy value
+        instance.email = f"{instance.username}@{instance.username}"
+        instance.gender = None
+        instance.ethnicity = None
+        instance.date_of_birth = None
+        instance.save()
+        # user is soft-deleted, contents user created will be cascade-deleted
+        instance.delete(force_policy=SOFT_DELETE_CASCADE)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
+        return response
+
+
+class CurrentUserProfile(generics.RetrieveAPIView):
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        user = self.request.user
+        if user.is_authenticated:
+            return user
+        else:
+            raise PermissionDenied("User is not authenticated")
+
+
+class CurrentUserNoteList(generics.ListAPIView):
+    queryset = Note.objects.all()
+    serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        return Note.objects.filter(author=user).order_by('-created_at')
+
+
+class CurrentUserResponseList(generics.ListAPIView):
+    queryset = _Response.objects.all()
+    serializer_class = ResponseMinimumSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        return _Response.objects.filter(author=user).order_by('-created_at')
+
+
+class FriendList(generics.ListAPIView):
+    serializer_class = FriendListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        user = self.request.user
+        friends = user.friends.all()
+
+        query_type = self.request.query_params.get('type')
+        has_updates = self.request.query_params.get('has_updates')
+        favorites = self.request.query_params.get('favorites')
+
+        if query_type == 'all':
+            return friends.order_by('username')
+        elif has_updates == 'true':
+            friends = friends.exclude(hidden=True)
+            friends_with_updates = [
+                friend for friend in friends if not User.user_read(user, friend)
+            ]
+            return sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
+        elif favorites == 'true':
+            return user.favorites.all().order_by('username')
+        else:
+            raise Http404("Query parameter 'type' is invalid or not provided.")
+
+
+class FriendListUpdate(generics.UpdateAPIView):
+    serializer_class = UserFriendsUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserFavoriteAdd(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        friend_id = request.data.get('friend_id')
+        if not friend_id:
+            return Response({'error': 'Friend ID must be provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            friend_id = int(friend_id)
+        except ValueError:
+            return Response({'error': 'Invalid Friend ID.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+
+        if user.favorites.filter(id=friend_id).exists():
+            return Response({'error': 'Friend is already in favorites.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.friends.filter(id=friend_id).exists():
+            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_to_add = get_object_or_404(User, id=friend_id)
+
+        user.favorites.add(user_to_add)
+
+        return Response({'message': 'Friend added to favorites successfully.'}, status=status.HTTP_201_CREATED)
+
+
+class UserFavoriteDestroy(generics.DestroyAPIView):
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_destroy(self, obj):
+        self.request.user.favorites.remove(obj)
+
+
+class UserHiddenAdd(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        friend_id = request.data.get('friend_id')
+        if not friend_id:
+            return Response({'error': 'Friend ID must be provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            friend_id = int(friend_id)
+        except ValueError:
+            return Response({'error': 'Invalid Friend ID.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+
+        if user.hidden.filter(id=friend_id).exists():
+            return Response({'error': 'Friend is already in hidden.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.friends.filter(id=friend_id).exists():
+            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_to_add = get_object_or_404(User, id=friend_id)
+
+        if user.favorites.filter(id=friend_id).exists():
+            user.favorites.remove(user_to_add)
+
+        user.hidden.add(user_to_add)
+
+        return Response({'message': 'Friend added to hidden successfully.'}, status=status.HTTP_201_CREATED)
+
+
 class UserFriendDestroy(generics.DestroyAPIView):
     queryset = User.objects.all()
     permission_classes = [IsAuthenticated]
@@ -613,7 +636,7 @@ class UserFriendDestroy(generics.DestroyAPIView):
         self.request.user.friends.remove(obj)
 
 
-class UserFriendRequestList(generics.ListCreateAPIView):
+class UserFriendRequestListCreate(generics.ListCreateAPIView):
     queryset = FriendRequest.objects.all()
     serializer_class = UserFriendRequestCreateSerializer
     permission_classes = [IsAuthenticated]
@@ -633,7 +656,7 @@ class UserFriendRequestList(generics.ListCreateAPIView):
 
 class UserSentFriendRequestList(generics.ListAPIView):
     queryset = FriendRequest.objects.all()
-    serializer_class = UserSentFriendRequestSerializer
+    serializer_class = UserFriendRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
