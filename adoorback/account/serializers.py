@@ -328,3 +328,4 @@ class UserFriendGroupOrderSerializer(serializers.Serializer):
         if 'ids' not in attrs:
             raise serializers.ValidationError("ids field is required.")
         return attrs
+
