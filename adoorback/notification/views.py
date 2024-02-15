@@ -1,8 +1,8 @@
 from django.db import transaction
 from django.http import JsonResponse
 from django.utils import translation
+from django.utils import timezone
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -26,7 +26,10 @@ class NotificationList(generics.ListAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        return Notification.objects.visible_only().filter(user=self.request.user)
+
+        thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
+
+        return Notification.objects.visible_only().filter(user=self.request.user, updated_at__gte=thirty_days_ago)
 
 
 class FriendRequestNotiList(generics.ListAPIView):

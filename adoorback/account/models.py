@@ -29,7 +29,6 @@ from safedelete.managers import SafeDeleteManager
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.validators import AdoorUsernameValidator
 
-
 GENDER_CHOICES = (
     (0, _('여성')),
     (1, _('남성')),
@@ -172,12 +171,13 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return list(UserReport.objects.filter(user=self).values_list('reported_user_id', flat=True))
 
     @property
-    def user_report_blocked_ids(self): # returns ids of users
+    def user_report_blocked_ids(self):  # returns ids of users
         from user_report.models import UserReport
-        return list(UserReport.objects.filter(user=self).values_list('reported_user_id', flat=True)) + list(UserReport.objects.filter(reported_user=self).values_list('user_id', flat=True))
+        return list(UserReport.objects.filter(user=self).values_list('reported_user_id', flat=True)) + list(
+            UserReport.objects.filter(reported_user=self).values_list('user_id', flat=True))
 
     @property
-    def content_report_blocked_ids(self): # returns ids of posts
+    def content_report_blocked_ids(self):  # returns ids of posts
         from content_report.models import ContentReport
         return list(ContentReport.objects.filter(user=self).values_list('post_id', flat=True))
 
@@ -267,7 +267,8 @@ class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['user', 'blocked_user'], condition=Q(deleted__isnull=True), name='unique_block_rec'),
+            models.UniqueConstraint(fields=['user', 'blocked_user'], condition=Q(deleted__isnull=True),
+                                    name='unique_block_rec'),
         ]
 
     def __str__(self):
@@ -329,37 +330,40 @@ def create_friend_noti(created, instance, **kwargs):
     requester = instance.requester
     requestee = instance.requestee
 
-    if requester.id in requestee.user_report_blocked_ids: # do not create notification from/for blocked user
+    if requester.id in requestee.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
 
     if created:
-        Notification.objects.create(user=requestee, actor=requester,
-                                    origin=requester, target=instance,
-                                    message_ko=f'{requester.username}님이 친구 요청을 보냈습니다.',
-                                    message_en=f'{requester.username} has requested to be your friend.',
-                                    redirect_url=f'/users/{requester.username}')
+        noti = Notification.objects.create(user=requestee,
+                                           origin=requester, target=instance,
+                                           message_ko=f'{requester.username}님이 친구 요청을 보냈습니다.',
+                                           message_en=f'{requester.username} has requested to be your friend.',
+                                           redirect_url=f'/users/{requester.username}')
+        noti.actors.add(requester)
         return
     elif accepted:
         if User.are_friends(requestee, requester):  # receiver function was triggered by undelete
             return
 
-        Notification.objects.create(user=requestee, actor=requester,
-                                    origin=requester, target=requester,
-                                    message_ko=f'{requester.username}님과 친구가 되었습니다.',
-                                    message_en=f'You are now friends with {requester.username}.',
-                                    redirect_url=f'/users/{requester.username}')
-        Notification.objects.create(user=requester, actor=requestee,
-                                    origin=requestee, target=requestee,
-                                    message_ko=f'{requestee.username}님과 친구가 되었습니다.',
-                                    message_en=f'You are now friends with {requestee.username}.',
-                                    redirect_url=f'/users/{requestee.username}')
+        noti = Notification.objects.create(user=requestee,
+                                           origin=requester, target=requester,
+                                           message_ko=f'{requester.username}님과 친구가 되었습니다.',
+                                           message_en=f'You are now friends with {requester.username}.',
+                                           redirect_url=f'/users/{requester.username}')
+        noti.actors.add(requester)
+        noti = Notification.objects.create(user=requester,
+                                           origin=requestee, target=requestee,
+                                           message_ko=f'{requestee.username}님과 친구가 되었습니다.',
+                                           message_en=f'You are now friends with {requestee.username}.',
+                                           redirect_url=f'/users/{requestee.username}')
+        noti.actors.add(requestee)
         # add friendship
         requester.friends.add(requestee)
 
     # make friend request notification invisible once requestee has responded
     instance.friend_request_targetted_notis.filter(user=requestee,
-                                                   actor=requester).update(is_read=True,
-                                                                           is_visible=False)
+                                                   actors__id=requester.id).update(is_read=True,
+                                                                                   is_visible=False)
 
 
 @transaction.atomic
@@ -372,19 +376,19 @@ def user_created(created, instance, **kwargs):
     '''
     if instance.deleted:
         return
-    
+
     if created:
         # send notification
         from notification.models import Notification
         admin = User.objects.filter(is_superuser=True).first()
-        Notification.objects.create(user=instance,
-                                    actor=admin,
-                                    target=admin,
-                                    origin=admin,
-                                    message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
-                                    message_en=f"{instance.username}, try making friends to share your whoami!",
-                                    redirect_url='/')
-        
+        noti = Notification.objects.create(user=instance,
+                                           target=admin,
+                                           origin=admin,
+                                           message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
+                                           message_en=f"{instance.username}, try making friends to share your whoami!",
+                                           redirect_url='/')
+        noti.actors.add(admin)
+
         # add default FriendGroup (close_friends)
         default_group, created = FriendGroup.objects.get_or_create(
             name='close friends',

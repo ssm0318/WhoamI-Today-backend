@@ -37,7 +37,7 @@ class Like(AdoorTimestampedModel, SafeDeleteModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.IntegerField()
     target = GenericForeignKey('content_type', 'object_id')
- 
+
     like_targetted_notis = GenericRelation(Notification,
                                            content_type_field='target_type',
                                            object_id_field='target_id')
@@ -47,7 +47,8 @@ class Like(AdoorTimestampedModel, SafeDeleteModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['user', 'content_type', 'object_id'], condition=Q(deleted__isnull=True), name='unique_like'),
+            models.UniqueConstraint(fields=['user', 'content_type', 'object_id'], condition=Q(deleted__isnull=True),
+                                    name='unique_like'),
         ]
         ordering = ['id']
 
@@ -73,31 +74,25 @@ def create_like_noti(instance, created, **kwargs):
     if user == actor:  # do not create notification for liker him/herself.
         return
 
-    if actor.id in user.user_report_blocked_ids: # do not create notification from/for blocked user
+    if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
-    actor_name_ko = '익명의 사용자가' if instance.is_anonymous else f'{actor.username}님이'
-    actor_name_en = 'An anonymous user' if instance.is_anonymous else f'{actor.username}'
+
     content_preview = wrap_content(origin)
 
     if origin.type == 'Comment' and origin.target.type == 'Comment':  # if is reply
-        message_ko = f'{actor_name_ko} 회원님의 댓글을 좋아합니다: "{content_preview}"'
-        message_en = f'{actor_name_en} likes your comment: "{content_preview}"'
         redirect_url = f'/{origin.target.target.type.lower()}s/' \
                        f'{origin.target.target.id}'
+        Notification.objects.create_or_update_notification(user=user, actor=actor,
+                                                           origin=origin, target=target, noti_type="like_reply_noti",
+                                                           redirect_url=redirect_url, content_preview=content_preview)
     elif origin.type == 'Comment':  # if is comment
-        message_ko = f'{actor_name_ko} 회원님의 댓글을 좋아합니다: "{content_preview}"'
-        message_en = f'{actor_name_en} likes your comment: "{content_preview}"'
         redirect_url = f'/{origin.target.type.lower()}s/' \
                        f'{origin.target.id}'
-    elif origin.type == 'Moment':  # if is moment
-        message_ko = f'{actor_name_ko} 회원님의 모먼트를 좋아합니다' + (f': "{content_preview}"' if content_preview else '.')
-        message_en = f'{actor_name_en} liked your moment' + (f': "{content_preview}"' if content_preview else '.')
+        Notification.objects.create_or_update_notification(user=user, actor=actor,
+                                                           origin=origin, target=target, noti_type="like_comment_noti",
+                                                           redirect_url=redirect_url, content_preview=content_preview)
+    elif origin.type == 'Response':
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-    else:  # if is response
-        message_ko = f'{actor_name_ko} 회원님의 답변을 좋아합니다: "{content_preview}"'
-        message_en = f'{actor_name_en} liked your response: "{content_preview}"'
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-
-    Notification.objects.create(actor=actor, user=user,
-                                origin=origin, target=target,
-                                message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
+        Notification.objects.create_or_update_notification(user=user, actor=actor,
+                                                           origin=origin, target=target, noti_type="like_response_noti",
+                                                           redirect_url=redirect_url, content_preview=content_preview)

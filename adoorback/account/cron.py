@@ -42,13 +42,13 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
             if user.noti_time is None:
                 continue
             if user.noti_time == time(timezone.now().astimezone(ZoneInfo(user.timezone)).hour, 0):
-                Notification.objects.create(user=user,
-                                            actor=admin,
-                                            target=admin,
-                                            origin=admin,
-                                            message_ko=f"{user.username}님, 오늘의 후엠아이를 남겨보세요! - {daily_question}",
-                                            message_en=f"{user.username}, time to leave your whoami for today! - {daily_question}",
-                                            redirect_url='/home')
+                noti = Notification.objects.create(user=user,
+                                                   target=admin,
+                                                   origin=admin,
+                                                   message_ko=f"{user.username}님, 오늘의 후엠아이를 남겨보세요! - {daily_question}",
+                                                   message_en=f"{user.username}, time to leave your whoami for today! - {daily_question}",
+                                                   redirect_url='/home')
+                noti.actors.add(admin)
 
         num_notis_after = Notification.objects.admin_only().count()
         print(f'{num_notis_after - num_notis_before} notifications sent!')
