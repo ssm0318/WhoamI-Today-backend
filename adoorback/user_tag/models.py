@@ -80,6 +80,8 @@ def create_user_tag_noti(instance, **kwargs):
             return  # do not create noti if comment / reply notification will be sent
         if origin.is_private and origin.target.author != user:
             return  # do not create noti for private comment that tagged user has no permission to see
+        if not User.are_friends(user, post.author):
+            return
         redirect_url = f'/{post.type.lower()}s/' \
                        f'{post.id}'
     else:
