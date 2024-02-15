@@ -47,6 +47,11 @@ def get_reaction_type():
     return ContentType.objects.get_for_model(Reaction)
 
 
+def get_reaction_type():
+    from reaction.models import Reaction
+    return ContentType.objects.get_for_model(Reaction)
+
+
 def get_generic_relation_type(model):
     model = model.capitalize()
     if model == 'Comment':
