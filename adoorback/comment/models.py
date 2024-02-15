@@ -36,7 +36,6 @@ class CommentManager(SafeDeleteManager):
 class Comment(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='comment_set', on_delete=models.CASCADE)
     is_private = models.BooleanField(default=False)
-    is_anonymous = models.BooleanField(default=False)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.IntegerField()
@@ -80,8 +79,6 @@ def create_noti(instance, created, **kwargs):
     origin = instance.target
     target = instance
 
-    actor_name_ko = '익명의 사용자가' if instance.is_anonymous else f'{actor.username}님이'
-    actor_name_en = 'An anonymous user' if instance.is_anonymous else f'{actor.username}'
     content_preview = wrap_content(instance.content)
 
     # if is_reply
@@ -98,29 +95,27 @@ def create_noti(instance, created, **kwargs):
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'{actor_name_ko} 회원님의 댓글에 답글을 남겼습니다: "{content_preview}"',
-                                               message_en=f'{actor_name_en} has replied to your comment: "{content_preview}"',
+                                               message_ko=f'{actor.username}이 회원님의 댓글에 답글을 남겼습니다: "{content_preview}"',
+                                               message_en=f'{actor.username} has replied to your comment: "{content_preview}"',
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
-        # send a notification to the author of the feed where the origin comment commented
-        feed_author = origin.target.author
-        if feed_author == origin_author:
+        # send a notification to the author of the qna where the origin comment commented
+        post_author = origin.target.author
+        if post_author == origin_author:
             pass
-        elif feed_author == actor:
+        elif post_author == actor:
             pass
-        elif actor.id in feed_author.user_report_blocked_ids:
+        elif actor.id in post_author.user_report_blocked_ids:
             pass
         else:
-            feed_type_ko = '모먼트' if origin.target.type == 'Moment' else '답변'
-            feed_type_en = 'moment' if origin.target.type == 'Moment' else 'answer'
-            noti = Notification.objects.create(user=feed_author,
+            noti = Notification.objects.create(user=post_author,
                                                origin_id=origin.id,
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'회원님의 {feed_type_ko}에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
-                                               message_en=f'There\'s a new reply to the comment on your {feed_type_en}: "{content_preview}"',
+                                               message_ko=f'회원님의 답변에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
+                                               message_en=f'There\'s a new reply to the comment on your response: "{content_preview}"',
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
@@ -128,7 +123,7 @@ def create_noti(instance, created, **kwargs):
         for participant_id in origin.participants:
             if participant_id == origin_author.id:
                 continue
-            if participant_id == feed_author.id:
+            if participant_id == post_author.id:
                 continue
             if participant_id == actor.id:
                 continue
@@ -148,9 +143,9 @@ def create_noti(instance, created, **kwargs):
     # if not reply
     else:
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-        # send a notification to the author of the origin feed
-        origin_target_name_ko = '모먼트' if origin.type == 'Moment' else '답변'
-        origin_target_name_en = 'moment' if origin.type == 'Moment' else 'answer'
+        # send a notification to the author of the origin qna
+        origin_target_name_ko = '노트' if origin.type == 'Note' else '답변'
+        origin_target_name_en = 'note' if origin.type == 'Note' else 'answer'
         if origin_author == actor:
             pass
         elif actor.id in origin_author.user_report_blocked_ids:
@@ -161,12 +156,12 @@ def create_noti(instance, created, **kwargs):
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'{actor_name_ko} 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다: "{content_preview}"',
-                                               message_en=f'{actor_name_en} has commented on your {origin_target_name_en}: "{content_preview}"',
+                                               message_ko=f'{actor.username}님이 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다: "{content_preview}"',
+                                               message_en=f'{actor.username} has commented on your {origin_target_name_en}: "{content_preview}"',
                                                redirect_url=redirect_url)
             noti.actors.add(actor)
 
-        # send notifications to participants of the origin feed
+        # send notifications to participants of the origin qna
         for participant_id in origin.participants:
             if participant_id == origin_author.id:
                 continue
@@ -193,9 +188,6 @@ def create_user_tag(instance, **kwargs):
     tagging_user = instance.author
     object_id = instance.id
     content_type = get_generic_relation_type(instance.type)
-
-    if instance.is_anonymous:
-        return
 
     tagged_users, word_indices = parse_user_tag_from_content(content)
 

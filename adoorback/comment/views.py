@@ -3,7 +3,7 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
 from comment.models import Comment
-from comment.serializers import CommentResponsiveSerializer
+from comment.serializers import CommentFriendSerializer
 
 from adoorback.utils.permissions import IsAuthorOrReadOnly
 from adoorback.utils.content_types import get_generic_relation_type
@@ -11,12 +11,10 @@ from adoorback.utils.validators import adoor_exception_handler
 from utils.helpers import parse_user_tag_from_content
 from utils.exceptions import BlockedUserTag, BlockingUserTag
 
+
 class CommentCreate(generics.ListCreateAPIView):
-    """
-    List all comments
-    """
     queryset = Comment.objects.order_by('id')
-    serializer_class = CommentResponsiveSerializer
+    serializer_class = CommentFriendSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
@@ -45,7 +43,7 @@ class CommentDetail(generics.DestroyAPIView):
     Retrieve, update, or destroy a comment.
     """
     queryset = Comment.objects.all()
-    serializer_class = CommentResponsiveSerializer
+    serializer_class = CommentFriendSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
     def get_exception_handler(self):

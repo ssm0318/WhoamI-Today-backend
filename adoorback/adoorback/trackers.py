@@ -4,7 +4,7 @@ from trackstats.models import Domain, Metric, Period
 from trackstats.trackers import CountObjectsByDateTracker, CountObjectsByDateAndObjectTracker
 
 from account.models import FriendRequest
-from feed.models import Article, Response, Question, ResponseRequest
+from qna.models import Article, Response, Question, ResponseRequest
 from comment.models import Comment
 from like.models import Like
 from notification.models import Notification

@@ -1,6 +1,5 @@
 from rest_framework import permissions
 
-from feed.models import Post
 from adoorback.utils.content_types import get_generic_relation_type
 
 
@@ -35,9 +34,9 @@ class IsShared(permissions.BasePermission):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
-        if obj.type == 'Question' or obj.share_anonymously:
+        if obj.type == 'Question':
             return True
-        elif obj.share_with_friends and User.are_friends(request.user, obj.author):
+        elif User.are_friends(request.user, obj.author):
             return True
         else:
             return obj.author == request.user
@@ -52,9 +51,12 @@ class IsNotBlocked(permissions.BasePermission):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
-        if obj.type in ['Response', 'Article']:
-            content_type_id = get_generic_relation_type(obj.type).id
-            post = Post.objects.get(content_type_id=content_type_id, object_id=obj.id)
-            return obj.author.id not in request.user.user_report_blocked_ids and post.id not in request.user.content_report_blocked_ids
-        else: # obj.type == user (can't access user detail page) 
-            return obj.id not in request.user.user_report_blocked_ids
+        pass
+        # TODO: 다시 구현할 것
+
+        # if obj.type in ['Response', 'Article']:
+        #     content_type_id = get_generic_relation_type(obj.type).id
+        #     post = Post.objects.get(content_type_id=content_type_id, object_id=obj.id)
+        #     return obj.author.id not in request.user.user_report_blocked_ids and post.id not in request.user.content_report_blocked_ids
+        # else: # obj.type == user (can't access user detail page)
+        #     return obj.id not in request.user.user_report_blocked_ids

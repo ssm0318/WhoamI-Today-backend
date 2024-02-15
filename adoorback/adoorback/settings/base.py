@@ -65,8 +65,7 @@ CORS_ORIGIN_WHITELIST = [
 INSTALLED_APPS = [
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
-    'feed.apps.FeedConfig',
-    'moment.apps.MomentConfig',
+    'qna.apps.QnaConfig',
     'like.apps.LikeConfig',
     'comment.apps.CommentConfig',
     'notification.apps.NotificationConfig',
@@ -102,7 +101,7 @@ AUTH_USER_MODEL = 'account.User'
 LOGIN_REDIRECT_URL = '/api/user/'
 
 CRON_CLASSES = [
-    "feed.cron.DailyQuestionCronJob",
+    "qna.cron.DailyQuestionCronJob",
     "account.cron.SendDailyWhoAmINotiCronJob",
 ]
 

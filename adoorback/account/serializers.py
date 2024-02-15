@@ -13,7 +13,7 @@ from django.utils import timezone
 from account.models import FriendRequest, FriendGroup, BlockRec
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
-from feed.models import Response
+from qna.models import Response
 from notification.models import Notification
 
 from django_countries.serializers import CountryFieldMixin
@@ -121,18 +121,6 @@ class AuthorFriendSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'profile_pic', 'url', 'profile_image']
 
 
-class AuthorAnonymousSerializer(serializers.ModelSerializer):
-    color_hex = serializers.SerializerMethodField(read_only=True)
-
-    def get_color_hex(self, obj):
-        author_hash = obj.id * secrets.randbelow(63872) * secrets.randbelow(98574)
-        return '#{0:06X}'.format(author_hash % 16777215)  # mod max color HEX
-
-    class Meta:
-        model = User
-        fields = ['color_hex']
-
-
 class FriendDetailSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
@@ -173,8 +161,7 @@ class FriendDetailSerializer(serializers.ModelSerializer):
     def responses(self, obj):
         user = self.context.get('request', None).user
         response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
-        response_queryset = Response.objects.filter(id__in=response_ids)
-        response_queryset = response_queryset.filter(available_limit__gt=timezone.now()).order_by('question__id', 'created_at')
+        response_queryset = Response.objects.filter(id__in=response_ids).order_by('question__id', 'created_at')
         responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
         return responses
 
@@ -346,70 +333,5 @@ class UserFriendGroupOrderSerializer(serializers.Serializer):
         return attrs
 
 
-from moment.serializers import MomentBaseSerializer
-from feed.serializers import ResponseMinimumSerializer
+from qna.serializers import ResponseMinimumSerializer
 from django.conf import settings
-
-
-class TodayFriendsSerializer(serializers.ModelSerializer):
-    url = serializers.SerializerMethodField(read_only=True)
-    moments = serializers.SerializerMethodField(read_only=True)
-    questions = serializers.SerializerMethodField(read_only=True)
-    check_in = serializers.SerializerMethodField(read_only=True)
-    current_user_read = serializers.SerializerMethodField(read_only=True)
-
-    def get_url(self, obj):
-        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
-
-    def get_moments(self, obj):
-        moments = obj.moment_set.filter(available_limit__gt=timezone.now()).order_by('date')
-        return MomentBaseSerializer(moments, many=True, read_only=True, context=self.context).data
-
-    def get_questions(self, obj):
-        responses = self.responses(obj)
-        questions_with_responses = []
-        last_question_id = 0
-
-        for response in responses:
-            question = response["question"]
-            copied_response = response.copy()
-            del copied_response["question"]
-
-            if question["id"] != last_question_id:
-                copied_question = question.copy()
-                copied_question["responses"] = [copied_response]
-                questions_with_responses.append(copied_question)
-                last_question_id = question["id"]
-            else:
-                questions_with_responses[-1]["responses"].append(copied_response)
-        return questions_with_responses
-    
-    def get_check_in(self, obj):
-        from check_in.serializers import CheckInBaseSerializer
-        user = self.context.get('request', None).user
-        check_in = obj.check_in_set.filter(is_active=True).first()
-        if check_in and CheckIn.is_audience(check_in, user):
-            return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
-        return {}
-    
-    def get_current_user_read(self, obj):
-        moments = self.get_moments(obj)
-        responses = self.responses(obj)
-        check_in = self.get_check_in(obj)
-
-        current_user_read = not any(not response['current_user_read'] for response in responses) \
-            and not any(not moment['current_user_read'] for moment in moments) \
-            and not (check_in and not check_in['current_user_read'])
-        return current_user_read
-
-    def responses(self, obj):
-        user = self.context.get('request', None).user
-        response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
-        response_queryset = Response.objects.filter(id__in=response_ids)
-        response_queryset = response_queryset.filter(available_limit__gt=timezone.now()).order_by('question__id', 'created_at')
-        responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
-        return responses
-
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image', 'moments', 'questions', 'check_in', 'current_user_read']

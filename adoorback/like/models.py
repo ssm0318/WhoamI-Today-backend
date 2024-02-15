@@ -26,13 +26,12 @@ class LikeManager(SafeDeleteManager):
     def comment_likes_only(self, **kwargs):
         return self.filter(content_type=get_comment_type(), **kwargs)
 
-    def feed_likes_only(self, **kwargs):
+    def post_likes_only(self, **kwargs):
         return self.exclude(content_type=get_comment_type(), **kwargs)
 
 
 class Like(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(User, related_name='like_set', on_delete=models.CASCADE)
-    is_anonymous = models.BooleanField(default=False)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.IntegerField()

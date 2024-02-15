@@ -5,7 +5,7 @@ from backports.zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django_cron import CronJobBase, Schedule
 
-from feed.models import Question
+from qna.models import Question
 from notification.models import Notification
 
 User = get_user_model()
