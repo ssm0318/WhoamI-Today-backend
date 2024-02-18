@@ -14,6 +14,9 @@ User = get_user_model()
 
 
 class UserReport(AdoorTimestampedModel, SafeDeleteModel):
+    """UserReport Model
+    This model describes UserReport between users
+    """
     user = models.ForeignKey(
         get_user_model(), related_name='filed_user_reports', on_delete=models.CASCADE)
     reported_user = models.ForeignKey(

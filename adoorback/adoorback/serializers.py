@@ -8,7 +8,6 @@ User = get_user_model()
 
 
 class AdoorBaseSerializer(serializers.ModelSerializer):
-    comment_count = serializers.SerializerMethodField(read_only=True)
     like_count = serializers.SerializerMethodField(read_only=True)
     current_user_like_id = serializers.SerializerMethodField(read_only=True)
 
@@ -16,15 +15,6 @@ class AdoorBaseSerializer(serializers.ModelSerializer):
         if len(attrs.get('content')) == 0:
             raise serializers.ValidationError('내용은 최소 한 글자 이상 써야해요...')
         return attrs
-
-    def get_comment_count(self, obj):
-        if obj.type == "Note":
-            return obj.note_comments.count()
-        elif obj.type == "Response":
-            return obj.response_comments.count()
-        elif obj.type == "Comment":
-            return obj.replies.count()
-        return None
 
     def get_like_count(self, obj):
         current_user = self.context['request'].user
@@ -40,5 +30,5 @@ class AdoorBaseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = None
-        fields = ['id', 'type', 'content', 'comment_count' ,'like_count', 'current_user_like_id', 'created_at']
+        fields = ['id', 'type', 'content', 'like_count', 'current_user_like_id', 'created_at']
         validators = []

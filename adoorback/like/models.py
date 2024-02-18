@@ -95,8 +95,3 @@ def create_like_noti(instance, created, **kwargs):
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_response_noti",
                                                            redirect_url=redirect_url, content_preview=content_preview)
-    elif origin.type == 'Note':
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-        Notification.objects.create_or_update_notification(user=user, actor=actor,
-                                                           origin=origin, target=target, noti_type="like_note_noti",
-                                                           redirect_url=redirect_url, content_preview=content_preview)

@@ -20,14 +20,17 @@ from account.models import FriendGroup
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
-import qna.serializers as qs
+import qna.serializers as fs
 from qna.models import Response, Question, ResponseRequest
 
 User = get_user_model()
 
 
 class ResponseList(generics.ListCreateAPIView):
-    serializer_class = qs.ResponseFriendSerializer
+    """
+    List all responses, or create a new response.
+    """
+    serializer_class = fs.ResponseFriendSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -45,8 +48,67 @@ class ResponseList(generics.ListCreateAPIView):
         serializer.save(author=self.request.user)
 
 
+class ResponseDaily(generics.ListCreateAPIView):
+    serializer_class = fs.ResponseBaseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_date(self):
+        year = self.kwargs.get('year')
+        month = self.kwargs.get('month')
+        day = self.kwargs.get('day')
+        created_date = date(year, month, day)
+
+        return created_date
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        share_group_ids = self.request.data.get('share_groups', [])
+        share_groups = [get_object_or_404(FriendGroup, id=id_) for id_ in share_group_ids]
+        share_friend_ids = self.request.data.get('share_friends', [])
+        share_friends = [get_object_or_404(User, id=id_) for id_ in share_friend_ids]
+        share_everyone = self.request.data.get('share_everyone', False)
+        serializer.save(author=self.request.user,
+                        share_friends=share_friends, share_groups=share_groups, share_everyone=share_everyone)
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        current_user = self.request.user
+        current_date = self.get_date()
+        return Response.objects.filter(author=current_user, date=current_date).order_by('question')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+
+        combined_responses = []
+        last_question_id = 0
+
+        for response in serializer.data:
+            question = response["question"]
+            copied_response = response.copy()
+            del copied_response["question"]
+
+            if question["id"] != last_question_id:
+                copied_question = question.copy()
+                copied_question["responses"] = [copied_response]
+                combined_responses.append(copied_question)
+                last_question_id = question["id"]
+            else:
+                combined_responses[-1]["responses"].append(copied_response)
+
+        return DjangoResponse(combined_responses)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+
 class QuestionResponseList(generics.RetrieveAPIView):
-    serializer_class = qs.QuestionResponseSerializer
+    """
+    List responses for a question
+    """
+    serializer_class = fs.QuestionResponseSerializer
     permission_classes = [IsAuthenticated]
 
     def get_serializer_context(self):
@@ -69,7 +131,10 @@ class QuestionResponseList(generics.RetrieveAPIView):
 
 
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = qs.ResponseFriendSerializer
+    """
+    Retrieve, update, or destroy a response.
+    """
+    serializer_class = fs.ResponseFriendSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -108,7 +173,7 @@ class ResponseComments(generics.ListAPIView):
 
 class ResponseRead(generics.UpdateAPIView):
     queryset = Response.objects.all()
-    serializer_class = qs.ResponseMinimumSerializer
+    serializer_class = fs.ResponseMinimumSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
@@ -129,7 +194,11 @@ class ResponseRead(generics.UpdateAPIView):
 
 
 class QuestionList(generics.ListCreateAPIView):
-    serializer_class = qs.QuestionBaseSerializer
+    """
+    List all questions, or create a new question.
+    """
+
+    serializer_class = fs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
@@ -157,7 +226,10 @@ class QuestionList(generics.ListCreateAPIView):
 
 
 class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = qs.QuestionBaseSerializer
+    """
+    Retrieve, update, or destroy a question.
+    """
+    serializer_class = fs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -171,8 +243,31 @@ class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
         return queryset
 
 
+class QuestionFriendResponsesDetail(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update, or destroy a question.
+    """
+    serializer_class = fs.QuestionDetailFriendResponsesSerializer
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        queryset = Question.objects.all()
+        cache.set('questions', queryset)
+        return queryset
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+
 class ResponseRequestList(generics.ListAPIView):
-    serializer_class = qs.ResponseRequestSerializer
+    """
+    Get response requests sent to other users on the selected question.
+    (for frontend 'send' button implementation purposes)
+    """
+    serializer_class = fs.ResponseRequestSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
@@ -198,7 +293,7 @@ class ResponseRequestCreate(generics.CreateAPIView):
     Get response requests of the selected question.
     """
     queryset = ResponseRequest.objects.all()
-    serializer_class = qs.ResponseRequestSerializer
+    serializer_class = fs.ResponseRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
@@ -223,7 +318,7 @@ class ResponseRequestCreate(generics.CreateAPIView):
 
 
 class ResponseRequestDestroy(generics.DestroyAPIView):
-    serializer_class = qs.ResponseRequestSerializer
+    serializer_class = fs.ResponseRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
@@ -237,7 +332,7 @@ class ResponseRequestDestroy(generics.DestroyAPIView):
 
 
 class DailyQuestionList(generics.ListAPIView):
-    serializer_class = qs.DailyQuestionSerializer
+    serializer_class = fs.DailyQuestionSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
@@ -252,7 +347,7 @@ class DailyQuestionList(generics.ListAPIView):
 
 
 class DateQuestionList(generics.ListAPIView):
-    serializer_class = qs.DailyQuestionSerializer
+    serializer_class = fs.DailyQuestionSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
@@ -270,7 +365,7 @@ class DateQuestionList(generics.ListAPIView):
 
 
 class RecommendedQuestionList(generics.ListAPIView):
-    serializer_class = qs.QuestionBaseSerializer
+    serializer_class = fs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
