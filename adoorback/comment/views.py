@@ -39,9 +39,6 @@ class CommentCreate(generics.ListCreateAPIView):
 
 
 class CommentDetail(generics.DestroyAPIView):
-    """
-    Retrieve, update, or destroy a comment.
-    """
     queryset = Comment.objects.all()
     serializer_class = CommentFriendSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]

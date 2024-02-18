@@ -22,9 +22,6 @@ User = get_user_model()
 
 
 class UserProfileSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
-    """
-    Serializer for auth and profile update
-    """
     url = serializers.SerializerMethodField(read_only=True)
     unread_noti = serializers.SerializerMethodField(read_only=True)
 
@@ -332,6 +329,3 @@ class UserFriendGroupOrderSerializer(serializers.Serializer):
             raise serializers.ValidationError("ids field is required.")
         return attrs
 
-
-from qna.serializers import ResponseMinimumSerializer
-from django.conf import settings
