@@ -7,6 +7,7 @@ from comment.models import Comment
 from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
 from account.serializers import AuthorFriendSerializer
+from note.models import Note
 from qna.models import Response
 from user_tag.serializers import UserTagSerializer
 
@@ -60,6 +61,29 @@ class PostCommentsSerializer(serializers.ModelSerializer):
             return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
 
+class PostCommentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = '__all__'
+
+    def to_representation(self, obj):
+        current_user = self.context.get('request', None).user
+        if isinstance(obj, Response):
+            comments = obj.response_comments
+        elif isinstance(obj, Note):
+            comments = obj.note_comments
+        else:
+            return None
+        comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)
+        if obj.author == current_user:
+            comments = comments.order_by('id')
+            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
+        else:
+            comments = comments.filter(is_private=False) | \
+                       comments.filter(author=current_user).order_by('id')
+            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
+
+
 class CommentFriendSerializer(CommentBaseSerializer):
     author = serializers.SerializerMethodField(read_only=True)
     author_detail = AuthorFriendSerializer(source='author', read_only=True)
@@ -78,7 +102,6 @@ class CommentFriendSerializer(CommentBaseSerializer):
             replies = obj.replies.filter(is_private=False) | \
                       obj.replies.filter(author=current_user).order_by('id')
         return self.__class__(replies, many=True, read_only=True, context=self.context).data
-
     class Meta(CommentBaseSerializer.Meta):
         model = Comment
         fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail', 'replies']
