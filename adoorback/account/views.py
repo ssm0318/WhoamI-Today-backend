@@ -368,7 +368,6 @@ class UserProfile(generics.RetrieveAPIView):
 
 
 class UserNoteList(generics.ListAPIView):
-    queryset = Note.objects.all().order_by('-created_at')
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'username'
@@ -514,18 +513,16 @@ class FriendList(generics.ListAPIView):
         friends = user.friends.all()
 
         query_type = self.request.query_params.get('type')
-        has_updates = self.request.query_params.get('has_updates')
-        favorites = self.request.query_params.get('favorites')
 
         if query_type == 'all':
             return friends.order_by('username')
-        elif has_updates == 'true':
+        elif query_type == 'has_updates':
             friends = friends.exclude(hidden=True)
             friends_with_updates = [
                 friend for friend in friends if not User.user_read(user, friend)
             ]
             return sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
-        elif favorites == 'true':
+        elif query_type == 'favorites':
             return user.favorites.all().order_by('username')
         else:
             raise Http404("Query parameter 'type' is invalid or not provided.")
