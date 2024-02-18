@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.http import Http404
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
@@ -42,7 +43,17 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
         return adoor_exception_handler
 
     def get_object(self):
-        return Note.objects.get(id=self.kwargs.get('pk'))
+        queryset = self.filter_queryset(self.get_queryset())
+
+        pk = self.kwargs.get('pk')
+        obj = queryset.filter(pk=pk).first()
+
+        if obj is None:
+            raise Http404('No Note matches the given query.')
+
+        self.check_object_permissions(self.request, obj)
+
+        return obj
 
     def get_queryset(self):
         return Note.objects.all()
