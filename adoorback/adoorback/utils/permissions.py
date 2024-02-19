@@ -51,11 +51,7 @@ class IsNotBlocked(permissions.BasePermission):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
-<<<<<<< HEAD
         return True
-=======
-        pass
->>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
         # TODO: 다시 구현할 것
 
         # if obj.type in ['Response', 'Article']:
