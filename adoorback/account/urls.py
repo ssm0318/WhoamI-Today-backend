@@ -18,7 +18,11 @@ urlpatterns = [
 
     # Current User Related
     path('me/', views.CurrentUserDetail.as_view(), name='current-user-detail'),
+<<<<<<< HEAD
     path('me/delete/', views.CurrentUserDelete.as_view(), name='current-user-delete'),
+=======
+    path('me/', views.CurrentUserDelete.as_view(), name='current-user-delete'),
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
     path('me/profile/', views.CurrentUserProfile.as_view(), name='current-user-profile'),
     path('me/notes/', views.CurrentUserNoteList.as_view(), name='current-user-note-list'),
     path('me/responses/', views.CurrentUserResponseList.as_view(), name='current-user-response-list'),
@@ -30,8 +34,13 @@ urlpatterns = [
     path('<str:username>/responses/', views.UserResponseList.as_view(), name='user-response-list'),
 
     # Friend List related
+<<<<<<< HEAD
     path('friends/', views.FriendList.as_view(), name='friend-list'),
     path('friends/update/', views.FriendListUpdate.as_view(), name='current-user-friends-update'),
+=======
+    path('friends/', views.FriendListUpdate.as_view(), name='current-user-friends-update'),
+    path('friends/', views.FriendList.as_view(), name='friend-list'),
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
 
     path('friends/favorites/', views.UserFavoriteAdd.as_view(), name='user-favorite-add'),
     path('friends/<int:pk>/favorites/', views.UserFavoriteDestroy.as_view(), name='user-favorite-destroy'),

@@ -36,7 +36,11 @@ from adoorback.utils.validators import adoor_exception_handler
 from check_in.models import CheckIn
 from note.models import Note
 from note.serializers import NoteSerializer
+<<<<<<< HEAD
 from qna.serializers import QuestionBaseSerializer
+=======
+from qna.serializers import QuestionBaseSerializer, ResponseMinimumSerializer
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
 from .email import email_manager
 from qna.models import Question
 from qna.models import Response as _Response
@@ -361,34 +365,56 @@ class UserProfile(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
+<<<<<<< HEAD
     lookup_field = 'user'
+=======
+    lookup_field = 'username'
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
 
 class UserNoteList(generics.ListAPIView):
+<<<<<<< HEAD
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated]
+=======
+    queryset = Note.objects.all().order_by('-created_at')
+    serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
         user = self.request.user
+<<<<<<< HEAD
         all_notes = Note.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
         print(all_notes)
+=======
+        all_notes = Note.objects.all().order_by('-created_at')
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
         note_ids = [note.id for note in all_notes if note.is_audience(user)]
         return Note.objects.filter(id__in=note_ids)
 
 
 class UserResponseList(generics.ListAPIView):
     queryset = _Response.objects.all().order_by('-created_at')
+<<<<<<< HEAD
     permission_classes = [IsAuthenticated]
+=======
+    serializer_class = ResponseMinimumSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'username'
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
+<<<<<<< HEAD
     def get_serializer_class(self):
         from qna.serializers import ResponseMinimumSerializer
         return ResponseMinimumSerializer
@@ -396,6 +422,11 @@ class UserResponseList(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         all_responses = _Response.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
+=======
+    def get_queryset(self):
+        user = self.request.user
+        all_responses = _Response.objects.all().order_by('-created_at')
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
         response_ids = [response.id for response in all_responses if response.is_audience(user)]
         return _Response.objects.filter(id__in=response_ids)
 
@@ -488,15 +519,22 @@ class CurrentUserNoteList(generics.ListAPIView):
 
 class CurrentUserResponseList(generics.ListAPIView):
     queryset = _Response.objects.all()
+<<<<<<< HEAD
+=======
+    serializer_class = ResponseMinimumSerializer
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
+<<<<<<< HEAD
     def get_serializer_class(self):
         from qna.serializers import ResponseMinimumSerializer
         return ResponseMinimumSerializer
 
+=======
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
     def get_queryset(self):
         user = self.request.user
         return _Response.objects.filter(author=user).order_by('-created_at')
@@ -518,16 +556,29 @@ class FriendList(generics.ListAPIView):
         friends = user.friends.all()
 
         query_type = self.request.query_params.get('type')
+<<<<<<< HEAD
 
         if query_type == 'all':
             return friends.order_by('username')
         elif query_type == 'has_updates':
+=======
+        has_updates = self.request.query_params.get('has_updates')
+        favorites = self.request.query_params.get('favorites')
+
+        if query_type == 'all':
+            return friends.order_by('username')
+        elif has_updates == 'true':
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
             friends = friends.exclude(hidden=True)
             friends_with_updates = [
                 friend for friend in friends if not User.user_read(user, friend)
             ]
             return sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
+<<<<<<< HEAD
         elif query_type == 'favorites':
+=======
+        elif favorites == 'true':
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
             return user.favorites.all().order_by('username')
         else:
             raise Http404("Query parameter 'type' is invalid or not provided.")

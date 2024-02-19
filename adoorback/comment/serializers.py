@@ -86,7 +86,6 @@ class PostCommentsSerializer(serializers.ModelSerializer):
             return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
 
-
 class CommentFriendSerializer(CommentBaseSerializer):
     author = serializers.SerializerMethodField(read_only=True)
     author_detail = UserMinimalSerializer(source='author', read_only=True)

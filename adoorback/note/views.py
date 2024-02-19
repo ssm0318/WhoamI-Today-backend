@@ -1,5 +1,8 @@
 from django.db import transaction
+<<<<<<< HEAD
 from django.http import Http404
+=======
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
@@ -57,5 +60,3 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Note.objects.all()
-
-

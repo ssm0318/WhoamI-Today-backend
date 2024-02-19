@@ -31,6 +31,7 @@ def note_image_path(instance, filename):
     return f'note_images/{instance.author_id}/{filename}'
 
 
+<<<<<<< HEAD
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
 
@@ -44,6 +45,8 @@ def note_image_path(instance, filename):
     return f'note_images/{instance.author_id}/{filename}'
 
 
+=======
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
 class Note(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='note_set', on_delete=models.CASCADE)
     image = models.ImageField(upload_to=note_image_path, storage=OverwriteStorage(), null=True, blank=True)
@@ -51,7 +54,11 @@ class Note(AdoorModel, SafeDeleteModel):
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
 
+<<<<<<< HEAD
     share_everyone = models.BooleanField(default=False, blank=True)
+=======
+    share_everyone = models.BooleanField(default=True)
+>>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
     share_groups = models.ManyToManyField(FriendGroup, related_name='shared_notes', blank=True)
     share_friends = models.ManyToManyField(User, related_name='shared_notes', blank=True)
 
@@ -101,4 +108,3 @@ class Note(AdoorModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['-id']),
         ]
-
