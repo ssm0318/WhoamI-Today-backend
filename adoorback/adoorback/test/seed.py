@@ -41,11 +41,7 @@ def set_seed(n):
             User.objects.create_user(username=username,
                                      email=faker.email(),
                                      password="Adoor2020:)")
-<<<<<<< HEAD
     if not User.objects.filter(username="tester2"):
-=======
-    if not User.objects.get(username="tester2"):
->>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
         User.objects.create_user(username="tester2", email=faker.email(), password="Test1234!")
     logging.info(
         f"{User.objects.count()} User(s) created!") if DEBUG else None

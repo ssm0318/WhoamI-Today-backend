@@ -48,21 +48,9 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         return self.readers.values_list('id', flat=True)
     
     def is_audience(self, user):
-<<<<<<< HEAD
         if self.user == user:
             return True
 
-=======
-        """
-        Returns True if the given user is in the audience that can view this check_in.
-        """
-        if self.user == user:
-            return True
-
-        if not User.are_friends(self.user, user):
-            return False
-        
->>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
         if self.share_everyone:
             return True
 
