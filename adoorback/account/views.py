@@ -36,7 +36,7 @@ from adoorback.utils.validators import adoor_exception_handler
 from check_in.models import CheckIn
 from note.models import Note
 from note.serializers import NoteSerializer
-from qna.serializers import QuestionBaseSerializer, ResponseMinimumSerializer
+from qna.serializers import QuestionBaseSerializer
 from .email import email_manager
 from qna.models import Question
 from qna.models import Response as _Response
@@ -361,7 +361,7 @@ class UserProfile(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'username'
+    lookup_field = 'user'
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -370,30 +370,32 @@ class UserProfile(generics.RetrieveAPIView):
 class UserNoteList(generics.ListAPIView):
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'username'
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
         user = self.request.user
-        all_notes = Note.objects.all().order_by('-created_at')
+        all_notes = Note.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
+        print(all_notes)
         note_ids = [note.id for note in all_notes if note.is_audience(user)]
         return Note.objects.filter(id__in=note_ids)
 
 
 class UserResponseList(generics.ListAPIView):
     queryset = _Response.objects.all().order_by('-created_at')
-    serializer_class = ResponseMinimumSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'username'
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    def get_serializer_class(self):
+        from qna.serializers import ResponseMinimumSerializer
+        return ResponseMinimumSerializer
+
     def get_queryset(self):
         user = self.request.user
-        all_responses = _Response.objects.all().order_by('-created_at')
+        all_responses = _Response.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
         response_ids = [response.id for response in all_responses if response.is_audience(user)]
         return _Response.objects.filter(id__in=response_ids)
 
@@ -486,11 +488,14 @@ class CurrentUserNoteList(generics.ListAPIView):
 
 class CurrentUserResponseList(generics.ListAPIView):
     queryset = _Response.objects.all()
-    serializer_class = ResponseMinimumSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
+
+    def get_serializer_class(self):
+        from qna.serializers import ResponseMinimumSerializer
+        return ResponseMinimumSerializer
 
     def get_queryset(self):
         user = self.request.user

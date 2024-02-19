@@ -16,7 +16,6 @@ from check_in.models import CheckIn
 from note.models import Note
 from qna.models import Response
 from notification.models import Notification
-from qna.serializers import ResponseMinimumSerializer
 
 from django_countries.serializers import CountryFieldMixin
 
@@ -191,6 +190,7 @@ class FriendListSerializer(UserMinimalSerializer):
         return {}
 
     def responses(self, obj):
+        from qna.serializers import ResponseMinimumSerializer
         user = self.context.get('request', None).user
         response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
         response_queryset = Response.objects.filter(id__in=response_ids).order_by('question__id', 'created_at')

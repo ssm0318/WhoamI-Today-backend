@@ -80,7 +80,7 @@ class Response(AdoorModel, SafeDeleteModel):
     response_reactions = GenericRelation(Reaction)
     readers = models.ManyToManyField(User, related_name='read_responses')
 
-    share_everyone = models.BooleanField(default=True)
+    share_everyone = models.BooleanField(default=False, blank=True)
     share_groups = models.ManyToManyField(FriendGroup, related_name='shared_responses', blank=True)
     share_friends = models.ManyToManyField(User, related_name='shared_responses', blank=True)
 
@@ -117,17 +117,14 @@ class Response(AdoorModel, SafeDeleteModel):
         return self.readers.values_list('id', flat=True)
 
     def is_audience(self, user):
-        """
-        Returns True if the given user is in the audience that can view this response.
-        """
         if self.author == user:
+            return True
+
+        if self.share_everyone:
             return True
 
         if not User.are_friends(self.author, user):
             return False
-
-        if self.share_everyone:
-            return True
 
         if self.share_groups.filter(friends=user).exists():
             return True
@@ -201,7 +198,7 @@ def create_request_answered_noti(instance, created, **kwargs):
     if instance.deleted:
         return
 
-    if not created or not instance.share_with_friends:  # response edit만 해줬거나 익명으로만 공개한 경우
+    if not created:  # response edit만 해줬거나 익명으로만 공개한 경우
         return
 
     author_id = instance.author.id

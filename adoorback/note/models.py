@@ -51,7 +51,7 @@ class Note(AdoorModel, SafeDeleteModel):
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
 
-    share_everyone = models.BooleanField(default=True)
+    share_everyone = models.BooleanField(default=False, blank=True)
     share_groups = models.ManyToManyField(FriendGroup, related_name='shared_notes', blank=True)
     share_friends = models.ManyToManyField(User, related_name='shared_notes', blank=True)
 
@@ -80,17 +80,14 @@ class Note(AdoorModel, SafeDeleteModel):
         return self.note_comments.values_list('author_id', flat=True).distinct()
 
     def is_audience(self, user):
-        """
-        Returns True if the given user is in the audience that can view this response.
-        """
         if self.author == user:
+            return True
+
+        if self.share_everyone:
             return True
 
         if not User.are_friends(self.author, user):
             return False
-
-        if self.share_everyone:
-            return True
 
         if self.share_groups.filter(friends=user).exists():
             return True
