@@ -356,10 +356,3 @@ class UserFriendGroupOrderSerializer(serializers.Serializer):
         if 'ids' not in attrs:
             raise serializers.ValidationError("ids field is required.")
         return attrs
-<<<<<<< HEAD
-=======
-
-
-from qna.serializers import ResponseMinimumSerializer
-from django.conf import settings
->>>>>>> 0d9d5b94c68ca2088241259c1ba17bc8bf491fd5
