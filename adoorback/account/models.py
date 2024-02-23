@@ -149,6 +149,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         if user2_check_in and user1.id not in user2_check_in.reader_ids:
             return False
 
+        user2_note = user1.can_access_note(user2)
+        if user2_note and user1.id not in user2_note.reader_ids:
+            return False
+
         return True
 
     @property
@@ -200,6 +204,12 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         if check_in and CheckIn.is_audience(check_in, self):
             return check_in
         return None
+
+    def can_access_note(self, user):
+        from note.models import Note
+        note_ids = [note.id for note in user.note_set.all() if Note.is_audience(note, self)]
+        note_queryset = Note.objects.filter(id__in=note_ids)
+        return note_queryset
 
 
 class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):

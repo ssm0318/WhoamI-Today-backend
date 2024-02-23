@@ -67,12 +67,11 @@ class Question(AdoorModel, SafeDeleteModel):
         return self.selected_dates[-1] if self.selected_dates else None
 
     class Meta:
-        ordering = ['id']
+        ordering = ['-id']
 
 
 class Response(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='response_set', on_delete=models.CASCADE)
-    share_with_friends = models.BooleanField(default=True)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
 
     response_comments = GenericRelation(Comment)
@@ -81,7 +80,7 @@ class Response(AdoorModel, SafeDeleteModel):
     response_reactions = GenericRelation(Reaction)
     readers = models.ManyToManyField(User, related_name='read_responses')
 
-    share_everyone = models.BooleanField(default=True)
+    share_everyone = models.BooleanField(default=False, blank=True)
     share_groups = models.ManyToManyField(FriendGroup, related_name='shared_responses', blank=True)
     share_friends = models.ManyToManyField(User, related_name='shared_responses', blank=True)
 
@@ -118,14 +117,14 @@ class Response(AdoorModel, SafeDeleteModel):
         return self.readers.values_list('id', flat=True)
 
     def is_audience(self, user):
-        """
-        Returns True if the given user is in the audience that can view this response.
-        """
-        if not User.are_friends(self.author, user):
-            return False
+        if self.author == user:
+            return True
 
         if self.share_everyone:
             return True
+
+        if not User.are_friends(self.author, user):
+            return False
 
         if self.share_groups.filter(friends=user).exists():
             return True
@@ -140,6 +139,7 @@ class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
     requester = models.ForeignKey(User, related_name='sent_response_request_set', on_delete=models.CASCADE)
     requestee = models.ForeignKey(User, related_name='received_response_request_set', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    message = models.TextField(blank=True, null=True)
 
     response_request_targetted_notis = GenericRelation('notification.Notification',
                                                        content_type_field='target_type',
@@ -198,7 +198,7 @@ def create_request_answered_noti(instance, created, **kwargs):
     if instance.deleted:
         return
 
-    if not created or not instance.share_with_friends:  # response edit만 해줬거나 익명으로만 공개한 경우
+    if not created:  # response edit만 해줬거나 익명으로만 공개한 경우
         return
 
     author_id = instance.author.id

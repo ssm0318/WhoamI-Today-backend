@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from account.serializers import AuthorFriendSerializer
+from account.serializers import UserMinimalSerializer
 from check_in.models import CheckIn
 
 
@@ -26,7 +26,7 @@ class MyCheckInSerializer(CheckInBaseSerializer):
 class CheckInDetailSerializer(MyCheckInSerializer):
     user = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='user', lookup_url_kwarg='username')
-    user_detail = AuthorFriendSerializer(source='user', read_only=True)
+    user_detail = UserMinimalSerializer(source='user', read_only=True)
 
     class Meta:
         model = CheckIn

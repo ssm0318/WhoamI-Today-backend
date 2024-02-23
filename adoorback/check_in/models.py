@@ -32,7 +32,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     description = models.CharField(blank=True, null=True, max_length=88)
     track_id = models.CharField(blank=True, null=True, max_length=50)
 
-    share_everyone = models.BooleanField(default=True)
+    share_everyone = models.BooleanField(default=False, blank=True)
     share_groups = models.ManyToManyField(FriendGroup, related_name='shared_check_ins', blank=True)
     share_friends = models.ManyToManyField(User, related_name='shared_check_ins', blank=True)
 
@@ -48,14 +48,14 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         return self.readers.values_list('id', flat=True)
     
     def is_audience(self, user):
-        """
-        Returns True if the given user is in the audience that can view this check_in.
-        """
-        if not User.are_friends(self.user, user):
-            return False
-        
+        if self.user == user:
+            return True
+
         if self.share_everyone:
             return True
+
+        if not User.are_friends(self.user, user):
+            return False
 
         if self.share_groups.filter(friends=user).exists():
             return True

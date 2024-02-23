@@ -36,7 +36,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField' # django 버전업하면서 �
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 15,
+    'PAGE_SIZE': 10,
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'adoorback.utils.authentication.CustomAuthentication',
         'adoorback.utils.authentication.SessionAuthentication',

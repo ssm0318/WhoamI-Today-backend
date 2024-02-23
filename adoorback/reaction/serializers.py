@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 
 from reaction.models import Reaction
 from adoorback.serializers import AdoorBaseSerializer
-from account.serializers import AuthorFriendSerializer
+from account.serializers import UserMinimalSerializer
 
 User = get_user_model()
 
@@ -28,7 +28,7 @@ class ReactionSerializer(ReactionBaseSerializer):
 
     def get_user(self, obj):
         user = obj.user
-        return AuthorFriendSerializer(user).data
+        return UserMinimalSerializer(user).data
 
 
     class Meta(AdoorBaseSerializer.Meta):

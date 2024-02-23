@@ -5,7 +5,7 @@ from rest_framework.exceptions import NotAcceptable
 from django.urls import reverse
 
 from account.models import FriendGroup
-from account.serializers import AuthorFriendSerializer, UserFriendGroupBaseSerializer
+from account.serializers import UserMinimalSerializer, UserFriendGroupBaseSerializer
 from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
 from adoorback.utils.content_types import get_generic_relation_type
@@ -62,7 +62,7 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
     share_groups = serializers.ListField(child=serializers.IntegerField(), write_only=True)
     share_groups_details = UserFriendGroupBaseSerializer(source='share_groups', read_only=True, many=True)
     share_friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    share_friends_details = AuthorFriendSerializer(source='share_friends', read_only=True, many=True)
+    share_friends_details = UserMinimalSerializer(source='share_friends', read_only=True, many=True)
     reaction_preview = serializers.SerializerMethodField(read_only=True)
 
     def get_reaction_preview(self, obj):
@@ -90,7 +90,7 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
 class ResponseFriendSerializer(ResponseBaseSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
-    author_detail = AuthorFriendSerializer(source='author', read_only=True)
+    author_detail = UserMinimalSerializer(source='author', read_only=True)
 
     class Meta(ResponseBaseSerializer.Meta):
         model = Response
@@ -115,7 +115,7 @@ class QuestionResponseSerializer(QuestionBaseSerializer):
 class QuestionFriendSerializer(QuestionBaseSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
-    author_detail = AuthorFriendSerializer(source='author', read_only=True)
+    author_detail = UserMinimalSerializer(source='author', read_only=True)
 
     class Meta(QuestionBaseSerializer.Meta):
         model = Question
@@ -125,8 +125,6 @@ class QuestionFriendSerializer(QuestionBaseSerializer):
 
 class DailyQuestionSerializer(QuestionBaseSerializer):
     """
-    for questions in question
-
     (all profiles are anonymized, including that of the current user)
     """
     author = serializers.SerializerMethodField(read_only=True)
@@ -134,7 +132,7 @@ class DailyQuestionSerializer(QuestionBaseSerializer):
         source='author', read_only=True)
 
     def get_author_detail(self, obj):
-        return AuthorFriendSerializer(obj.author).data
+        return UserMinimalSerializer(obj.author).data
 
     def get_author(self, obj):
         return None
@@ -182,4 +180,4 @@ class ResponseRequestSerializer(serializers.ModelSerializer):
 
     class Meta():
         model = ResponseRequest
-        fields = ['id', 'requester_id', 'requestee_id', 'question_id']
+        fields = ['id', 'requester_id', 'requestee_id', 'question_id', 'message']
