@@ -126,7 +126,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
         ]
 
     def __str__(self):
-        return self.message
+        return f"@{self.user} {self.message}"
 
 
 @receiver(post_save, sender=Notification)

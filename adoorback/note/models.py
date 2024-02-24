@@ -2,6 +2,7 @@ import urllib
 
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.files.storage import FileSystemStorage
 from safedelete import SOFT_DELETE_CASCADE
@@ -12,6 +13,7 @@ from django.conf import settings
 from account.models import FriendGroup
 from adoorback.models import AdoorModel
 from comment.models import Comment
+from content_report.models import ContentReport
 from like.models import Like
 from notification.models import Notification
 
@@ -80,6 +82,13 @@ class Note(AdoorModel, SafeDeleteModel):
         return self.note_comments.values_list('author_id', flat=True).distinct()
 
     def is_audience(self, user):
+        content_type = ContentType.objects.get_for_model(self)
+        if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():
+            return False
+
+        if self.author.id in user.user_report_blocked_ids:
+            return False
+
         if self.author == user:
             return True
 

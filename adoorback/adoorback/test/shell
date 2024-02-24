@@ -6,6 +6,8 @@ from comment.models import Comment
 from like.models import Like
 from notification.models import Notification
 from reaction.models import Reaction
+from user_report.models import UserReport
+from content_report.models import ContentReport
 from adoorback.utils.content_types import get_question_type, get_comment_type, get_response_type
 from note.models import Note
 from django.contrib.auth import get_user_model
