@@ -18,7 +18,8 @@ class ChatRoomList(generics.ListAPIView):
 
     def get_queryset(self):
         current_user = self.request.user
-        return current_user.chat_rooms.all()
+        current_user.chat_rooms.all()
+        return current_user.chat_rooms.filter(messages__isnull=False)
 
 
 class ReversePagination(PageNumberPagination):
@@ -36,7 +37,7 @@ class ReversePagination(PageNumberPagination):
 
 class ChatRoomFriendList(generics.ListAPIView):
     """
-    Get chat room with a friend.
+    Get chat rooms with a friend.
     """
     serializer_class = cs.ChatRoomSerializer
     permission_classes = [IsAuthenticated]
@@ -52,8 +53,10 @@ class ChatRoomFriendList(generics.ListAPIView):
         if (friend == current_user):
             raise exceptions.PermissionDenied("You cannot chat with yourself")
 
-        chat_room = ChatRoom.objects.filter(users=current_user).filter(users=friend)
-        return chat_room
+        chat_rooms = ChatRoom.objects.filter(users=current_user).filter(users=friend) \
+            .filter(messages__isnull=False)
+
+        return chat_rooms
 
 
 class ChatMessagesListView(generics.ListAPIView):
