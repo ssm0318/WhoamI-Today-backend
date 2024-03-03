@@ -4,6 +4,7 @@ import json
 from asgiref.sync import async_to_sync
 from channels.exceptions import DenyConnection
 from channels.generic.websocket import WebsocketConsumer
+from django.db.models import Q
 
 from chat.models import Message, ChatRoom
 from utils.helpers import update_last_read_message
@@ -11,6 +12,8 @@ from utils.helpers import update_last_read_message
 
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.000+00:00"
 
+from chat.models import Message, ChatRoom, UserChatActivity
+from utils.helpers import update_last_read_message
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
@@ -30,6 +33,8 @@ class ChatConsumer(WebsocketConsumer):
         self.accept()
 
         # Update last read message for user
+        user = self.scope["user"]
+        chat_room = ChatRoom.objects.get(id=self.room_id)
         update_last_read_message(user, chat_room)
 
         # Send message to own chatroom_list group 
@@ -59,6 +64,10 @@ class ChatConsumer(WebsocketConsumer):
         user_name = text_data_json["userName"]
         timestamp = datetime.utcnow()
         timestamp_str = timestamp.strftime(TIME_FORMAT)
+
+        # Save message to database
+        new_message = Message.objects.create(sender_id=user_id, content=content, chat_room_id=self.room_id, timestamp=timestamp)
+        message_id = new_message.id
 
         # Save message to database
         new_message = Message.objects.create(sender_id=user_id, content=content, chat_room_id=self.room_id, timestamp=timestamp)
