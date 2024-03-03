@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from chat.models import ChatRoom, Message
-from account.serializers import AuthorFriendSerializer
+from account.serializers import UserMinimalSerializer
 
 
 class ChatRoomSerializer(serializers.ModelSerializer):
@@ -11,15 +11,15 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         if request and request.user:
             current_user = request.user
             participants = obj.users.exclude(id=current_user.id)
-            return AuthorFriendSerializer(participants, many=True).data
+            return UserMinimalSerializer(participants, many=True).data
         return []
 
     class Meta:
         model = ChatRoom
-        fields = ['id', 'participants', 'last_message_content', 'last_message_time']
+        fields = ['id', 'participants', 'last_message_content', 'last_message_time', 'active']
 
 class MessageSerializer(serializers.ModelSerializer):
-    sender = AuthorFriendSerializer(read_only=True)
+    sender = UserMinimalSerializer(read_only=True)
 
     class Meta:
         model = Message
