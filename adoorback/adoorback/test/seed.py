@@ -1,18 +1,20 @@
-import random
+from datetime import datetime
 import logging
+import random
 import sys
 
 from django.contrib.auth import get_user_model
 from faker import Faker
 
-from adoorback.utils.content_types import get_comment_type, get_response_type
 from account.models import FriendRequest
+from adoorback.utils.content_types import get_comment_type, get_response_type
+from chat.models import ChatRoom, Message
+from check_in.models import CheckIn
+from comment.models import Comment
+from like.models import Like
 from note.models import Note
 from qna.algorithms.data_crawler import select_daily_questions
 from qna.models import Response, Question, ResponseRequest
-from comment.models import Comment
-from like.models import Like
-from check_in.models import CheckIn
 
 DEBUG = False
 
@@ -217,3 +219,11 @@ def set_seed(n):
         Like.objects.create(user=user, target=reply)
     logging.info(
         f"{Like.objects.count()} Like(s) created!") if DEBUG else None
+
+    # Seed Chat Messages
+    for chat_room in ChatRoom.objects.all():
+        participants = chat_room.users.all()
+        for p in participants:
+            timestamp = datetime.utcnow()
+            for _ in range(random.randint(3, 5)):
+                Message.objects.create(sender=p, content=faker.text(max_nb_chars=50), timestamp=timestamp, chat_room=chat_room)
