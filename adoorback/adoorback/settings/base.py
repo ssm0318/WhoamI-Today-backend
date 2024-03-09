@@ -84,7 +84,6 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'rest_framework',
     'polymorphic',
-    'admin_honeypot',
     'django_cron',
     'django_countries',
     'corsheaders',
