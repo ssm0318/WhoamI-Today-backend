@@ -151,15 +151,9 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_mutuals(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            print(obj)
-            print(request.user)
-            print(request.user.friends.all())
             current_user_friends = set(request.user.friends.all())
-            print(obj.friends.all())
             obj_user_friends = set(obj.friends.all())
-            print(current_user_friends & obj_user_friends)
             mutual_friends = current_user_friends & obj_user_friends
-            print(mutual_friends)
             return UserMinimalSerializer(mutual_friends, many=True).data
         return {}
 
