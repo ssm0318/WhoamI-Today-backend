@@ -8,7 +8,7 @@ from django.dispatch import receiver
 
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.content_types import get_response_request_type, get_question_type
-from notification.helpers import parse_message_ko, parse_message_en, find_like_noti, construct_message
+from notification.helpers import find_like_noti, construct_message
 
 from firebase_admin.messaging import Message
 from firebase_admin.messaging import Notification as FirebaseNotification
@@ -51,14 +51,14 @@ class NotificationManager(SafeDeleteManager):
                         break
 
         if noti_to_update:
-            N = noti_to_update.actors.count()
-            user_a_ko = parse_message_ko(noti_to_update.message_ko, N)['user_a']
-            user_a_en = parse_message_en(noti_to_update.message_en, N)['user_a']
+            actors = noti_to_update.notificationactor_set.order_by('-created_at')
+            N = actors.count()
+            new_actor = actors.first().user
             updated_message_ko, updated_message_en = construct_message(noti_type,
                                                                        actor.username + "님",
-                                                                       user_a_ko + "님",
+                                                                       new_actor.username + "님",
                                                                        actor.username,
-                                                                       user_a_en,
+                                                                       new_actor.username,
                                                                        N + 1,
                                                                        content_preview,
                                                                        emoji)
@@ -86,9 +86,9 @@ def default_user():
 
 
 class Notification(AdoorTimestampedModel, SafeDeleteModel):
-    user = models.ForeignKey(get_user_model(), related_name='received_noti_set',
+    user = models.ForeignKey('account.User', related_name='received_noti_set',
                              on_delete=models.CASCADE, null=True)
-    actors = models.ManyToManyField(get_user_model(), through='NotificationActor', related_name='sent_noti_set')
+    actors = models.ManyToManyField('account.User', through='NotificationActor', related_name='sent_notification_set')
 
     # target: notification을 발생시킨 직접적인 원인(?)
     target_type = models.ForeignKey(ContentType,
@@ -128,7 +128,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
 
 
 class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+    user = models.ForeignKey('account.User', on_delete=models.CASCADE)
     notification = models.ForeignKey(Notification, on_delete=models.CASCADE)
 
     _safedelete_policy = SOFT_DELETE_CASCADE
