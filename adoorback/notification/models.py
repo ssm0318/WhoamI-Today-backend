@@ -17,8 +17,6 @@ from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
 from safedelete.managers import SafeDeleteManager
 
-User = get_user_model()
-
 
 class NotificationManager(SafeDeleteManager):
 
@@ -29,7 +27,7 @@ class NotificationManager(SafeDeleteManager):
         return self.filter(is_read=False, **kwargs)
 
     def admin_only(self, **kwargs):
-        admin = User.objects.filter(is_superuser=True).first()
+        admin = get_user_model().objects.filter(is_superuser=True).first()
         return self.filter(actor=admin, **kwargs)
 
     def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_preview,
@@ -69,7 +67,7 @@ class NotificationManager(SafeDeleteManager):
             noti_to_update.message_en = updated_message_en
             noti_to_update.is_visible = True
             noti_to_update.is_read = False
-            noti_to_update.actors.add(actor)
+            NotificationActor.objects.create(user=actor, notification=noti_to_update)
             noti_to_update.save()
             print(noti_to_update.message_ko)
             print(noti_to_update.message_en)
@@ -78,19 +76,19 @@ class NotificationManager(SafeDeleteManager):
                                                        actor.username, None, 1, content_preview, emoji)
             noti = Notification.objects.create(user=user, origin=origin, target=target, redirect_url=redirect_url,
                                                message_ko=message_ko, message_en=message_en)
-            noti.actors.add(actor)
+            NotificationActor.objects.create(user=actor, notification=noti)
             print(noti.message_ko)
             print(noti.message_en)
 
 
 def default_user():
-    return User.objects.filter(is_superuser=True).first()
+    return get_user_model().objects.filter(is_superuser=True).first()
 
 
 class Notification(AdoorTimestampedModel, SafeDeleteModel):
-    user = models.ForeignKey(User, related_name='received_noti_set',
+    user = models.ForeignKey(get_user_model(), related_name='received_noti_set',
                              on_delete=models.CASCADE, null=True)
-    actors = models.ManyToManyField(User, related_name='sent_noti_set')
+    actors = models.ManyToManyField(get_user_model(), through='NotificationActor', related_name='sent_noti_set')
 
     # target: notification을 발생시킨 직접적인 원인(?)
     target_type = models.ForeignKey(ContentType,
@@ -127,6 +125,16 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return self.message
+
+
+class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+    notification = models.ForeignKey(Notification, on_delete=models.CASCADE)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        ordering = ['-created_at']
 
 
 @receiver(post_save, sender=Notification)

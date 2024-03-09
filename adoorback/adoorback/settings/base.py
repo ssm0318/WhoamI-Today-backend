@@ -63,17 +63,17 @@ CORS_ORIGIN_WHITELIST = [
 # Application definition
 
 INSTALLED_APPS = [
-    'content_report.apps.ContentReportConfig',
-    'user_report.apps.UserReportConfig',
+    'account.apps.AccountConfig',
     'qna.apps.QnaConfig',
+    'check_in.apps.CheckInConfig',
+    'note.apps.NoteConfig',
     'like.apps.LikeConfig',
     'comment.apps.CommentConfig',
     'notification.apps.NotificationConfig',
-    'account.apps.AccountConfig',
     'user_tag.apps.UserTagConfig',
     'reaction.apps.ReactionConfig',
-    'check_in.apps.CheckInConfig',
-    'note.apps.NoteConfig',
+    'content_report.apps.ContentReportConfig',
+    'user_report.apps.UserReportConfig',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
