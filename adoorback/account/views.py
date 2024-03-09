@@ -361,7 +361,7 @@ class UserProfile(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'user'
+    lookup_field = 'username'
 
     def get_exception_handler(self):
         return adoor_exception_handler
