@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 
 from asgiref.sync import async_to_sync
+from channels.exceptions import DenyConnection
 from channels.generic.websocket import WebsocketConsumer
 
 from chat.models import Message, ChatRoom
@@ -17,6 +18,10 @@ class ChatConsumer(WebsocketConsumer):
         self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
         self.room_group_id = f"chat_{self.room_id}"
 
+        chat_room = ChatRoom.objects.get(id=self.room_id)
+        if user not in chat_room.users.all():
+            raise DenyConnection("You must be a member to join this chat.")
+
         # Join room group
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_id, self.channel_name
@@ -25,7 +30,6 @@ class ChatConsumer(WebsocketConsumer):
         self.accept()
 
         # Update last read message for user
-        chat_room = ChatRoom.objects.get(id=self.room_id)
         update_last_read_message(user, chat_room)
 
         # Send message to own chatroom_list group 
