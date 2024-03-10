@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models.signals import m2m_changed, post_save
+from django.db.models.signals import m2m_changed, post_save, pre_save
 from django.dispatch import receiver
 
 from adoorback.models import AdoorModel, AdoorTimestampedModel
@@ -20,6 +21,14 @@ class ChatRoom(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return f"chatroom of {', '.join([user.username for user in self.users.all()])}"
+
+    def clean(self):
+        super().clean()
+        # Check if users in the chatroom are friends
+        for user in self.users.all():
+            for other_user in self.users.exclude(id=user.id):
+                if not User.are_friends(user, other_user):
+                    raise ValidationError("All users in the chatroom must be friends.")
 
     @property
     def last_message_content(self):
@@ -97,3 +106,8 @@ def sender_read_message(created, instance, **kwargs):
         )
         user_activity.last_read_message_id = instance.id
         user_activity.save()
+
+
+@receiver(post_save, sender=ChatRoom)
+def validate_chatroom(sender, instance, **kwargs):
+    instance.full_clean()
