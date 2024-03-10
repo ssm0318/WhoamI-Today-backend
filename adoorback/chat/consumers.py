@@ -4,7 +4,6 @@ import json
 from asgiref.sync import async_to_sync
 from channels.exceptions import DenyConnection
 from channels.generic.websocket import WebsocketConsumer
-from django.db.models import Q
 
 from chat.models import Message, ChatRoom
 from utils.helpers import update_last_read_message
@@ -14,6 +13,7 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.000+00:00"
 
 from chat.models import Message, ChatRoom, UserChatActivity
 from utils.helpers import update_last_read_message
+
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
