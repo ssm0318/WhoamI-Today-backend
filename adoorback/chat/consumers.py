@@ -64,13 +64,10 @@ class ChatConsumer(WebsocketConsumer):
         user_name = text_data_json["userName"]
         timestamp = datetime.utcnow()
         timestamp_str = timestamp.strftime(TIME_FORMAT)
-<<<<<<< HEAD
 
         # Save message to database
         new_message = Message.objects.create(sender_id=user_id, content=content, chat_room_id=self.room_id, timestamp=timestamp)
         message_id = new_message.id
-=======
->>>>>>> 6ce4b45 (feat: #117 add websocket message send in case of accessing in different devices)
 
         # Save message to database
         new_message = Message.objects.create(sender_id=user_id, content=content, chat_room_id=self.room_id, timestamp=timestamp)
