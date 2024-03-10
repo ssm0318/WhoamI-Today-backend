@@ -1,6 +1,7 @@
 import secrets
 
 from django.db import transaction
+from django.db.models import Count
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
@@ -157,6 +158,7 @@ class FriendListSerializer(UserMinimalSerializer):
     is_favorite = serializers.SerializerMethodField(read_only=True)
     is_hidden = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
+    unread_cnt = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -180,6 +182,16 @@ class FriendListSerializer(UserMinimalSerializer):
         current_user_read = not any(not response['current_user_read'] for response in responses) \
                             and not (check_in and not check_in['current_user_read'])
         return current_user_read
+    
+    def get_unread_cnt(self, obj):
+        from chat.models import ChatRoom
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user = request.user
+            chat_room = ChatRoom.objects.filter(users__in=[user, obj]).annotate(user_count=Count('users')).filter(user_count=2).first()
+            if chat_room:
+                return chat_room.unread_cnt(user)
+        return 0
 
     def check_in(self, obj):
         from check_in.serializers import CheckInBaseSerializer
@@ -199,7 +211,7 @@ class FriendListSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read']
+        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read', 'unread_cnt']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):
