@@ -3,13 +3,14 @@ import json
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
-from django.db.models import Q
 
-from chat.models import Message, ChatRoom, UserChatActivity
+from chat.models import Message, ChatRoom
 from utils.helpers import update_last_read_message
+
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
+        user = self.scope["user"]
         self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
         self.room_group_id = f"chat_{self.room_id}"
 
@@ -20,8 +21,7 @@ class ChatConsumer(WebsocketConsumer):
 
         self.accept()
 
-        # Update last read message for the user
-        user = self.scope["user"]
+        # Update last read message for user
         chat_room = ChatRoom.objects.get(id=self.room_id)
         update_last_read_message(user, chat_room)
 
@@ -61,7 +61,7 @@ class ChatConsumer(WebsocketConsumer):
         for r in recipients:
             async_to_sync(self.channel_layer.group_send)(
                 f"user_{r.id}_chat_list", {
-                    "type": "chatroom.message",
+                    "type": "chat.message",
                     "roomId": self.room_id,
                     "content": content,
                     "timestamp": timestamp_str,
@@ -80,14 +80,15 @@ class ChatConsumer(WebsocketConsumer):
 
         # Save read status to database
         user = self.scope["user"]
-        chat_room = ChatRoom.objects.get(id=self.room_id)
-        update_last_read_message(user, chat_room)
+        if user.username != user_name:
+            chat_room = ChatRoom.objects.get(id=self.room_id)
+            update_last_read_message(user, chat_room)
 
 
 class ChatRoomListConsumer(WebsocketConsumer):
     def connect(self):
         # Make group for each user
-        self.user_id = self.scope["user"]
+        self.user_id = self.scope["user"].id
         self.user_group_id = f"user_{self.user_id}_chat_list"
 
         async_to_sync(self.channel_layer.group_add)(

@@ -23,7 +23,6 @@ class ChatRoomList(generics.ListAPIView):
 
 
 class ReversePagination(PageNumberPagination):
-    # TODO - adjust page size
     page_size = 30
 
     def get_paginated_response(self, data):
