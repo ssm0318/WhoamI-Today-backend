@@ -8,6 +8,9 @@ from chat.models import Message, ChatRoom
 from utils.helpers import update_last_read_message
 
 
+TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.000+00:00"
+
+
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
         user = self.scope["user"]
@@ -25,6 +28,19 @@ class ChatConsumer(WebsocketConsumer):
         chat_room = ChatRoom.objects.get(id=self.room_id)
         update_last_read_message(user, chat_room)
 
+        # Send message to own chatroom_list group 
+        # (in case of accessing chatroom, chat list in different devices)
+        if chat_room.messages.all():
+            async_to_sync(self.channel_layer.group_send)(
+                f"user_{user.id}_chat_list", {
+                    "type": "chat.message",
+                    "roomId": self.room_id,
+                    "content": chat_room.last_message_content,
+                    "timestamp": chat_room.last_message_time.strftime(TIME_FORMAT),
+                    "unreadCnt": 0
+                }
+            )
+
     def disconnect(self, close_code):
         # Leave room group
         async_to_sync(self.channel_layer.group_discard)(
@@ -38,7 +54,7 @@ class ChatConsumer(WebsocketConsumer):
         user_id = text_data_json["userId"]
         user_name = text_data_json["userName"]
         timestamp = datetime.utcnow()
-        timestamp_str = timestamp.strftime("%Y-%m-%dT%H:%M:%S.000+00:00")
+        timestamp_str = timestamp.strftime(TIME_FORMAT)
 
         # Save message to database
         new_message = Message.objects.create(sender_id=user_id, content=content, chat_room_id=self.room_id, timestamp=timestamp)
@@ -80,9 +96,22 @@ class ChatConsumer(WebsocketConsumer):
 
         # Save read status to database
         user = self.scope["user"]
+        chat_room = ChatRoom.objects.get(id=self.room_id)
         if user.username != user_name:
-            chat_room = ChatRoom.objects.get(id=self.room_id)
             update_last_read_message(user, chat_room)
+
+        # Send message to own chatroom_list group 
+        # (in case of accessing chatroom, chat list in different devices)
+        if chat_room.messages.all():
+            async_to_sync(self.channel_layer.group_send)(
+                f"user_{user.id}_chat_list", {
+                    "type": "chat.message",
+                    "roomId": self.room_id,
+                    "content": chat_room.last_message_content,
+                    "timestamp": chat_room.last_message_time.strftime(TIME_FORMAT),
+                    "unreadCnt": 0
+                }
+            )
 
 
 class ChatRoomListConsumer(WebsocketConsumer):
