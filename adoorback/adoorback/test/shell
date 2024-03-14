@@ -1,18 +1,21 @@
 python manage.py shell
 
+from django.contrib.auth import get_user_model
+
 from account.models import FriendRequest
-from qna.models import Question, Response, ResponseRequest
+from adoorback.test.seed import set_seed
+from adoorback.utils.content_types import get_question_type, get_comment_type, get_response_type
+from chat.models import ChatRoom, Message
 from comment.models import Comment
 from like.models import Like
-from notification.models import Notification
-from reaction.models import Reaction
-from adoorback.utils.content_types import get_question_type, get_comment_type, get_response_type
 from note.models import Note
-from django.contrib.auth import get_user_model
+from notification.models import Notification
+from qna.models import Question, Response, ResponseRequest
+from reaction.models import Reaction
+
+
 User = get_user_model()
 User.objects.values_list('email', flat=True)
-
-from adoorback.test.seed import set_seed
 
 set_seed(30)
 
@@ -22,6 +25,8 @@ response = Response.objects.last()
 question = Question.objects.last()
 comment = Comment.objects.last()
 like = Like.objects.last()
+chat_room = ChatRoom.objects.last()
+message = Message.objects.last()
 
 feed_comment = Comment.objects.comments_only().last()
 reply = Comment.objects.replies_only().last()
@@ -38,4 +43,6 @@ Comment.objects.all().delete()
 Like.objects.all().delete()
 Notification.objects.all().delete()
 Reaction.objects.all().delete()
+Message.objects.all().delete()
+ChatRoom.objects.all().delete()
 User.objects.all().delete()
