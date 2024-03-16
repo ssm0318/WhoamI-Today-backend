@@ -73,7 +73,7 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
         existing_images = instance.images.all()
 
         for image in existing_images:
-            image.delete(force_policy=SOFT_DELETE_CASCADE) #soft?
+            image.delete(force_policy=SOFT_DELETE_CASCADE)
 
         for image in new_images:
             n = NoteImage.objects.create(note=instance, image=image)
