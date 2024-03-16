@@ -17,7 +17,6 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path, re_path
-from django.conf.urls import url
 from django.views.static import serve
 from django.conf.urls.i18n import i18n_patterns
 from fcm_django.api.rest_framework import FCMDeviceAuthorizedViewSet
@@ -36,7 +35,6 @@ urlpatterns = i18n_patterns(
     path('api/check_in/', include('check_in.urls')),
     path('api/notes/', include('note.urls')),
 
-    path('api/admin/', include('admin_honeypot.urls', namespace='admin_honeypot')),
     path('api/secret/', admin.site.urls),
     path('api/user/', include('rest_framework.urls', namespace='rest_framework')),
     path('api/devices/', FCMDeviceAuthorizedViewSet.as_view({'post': 'create'}), name='create_fcm_device'),
@@ -49,6 +47,6 @@ if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 else:
     urlpatterns += [
-        url(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
-        url(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
+        path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+        path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
     ]
