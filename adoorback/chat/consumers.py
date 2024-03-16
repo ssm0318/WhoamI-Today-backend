@@ -37,7 +37,7 @@ class ChatConsumer(WebsocketConsumer):
         chat_room = ChatRoom.objects.get(id=self.room_id)
         update_last_read_message(user, chat_room)
 
-        # Send message to own chatroom_list group 
+        # Send message to own chat_list group 
         # (in case of accessing chatroom, chat list in different devices)
         if chat_room.messages.all():
             async_to_sync(self.channel_layer.group_send)(
@@ -46,6 +46,18 @@ class ChatConsumer(WebsocketConsumer):
                     "roomId": self.room_id,
                     "content": chat_room.last_message_content,
                     "timestamp": chat_room.last_message_time.strftime(TIME_FORMAT),
+                    "unreadCnt": 0
+                }
+            )
+
+        # Send message to own friend_list group 
+        # (in case of accessing chatroom, friend list in different devices)
+        if chat_room.messages.all() and chat_room.users.count() == 2:
+            friend_id = chat_room.users.exclude(id=user.id).first().id
+            async_to_sync(self.channel_layer.group_send)(
+                f"user_{user.id}_friend_list", {
+                    "type": "chat.message",
+                    "friendId": friend_id,
                     "unreadCnt": 0
                 }
             )
@@ -84,7 +96,7 @@ class ChatConsumer(WebsocketConsumer):
             }
         )
 
-        # Send message to chatroom_list group
+        # Send message to chat_list group
         chat_room = ChatRoom.objects.get(id=self.room_id)
         recipients = chat_room.users.exclude(id=user_id)
         for r in recipients:
@@ -94,6 +106,17 @@ class ChatConsumer(WebsocketConsumer):
                     "roomId": self.room_id,
                     "content": content,
                     "timestamp": timestamp_str,
+                    "unreadCnt": chat_room.unread_cnt(r)
+                }
+            )
+
+        # Send message to friend_list group
+        if chat_room.users.count() == 2:
+            friend_id = recipients.first().id
+            async_to_sync(self.channel_layer.group_send)(
+                f"user_{friend_id}_friend_list", {
+                    "type": "chat.message",
+                    "friendId": user_id,
                     "unreadCnt": chat_room.unread_cnt(r)
                 }
             )
@@ -113,7 +136,7 @@ class ChatConsumer(WebsocketConsumer):
         if user.username != user_name:
             update_last_read_message(user, chat_room)
 
-        # Send message to own chatroom_list group 
+        # Send message to own chat_list group 
         # (in case of accessing chatroom, chat list in different devices)
         if chat_room.messages.all():
             async_to_sync(self.channel_layer.group_send)(
@@ -122,6 +145,18 @@ class ChatConsumer(WebsocketConsumer):
                     "roomId": self.room_id,
                     "content": chat_room.last_message_content,
                     "timestamp": chat_room.last_message_time.strftime(TIME_FORMAT),
+                    "unreadCnt": 0
+                }
+            )
+
+        # Send message to own friend_list group 
+        # (in case of accessing chatroom, friend list in different devices)
+        if chat_room.messages.all() and chat_room.users.count() == 2:
+            friend_id = chat_room.users.exclude(id=user.id).first().id
+            async_to_sync(self.channel_layer.group_send)(
+                f"user_{user.id}_friend_list", {
+                    "type": "chat.message",
+                    "friendId": friend_id,
                     "unreadCnt": 0
                 }
             )
@@ -154,4 +189,32 @@ class ChatRoomListConsumer(WebsocketConsumer):
         # Send message to WebSocket
         self.send(text_data=json.dumps({
             "content": content, "roomId": room_id, "timestamp": timestamp, "unreadCnt": unread_cnt
+        }))
+
+
+class FriendListConsumer(WebsocketConsumer):
+    def connect(self):
+        # Make group for each user
+        self.user_id = self.scope["user"].id
+        self.user_group_id = f"user_{self.user_id}_friend_list"
+
+        async_to_sync(self.channel_layer.group_add)(
+            self.user_group_id, self.channel_name
+        )
+
+        self.accept()
+
+    def disconnect(self, close_code):
+        async_to_sync(self.channel_layer.group_discard)(
+            self.user_group_id, self.channel_name
+        )
+
+    # Receive message from room group
+    def chat_message(self, event):
+        friend_id = event["friendId"]
+        unread_cnt = event["unreadCnt"]
+
+        # Send message to WebSocket
+        self.send(text_data=json.dumps({
+            "friendId": friend_id, "unreadCnt": unread_cnt
         }))
