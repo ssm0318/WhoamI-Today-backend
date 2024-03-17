@@ -113,6 +113,10 @@ def set_seed(n):
 
     # Seed Friendship
     user_2.friends.add(user_1, user_3, user_4, user_5, user_6)
+    for u in [user_1, user_3, user_4, user_5, user_6]:
+        chat_room = ChatRoom()
+        chat_room.save()
+        chat_room.users.add(user_2, u)
 
     # Test Notifications
     response = Response.objects.first()

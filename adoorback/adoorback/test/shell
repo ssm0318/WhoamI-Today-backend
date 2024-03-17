@@ -1,6 +1,7 @@
 python manage.py shell
 
 from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from account.models import FriendRequest
 from adoorback.test.seed import set_seed
@@ -18,6 +19,9 @@ User = get_user_model()
 User.objects.values_list('email', flat=True)
 
 set_seed(30)
+
+for user in User.objects.all():
+    print(user.username, user.id, str(RefreshToken.for_user(user).access_token))
 
 user = User.objects.last()
 
