@@ -51,9 +51,9 @@ class NotificationManager(SafeDeleteManager):
                         break
 
         if noti_to_update:
-            actors = noti_to_update.notificationactor_set.order_by('-created_at')
+            actors = noti_to_update.actors.all()
             N = actors.count()
-            new_actor = actors.first().user
+            new_actor = actors.first()
             updated_message_ko, updated_message_en = construct_message(noti_type,
                                                                        actor.username + "님",
                                                                        new_actor.username + "님",
