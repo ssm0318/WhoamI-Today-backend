@@ -55,16 +55,12 @@ class IsNotBlocked(permissions.BasePermission):
         from qna.models import Response
         from check_in.models import CheckIn
 
-        if obj.type == 'Response':
-            model = Response
-        elif obj.type == 'Note':
-            model = Note
-        elif obj.type == 'CheckIn':
-            model = CheckIn
+        if obj.type in ['Response', 'Note', 'CheckIn']:
+            is_model = True
         else:
-            model = None
+            is_model = False
 
-        if model:
+        if is_model:
             current_content_type = ContentType.objects.get_for_model(obj).model
 
             blocked_contents = request.user.content_report_blocked_model_ids

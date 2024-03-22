@@ -18,17 +18,8 @@ class ContentReportList(generics.ListCreateAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def get_queryset(self):
-        queryset = ContentReport.objects.all()
-        user = self.request.query_params.get('user')
-        if user is not None:
-            queryset = queryset.filter(reported_by__username=user)
-        return queryset
-
     @transaction.atomic
     def perform_create(self, serializer):
-        print(self.request.data)
-
         user = self.request.user
         content_type = self.request.data.get('target_type')
         content_type_id = get_generic_relation_type(content_type).id
