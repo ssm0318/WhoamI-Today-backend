@@ -4,6 +4,7 @@ import re
 from django.contrib.auth import get_user_model
 
 from adoorback.utils.validators import USERNAME_REGEX
+from chat.models import UserChatActivity
 
 User = get_user_model()
 
@@ -28,3 +29,12 @@ def parse_user_tag_from_content(content):
             continue
 
     return tagged_users, word_indices
+
+
+def update_last_read_message(user, chat_room):
+    last_message = chat_room.messages.last()
+    user_activity, _ = UserChatActivity.objects.get_or_create(user=user, chat_room=chat_room)
+    user_activity.last_read_message = last_message
+    user_activity.save()
+
+    return

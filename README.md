@@ -40,6 +40,9 @@ django-mysql==3.9.0
 psql -U postgres
 drop database diivers;
 create database diivers with owner postgres;
+alter role postgres set client_encoding to 'utf-8';
+alter role postgres set timezone to 'America/Los_Angeles';
+grant all privileges on database diivers to postgres;
 \q
 
 # need to migrate again
