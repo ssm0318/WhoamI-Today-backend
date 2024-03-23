@@ -10,9 +10,13 @@ class NoteSerializer(AdoorBaseSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
     author_detail = UserMinimalSerializer(source='author', read_only=True)
-    image = serializers.ImageField(required=False)
+    images = serializers.SerializerMethodField()
+
+    def get_images(self, obj):
+        images = obj.images.all()
+        return [image.image.url for image in images]
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Note
-        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'image']
+        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images']
 

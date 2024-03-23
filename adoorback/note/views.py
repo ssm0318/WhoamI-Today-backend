@@ -2,10 +2,12 @@ from django.db import transaction
 from django.http import Http404
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from safedelete.models import SOFT_DELETE_CASCADE
 
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
-from note.models import Note
+from note.models import Note, NoteImage
 from note.serializers import NoteSerializer
 import comment.serializers as cs
 import qna.serializers as qs
@@ -21,7 +23,11 @@ class NoteList(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        images = self.request.FILES.getlist('images')
+        note_instance = serializer.save(author=self.request.user)
         serializer.save(author=self.request.user)
+        for image in images:
+            NoteImage.objects.create(note=note_instance, image=image)
 
 
 class NoteComments(generics.ListAPIView):
@@ -57,3 +63,20 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Note.objects.all()
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        new_images = request.FILES.getlist('images', [])
+        existing_images = instance.images.all()
+
+        for image in existing_images:
+            image.delete(force_policy=SOFT_DELETE_CASCADE)
+
+        for image in new_images:
+            n = NoteImage.objects.create(note=instance, image=image)
+        
+        self.perform_update(serializer)
+        return Response(serializer.data)
