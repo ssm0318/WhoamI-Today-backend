@@ -72,3 +72,29 @@ class ChatMessagesListView(generics.ListAPIView):
 
         chat_messages = Message.objects.filter(chat_room__id=self.kwargs.get('pk')).order_by('-id')
         return chat_messages
+
+
+class OneOnOneChatRoomId(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def retrieve(self, request, *args, **kwargs):
+        friend_id = kwargs.get('pk')
+        current_user = request.user
+
+        try:
+            friend = User.objects.get(id=friend_id)
+        except User.DoesNotExist:
+            raise exceptions.NotFound("Friend not found")
+        
+        if friend == current_user:
+            raise exceptions.PermissionDenied("You cannot chat with yourself")
+
+        if friend not in current_user.friends.all():
+            raise exceptions.PermissionDenied("You are not friends with this user")
+
+        try:
+            chat_room = ChatRoom.objects.filter(users=current_user).filter(users=friend).first()
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Chat room not found")
+
+        return Response({'chat_room_id': chat_room.id})
