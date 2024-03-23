@@ -57,6 +57,7 @@ class Message(AdoorModel, SafeDeleteModel):
     sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)
     chat_room = models.ForeignKey(ChatRoom, related_name='messages', on_delete=models.CASCADE)
     timestamp = models.DateTimeField(blank=False, null=False, default=DEFAULT_TIMESTAMP)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 

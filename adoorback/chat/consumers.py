@@ -4,6 +4,7 @@ import json
 from asgiref.sync import async_to_sync
 from channels.exceptions import DenyConnection
 from channels.generic.websocket import WebsocketConsumer
+from django.core.exceptions import ValidationError
 
 from chat.models import Message, ChatRoom
 from utils.helpers import update_last_read_message
@@ -74,15 +75,27 @@ class ChatConsumer(WebsocketConsumer):
         content = text_data_json["content"]
         user_id = text_data_json["userId"]
         user_name = text_data_json["userName"]
+        parent_id = text_data_json["parentId"]
         timestamp = datetime.utcnow()
         timestamp_str = timestamp.strftime(TIME_FORMAT)
 
-        # Save message to database
-        new_message = Message.objects.create(sender_id=user_id, content=content, chat_room_id=self.room_id, timestamp=timestamp)
-        message_id = new_message.id
+        # validation
+        parent, parent_content = None, None
+        if parent_id is not None:
+            try:
+                parent = Message.objects.get(id=parent_id)
+                parent_content = parent.content
+            except Message.DoesNotExist:
+                raise ValidationError("Parent message does not exist.")
 
         # Save message to database
-        new_message = Message.objects.create(sender_id=user_id, content=content, chat_room_id=self.room_id, timestamp=timestamp)
+        new_message = Message.objects.create(
+            sender_id=user_id, 
+            content=content, 
+            chat_room_id=self.room_id, 
+            timestamp=timestamp,
+            parent=parent
+        )
         message_id = new_message.id
 
         # Send message to room group
@@ -92,7 +105,9 @@ class ChatConsumer(WebsocketConsumer):
                 "content": content, 
                 "messageId": message_id,
                 "userName": user_name, 
-                "timestamp": timestamp_str
+                "timestamp": timestamp_str,
+                "parentId": parent_id,
+                "parentContent": parent_content
             }
         )
 
@@ -126,9 +141,17 @@ class ChatConsumer(WebsocketConsumer):
         content = event["content"]
         user_name = event["userName"]
         timestamp = event["timestamp"]
+        parent_id = event["parentId"]
+        parent_content = event["parentContent"]
 
         # Send message to WebSocket
-        self.send(text_data=json.dumps({"content": content, "userName": user_name, "timestamp": timestamp}))
+        self.send(text_data=json.dumps({
+            "content": content, 
+            "userName": user_name, 
+            "timestamp": timestamp,
+            "parentId": parent_id,
+            "parentContent": parent_content
+        }))
 
         # Save read status to database
         user = self.scope["user"]
