@@ -10,4 +10,5 @@ urlpatterns = [
     path('rooms/friend/<int:pk>/', views.ChatRoomFriendList.as_view()),
     path('<int:pk>/messages/', views.ChatMessagesListView.as_view()),
     path('rooms/one_on_one/<int:pk>/', views.OneOnOneChatRoomId.as_view()),
+    path('messages/likes/<int:pk>', views.MessageLikeList.as_view(), name='message-like-list'),
 ]
