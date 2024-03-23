@@ -68,6 +68,17 @@ class ChatConsumer(WebsocketConsumer):
                 }
             )
 
+        # Send message to own chat_icon group 
+        # (in case of accessing chatroom, app in different devices)
+        if chat_room.messages.all():
+            updated_cnt = user.unread_message_cnt
+            async_to_sync(self.channel_layer.group_send)(
+                f"user_{user.id}_chat_icon", {
+                    "type": "chat.message",
+                    "unreadCnt": updated_cnt
+                }
+            )
+
     def disconnect(self, close_code):
         # Leave room group
         async_to_sync(self.channel_layer.group_discard)(
@@ -152,7 +163,7 @@ class ChatConsumer(WebsocketConsumer):
                 }
             )
 
-            # Send message to chat_list group
+            # Send message to chat_list, chat_icon group
             chat_room = ChatRoom.objects.get(id=self.room_id)
             recipients = chat_room.users.exclude(id=user_id)
             for r in recipients:
@@ -163,6 +174,13 @@ class ChatConsumer(WebsocketConsumer):
                         "content": content,
                         "timestamp": timestamp_str,
                         "unreadCnt": chat_room.unread_cnt(r)
+                    }
+                )
+                updated_cnt = r.unread_message_cnt
+                async_to_sync(self.channel_layer.group_send)(
+                    f"user_{r.id}_chat_icon", {
+                        "type": "chat.message",
+                        "unreadCnt": updated_cnt
                     }
                 )
 
@@ -242,6 +260,17 @@ class ChatConsumer(WebsocketConsumer):
             "currentUserMessageLikeId": current_user_message_like_id
         }))
 
+        # Send message to own chat_icon group 
+        # (in case of accessing chatroom, app in different devices)
+        if chat_room.messages.all():
+            updated_cnt = user.unread_message_cnt
+            async_to_sync(self.channel_layer.group_send)(
+                f"user_{user.id}_chat_icon", {
+                    "type": "chat.message",
+                    "unreadCnt": updated_cnt
+                }
+            )
+
 
 class ChatRoomListConsumer(WebsocketConsumer):
     def connect(self):
@@ -298,4 +327,31 @@ class FriendListConsumer(WebsocketConsumer):
         # Send message to WebSocket
         self.send(text_data=json.dumps({
             "friendId": friend_id, "unreadCnt": unread_cnt
+        }))
+
+
+class ChatIconConsumer(WebsocketConsumer):
+    def connect(self):
+        # Make group for each user
+        self.user_id = self.scope["user"].id
+        self.user_group_id = f"user_{self.user_id}_chat_icon"
+
+        async_to_sync(self.channel_layer.group_add)(
+            self.user_group_id, self.channel_name
+        )
+
+        self.accept()
+
+    def disconnect(self, close_code):
+        async_to_sync(self.channel_layer.group_discard)(
+            self.user_group_id, self.channel_name
+        )
+
+    # Receive message from room group
+    def chat_message(self, event):
+        unread_cnt = event["unreadCnt"]
+
+        # Send message to WebSocket
+        self.send(text_data=json.dumps({
+            "unreadCnt": unread_cnt
         }))
