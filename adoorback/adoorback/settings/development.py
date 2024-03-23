@@ -38,6 +38,7 @@ DATABASES = {
 ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', "127.0.0.1"]
 
 CORS_ALLOWED_ORIGINS = ['http://localhost:3000']
+CSRF_TRUSTED_ORIGINS = ['http://localhost:3000']
 CORS_ALLOW_CREDENTIALS = True
 
 FRONTEND_URL = 'http://localhost:3000'
