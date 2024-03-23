@@ -3,11 +3,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
+from adoorback.utils.validators import adoor_exception_handler
 from chat.models import Message, ChatRoom
+import chat.serializers as cs
 from collections import OrderedDict
 from account.models import User
 
-import chat.serializers as cs
 
 class ChatRoomList(generics.ListAPIView):
     """
@@ -32,6 +33,28 @@ class ReversePagination(PageNumberPagination):
             ('previous', self.get_previous_link()),
             ('results', list(reversed(data)))
         ]))
+
+
+class ChatRoomDetail(generics.RetrieveAPIView):
+    serializer_class = cs.ChatRoomSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        chat_room_id = self.kwargs.get('pk')
+        current_user = self.request.user
+
+        try:
+            chat_room = ChatRoom.objects.get(id=chat_room_id)
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("ChatRoom not found")
+
+        if current_user not in chat_room.users.all():
+            raise exceptions.PermissionDenied("You are not a member of this chat room")
+
+        return chat_room
 
 
 class ChatRoomFriendList(generics.ListAPIView):
