@@ -130,6 +130,9 @@ def create_noti(instance, created, **kwargs):
             participant = User.objects.get(id=participant_id)
             if actor.id in participant.user_report_blocked_ids:
                 continue
+            content_type = ContentType.objects.get_for_model(origin).model
+            if (content_type, origin.id) in participant.content_report_blocked_model_ids:
+                return
             noti = Notification.objects.create(user=participant,
                                                origin_id=origin.id,
                                                origin_type=get_generic_relation_type(origin.type),
@@ -170,6 +173,9 @@ def create_noti(instance, created, **kwargs):
             participant = User.objects.get(id=participant_id)
             if actor.id in participant.user_report_blocked_ids:
                 continue
+            content_type = ContentType.objects.get_for_model(origin).model
+            if (content_type, origin.id) in participant.content_report_blocked_model_ids:
+                return
             noti = Notification.objects.create(user=participant,
                                                origin_id=origin.id,
                                                origin_type=get_generic_relation_type(origin.type),

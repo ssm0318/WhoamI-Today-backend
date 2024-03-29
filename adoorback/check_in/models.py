@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -8,6 +9,8 @@ from adoorback.models import AdoorTimestampedModel
 
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
+
+from content_report.models import ContentReport
 
 User = get_user_model()
 
@@ -48,6 +51,13 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         return self.readers.values_list('id', flat=True)
     
     def is_audience(self, user):
+        content_type = ContentType.objects.get_for_model(self)
+        if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():
+            return False
+
+        if self.user.id in user.user_report_blocked_ids:
+            return False
+
         if self.user == user:
             return True
 

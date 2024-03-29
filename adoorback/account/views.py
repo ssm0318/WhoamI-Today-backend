@@ -625,6 +625,18 @@ class UserHiddenAdd(generics.CreateAPIView):
         return Response({'message': 'Friend added to hidden successfully.'}, status=status.HTTP_201_CREATED)
 
 
+class UserHiddenDestroy(generics.DestroyAPIView):
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_destroy(self, obj):
+        self.request.user.hidden.remove(obj)
+
+
 class UserFriendDestroy(generics.DestroyAPIView):
     queryset = User.objects.all()
     permission_classes = [IsAuthenticated]
