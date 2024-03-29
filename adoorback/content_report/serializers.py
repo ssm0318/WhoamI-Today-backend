@@ -8,10 +8,10 @@ class ContentReportSerializer(serializers.ModelSerializer):
     target_id = serializers.SerializerMethodField()
 
     def get_target_type(self, obj):
-        return obj.post.target_type
+        return obj.target.type
 
     def get_target_id(self, obj):
-        return obj.post.object_id
+        return obj.object_id
 
     class Meta:
         model = ContentReport

@@ -102,23 +102,11 @@ class UserEmailSerializer(serializers.ModelSerializer):
         model = User
         fields = ['email']
 
-    def validate(self, attrs):
-        for user in User.deleted_objects.all():
-            if attrs['email'] == user.email:
-                raise ExistingEmail()
-        return super(UserEmailSerializer, self).validate(attrs)
-
 
 class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username']
-
-    def validate(self, attrs):
-        for user in User.deleted_objects.all():
-            if attrs['username'] == user.username:
-                raise ExistingUsername()
-        return super(UserUsernameSerializer, self).validate(attrs)
 
 
 class UserProfileSerializer(UserMinimalSerializer):

@@ -37,6 +37,7 @@ urlpatterns = [
     path('friends/<int:pk>/favorites/', views.UserFavoriteDestroy.as_view(), name='user-favorite-destroy'),
 
     path('friends/hidden/', views.UserHiddenAdd.as_view(), name='user-hidden-add'),
+    path('friends/<int:pk>/hidden/', views.UserHiddenDestroy.as_view(), name='user-hidden-destroy'),
 
     # Friendship related
     path('friends/<int:pk>/', views.UserFriendDestroy.as_view(), name='user-friend-destroy'),

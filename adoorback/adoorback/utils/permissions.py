@@ -1,3 +1,4 @@
+from django.contrib.contenttypes.models import ContentType
 from rest_framework import permissions
 
 from adoorback.utils.content_types import get_generic_relation_type
@@ -50,13 +51,24 @@ class IsNotBlocked(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         from django.contrib.auth import get_user_model
         User = get_user_model()
+        from note.models import Note
+        from qna.models import Response
+        from check_in.models import CheckIn
+
+        if obj.type in ['Response', 'Note', 'CheckIn']:
+            is_model = True
+        else:
+            is_model = False
+
+        if is_model:
+            current_content_type = ContentType.objects.get_for_model(obj).model
+
+            blocked_contents = request.user.content_report_blocked_model_ids
+
+            content_blocked = (current_content_type, obj.id) in blocked_contents
+
+            author_blocked = obj.author.id in request.user.user_report_blocked_ids
+
+            return not (content_blocked or author_blocked)
 
         return True
-        # TODO: 다시 구현할 것
-
-        # if obj.type in ['Response', 'Article']:
-        #     content_type_id = get_generic_relation_type(obj.type).id
-        #     post = Post.objects.get(content_type_id=content_type_id, object_id=obj.id)
-        #     return obj.author.id not in request.user.user_report_blocked_ids and post.id not in request.user.content_report_blocked_ids
-        # else: # obj.type == user (can't access user detail page)
-        #     return obj.id not in request.user.user_report_blocked_ids
