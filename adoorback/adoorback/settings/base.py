@@ -67,8 +67,6 @@ INSTALLED_APPS = [
     'daphne',
     'channels',
     'chat.apps.ChatConfig',
-    'content_report.apps.ContentReportConfig',
-    'user_report.apps.UserReportConfig',
     'qna.apps.QnaConfig',
     'check_in.apps.CheckInConfig',
     'note.apps.NoteConfig',
