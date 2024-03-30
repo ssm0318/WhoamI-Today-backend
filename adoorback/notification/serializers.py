@@ -14,6 +14,8 @@ class NotificationSerializer(serializers.ModelSerializer):
     is_friend_request = serializers.SerializerMethodField(read_only=True)
     question_content = serializers.SerializerMethodField(read_only=True)
     is_read = serializers.BooleanField(required=True)
+    recent_actors = serializers.SerializerMethodField(read_only=True)
+    notification_type = serializers.SerializerMethodField(read_only=True)
     is_recent = serializers.SerializerMethodField(read_only=True)
 
     def get_is_response_request(self, obj):
@@ -25,6 +27,14 @@ class NotificationSerializer(serializers.ModelSerializer):
         if obj.target is None:
             return False
         return obj.target.type == 'FriendRequest'
+
+    def get_recent_actors(self, obj):
+        from account.serializers import UserMinimalSerializer
+        recent_actors = obj.actors.all()[:3]
+        return UserMinimalSerializer(recent_actors, many=True).data
+
+    def get_notification_type(self, obj):
+        return obj.target.type if obj.target else 'other'
 
 
     def get_is_recent(self, obj):
@@ -54,5 +64,5 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification
-        fields = ['id', 'is_response_request', 'is_friend_request', 'is_recent',
-                  'message', 'question_content', 'is_read', 'created_at', 'redirect_url']
+        fields = ['id', 'is_response_request', 'is_friend_request', 'recent_actors', 'notification_type', 
+                  'is_recent', 'message', 'question_content', 'is_read', 'created_at', 'redirect_url']

@@ -26,6 +26,7 @@ from safedelete.managers import SafeDeleteManager
 
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.validators import AdoorUsernameValidator
+from notification.models import NotificationActor
 
 GENDER_CHOICES = (
     (0, _('여성')),
@@ -353,7 +354,7 @@ def create_friend_noti(created, instance, **kwargs):
                                            message_ko=f'{requester.username}님이 친구 요청을 보냈습니다.',
                                            message_en=f'{requester.username} has requested to be your friend.',
                                            redirect_url=f'/users/{requester.username}')
-        noti.actors.add(requester)
+        NotificationActor.objects.create(user=requester, notification=noti)
         return
     elif accepted:
         if User.are_friends(requestee, requester):  # receiver function was triggered by undelete
@@ -364,13 +365,13 @@ def create_friend_noti(created, instance, **kwargs):
                                            message_ko=f'{requester.username}님과 친구가 되었습니다.',
                                            message_en=f'You are now friends with {requester.username}.',
                                            redirect_url=f'/users/{requester.username}')
-        noti.actors.add(requester)
+        NotificationActor.objects.create(user=requester, notification=noti)
         noti = Notification.objects.create(user=requester,
                                            origin=requestee, target=requestee,
                                            message_ko=f'{requestee.username}님과 친구가 되었습니다.',
                                            message_en=f'You are now friends with {requestee.username}.',
                                            redirect_url=f'/users/{requestee.username}')
-        noti.actors.add(requestee)
+        NotificationActor.objects.create(user=requestee, notification=noti)
         # add friendship
         requester.friends.add(requestee)
 
@@ -407,7 +408,7 @@ def user_created(created, instance, **kwargs):
                                            message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
                                            message_en=f"{instance.username}, try making friends to share your whoami!",
                                            redirect_url='/')
-        noti.actors.add(admin)
+        NotificationActor.objects.create(user=admin, notification=noti)
 
         # add default FriendGroup (close_friends)
         default_group, created = FriendGroup.objects.get_or_create(

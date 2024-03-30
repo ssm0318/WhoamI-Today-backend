@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
 from adoorback.models import AdoorTimestampedModel
-from notification.models import Notification
+from notification.models import Notification, NotificationActor
 from adoorback.utils.content_types import get_generic_relation_type
 
 User = get_user_model()
@@ -95,4 +95,4 @@ def create_user_tag_noti(instance, **kwargs):
         noti = Notification.objects.create(user=user,
                                            origin=origin, target=target,
                                            message=message, redirect_url=redirect_url)
-        noti.actors.add(actor)
+        NotificationActor.objects.create(user=actor, notification=noti)
