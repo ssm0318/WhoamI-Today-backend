@@ -11,6 +11,7 @@ from django.db.models import Q
 
 from account.models import FriendGroup
 from comment.models import Comment
+from content_report.models import ContentReport
 from like.models import Like
 from reaction.models import Reaction
 from adoorback.models import AdoorModel, AdoorTimestampedModel
@@ -117,6 +118,13 @@ class Response(AdoorModel, SafeDeleteModel):
         return self.readers.values_list('id', flat=True)
 
     def is_audience(self, user):
+        content_type = ContentType.objects.get_for_model(self)
+        if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():
+            return False
+
+        if self.author.id in user.user_report_blocked_ids:
+            return False
+
         if self.author == user:
             return True
 

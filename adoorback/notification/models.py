@@ -124,7 +124,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
         ]
 
     def __str__(self):
-        return self.message
+        return f"@{self.user} {self.message}"
 
 
 class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):

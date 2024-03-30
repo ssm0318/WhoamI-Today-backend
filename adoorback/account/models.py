@@ -7,6 +7,7 @@ from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.db.models.signals import post_save, m2m_changed
 from django.db.utils import IntegrityError
@@ -176,9 +177,13 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             UserReport.objects.filter(reported_user=self).values_list('user_id', flat=True))
 
     @property
-    def content_report_blocked_ids(self):  # returns ids of posts
+    def content_report_blocked_model_ids(self):  # returns ids of posts
         from content_report.models import ContentReport
-        return list(ContentReport.objects.filter(user=self).values_list('post_id', flat=True))
+        blocked_contents = []
+        for report in self.content_report_set.all():
+            content_type = ContentType.objects.get_for_id(report.content_type_id).model
+            blocked_contents.append((content_type, report.object_id))
+        return blocked_contents
 
     def most_recent_update(self, user):
         # most recent update time of self (among self's content that user can access)

@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
@@ -14,6 +16,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     is_read = serializers.BooleanField(required=True)
     recent_actors = serializers.SerializerMethodField(read_only=True)
     notification_type = serializers.SerializerMethodField(read_only=True)
+    is_recent = serializers.SerializerMethodField(read_only=True)
 
     def get_is_response_request(self, obj):
         if obj.target is None:
@@ -32,6 +35,12 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_notification_type(self, obj):
         return obj.target.type if obj.target else 'other'
+
+
+    def get_is_recent(self, obj):
+        now = timezone.now()
+        delta = now - obj.created_at
+        return delta.days <= 7
 
 
     def get_question_content(self, obj):
@@ -55,5 +64,5 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification
-        fields = ['id', 'is_response_request', 'is_friend_request', 'recent_actors', 'notification_type',
-                  'message', 'question_content', 'is_read', 'created_at', 'redirect_url']
+        fields = ['id', 'is_response_request', 'is_friend_request', 'recent_actors', 'notification_type', 
+                  'is_recent', 'message', 'question_content', 'is_read', 'created_at', 'redirect_url']
