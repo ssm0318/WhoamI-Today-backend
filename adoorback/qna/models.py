@@ -16,7 +16,7 @@ from like.models import Like
 from reaction.models import Reaction
 from adoorback.models import AdoorModel, AdoorTimestampedModel
 from adoorback.utils.helpers import wrap_content
-from notification.models import Notification
+from notification.models import Notification, NotificationActor
 
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
@@ -229,7 +229,7 @@ def create_request_answered_noti(instance, created, **kwargs):
         noti = Notification.objects.create(user=user,
                                            origin=origin, target=target,
                                            message_ko=message_ko, message_en=message_en, redirect_url=redirect_url)
-        noti.actors.add(actor)
+        NotificationActor.objects.create(user=actor, notification=noti)
 
 
 @transaction.atomic

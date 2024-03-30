@@ -36,6 +36,7 @@ from adoorback.utils.validators import adoor_exception_handler
 from check_in.models import CheckIn
 from note.models import Note
 from note.serializers import NoteSerializer
+from notification.models import NotificationActor
 from qna.serializers import QuestionBaseSerializer
 from .email import email_manager
 from qna.models import Question
@@ -428,7 +429,7 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                                                message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
                                                message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
                                                redirect_url='/questions')
-            noti.actors.add(admin)
+            NotificationActor.objects.create(user=admin, notification=noti)
 
 
 class CurrentUserDelete(generics.DestroyAPIView):
@@ -741,7 +742,7 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
                                                message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
                                                message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
                                                redirect_url='/settings')
-            noti.actors.add(admin)
+            NotificationActor.objects.create(user=admin, notification=noti)
 
 
 class UserRecommendedFriendsList(generics.ListAPIView):

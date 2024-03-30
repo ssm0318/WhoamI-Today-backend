@@ -9,7 +9,7 @@ from django.db import IntegrityError
 
 from like.models import Like
 from account.models import User
-from notification.models import Notification
+from notification.models import Notification, NotificationActor
 from user_tag.models import UserTag
 from adoorback.models import AdoorModel
 
@@ -98,7 +98,7 @@ def create_noti(instance, created, **kwargs):
                                                message_ko=f'{actor.username}이 회원님의 댓글에 답글을 남겼습니다: "{content_preview}"',
                                                message_en=f'{actor.username} has replied to your comment: "{content_preview}"',
                                                redirect_url=redirect_url)
-            noti.actors.add(actor)
+            NotificationActor.objects.create(user=actor, notification=noti)
 
         # send a notification to the author of the qna where the origin comment commented
         post_author = origin.target.author
@@ -117,7 +117,7 @@ def create_noti(instance, created, **kwargs):
                                                message_ko=f'회원님의 답변에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
                                                message_en=f'There\'s a new reply to the comment on your response: "{content_preview}"',
                                                redirect_url=redirect_url)
-            noti.actors.add(actor)
+            NotificationActor.objects.create(user=actor, notification=noti)
 
         # send notifications to participants of the origin comment
         for participant_id in origin.participants:
@@ -141,7 +141,7 @@ def create_noti(instance, created, **kwargs):
                                                message_ko=f'회원님이 답글을 남긴 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
                                                message_en=f'There\'s a new reply in the comment thread where you left a reply: "{content_preview}"',
                                                redirect_url=redirect_url)
-            noti.actors.add(actor)
+            NotificationActor.objects.create(user=actor, notification=noti)
 
     # if not reply
     else:
@@ -162,7 +162,7 @@ def create_noti(instance, created, **kwargs):
                                                message_ko=f'{actor.username}님이 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다: "{content_preview}"',
                                                message_en=f'{actor.username} has commented on your {origin_target_name_en}: "{content_preview}"',
                                                redirect_url=redirect_url)
-            noti.actors.add(actor)
+            NotificationActor.objects.create(user=actor, notification=noti)
 
         # send notifications to participants of the origin qna
         for participant_id in origin.participants:
@@ -184,7 +184,7 @@ def create_noti(instance, created, **kwargs):
                                                message_ko=f'회원님이 댓글을 남긴 {origin_target_name_ko}에 새로운 댓글이 달렸습니다: "{content_preview}"',
                                                message_en=f'There\'s a new comment on the {origin_target_name_en} you commented on: "{content_preview}"',
                                                redirect_url=redirect_url)
-            noti.actors.add(actor)
+            NotificationActor.objects.create(user=actor, notification=noti)
 
 
 @transaction.atomic
