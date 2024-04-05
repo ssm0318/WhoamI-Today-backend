@@ -35,10 +35,6 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     description = models.CharField(blank=True, null=True, max_length=88)
     track_id = models.CharField(blank=True, null=True, max_length=50)
 
-    share_everyone = models.BooleanField(default=False, blank=True)
-    share_groups = models.ManyToManyField(FriendGroup, related_name='shared_check_ins', blank=True)
-    share_friends = models.ManyToManyField(User, related_name='shared_check_ins', blank=True)
-
     readers = models.ManyToManyField(User, related_name='read_check_ins')
 
     _safedelete_policy = SOFT_DELETE_CASCADE
@@ -61,17 +57,8 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         if self.user == user:
             return True
 
-        if self.share_everyone:
-            return True
-
         if not User.are_friends(self.user, user):
             return False
-
-        if self.share_groups.filter(friends=user).exists():
-            return True
-
-        if self.share_friends.filter(pk=user.pk).exists():
-            return True
 
         return False
 
