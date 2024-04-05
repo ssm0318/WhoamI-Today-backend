@@ -64,7 +64,7 @@ class ResponseSerializer(serializers.ModelSerializer):
         model = Response
         fields = ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
                   'question', 'question_id', 'created_at', 'current_user_read', 'like_user_sample']
-
+        
 
 class QuestionResponseSerializer(QuestionBaseSerializer):
     response_set = serializers.SerializerMethodField()
