@@ -8,6 +8,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
+from django.utils import timezone
 
 from account.models import FriendGroup
 from comment.models import Comment
@@ -34,7 +35,8 @@ class QuestionManager(SafeDeleteManager):
         return self.filter(is_admin_question=False, **kwargs)
 
     def daily_questions(self, **kwargs):
-        return self.filter(selected_dates__contains=[datetime.date.today()], **kwargs)
+        today = timezone.now().date()
+        return self.filter(selected_dates__contains=[today], **kwargs)
 
     def date_questions(self, date, **kwargs):
         return self.filter(selected_dates__contains=[date], **kwargs)
