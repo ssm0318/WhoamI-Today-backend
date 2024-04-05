@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DJANGO_SETTINGS_MODULE=adoorback.settings.development
+      - DATABASE_URL=postgres://DATABASE_USER:DATABASE_PWD@db:5432/dbname
+      - REDIS_URL=redis://redis:6379/0 
+    volumes:
+      - ./backend:/app/backend
+
+  db:
+    image: postgres:12
+    environment:
+      - POSTGRES_DB: DATABASE_NAME
+      - POSTGRES_USER: DATABASE_USER
+      - POSTGRES_PASSWORD: DATABASE_PWD
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7.2.4
