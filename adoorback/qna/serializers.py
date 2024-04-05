@@ -41,6 +41,7 @@ class ResponseMinimumSerializer(serializers.ModelSerializer):
     question = QuestionMinimumSerializer(read_only=True)
     current_user_like_id = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
+    like_user_sample = serializers.SerializerMethodField(read_only=True)
 
     def get_current_user_like_id(self, obj):
         current_user_id = self.context['request'].user.id
@@ -52,10 +53,16 @@ class ResponseMinimumSerializer(serializers.ModelSerializer):
         current_user_id = self.context['request'].user.id
         return current_user_id in obj.reader_ids
 
+    def get_like_user_sample(self, obj):
+        from account.serializers import UserMinimalSerializer
+        recent_likes = obj.response_likes.order_by('-created_at')[:3]
+        recent_users = [like.user for like in recent_likes]
+        return UserMinimalSerializer(recent_users, many=True, context=self.context).data
+
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'created_at', 'current_user_read']
+                  'question', 'created_at', 'current_user_read', 'like_user_sample']
 
 
 class ResponseBaseSerializer(AdoorBaseSerializer):
