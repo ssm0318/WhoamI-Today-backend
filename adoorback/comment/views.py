@@ -12,7 +12,7 @@ from utils.helpers import parse_user_tag_from_content
 from utils.exceptions import BlockedUserTag, BlockingUserTag
 
 
-class CommentCreate(generics.ListCreateAPIView):
+class CommentCreate(generics.CreateAPIView):
     queryset = Comment.objects.order_by('id')
     serializer_class = CommentFriendSerializer
     permission_classes = [IsAuthenticated]

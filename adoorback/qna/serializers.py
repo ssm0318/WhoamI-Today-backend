@@ -34,11 +34,12 @@ class QuestionBaseSerializer(serializers.ModelSerializer):
                   'selected', 'is_admin_question']
 
 
-class ResponseMinimumSerializer(serializers.ModelSerializer):
+class ResponseSerializer(serializers.ModelSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     question = QuestionMinimumSerializer(read_only=True)
+    question_id = serializers.IntegerField()
     current_user_like_id = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
@@ -65,47 +66,6 @@ class ResponseMinimumSerializer(serializers.ModelSerializer):
                   'question', 'created_at', 'current_user_read', 'like_user_sample']
 
 
-class ResponseBaseSerializer(AdoorBaseSerializer):
-    question = QuestionBaseSerializer(read_only=True)
-    question_id = serializers.IntegerField()
-    current_user_read = serializers.SerializerMethodField(read_only=True)
-    share_groups = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    share_groups_details = UserFriendGroupBaseSerializer(source='share_groups', read_only=True, many=True)
-    share_friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    share_friends_details = UserMinimalSerializer(source='share_friends', read_only=True, many=True)
-    reaction_preview = serializers.SerializerMethodField(read_only=True)
-
-    def get_reaction_preview(self, obj):
-        current_user = self.context['request'].user
-        reactions = obj.response_reactions.all().order_by('-created_at') if obj.author == current_user else \
-            obj.response_reactions.filter(user_id=current_user.id).order_by('-created_at')
-
-        if len(reactions) <= 4:
-            return ReactionMineSerializer(reactions, many=True, read_only=True, context=self.context).data
-
-        reactions_summary = list(reactions[:3]) + list(reactions[len(reactions) - 1:])
-        return ReactionMineSerializer(reactions_summary, many=True, read_only=True, context=self.context).data
-
-    def get_current_user_read(self, obj):
-        current_user_id = self.context['request'].user.id
-        return current_user_id in obj.reader_ids
-    
-    class Meta(AdoorBaseSerializer.Meta):
-        model = Response
-        fields = AdoorBaseSerializer.Meta.fields + ['question', 'question_id', 'current_user_read', 'reaction_preview']
-
-
-class ResponseFriendSerializer(ResponseBaseSerializer):
-    author = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
-    author_detail = UserMinimalSerializer(source='author', read_only=True)
-
-    class Meta(ResponseBaseSerializer.Meta):
-        model = Response
-        fields = ResponseBaseSerializer.Meta.fields + \
-                 ['author', 'author_detail']
-
-
 class QuestionResponseSerializer(QuestionBaseSerializer):
     response_set = serializers.SerializerMethodField()
     
@@ -113,7 +73,7 @@ class QuestionResponseSerializer(QuestionBaseSerializer):
         current_user = self.context.get('request', None).user
         question_id = self.context.get('kwargs', None).get('pk')
         responses = Response.objects.filter(question__id=question_id, author=current_user).order_by('-created_at')
-        return ResponseBaseSerializer(responses, many=True, read_only=True, context=self.context).data
+        return ResponseSerializer(responses, many=True, read_only=True, context=self.context).data
     
     class Meta(QuestionBaseSerializer.Meta):
         model = Question
@@ -169,7 +129,7 @@ class QuestionDetailFriendResponsesSerializer(QuestionFriendSerializer):
         paginator = Paginator(responses, page_size)
         page = self.context['request'].query_params.get('page') or 1
         responses = paginator.page(page)
-        return ResponseFriendSerializer(responses, many=True, read_only=True, context=self.context).data
+        return ResponseSerializer(responses, many=True, read_only=True, context=self.context).data
 
     class Meta(QuestionFriendSerializer.Meta):
         model = Question
