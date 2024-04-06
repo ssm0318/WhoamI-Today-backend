@@ -66,16 +66,19 @@ class Note(AdoorModel, SafeDeleteModel):
     def is_audience(self, user):
         content_type = ContentType.objects.get_for_model(self)
         if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():
+            print("is_audience: report exists")
             return False
 
         if self.author.id in user.user_report_blocked_ids:
+            print("is_audience: author is blocked")
             return False
 
         if self.author == user:
+            print("is_audience: author is user")
             return True
 
-        if not User.are_friends(self.author, user):
-            return False
+        if User.are_friends(self.author, user):
+            return True
 
         return False
 
