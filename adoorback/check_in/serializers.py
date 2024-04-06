@@ -20,7 +20,7 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
 class MyCheckInSerializer(CheckInBaseSerializer):
     class Meta:
         model = CheckIn
-        fields = CheckInBaseSerializer.Meta.fields + ['share_everyone', 'share_groups', 'share_friends']
+        fields = CheckInBaseSerializer.Meta.fields
 
 
 class CheckInDetailSerializer(MyCheckInSerializer):

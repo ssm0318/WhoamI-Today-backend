@@ -81,10 +81,6 @@ class Response(AdoorModel, SafeDeleteModel):
     response_reactions = GenericRelation(Reaction)
     readers = models.ManyToManyField(User, related_name='read_responses')
 
-    share_everyone = models.BooleanField(default=False, blank=True)
-    share_groups = models.ManyToManyField(FriendGroup, related_name='shared_responses', blank=True)
-    share_friends = models.ManyToManyField(User, related_name='shared_responses', blank=True)
-
     response_targetted_notis = GenericRelation(Notification,
                                                content_type_field='target_type',
                                                object_id_field='target_id')
@@ -128,17 +124,8 @@ class Response(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
 
-        if self.share_everyone:
-            return True
-
         if not User.are_friends(self.author, user):
             return False
-
-        if self.share_groups.filter(friends=user).exists():
-            return True
-
-        if self.share_friends.filter(pk=user.pk).exists():
-            return True
 
         return False
 

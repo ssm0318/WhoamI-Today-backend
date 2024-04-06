@@ -62,10 +62,6 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
     question = QuestionBaseSerializer(read_only=True)
     question_id = serializers.IntegerField()
     current_user_read = serializers.SerializerMethodField(read_only=True)
-    share_groups = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    share_groups_details = UserFriendGroupBaseSerializer(source='share_groups', read_only=True, many=True)
-    share_friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    share_friends_details = UserMinimalSerializer(source='share_friends', read_only=True, many=True)
     reaction_preview = serializers.SerializerMethodField(read_only=True)
 
     def get_reaction_preview(self, obj):
@@ -85,9 +81,7 @@ class ResponseBaseSerializer(AdoorBaseSerializer):
     
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
-        fields = AdoorBaseSerializer.Meta.fields + ['question', 'question_id', 'current_user_read',
-                                                    'reaction_preview', 'share_friends', 'share_friends_details', 
-                                                    'share_groups', 'share_groups_details', 'share_everyone']
+        fields = AdoorBaseSerializer.Meta.fields + ['question', 'question_id', 'current_user_read', 'reaction_preview']
 
 
 class ResponseFriendSerializer(ResponseBaseSerializer):
