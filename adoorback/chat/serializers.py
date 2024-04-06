@@ -26,9 +26,22 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         model = ChatRoom
         fields = ['id', 'participants', 'last_message_content', 'last_message_time', 'active', 'unread_cnt']
 
+
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserMinimalSerializer(read_only=True)
+    parent_id = serializers.SerializerMethodField()
+    parent_content = serializers.SerializerMethodField()
+
+    def get_parent_id(self, obj):
+        if obj.parent:
+            return obj.parent.id
+        return None
+
+    def get_parent_content(self, obj):
+        if obj.parent:
+            return obj.parent.content
+        return None
 
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'content', 'timestamp']
+        fields = ['id', 'sender', 'content', 'timestamp', 'parent_id', 'parent_content']
