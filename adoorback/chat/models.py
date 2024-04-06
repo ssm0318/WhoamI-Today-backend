@@ -115,39 +115,3 @@ def sender_read_message(created, instance, **kwargs):
 @receiver(post_save, sender=ChatRoom)
 def validate_chatroom(sender, instance, **kwargs):
     instance.full_clean()
-
-
-@receiver(post_save, sender=Message)
-def send_chat_push_notification(sender, instance, created, **kwargs):
-    if created:
-        message_preview = instance.content[:50]
-        data_message = {
-            "sender": instance.sender.username,
-            "message": message_preview,
-        }
-
-        fcm_message = Message(data=data_message)
-
-        recipient = instance.chat_room.users.exclude(id=instance.sender.id).first()
-        device = FCMDevice.objects.filter(user=recipient).first()
-
-        if device:
-            device.send_message(fcm_message)
-
-
-@receiver(post_delete, sender=Message)
-def cancel_chat_push_notification(sender, instance, **kwargs):
-    if instance.deleted:
-        message = {
-            "body": "This message has been deleted.",
-            "url": "/home",
-            "tag": str(instance.id),
-            "type": "cancel",
-        }
-
-        recipient = instance.chat_room.users.exclude(id=instance.sender.id).first()
-
-        try:
-            FCMDevice.objects.filter(user_id=instance.user.id).send_message(message, False)
-        except Exception as e:
-            print("error while canceling firebase notification: ", e)
