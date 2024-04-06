@@ -14,7 +14,7 @@ import comment.serializers as cs
 import qna.serializers as qs
 
 
-class NoteList(generics.CreateAPIView):
+class NoteCreate(generics.CreateAPIView):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]

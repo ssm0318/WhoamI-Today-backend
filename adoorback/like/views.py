@@ -20,9 +20,6 @@ class LikeList(generics.CreateAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def get_queryset(self):
-        return Like.objects.filter(user=self.request.user)
-
     @transaction.atomic
     def perform_create(self, serializer):
         content_type_id = get_generic_relation_type(self.request.data['target_type']).id

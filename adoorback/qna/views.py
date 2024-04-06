@@ -27,19 +27,12 @@ from qna.models import Response, Question, ResponseRequest
 User = get_user_model()
 
 
-class ResponseList(generics.CreateAPIView):
+class ResponseCreate(generics.CreateAPIView):
     serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        queryset = Response.objects.all()
-        return queryset
 
     @transaction.atomic
     def perform_create(self, serializer):

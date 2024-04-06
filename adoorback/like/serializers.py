@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
+from account.serializers import UserMinimalSerializer
 from like.models import Like
 from adoorback.serializers import AdoorBaseSerializer
 
@@ -10,7 +11,7 @@ User = get_user_model()
 class LikeSerializer(serializers.ModelSerializer):
     user = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='user', lookup_url_kwarg='username')
-    user_detail = serializers.SerializerMethodField()
+    user_detail = UserMinimalSerializer(source='user', read_only=True)
     target_type = serializers.SerializerMethodField()
     target_id = serializers.SerializerMethodField()
 

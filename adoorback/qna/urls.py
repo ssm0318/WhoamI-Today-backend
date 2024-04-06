@@ -3,7 +3,7 @@ from qna import views
 
 urlpatterns = [
     # Response related
-    path('responses/', views.ResponseList.as_view(), name='response-list'),
+    path('responses/', views.ResponseCreate.as_view(), name='response-list'),
     path('responses/<int:pk>/', views.ResponseDetail.as_view(), name='response-detail'),
     path('responses/<int:pk>/comments/', views.ResponseComments.as_view(), name='response-comments'),
     path('responses/<int:pk>/likes/', views.ResponseLikes.as_view(), name='response-like-user-list'),
