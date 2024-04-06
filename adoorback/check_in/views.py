@@ -16,7 +16,7 @@ from qna.models import FriendGroup
 User = get_user_model()
 
 
-class CurrentCheckIn(generics.CreateAPIView):
+class CurrentCheckIn(generics.ListCreateAPIView):
     """
     Get current active check-in of request user or create a new check-in.
     """
