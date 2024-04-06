@@ -7,13 +7,14 @@ from safedelete.models import SOFT_DELETE_CASCADE
 
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
+from like.serializers import LikeSerializer
 from note.models import Note, NoteImage
 from note.serializers import NoteSerializer
 import comment.serializers as cs
 import qna.serializers as qs
 
 
-class NoteList(generics.ListCreateAPIView):
+class NoteCreate(generics.CreateAPIView):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
@@ -80,3 +81,13 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
         
         self.perform_update(serializer)
         return Response(serializer.data)
+
+
+class NoteLikes(generics.ListAPIView):
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        from like.models import Like
+        note_id = self.kwargs['pk']
+        return Like.objects.filter(content_type__model='note', object_id=note_id)

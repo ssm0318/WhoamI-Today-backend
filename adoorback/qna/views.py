@@ -21,24 +21,18 @@ from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlock
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
 import qna.serializers as qs
+from like.serializers import LikeSerializer
 from qna.models import Response, Question, ResponseRequest
 
 User = get_user_model()
 
 
-class ResponseList(generics.ListCreateAPIView):
-    serializer_class = qs.ResponseFriendSerializer
+class ResponseCreate(generics.CreateAPIView):
+    serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        queryset = Response.objects.all()
-        return queryset
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -69,7 +63,7 @@ class QuestionResponseList(generics.RetrieveAPIView):
 
 
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = qs.ResponseFriendSerializer
+    serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -106,9 +100,19 @@ class ResponseComments(generics.ListAPIView):
         return Response.objects.filter(id=self.kwargs.get('pk'))
 
 
+class ResponseLikes(generics.ListAPIView):
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        from like.models import Like
+        response_id = self.kwargs['pk']
+        return Like.objects.filter(content_type__model='response', object_id=response_id)
+
+
 class ResponseRead(generics.UpdateAPIView):
     queryset = Response.objects.all()
-    serializer_class = qs.ResponseMinimumSerializer
+    serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):

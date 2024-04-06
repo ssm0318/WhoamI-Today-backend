@@ -390,8 +390,8 @@ class UserResponseList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_serializer_class(self):
-        from qna.serializers import ResponseMinimumSerializer
-        return ResponseMinimumSerializer
+        from qna.serializers import ResponseSerializer
+        return ResponseSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -494,8 +494,8 @@ class CurrentUserResponseList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_serializer_class(self):
-        from qna.serializers import ResponseMinimumSerializer
-        return ResponseMinimumSerializer
+        from qna.serializers import ResponseSerializer
+        return ResponseSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -650,7 +650,7 @@ class UserFriendDestroy(generics.DestroyAPIView):
         self.request.user.friends.remove(obj)
 
 
-class UserFriendRequestListCreate(generics.ListCreateAPIView):
+class UserFriendRequest(generics.ListCreateAPIView):
     queryset = FriendRequest.objects.all()
     serializer_class = UserFriendRequestCreateSerializer
     permission_classes = [IsAuthenticated]

@@ -201,11 +201,11 @@ class FriendListSerializer(UserMinimalSerializer):
         return {}
 
     def responses(self, obj):
-        from qna.serializers import ResponseMinimumSerializer
+        from qna.serializers import ResponseSerializer
         user = self.context.get('request', None).user
         response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
         response_queryset = Response.objects.filter(id__in=response_ids).order_by('question__id', 'created_at')
-        responses = ResponseMinimumSerializer(response_queryset, many=True, read_only=True, context=self.context).data
+        responses = ResponseSerializer(response_queryset, many=True, read_only=True, context=self.context).data
         return responses
 
     class Meta(UserMinimalSerializer.Meta):

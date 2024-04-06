@@ -2,6 +2,7 @@ from django.db import transaction, IntegrityError
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
+from account.serializers import UserMinimalSerializer
 from like.models import Like
 from like.serializers import LikeSerializer
 
@@ -10,7 +11,7 @@ from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 
 
-class LikeList(generics.ListCreateAPIView):
+class LikeCreate(generics.CreateAPIView):
     queryset = Like.objects.all()
     serializer_class = LikeSerializer
     permission_classes = [IsAuthenticated]
@@ -18,9 +19,6 @@ class LikeList(generics.ListCreateAPIView):
 
     def get_exception_handler(self):
         return adoor_exception_handler
-
-    def get_queryset(self):
-        return Like.objects.filter(user=self.request.user)
 
     @transaction.atomic
     def perform_create(self, serializer):

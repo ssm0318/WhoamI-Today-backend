@@ -176,4 +176,4 @@ def cancel_firebase_notification(sender, instance, **kwargs):
     try:
         FCMDevice.objects.filter(user_id=instance.user.id).send_message(message, False)
     except Exception as e:
-        print("error while sending a firebase notification: ", e)
+        print("error while canceling firebase notification: ", e)
