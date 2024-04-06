@@ -650,7 +650,11 @@ class UserFriendDestroy(generics.DestroyAPIView):
         self.request.user.friends.remove(obj)
 
 
+<<<<<<< HEAD
 class UserFriendRequest(generics.ListCreateAPIView):
+=======
+class UserFriendRequest(generics.CreateAPIView):
+>>>>>>> fdd6586 (feat: #186 like user list)
     queryset = FriendRequest.objects.all()
     serializer_class = UserFriendRequestCreateSerializer
     permission_classes = [IsAuthenticated]
