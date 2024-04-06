@@ -10,7 +10,7 @@ from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 
 
-class ContentReportList(generics.ListCreateAPIView):
+class ContentReportList(generics.CreateAPIView):
     queryset = ContentReport.objects.all()
     serializer_class = ContentReportSerializer
     permission_classes = [IsAuthenticated]

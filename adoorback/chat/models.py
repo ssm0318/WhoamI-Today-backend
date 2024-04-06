@@ -1,8 +1,11 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models.signals import m2m_changed, post_save, pre_save
+from django.db.models.signals import m2m_changed, post_save, pre_save, post_delete
 from django.dispatch import receiver
+
+from firebase_admin.messaging import Message
+from fcm_django.models import FCMDevice
 
 from adoorback.models import AdoorModel, AdoorTimestampedModel
 from safedelete.models import SafeDeleteModel
@@ -111,3 +114,39 @@ def sender_read_message(created, instance, **kwargs):
 @receiver(post_save, sender=ChatRoom)
 def validate_chatroom(sender, instance, **kwargs):
     instance.full_clean()
+
+
+@receiver(post_save, sender=Message)
+def send_chat_push_notification(sender, instance, created, **kwargs):
+    if created:
+        message_preview = instance.content[:50]
+        data_message = {
+            "sender": instance.sender.username,
+            "message": message_preview,
+        }
+
+        fcm_message = Message(data=data_message)
+
+        recipient = instance.chat_room.users.exclude(id=instance.sender.id).first()
+        device = FCMDevice.objects.filter(user=recipient).first()
+
+        if device:
+            device.send_message(fcm_message)
+
+
+@receiver(post_delete, sender=Message)
+def cancel_chat_push_notification(sender, instance, **kwargs):
+    if instance.deleted:
+        message = {
+            "body": "This message has been deleted.",
+            "url": "/home",
+            "tag": str(instance.id),
+            "type": "cancel",
+        }
+
+        recipient = instance.chat_room.users.exclude(id=instance.sender.id).first()
+
+        try:
+            FCMDevice.objects.filter(user_id=instance.user.id).send_message(message, False)
+        except Exception as e:
+            print("error while canceling firebase notification: ", e)
