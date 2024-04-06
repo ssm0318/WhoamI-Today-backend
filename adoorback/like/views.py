@@ -11,7 +11,7 @@ from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 
 
-class LikeList(generics.CreateAPIView):
+class LikeCreate(generics.CreateAPIView):
     queryset = Like.objects.all()
     serializer_class = LikeSerializer
     permission_classes = [IsAuthenticated]
