@@ -11,7 +11,7 @@ from adoorback.utils.validators import adoor_exception_handler
 from adoorback.utils.exceptions import ExistingReaction, NoSuchTarget, NotFriend
 
 
-class ReactionList(generics.CreateAPIView):
+class ReactionList(generics.ListCreateAPIView):
     """
     List all reactions, or create a new reaction.
     """
