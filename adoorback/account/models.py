@@ -306,16 +306,6 @@ def friend_removed(action, pk_set, instance, **kwargs):
             FriendRequest.objects.filter(requester=instance, requestee=friend).delete(force_policy=HARD_DELETE)
             FriendRequest.objects.filter(requester=friend, requestee=instance).delete(force_policy=HARD_DELETE)
 
-            # remove from share_friends (TODO: if 'Note' model is added, add related logic here)
-            for response in friend.shared_responses.filter(author=instance):
-                response.share_friends.remove(friend)
-            for response in instance.shared_responses.filter(author=friend):
-                response.share_friends.remove(instance)
-            for check_in in friend.shared_check_ins.filter(is_active=True, user=instance):
-                check_in.share_friends.remove(friend)
-            for check_in in instance.shared_check_ins.filter(is_active=True, user=friend):
-                check_in.share_friends.remove(instance)
-
             # remove friend from favorites and hidden
             try:
                 instance.favorites.remove(friend)

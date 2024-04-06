@@ -29,14 +29,7 @@ class CurrentCheckIn(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         current_user = self.request.user
-        share_group_ids = self.request.data.get('share_groups', [])
-        share_groups = [get_object_or_404(FriendGroup, id=id_) for id_ in share_group_ids]
-        share_friend_ids = self.request.data.get('share_friends', [])
-        share_friends = [get_object_or_404(User, id=id_) for id_ in share_friend_ids]
-        share_everyone = self.request.data.get('share_everyone', False)
-        serializer.save(user=current_user, is_active=True,
-                        share_friends=share_friends, share_groups=share_groups, 
-                        share_everyone=share_everyone)
+        serializer.save(user=current_user, is_active=True)
 
         # deactivate previous check-in
         previous_check_in = CheckIn.objects.filter(user=current_user, is_active=True) \
