@@ -358,6 +358,29 @@ class UserSearch(generics.ListAPIView):
         return qs
 
 
+class CurrentUserFriendSearch(generics.ListAPIView):
+    serializer_class = UserFriendshipStatusSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        query = self.request.GET.get('query')
+        user = self.request.user
+        friends = user.friends.all()
+
+        if query:
+            start_friends = friends.filter(username__startswith=query).order_by('username')
+            contain_friends = friends.filter(username__icontains=query).order_by('username')
+
+            qs = start_friends.union(contain_friends, all=False) # start_friends first *then* contain_friends
+
+            return qs
+
+        return friends
+
+
 class UserProfile(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
