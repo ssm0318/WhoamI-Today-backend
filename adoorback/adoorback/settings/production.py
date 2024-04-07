@@ -11,7 +11,7 @@ BASE_URL = 'https://diivers.world'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'whoamitoday',
         'USER': 'postgres',
         'PASSWORD': os.environ['DB_PASSWORD'],
