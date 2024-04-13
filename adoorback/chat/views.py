@@ -1,13 +1,15 @@
+from collections import OrderedDict
+
 from rest_framework import generics, exceptions
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from account.models import User
 from adoorback.utils.validators import adoor_exception_handler
-from chat.models import Message, ChatRoom
+from chat.models import Message, ChatRoom, MessageLike
 import chat.serializers as cs
 from collections import OrderedDict
-from account.models import User
 
 
 class ChatRoomList(generics.ListAPIView):
@@ -121,3 +123,14 @@ class OneOnOneChatRoomId(generics.RetrieveAPIView):
             raise exceptions.NotFound("Chat room not found")
 
         return Response({'chat_room_id': chat_room.id})
+
+
+class MessageLikeList(generics.ListAPIView):
+    serializer_class = cs.MessageLikeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return MessageLike.objects.filter(message_id=self.kwargs.get('pk'))

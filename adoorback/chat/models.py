@@ -1,7 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models.signals import m2m_changed, post_save, pre_save, post_delete
+from django.db.models import Q
+from django.db.models.signals import m2m_changed, post_save, post_delete
 from django.dispatch import receiver
 
 from firebase_admin.messaging import Message
@@ -74,6 +75,26 @@ class Message(AdoorModel, SafeDeleteModel):
     @property
     def unread_users_cnt(self):
         return self.chat_room.users.count() - self.read_users_cnt()
+
+
+class MessageLike(AdoorTimestampedModel, SafeDeleteModel):
+    user = models.ForeignKey(User, related_name='message_likes', on_delete=models.CASCADE)
+    message = models.ForeignKey(Message, related_name='message_likes', on_delete=models.CASCADE)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'message'], 
+                condition=Q(deleted__isnull=True),
+                name='unique_message_like'
+            ),
+        ]
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.user} likes {self.message}'
 
 
 class UserChatActivity(AdoorTimestampedModel, SafeDeleteModel):
