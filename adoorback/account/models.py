@@ -185,6 +185,14 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             blocked_contents.append((content_type, report.object_id))
         return blocked_contents
 
+    @property
+    def unread_message_cnt(self):
+        chat_rooms = self.chat_rooms.all()
+        unread_cnt = 0
+        for room in chat_rooms:
+            unread_cnt += room.unread_cnt(self)
+        return unread_cnt
+
     def most_recent_update(self, user):
         # most recent update time of self (among self's content that user can access)
         most_recent_response = user.can_access_response_set(self).aggregate(Max('created_at'))['created_at__max']
