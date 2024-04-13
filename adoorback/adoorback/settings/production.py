@@ -40,6 +40,8 @@ DATABASES = {
 #    "develop.d3t1tnno5uz3sa.amplifyapp.com",
 #    "localhost"
 # ]
+CSRF_TRUSTED_ORIGINS = ['https://diivers.world']
+
 
 ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', '3.39.220.146']
 

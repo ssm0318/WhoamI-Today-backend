@@ -33,5 +33,8 @@
 # firebase
 /adoorback/adoorback/serviceAccountKey.json
 
-#media
+# media
 /adoorback/adoorback/media
+
+# logging
+/adoorback/error.log
