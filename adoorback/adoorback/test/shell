@@ -18,11 +18,20 @@ from content_report.models import ContentReport
 from adoorback.utils.content_types import get_question_type, get_comment_type, get_response_type
 from note.models import Note
 from django.contrib.auth import get_user_model
-
 User = get_user_model()
-User.objects.values_list('email', flat=True)
+
+
+for i in range(3):
+    set_seed(30)
+    set_seed(10)
+    set_seed(20)
+    set_seed(5)
+    set_seed(30)
 
 set_seed(30)
+
+User.objects.values_list('email', flat=True)
+
 
 for user in User.objects.all():
     print(user.username, user.id, str(RefreshToken.for_user(user).access_token))
