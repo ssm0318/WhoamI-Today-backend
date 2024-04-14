@@ -66,7 +66,6 @@ class UserLogin(APIView):
             translation.activate(lang)
 
         data = request.data
-        response = Response()
         username = data.get('username', None)
         password = data.get('password', None)
         try:
@@ -77,6 +76,9 @@ class UserLogin(APIView):
         user = authenticate(username=username, password=password)
         if user is not None:
             access_token = get_access_token_for_user(user)
+            response = Response({
+                'access_token': access_token,
+            })
             response.set_cookie(
                 key=settings.SIMPLE_JWT['AUTH_COOKIE'],
                 value=access_token,
