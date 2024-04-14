@@ -1,13 +1,13 @@
-from datetime import datetime
 import logging
 import random
 import sys
 
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from faker import Faker
 
 from account.models import FriendRequest
-from adoorback.utils.content_types import get_comment_type, get_response_type
+from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
 from chat.models import ChatRoom, Message
 from check_in.models import CheckIn
 from comment.models import Comment
@@ -16,7 +16,7 @@ from note.models import Note
 from qna.algorithms.data_crawler import select_daily_questions
 from qna.models import Response, Question, ResponseRequest
 
-DEBUG = False
+DEBUG = True
 
 
 def set_seed(n):
@@ -26,15 +26,15 @@ def set_seed(n):
     User = get_user_model()
     faker = Faker()
 
-    try:
+    if not User.objects.filter(username='adoor').exists():
         User.objects.create_superuser(
             username='adoor', email='adoor.team@gmail.com', password='adoor2020:)',
             question_history=",".join(map(str, faker.random_elements(
                 elements=range(1, 1501),
                 length=random.randint(3, 10),
                 unique=True))))
-    except:
-        pass
+    else:
+        print("Superuser already exists!")
 
     # Seed User
     for _ in range(10):
@@ -57,8 +57,8 @@ def set_seed(n):
     users = User.objects.all()
     for _ in range(n):
         user = random.choice(users)
-        Question.objects.create(
-            author=admin, is_admin_question=True, content=faker.word())
+        (Question.objects.create(
+            author=admin, is_admin_question=True, content=faker.word()))
     logging.info(f"{Question.objects.count()} Question(s) created!") \
         if DEBUG else None
 
@@ -70,28 +70,28 @@ def set_seed(n):
     for _ in range(n):
         user = random.choice(users)
         question = random.choice(questions)
-        response = Response.objects.create(author=user,
-                                           content=faker.text(max_nb_chars=50),
-                                           question=question)
+        response, created = Response.objects.get_or_create(author=user,
+                                                  content=faker.text(max_nb_chars=50),
+                                                  question=question)
     logging.info(
         f"{Response.objects.count()} Response(s) created!") if DEBUG else None
 
     # Seed Check-in
     for _ in range(n):
         user = random.choice(users)
-        checkin = CheckIn.objects.create(user=user,
-                                         availability=faker.text(max_nb_chars=10),
-                                         mood=faker.text(max_nb_chars=5),
-                                         description=faker.text(max_nb_chars=20),
-                                         track_id=faker.text(max_nb_chars=10))
+        checkin, created = CheckIn.objects.get_or_create(user=user,
+                                                availability=faker.text(max_nb_chars=10),
+                                                mood=faker.text(max_nb_chars=5),
+                                                description=faker.text(max_nb_chars=20),
+                                                track_id=faker.text(max_nb_chars=10))
     logging.info(
         f"{CheckIn.objects.count()} Check-in(s) created!") if DEBUG else None
 
     # Seed Note
     for _ in range(n):
         user = random.choice(users)
-        note = Note.objects.create(author=user,
-                                   content=faker.text(max_nb_chars=50))
+        note, created = Note.objects.get_or_create(author=user,
+                                          content=faker.text(max_nb_chars=50))
     logging.info(
         f"{Note.objects.count()} Note(s) created!") if DEBUG else None
 
@@ -107,7 +107,7 @@ def set_seed(n):
     user_9 = User.objects.get(username="adoor_9")
     user_10 = User.objects.get(username="adoor_10")
 
-    FriendRequest.objects.all().delete()
+    # FriendRequest.objects.all().delete()
     FriendRequest.objects.get_or_create(requester=user_8, requestee=user_9)
     FriendRequest.objects.get_or_create(requester=user_8, requestee=user_10)
 
@@ -122,40 +122,52 @@ def set_seed(n):
     response = Response.objects.first()
     note = Note.objects.first()
 
-    Like.objects.all().delete()
-    Like.objects.create(user=user_1, target=response)
-    Like.objects.create(user=user_3, target=response)
-    Like.objects.create(user=user_4, target=response)
-    Like.objects.create(user=user_5, target=response)
-    Like.objects.create(user=user_6, target=response)
-    Like.objects.create(user=user_7, target=response)
-    Like.objects.create(user=user_1, target=note)
-    Like.objects.create(user=user_3, target=note)
-    Like.objects.create(user=user_4, target=note)
-    Like.objects.create(user=user_5, target=note)
-    Like.objects.create(user=user_6, target=note)
-    Like.objects.create(user=user_7, target=note)
-    Like.objects.all().delete()
-    Comment.objects.all().delete()
-    Comment.objects.create(author=user_1, target=response, content="test comment noti")
-    Comment.objects.create(author=user_3, target=response, content="test comment noti")
-    Comment.objects.create(author=user_4, target=response, content="test comment noti")
-    Comment.objects.create(author=user_5, target=response, content="test comment noti")
-    Comment.objects.create(author=user_6, target=response, content="test comment noti")
-    Comment.objects.create(author=user_7, target=response, content="test comment noti")
-    Comment.objects.create(author=user_1, target=note, content="test note noti")
-    Comment.objects.create(author=user_3, target=note, content="test note noti")
-    Comment.objects.create(author=user_4, target=note, content="test note noti")
-    Comment.objects.create(author=user_5, target=note, content="test note noti")
-    Comment.objects.create(author=user_6, target=note, content="test note noti")
-    Comment.objects.create(author=user_7, target=note, content="test note noti")
-    Comment.objects.all().delete()
-    ResponseRequest.objects.all().delete()
-    ResponseRequest.objects.create(requester=user_1, requestee=user_3, question=response.question, message="test")
-    ResponseRequest.objects.create(requester=user_4, requestee=user_3, question=response.question, message="test")
-    ResponseRequest.objects.create(requester=user_5, requestee=user_3, question=response.question, message="test")
-    ResponseRequest.objects.create(requester=user_6, requestee=user_3, question=response.question, message="test")
-    ResponseRequest.objects.create(requester=user_7, requestee=user_3, question=response.question, message="test")
+    # Like.objects.all().delete()
+    Like.objects.get_or_create(user=user_1, content_type=get_response_type(), object_id=response.id)
+    Like.objects.get_or_create(user=user_3, content_type=get_response_type(), object_id=response.id)
+    Like.objects.get_or_create(user=user_4, content_type=get_response_type(), object_id=response.id)
+    Like.objects.get_or_create(user=user_5, content_type=get_response_type(), object_id=response.id)
+    Like.objects.get_or_create(user=user_6, content_type=get_response_type(), object_id=response.id)
+    Like.objects.get_or_create(user=user_7, content_type=get_response_type(), object_id=response.id)
+    Like.objects.get_or_create(user=user_1, content_type=get_note_type(), object_id=note.id)
+    Like.objects.get_or_create(user=user_3, content_type=get_note_type(), object_id=note.id)
+    Like.objects.get_or_create(user=user_4, content_type=get_note_type(), object_id=note.id)
+    Like.objects.get_or_create(user=user_5, content_type=get_note_type(), object_id=note.id)
+    Like.objects.get_or_create(user=user_6, content_type=get_note_type(), object_id=note.id)
+    Like.objects.get_or_create(user=user_7, content_type=get_note_type(), object_id=note.id)
+    # Like.objects.all().delete()
+    # Comment.objects.all().delete()
+    Comment.objects.get_or_create(author=user_1, content_type=get_response_type(), object_id=response.id,
+                                  content="test comment noti")
+    Comment.objects.get_or_create(author=user_3, content_type=get_response_type(), object_id=response.id,
+                                  content="test comment noti")
+    Comment.objects.get_or_create(author=user_4, content_type=get_response_type(), object_id=response.id,
+                                  content="test comment noti")
+    Comment.objects.get_or_create(author=user_5, content_type=get_response_type(), object_id=response.id,
+                                  content="test comment noti")
+    Comment.objects.get_or_create(author=user_6, content_type=get_response_type(), object_id=response.id,
+                                  content="test comment noti")
+    Comment.objects.get_or_create(author=user_7, content_type=get_response_type(), object_id=response.id,
+                                  content="test comment noti")
+    Comment.objects.get_or_create(author=user_1, content_type=get_note_type(), object_id=note.id,
+                                  content="test note noti")
+    Comment.objects.get_or_create(author=user_3, content_type=get_note_type(), object_id=note.id,
+                                  content="test note noti")
+    Comment.objects.get_or_create(author=user_4, content_type=get_note_type(), object_id=note.id,
+                                  content="test note noti")
+    Comment.objects.get_or_create(author=user_5, content_type=get_note_type(), object_id=note.id,
+                                  content="test note noti")
+    Comment.objects.get_or_create(author=user_6, content_type=get_note_type(), object_id=note.id,
+                                  content="test note noti")
+    Comment.objects.get_or_create(author=user_7, content_type=get_note_type(), object_id=note.id,
+                                  content="test note noti")
+    # Comment.objects.all().delete()
+    # ResponseRequest.objects.all().delete()
+    ResponseRequest.objects.get_or_create(requester=user_1, requestee=user_3, question=response.question)
+    ResponseRequest.objects.get_or_create(requester=user_4, requestee=user_3, question=response.question)
+    ResponseRequest.objects.get_or_create(requester=user_5, requestee=user_3, question=response.question)
+    ResponseRequest.objects.get_or_create(requester=user_6, requestee=user_3, question=response.question)
+    ResponseRequest.objects.get_or_create(requester=user_7, requestee=user_3, question=response.question)
     ResponseRequest.objects.all().delete()
 
     # Seed Response Request
@@ -163,8 +175,7 @@ def set_seed(n):
         question = random.choice(questions)
         requester = random.choice(users)
         requestee = random.choice(users.exclude(id=requester.id))
-        ResponseRequest.objects.create(requester=requester, requestee=requestee, question=question,
-                                       message=faker.catch_phrase())
+        ResponseRequest.objects.get_or_create(requester=requester, requestee=requestee, question=question)
     logging.info(
         f"{ResponseRequest.objects.count()} ResponseRequest(s) created!") if DEBUG else None
 
@@ -173,19 +184,19 @@ def set_seed(n):
     for _ in range(n):
         user = random.choice(users)
         response = random.choice(responses)
-        Comment.objects.create(author=user, target=response,
-                               content=faker.catch_phrase(), is_private=_ % 2)
+        Comment.objects.get_or_create(author=user, content_type=get_response_type(), object_id=response.id,
+                                      content=faker.catch_phrase(), is_private=_ % 2)
     logging.info(
         f"{Comment.objects.count()} Comment(s) created!") if DEBUG else None
 
-    # Seed Reply Comment (target=Comment)
+    # Seed Reply Comment (content_type=get_comment_type(), object_id=comment.id)
     comment_model = get_comment_type()
-    comments = Comment.objects.filter(author=user_2)
     for _ in range(n):
-        user = random.choice(users)
-        comment = random.choice(comments)
-        reply = Comment.objects.create(author=user, target=comment,
-                                       content=faker.catch_phrase(), is_private=comment.is_private)
+        comment_user = random.choice(users)
+        reply_user = random.choice(users)
+        comment = Comment.objects.all()[_ % 10]
+        reply, created = Comment.objects.get_or_create(author=reply_user, content_type=get_comment_type(), object_id=comment.id,
+                                              content=faker.catch_phrase(), is_private=comment.is_private)
         if reply.target.is_private:
             reply.is_private = True
             reply.save()
@@ -195,20 +206,20 @@ def set_seed(n):
     # Test Notification
     comment = Comment.objects.filter(content_type=comment_model).last()
     reply = Comment.objects.filter(content_type=get_response_type()).last()
-    Like.objects.all().delete()
-    Like.objects.create(user=user_1, target=comment)
-    Like.objects.create(user=user_3, target=comment)
-    Like.objects.create(user=user_4, target=comment)
-    Like.objects.create(user=user_5, target=comment)
-    Like.objects.create(user=user_6, target=comment)
-    Like.objects.create(user=user_7, target=comment)
-    Like.objects.create(user=user_1, target=reply)
-    Like.objects.create(user=user_3, target=reply)
-    Like.objects.create(user=user_4, target=reply)
-    Like.objects.create(user=user_5, target=reply)
-    Like.objects.create(user=user_6, target=reply)
-    Like.objects.create(user=user_7, target=reply)
-    Like.objects.all().delete()
+    # Like.objects.all().delete()
+    Like.objects.get_or_create(user=user_1, content_type=get_comment_type(), object_id=comment.id)
+    Like.objects.get_or_create(user=user_3, content_type=get_comment_type(), object_id=comment.id)
+    Like.objects.get_or_create(user=user_4, content_type=get_comment_type(), object_id=comment.id)
+    Like.objects.get_or_create(user=user_5, content_type=get_comment_type(), object_id=comment.id)
+    Like.objects.get_or_create(user=user_6, content_type=get_comment_type(), object_id=comment.id)
+    Like.objects.get_or_create(user=user_7, content_type=get_comment_type(), object_id=comment.id)
+    Like.objects.get_or_create(user=user_1, content_type=get_comment_type(), object_id=reply.id)
+    Like.objects.get_or_create(user=user_3, content_type=get_comment_type(), object_id=reply.id)
+    Like.objects.get_or_create(user=user_4, content_type=get_comment_type(), object_id=reply.id)
+    Like.objects.get_or_create(user=user_5, content_type=get_comment_type(), object_id=reply.id)
+    Like.objects.get_or_create(user=user_6, content_type=get_comment_type(), object_id=reply.id)
+    Like.objects.get_or_create(user=user_7, content_type=get_comment_type(), object_id=reply.id)
+    # Like.objects.all().delete()
 
     # Seed Like
     for i in range(n):
@@ -217,10 +228,10 @@ def set_seed(n):
         response = Response.objects.all()[i:i + 1].first()
         comment = Comment.objects.comments_only()[i]
         reply = Comment.objects.replies_only()[i]
-        Like.objects.create(user=user, target=question)
-        Like.objects.create(user=user, target=response)
-        Like.objects.create(user=user, target=comment)
-        Like.objects.create(user=user, target=reply)
+        Like.objects.get_or_create(user=user, content_type=get_question_type(), object_id=question.id)
+        Like.objects.get_or_create(user=user, content_type=get_response_type(), object_id=response.id)
+        Like.objects.get_or_create(user=user, content_type=get_comment_type(), object_id=comment.id)
+        Like.objects.get_or_create(user=user, content_type=get_comment_type(), object_id=reply.id)
     logging.info(
         f"{Like.objects.count()} Like(s) created!") if DEBUG else None
 
@@ -228,6 +239,9 @@ def set_seed(n):
     for chat_room in ChatRoom.objects.all():
         participants = chat_room.users.all()
         for p in participants:
-            timestamp = datetime.utcnow()
+            timestamp = timezone.now()
             for _ in range(random.randint(3, 5)):
-                Message.objects.create(sender=p, content=faker.text(max_nb_chars=50), timestamp=timestamp, chat_room=chat_room)
+                Message.objects.get_or_create(sender=p, content=faker.text(max_nb_chars=50), timestamp=timestamp,
+                                              chat_room=chat_room)
+    logging.info(
+        f"{Message.objects.count()} Message(s) created!") if DEBUG else None
