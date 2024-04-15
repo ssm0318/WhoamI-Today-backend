@@ -16,7 +16,7 @@ DATABASES = {
         'USER': 'postgres',
         'PASSWORD': os.environ['DB_PASSWORD'],
         'HOST': 'localhost',
-        'POST': '',
+        'POST': 5433,
     },
 }
 
