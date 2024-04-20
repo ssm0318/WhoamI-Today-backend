@@ -10,6 +10,7 @@ from django.http import HttpResponseBadRequest
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from django.utils import timezone, translation
+from django.db.models import Max
 
 from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
@@ -252,7 +253,9 @@ class DailyQuestionList(generics.ListAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        return Question.objects.daily_questions()
+        daily_questions = Question.objects.daily_questions()
+        daily_questions = daily_questions.annotate(max_selected_date=Max('selected_dates'))
+        return daily_questions.order_by('-max_selected_date')
 
 
 class DateQuestionList(generics.ListAPIView):

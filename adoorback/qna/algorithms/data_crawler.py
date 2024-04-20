@@ -9,7 +9,7 @@ from notification.models import Notification
 from adoorback.utils.content_types import get_response_request_type
 
 
-NUM_DAILY_QUESTIONS = 30
+NUM_DAILY_QUESTIONS = 5
 
 
 def select_daily_questions(set_date=None):
