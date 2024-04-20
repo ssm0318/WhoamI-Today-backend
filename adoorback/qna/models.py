@@ -36,7 +36,9 @@ class QuestionManager(SafeDeleteManager):
 
     def daily_questions(self, **kwargs):
         today = timezone.now().date()
-        return self.filter(selected_dates__contains=[today], **kwargs)
+        six_days_ago = today - datetime.timedelta(days=6)
+        date_list = [six_days_ago + datetime.timedelta(days=x) for x in range(0, (today - six_days_ago).days + 1)]
+        return self.filter(selected_dates__overlap=date_list, **kwargs)
 
     def date_questions(self, date, **kwargs):
         return self.filter(selected_dates__contains=[date], **kwargs)
@@ -45,7 +47,7 @@ class QuestionManager(SafeDeleteManager):
 class Question(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='question_set', on_delete=models.CASCADE)
 
-    selected_date = models.DateTimeField(null=True)  # obsolete
+    selected_date = models.DateTimeField(null=True, blank=True)  # obsolete
     selected_dates = ArrayField(models.DateField(), blank=True, default=list)
     selected = models.BooleanField(default=False)
     is_admin_question = models.BooleanField(default=True)
