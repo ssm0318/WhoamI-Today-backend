@@ -82,7 +82,8 @@ class UserLogin(APIView):
                 value=access_token,
                 max_age=settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
                 secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
+                # FIXME: 원활한 테스트를 위해 일단 XSS 보안 이슈는 스킵
+                # httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
             csrf.get_token(request)
@@ -207,7 +208,8 @@ class UserSignup(generics.CreateAPIView):
             value=access_token,
             max_age=settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
             secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
+            # FIXME: 원활한 테스트를 위해 일단 보안 이슈는 스킵
+            # httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
             samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
         )
         csrf.get_token(request)
