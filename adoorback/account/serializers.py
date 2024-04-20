@@ -114,6 +114,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     notes = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
     mutuals = serializers.SerializerMethodField(read_only=True)
+    are_friends = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -146,10 +147,16 @@ class UserProfileSerializer(UserMinimalSerializer):
             return UserMinimalSerializer(mutual_friends, many=True).data
         return {}
 
+    def get_are_friends(self, obj):
+        user = self.context.get('request', None).user
+        if user == obj:
+            return None
+        return User.are_friends(user, obj)
+
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'notes', 'is_favorite', 'mutuals']
+        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'notes', 'is_favorite', 'mutuals', 'are_friends']
 
 
 class FriendListSerializer(UserMinimalSerializer):
