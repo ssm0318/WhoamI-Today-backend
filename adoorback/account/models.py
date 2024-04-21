@@ -121,6 +121,9 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             models.Index(fields=['id']),
             models.Index(fields=['username'], condition=models.Q(deleted__isnull=True), name='unique_active_username'),
         ]
+        constraints = [
+            models.UniqueConstraint(fields=['username'], condition=Q(deleted__isnull=True), name='unique_active_username')
+        ]
         ordering = ['id']
 
     def save(self, *args, **kwargs):
@@ -224,11 +227,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         note_ids = [note.id for note in user.note_set.all() if Note.is_audience(note, self)]
         note_queryset = Note.objects.filter(id__in=note_ids)
         return note_queryset
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['username'], condition=Q(deleted__isnull=True), name='unique_active_username')
-        ]
 
 
 class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
