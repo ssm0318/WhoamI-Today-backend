@@ -16,7 +16,7 @@ DATABASES = {
         'USER': 'postgres',
         'PASSWORD': os.environ['DB_PASSWORD'],
         'HOST': 'localhost',
-        'PORT': '5433',
+        'PORT': '5432',
     },
 }
 
@@ -43,7 +43,7 @@ DATABASES = {
 CSRF_TRUSTED_ORIGINS = ['https://diivers.world']
 
 
-ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', '3.39.220.146']
+ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', '3.39.220.146', 'ip-172-31-19-133']
 
 # CORS_ALLOWED_ORIGINS = [
 #    "https://develop.d3t1tnno5uz3sa.amplifyapp.com",
