@@ -330,10 +330,11 @@ def friend_removed(action, pk_set, instance, **kwargs):
 
             # inactivate chat room
             from chat.models import ChatRoom
-            chat_room = ChatRoom.objects.filter(users__in=[instance, friend])
-            if chat_room:
-                chat_room.active = False
-                chat_room.save()
+            chat_rooms = ChatRoom.objects.filter(users__in=[instance, friend])
+            for chat_room in chat_rooms:
+                if chat_room.users.count() == 2:
+                    chat_room.active = False
+                    chat_room.save()
 
 
 @transaction.atomic
