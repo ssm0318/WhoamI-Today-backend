@@ -37,4 +37,4 @@
 /adoorback/adoorback/media
 
 # logging
-/adoorback/error.log
+**/error.log
