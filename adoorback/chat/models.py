@@ -29,10 +29,11 @@ class ChatRoom(AdoorTimestampedModel, SafeDeleteModel):
     def clean(self):
         super().clean()
         # Check if users in the chatroom are friends
-        for user in self.users.all():
-            for other_user in self.users.exclude(id=user.id):
-                if not User.are_friends(user, other_user):
-                    raise ValidationError("All users in the chatroom must be friends.")
+        if self.active:
+            for user in self.users.all():
+                for other_user in self.users.exclude(id=user.id):
+                    if not User.are_friends(user, other_user):
+                        raise ValidationError("All users in the chatroom must be friends.")
 
     @property
     def last_message_content(self):
