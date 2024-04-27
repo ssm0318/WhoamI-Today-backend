@@ -154,8 +154,9 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         if user2_check_in and user1.id not in user2_check_in.reader_ids:
             return False
 
-        user2_note = user1.can_access_note(user2)
-        if user2_note and user1.id not in user2_note.reader_ids:
+        # Check if user1 has read user2's notes
+        user2_note_queryset = user1.can_access_note_set(user2)
+        if any(user1.id not in note.reader_ids for note in user2_note_queryset):
             return False
 
         return True
@@ -222,7 +223,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             return check_in
         return None
 
-    def can_access_note(self, user):
+    def can_access_note_set(self, user):
         from note.models import Note
         note_ids = [note.id for note in user.note_set.all() if Note.is_audience(note, self)]
         note_queryset = Note.objects.filter(id__in=note_ids)
