@@ -1,17 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from rest_framework import serializers
-from rest_framework.exceptions import NotAcceptable
-from django.urls import reverse
 
-from account.models import FriendGroup
-from account.serializers import UserMinimalSerializer, UserFriendGroupBaseSerializer
+from account.serializers import UserMinimalSerializer
 from adoorback.serializers import AdoorBaseSerializer
-from django.conf import settings
 from adoorback.utils.content_types import get_generic_relation_type
 from qna.models import Response, Question, ResponseRequest
 from like.models import Like
-from reaction.serializers import ReactionMineSerializer
 
 User = get_user_model()
 

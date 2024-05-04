@@ -3,8 +3,10 @@ import urllib
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
 from django.core.files.storage import FileSystemStorage
+from django.db import models, transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from safedelete import SOFT_DELETE_CASCADE
 from safedelete.models import SafeDeleteModel
 
@@ -38,6 +40,7 @@ class Note(AdoorModel, SafeDeleteModel):
 
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
+    readers = models.ManyToManyField(User, related_name='read_notes')
 
     note_targetted_notis = GenericRelation(Notification,
                                            content_type_field='target_type',
@@ -62,6 +65,10 @@ class Note(AdoorModel, SafeDeleteModel):
     @property
     def participants(self):
         return self.note_comments.values_list('author_id', flat=True).distinct()
+    
+    @property
+    def reader_ids(self):
+        return self.readers.values_list('id', flat=True)
 
     def is_audience(self, user):
         content_type = ContentType.objects.get_for_model(self)
@@ -100,3 +107,12 @@ class NoteImage(SafeDeleteModel):
 
     class Meta:
         ordering = ['-created_at']
+
+
+@transaction.atomic
+@receiver(post_save, sender=Note)
+def add_author_to_readers(instance, created, **kwargs):
+    if not created:
+        return
+    instance.readers.add(instance.author)
+    instance.save()

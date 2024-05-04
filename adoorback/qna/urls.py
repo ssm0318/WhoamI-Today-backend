@@ -7,7 +7,7 @@ urlpatterns = [
     path('responses/<int:pk>/', views.ResponseDetail.as_view(), name='response-detail'),
     path('responses/<int:pk>/comments/', views.ResponseComments.as_view(), name='response-comments'),
     path('responses/<int:pk>/likes/', views.ResponseLikes.as_view(), name='response-like-user-list'),
-    path('responses/read', views.ResponseRead.as_view(), name='response-read'),
+    path('responses/read/', views.ResponseRead.as_view(), name='response-read'),
 
     # Question related
     path('questions/daily/', views.DailyQuestionList.as_view(), name='daily-question-list'),
