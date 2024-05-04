@@ -1,15 +1,11 @@
 import os
 import pandas as pd
-from datetime import date, datetime, timedelta
-import json
+from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError
-from django.db.models import Q
 from django.http import HttpResponseBadRequest
-from django.core.cache import cache
-from django.shortcuts import get_object_or_404
-from django.utils import timezone, translation
+from django.utils import translation
 from django.db.models import Max
 
 from rest_framework import generics, exceptions, status
@@ -17,7 +13,6 @@ from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
-from account.models import FriendGroup
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
@@ -99,6 +94,17 @@ class ResponseComments(generics.ListAPIView):
 
     def get_queryset(self):
         return Response.objects.filter(id=self.kwargs.get('pk'))
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data[0])
+
+        serializer = self.get_serializer(queryset, many=True)
+        return DjangoResponse(serializer.data[0])
 
 
 class ResponseLikes(generics.ListAPIView):

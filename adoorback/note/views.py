@@ -41,6 +41,17 @@ class NoteComments(generics.ListAPIView):
     def get_queryset(self):
         return Note.objects.filter(id=self.kwargs.get('pk'))
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data[0])
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data[0])
+
 
 class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = NoteSerializer
