@@ -2,7 +2,6 @@ from rest_framework import serializers
 
 from account.serializers import UserMinimalSerializer
 from adoorback.serializers import AdoorBaseSerializer
-from comment.serializers import CommentFriendSerializer
 from note.models import Note
 
 

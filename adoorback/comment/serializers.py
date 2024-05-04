@@ -56,11 +56,11 @@ class PostCommentsSerializer(serializers.ModelSerializer):
         comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)
         if obj.author == current_user:
             comments = comments.order_by('id')
-            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
         else:
             comments = comments.filter(is_private=False) | \
-                       comments.filter(author=current_user).order_by('id')
-            return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
+                       comments.filter(author=current_user)
+            comments = comments.order_by('id')
+        return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
 
 class CommentFriendSerializer(CommentBaseSerializer):
