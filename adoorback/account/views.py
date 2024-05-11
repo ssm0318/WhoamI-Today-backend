@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import authenticate, logout
@@ -9,7 +11,7 @@ from django.db.models import F, Q, Max, Case, When, Value, IntegerField
 from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse, Http404
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
-from django.utils import translation
+from django.utils import translation, timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -20,6 +22,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
+from .email import email_manager
 from account.models import FriendRequest, FriendGroup, BlockRec
 from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -31,15 +34,12 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword
-from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
-from check_in.models import CheckIn
 from note.models import Note
 from note.serializers import NoteSerializer
 from notification.models import NotificationActor
 from qna.serializers import QuestionBaseSerializer
-from .email import email_manager
-from qna.models import Question
+from qna.models import Question, ResponseRequest
 from qna.models import Response as _Response
 
 User = get_user_model()
@@ -525,6 +525,23 @@ class CurrentUserResponseList(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return _Response.objects.filter(author=user).order_by('-created_at')
+
+
+class ReceivedResponseRequestList(generics.ListAPIView):
+    queryset = ResponseRequest.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_serializer_class(self):
+        from qna.serializers import ResponseRequestSerializer
+        return ResponseRequestSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        return ResponseRequest.objects.filter(requestee=user, created_at__gte=thirty_days_ago).order_by('-created_at')
 
 
 class FriendList(generics.ListAPIView):
