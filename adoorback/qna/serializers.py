@@ -1,17 +1,16 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
+from django.utils import timezone
 from rest_framework import serializers
-from rest_framework.exceptions import NotAcceptable
-from django.urls import reverse
 
-from account.models import FriendGroup
-from account.serializers import UserMinimalSerializer, UserFriendGroupBaseSerializer
+from account.serializers import UserMinimalSerializer
 from adoorback.serializers import AdoorBaseSerializer
 from django.conf import settings
 from adoorback.utils.content_types import get_generic_relation_type
 from qna.models import Response, Question, ResponseRequest
 from like.models import Like
-from reaction.serializers import ReactionMineSerializer
 
 User = get_user_model()
 
@@ -140,12 +139,17 @@ class ResponseRequestSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField()
     requestee_id = serializers.IntegerField()
     question_id = serializers.IntegerField()
+    is_recent = serializers.SerializerMethodField(read_only=True)  # received in the last 7 days
 
     def validate(self, data):
         if data.get('requester_id') == data.get('requestee_id'):
             raise serializers.ValidationError('본인과는 친구가 될 수 없어요...')
         return data
+    
+    def get_is_recent(self, obj):
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        return obj.created_at >= seven_days_ago
 
     class Meta():
         model = ResponseRequest
-        fields = ['id', 'requester_id', 'requestee_id', 'question_id', 'message']
+        fields = ['id', 'requester_id', 'requestee_id', 'question_id', 'message', 'created_at', 'is_recent']
