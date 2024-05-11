@@ -1,6 +1,6 @@
 from django.db import transaction
 from django.http import Http404
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from safedelete.models import SOFT_DELETE_CASCADE
@@ -102,3 +102,25 @@ class NoteLikes(generics.ListAPIView):
         from like.models import Like
         note_id = self.kwargs['pk']
         return Like.objects.filter(content_type__model='note', object_id=note_id)
+
+
+class NoteRead(generics.UpdateAPIView):
+    queryset = Note.objects.all()
+    serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request, *args, **kwargs):
+        current_user = self.request.user
+        ids = request.data.get('ids', [])
+        queryset = Note.objects.filter(id__in=ids)
+        if len(ids) != queryset.count():
+            return Response({'error': 'Note with provided IDs does not exist.'},
+                                  status=status.HTTP_404_NOT_FOUND)
+        for note in queryset:
+            note.readers.add(current_user)
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response(serializer.data)

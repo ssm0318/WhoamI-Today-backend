@@ -7,7 +7,6 @@ from rest_framework import serializers
 
 from account.serializers import UserMinimalSerializer
 from adoorback.serializers import AdoorBaseSerializer
-from django.conf import settings
 from adoorback.utils.content_types import get_generic_relation_type
 from qna.models import Response, Question, ResponseRequest
 from like.models import Like

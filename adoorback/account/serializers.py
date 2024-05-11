@@ -183,9 +183,11 @@ class FriendListSerializer(UserMinimalSerializer):
 
     def get_current_user_read(self, obj):
         responses = self.responses(obj)
+        notes = self.notes(obj)
         check_in = self.check_in(obj)
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
+                            and not any(not note['current_user_read'] for note in notes) \
                             and not (check_in and not check_in['current_user_read'])
         return current_user_read
     
@@ -214,6 +216,14 @@ class FriendListSerializer(UserMinimalSerializer):
         response_queryset = Response.objects.filter(id__in=response_ids).order_by('question__id', 'created_at')
         responses = ResponseSerializer(response_queryset, many=True, read_only=True, context=self.context).data
         return responses
+    
+    def notes(self, obj):
+        from note.serializers import NoteSerializer
+        user = self.context.get('request', None).user
+        note_ids = [note.id for note in obj.note_set.all() if Note.is_audience(note, user)]
+        note_queryset = Note.objects.filter(id__in=note_ids)
+        notes = NoteSerializer(note_queryset, many=True, read_only=True, context=self.context).data
+        return notes
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
