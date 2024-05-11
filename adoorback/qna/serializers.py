@@ -148,4 +148,4 @@ class ResponseRequestSerializer(serializers.ModelSerializer):
 
     class Meta():
         model = ResponseRequest
-        fields = ['id', 'requester_id', 'requestee_id', '`question_id`', 'message']
+        fields = ['id', 'requester_id', 'requestee_id', 'question_id', 'message']
