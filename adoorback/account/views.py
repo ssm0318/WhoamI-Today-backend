@@ -535,8 +535,8 @@ class ReceivedResponseRequestList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_serializer_class(self):
-        from qna.serializers import ResponseRequestSerializer
-        return ResponseRequestSerializer
+        from qna.serializers import ReceivedResponseRequestSerializer
+        return ReceivedResponseRequestSerializer
 
     def get_queryset(self):
         user = self.request.user
