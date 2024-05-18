@@ -201,12 +201,16 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         # most recent update time of self (among self's content that user can access)
         most_recent_response = user.can_access_response_set(self).aggregate(Max('created_at'))['created_at__max']
         most_recent_check_in = user.can_access_check_in(self)
-        if not most_recent_check_in:
-            return most_recent_response
-        most_recent_check_in = most_recent_check_in.created_at
-        if not most_recent_response:
-            return most_recent_check_in
-        return max(most_recent_response, most_recent_check_in)
+        if most_recent_check_in:
+            most_recent_check_in = most_recent_check_in.created_at
+        most_recent_note = user.can_access_note_set(self).aggregate(Max('created_at'))['created_at__max']
+        most_recent_times = [most_recent_response, most_recent_check_in, most_recent_note]
+        most_recent_times = [time for time in most_recent_times if time is not None]
+        
+        if most_recent_times:
+            return max(most_recent_times)
+        else:
+            return None
 
     def can_access_response_set(self, user):
         # return responses of user that self can access
