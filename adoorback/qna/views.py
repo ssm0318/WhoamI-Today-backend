@@ -7,6 +7,7 @@ from django.db import transaction, IntegrityError
 from django.http import HttpResponseBadRequest
 from django.utils import translation
 from django.db.models import Max
+from django.core.exceptions import ValidationError
 
 from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
@@ -220,6 +221,11 @@ class ResponseRequestCreate(generics.CreateAPIView):
         current_user = self.request.user
         requester = User.objects.get(id=self.request.data.get('requester_id'))
         requestee = User.objects.get(id=self.request.data.get('requestee_id'))
+        question_id = self.request.data.get('question_id')
+        if not Question.objects.filter(id=question_id).exists():
+            raise IntegrityError('The provided question_id does not correspond to any existing Question.')
+        if Question.all_objects.filter(id=question_id, deleted__isnull=False).exists():
+            raise IntegrityError('The provided question_id corresponds to a deleted Question.')
         if requester != current_user:
             raise PermissionDenied("requester가 본인이 아닙니다...")
         if not User.are_friends(requestee, current_user):
@@ -228,7 +234,7 @@ class ResponseRequestCreate(generics.CreateAPIView):
             serializer.save()
         except IntegrityError as e:
             if 'unique constraint' in e.args[0]:
-                return
+                raise IntegrityError('이미 response request를 보냈습니다...')
             else:
                 raise e
 
