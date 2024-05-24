@@ -83,7 +83,10 @@ def create_noti(instance, created, **kwargs):
 
     # if is_reply
     if origin.type == 'Comment':
-        redirect_url = f'/{origin.target.type.lower()}s/{origin.target.id}'
+        if origin.target.type == 'Note':
+            redirect_url = f'/notes/{origin.target.id}'
+        elif origin.target.type == 'Response':
+            redirect_url = f'/qna/responses/{origin.target.id}'
         # send a notification to the author of the origin comment
         if origin_author == actor:
             pass
@@ -145,7 +148,10 @@ def create_noti(instance, created, **kwargs):
 
     # if not reply
     else:
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+        if origin.type == 'Note':
+            redirect_url = f'/notes/{origin.id}'
+        elif origin.type == 'Response':
+            redirect_url = f'/qna/responses/{origin.id}'
         # send a notification to the author of the origin qna
         origin_target_name_ko = '노트' if origin.type == 'Note' else '답변'
         origin_target_name_en = 'note' if origin.type == 'Note' else 'answer'
