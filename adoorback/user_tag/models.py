@@ -80,8 +80,10 @@ def create_user_tag_noti(instance, **kwargs):
             return  # do not create noti if comment / reply notification will be sent
         if origin.is_private and origin.target.author != user:
             return  # do not create noti for private comment that tagged user has no permission to see
-        redirect_url = f'/{post.type.lower()}s/' \
-                       f'{post.id}'
+        if post.type == 'Note':
+            redirect_url = f'/notes/{post.id}'
+        elif post.type == 'Response':
+            redirect_url = f'/qna/responses/{post.id}'
     else:
         print("UserTag can only be created in comment or reply for now.")
         return

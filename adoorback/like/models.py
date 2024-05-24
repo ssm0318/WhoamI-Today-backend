@@ -79,24 +79,28 @@ def create_like_noti(instance, created, **kwargs):
     content_preview = wrap_content(origin)
 
     if origin.type == 'Comment' and origin.target.type == 'Comment':  # if is reply
-        redirect_url = f'/{origin.target.target.type.lower()}s/' \
-                       f'{origin.target.target.id}'
+        if origin.target.type == 'Note':
+            redirect_url = f'/notes/{origin.target.target.id}'
+        elif origin.target.type == 'Response':
+            redirect_url = f'/qna/responses/{origin.target.target.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_reply_noti",
                                                            redirect_url=redirect_url, content_preview=content_preview)
     elif origin.type == 'Comment':  # if is comment
-        redirect_url = f'/{origin.target.type.lower()}s/' \
-                       f'{origin.target.id}'
+        if origin.target.type == 'Note':
+            redirect_url = f'/notes/{origin.target.id}'
+        elif origin.target.type == 'Response':
+            redirect_url = f'/qna/responses/{origin.target.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_comment_noti",
                                                            redirect_url=redirect_url, content_preview=content_preview)
     elif origin.type == 'Response':
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+        redirect_url = f'/qna/responses/{origin.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_response_noti",
                                                            redirect_url=redirect_url, content_preview=content_preview)
     elif origin.type == 'Note':
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+        redirect_url = f'/notes/{origin.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_note_noti",
                                                            redirect_url=redirect_url, content_preview=content_preview)

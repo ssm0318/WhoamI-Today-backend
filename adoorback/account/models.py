@@ -360,7 +360,7 @@ def create_friend_noti(created, instance, **kwargs):
                                            origin=requester, target=instance,
                                            message_ko=f'{requester.username}님이 친구 요청을 보냈습니다.',
                                            message_en=f'{requester.username} has requested to be your friend.',
-                                           redirect_url=f'/users/{requester.username}')
+                                           redirect_url=f'/user/{requester.username}/profile/')
         NotificationActor.objects.create(user=requester, notification=noti)
         return
     elif accepted:
@@ -371,13 +371,13 @@ def create_friend_noti(created, instance, **kwargs):
                                            origin=requester, target=requester,
                                            message_ko=f'{requester.username}님과 친구가 되었습니다.',
                                            message_en=f'You are now friends with {requester.username}.',
-                                           redirect_url=f'/users/{requester.username}')
+                                           redirect_url=f'/user/{requester.username}/profile/')
         NotificationActor.objects.create(user=requester, notification=noti)
         noti = Notification.objects.create(user=requester,
                                            origin=requestee, target=requestee,
                                            message_ko=f'{requestee.username}님과 친구가 되었습니다.',
                                            message_en=f'You are now friends with {requestee.username}.',
-                                           redirect_url=f'/users/{requestee.username}')
+                                           redirect_url=f'/user/{requestee.username}/profile/')
         NotificationActor.objects.create(user=requestee, notification=noti)
         # add friendship
         requester.friends.add(requestee)
