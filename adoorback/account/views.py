@@ -402,9 +402,9 @@ class UserNoteList(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        all_notes = Note.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
+        all_notes = Note.objects.filter(author__username=self.kwargs.get('username'))
         note_ids = [note.id for note in all_notes if note.is_audience(user)]
-        return Note.objects.filter(id__in=note_ids)
+        return Note.objects.filter(id__in=note_ids).order_by('-created_at')
 
 
 class UserResponseList(generics.ListAPIView):
