@@ -71,10 +71,9 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
             translation.activate(lang)
         try:
             response = Response.objects.get(id=self.kwargs.get('pk'))
+            self.check_object_permissions(self.request, response)
         except Response.DoesNotExist:
             raise exceptions.NotFound("Response not found")
-        if response.author != self.request.user: #TODO check if this is correct
-            raise exceptions.PermissionDenied("User has no permission")
         return response
 
     def get_queryset(self):
