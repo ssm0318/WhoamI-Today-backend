@@ -53,13 +53,7 @@ class PostCommentsSerializer(serializers.ModelSerializer):
             comments = obj.note_comments
         else:
             return None
-        comments = comments.exclude(author_id__in=current_user.user_report_blocked_ids)
-        if obj.author == current_user:
-            comments = comments.order_by('id')
-        else:
-            comments = comments.filter(is_private=False) | \
-                       comments.filter(author=current_user)
-            comments = comments.order_by('id')
+        comments = comments.order_by('-id')
         return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
 
 
@@ -81,6 +75,15 @@ class CommentFriendSerializer(CommentBaseSerializer):
             replies = obj.replies.filter(is_private=False) | \
                       obj.replies.filter(author=current_user).order_by('id')
         return self.__class__(replies, many=True, read_only=True, context=self.context).data
+
+    def to_representation(self, instance):
+        current_user = self.context.get('request', None).user
+        if (instance.author != current_user
+                and instance.target.author != current_user
+                and (instance.is_private or instance.author_id in current_user.user_report_blocked_ids)):
+            return {'is_private': True}
+        else:
+            return super().to_representation(instance)
 
     class Meta(CommentBaseSerializer.Meta):
         model = Comment

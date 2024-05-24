@@ -32,25 +32,19 @@ class NoteCreate(generics.CreateAPIView):
 
 
 class NoteComments(generics.ListAPIView):
-    serializer_class = cs.PostCommentsSerializer
+    serializer_class = cs.CommentFriendSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
-        return Note.objects.filter(id=self.kwargs.get('pk'))
+        return Note.objects.get(id=self.kwargs.get('pk')).note_comments.all()
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data[0])
-
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data[0])
+        return Response({'count': queryset.count(), 'results': serializer.data})
 
 
 class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
