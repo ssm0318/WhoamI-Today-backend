@@ -32,7 +32,7 @@ class QuestionBaseSerializer(serializers.ModelSerializer):
                   'selected', 'is_admin_question']
 
 
-class ResponseSerializer(serializers.ModelSerializer):
+class ResponseSerializer(AdoorBaseSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
     author_detail = UserMinimalSerializer(source='author', read_only=True)
@@ -60,7 +60,7 @@ class ResponseSerializer(serializers.ModelSerializer):
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
-        fields = ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
+        fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
                   'question', 'question_id', 'created_at', 'current_user_read', 'like_user_sample']
         
 
