@@ -48,7 +48,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         if obj.target and (obj.target.type == 'ResponseRequest' or obj.target.type == 'Response'):
             content = obj.target.question.content
         # if question/response was deleted
-        elif obj.target and obj.redirect_url[:11] == '/qna/questions/' and obj.target.type != 'Like':
+        elif obj.target and obj.redirect_url[:11] == '/questions/' and obj.target.type != 'Like':
             content = Question.objects.get(id=int(obj.redirect_url[11:]))
         else:
             return content

@@ -185,7 +185,7 @@ def create_response_request_noti(instance, created, **kwargs):
 
     if requester.id in requestee.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
-    redirect_url = f'/qna/questions/{origin.id}/new'
+    redirect_url = f'/questions/{origin.id}/new'
     Notification.objects.create_or_update_notification(user=requestee, actor=requester,
                                                        origin=origin, target=target, noti_type="response_request_noti",
                                                        redirect_url=redirect_url, content_preview=content_preview)
@@ -207,7 +207,7 @@ def create_request_answered_noti(instance, created, **kwargs):
     actor = instance.author
     related_requests = ResponseRequest.objects.filter(
         requestee_id=author_id, question_id=question_id)
-    redirect_url = f'/qna/responses/{instance.id}'
+    redirect_url = f'/responses/{instance.id}'
 
     content_preview = wrap_content(origin)
 

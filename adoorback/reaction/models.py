@@ -69,10 +69,7 @@ def create_reaction_noti(instance, created, **kwargs):
 
     content_preview = wrap_content(origin)
 
-    if origin.type == 'Note':
-        redirect_url = f'/notes/{origin.id}'
-    elif origin.type == 'Response':
-        redirect_url = f'/qna/responses/{origin.id}'
+    redirect_url = f'/{origin.type.lower()}s/{origin.id}'
     Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                        origin=origin, target=target, noti_type="reaction_response_noti",
                                                        redirect_url=redirect_url, content_preview=content_preview,

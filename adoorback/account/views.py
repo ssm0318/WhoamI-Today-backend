@@ -441,8 +441,6 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     @transaction.atomic
     def perform_update(self, serializer):
         if serializer.is_valid(raise_exception=True):
-            # if 'profile_pic' in self.request.FILES:
-            #     serializer.validated_data['profile_pic'] = self.request.FILES['profile_pic']
             serializer.save()
         updating_data = list(self.request.data.keys())
         if len(updating_data) == 1 and updating_data[0] == 'question_history':
@@ -450,12 +448,13 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
             Notification = apps.get_model('notification', 'Notification')
             admin = User.objects.filter(is_superuser=True).first()
 
+            # NOTE: 질문 선택이 없어져서 업데이트 필요할 듯
             noti = Notification.objects.create(user=obj,
                                                target=admin,
                                                origin=admin,
                                                message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
                                                message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
-                                               redirect_url='qna/questions')
+                                               redirect_url='/questions')
             NotificationActor.objects.create(user=admin, notification=noti)
 
 
