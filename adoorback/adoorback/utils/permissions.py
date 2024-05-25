@@ -40,7 +40,6 @@ class IsShared(permissions.BasePermission):
         elif User.are_friends(request.user, obj.author):
             return True
         else:
-            result = obj.author == request.user
             return obj.author == request.user
 
 
