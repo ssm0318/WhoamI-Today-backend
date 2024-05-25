@@ -35,6 +35,7 @@
 
 # media
 /adoorback/adoorback/media
+/adoorback/adoorback/adoorback/media
 
 # logging
 **/error.log
