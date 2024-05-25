@@ -146,7 +146,6 @@ class ResponseRequestSerializer(serializers.ModelSerializer):
         return data
     
     def get_is_recent(self, obj):
-        print(obj)
         seven_days_ago = timezone.now() - timedelta(days=7)
         return obj.created_at >= seven_days_ago
 
