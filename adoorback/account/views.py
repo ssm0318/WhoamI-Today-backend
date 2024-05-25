@@ -448,6 +448,7 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
             Notification = apps.get_model('notification', 'Notification')
             admin = User.objects.filter(is_superuser=True).first()
 
+            # NOTE: 질문 선택이 없어져서 업데이트 필요할 듯
             noti = Notification.objects.create(user=obj,
                                                target=admin,
                                                origin=admin,

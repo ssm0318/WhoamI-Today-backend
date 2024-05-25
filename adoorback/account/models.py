@@ -414,7 +414,7 @@ def user_created(created, instance, **kwargs):
                                            origin=admin,
                                            message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
                                            message_en=f"{instance.username}, try making friends to share your whoami!",
-                                           redirect_url='/')
+                                           redirect_url='/friends/explore')
         NotificationActor.objects.create(user=admin, notification=noti)
 
         # add default FriendGroup (close_friends)
