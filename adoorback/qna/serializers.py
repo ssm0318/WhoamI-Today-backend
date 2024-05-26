@@ -152,3 +152,18 @@ class ResponseRequestSerializer(serializers.ModelSerializer):
     class Meta():
         model = ResponseRequest
         fields = ['id', 'requester_id', 'requestee_id', 'question_id', 'message', 'created_at', 'is_recent']
+
+
+class ReceivedResponseRequestSerializer(ResponseRequestSerializer):
+    requester_username = serializers.SerializerMethodField(read_only=True)
+    question_content = serializers.SerializerMethodField(read_only=True)
+
+    def get_requester_username(self, obj):
+        return User.objects.get(id=obj.requester_id).username
+
+    def get_question_content(self, obj):
+        return Question.objects.get(id=obj.question_id).content
+
+    class Meta:
+        model = ResponseRequest
+        fields = ResponseRequestSerializer.Meta.fields + ['requester_username', 'question_content']
