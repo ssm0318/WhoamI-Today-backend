@@ -31,7 +31,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(User, related_name='check_in_set', on_delete=models.CASCADE)
     is_active = models.BooleanField(default=False)
     mood = models.CharField(blank=True, null=True, max_length=5)
-    availability = models.CharField(max_length=20, choices=AVAILABILITY_CHOICES, default='no_status')
+    availability = models.CharField(blank=True, null=True, max_length=20, choices=AVAILABILITY_CHOICES)
     description = models.CharField(blank=True, null=True, max_length=88)
     track_id = models.CharField(blank=True, null=True, max_length=50)
 
