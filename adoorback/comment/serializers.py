@@ -40,23 +40,6 @@ class CommentBaseSerializer(AdoorBaseSerializer):
         fields = AdoorBaseSerializer.Meta.fields + ['is_reply', 'is_private', 'target_id', 'user_tags']
 
 
-class PostCommentsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        fields = '__all__'
-
-    def to_representation(self, obj):
-        current_user = self.context.get('request', None).user
-        if isinstance(obj, Response):
-            comments = obj.response_comments
-        elif isinstance(obj, Note):
-            comments = obj.note_comments
-        else:
-            return None
-        comments = comments.order_by('-id')
-        return CommentFriendSerializer(comments, many=True, read_only=True, context=self.context).data
-
-
 class CommentFriendSerializer(CommentBaseSerializer):
     author = serializers.SerializerMethodField(read_only=True)
     author_detail = UserMinimalSerializer(source='author', read_only=True)
@@ -67,14 +50,17 @@ class CommentFriendSerializer(CommentBaseSerializer):
 
     def get_replies(self, obj):
         current_user = self.context.get('request', None).user
-        if obj.target.type == 'Comment':
-            replies = Comment.objects.none()
-        elif obj.target.author == current_user or obj.author == current_user:
-            replies = obj.replies.order_by('id')
-        else:
-            replies = obj.replies.filter(is_private=False) | \
-                      obj.replies.filter(author=current_user).order_by('id')
-        return self.__class__(replies, many=True, read_only=True, context=self.context).data
+        replies = obj.replies.order_by('id')
+
+        def serialize_reply(reply):
+            if (reply.author != current_user
+                    and reply.target.author != current_user
+                    and (reply.is_private or reply.author_id in current_user.user_report_blocked_ids)):
+                return {'is_private': True}
+            else:
+                return self.__class__(reply, read_only=True, context=self.context).data
+
+        return [serialize_reply(reply) for reply in replies]
 
     def to_representation(self, instance):
         current_user = self.context.get('request', None).user
