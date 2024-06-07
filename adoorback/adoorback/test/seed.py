@@ -77,13 +77,30 @@ def set_seed(n):
         f"{Response.objects.count()} Response(s) created!") if DEBUG else None
 
     # Seed Check-in
+    availability_options = [
+        'available',
+        'busy',
+        'might_get_distracted',
+        'urgent_only',
+        'about_to_sleep',
+        'studying',
+        'in_transit',
+        'feeling_social',
+        'feeling_quiet'
+    ]
+
+    with open('adoorback/test/spotify_ids.txt', 'r') as file:
+        spotify_ids = [line.strip() for line in file]
+
     for _ in range(n):
         user = random.choice(users)
+        availability = random.choice(availability_options)
+        track_id = random.choice(spotify_ids)
         checkin, created = CheckIn.objects.get_or_create(user=user,
-                                                availability=faker.text(max_nb_chars=10),
+                                                availability=availability,
                                                 mood=faker.text(max_nb_chars=5),
                                                 description=faker.text(max_nb_chars=20),
-                                                track_id=faker.text(max_nb_chars=10))
+                                                track_id=track_id)
     logging.info(
         f"{CheckIn.objects.count()} Check-in(s) created!") if DEBUG else None
 
