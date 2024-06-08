@@ -15,8 +15,6 @@
 /.DS_Store
 /adoorback/.idea/
 /adoorback/.config/uwsgi/env
-/adoorback/adoorback/test/admin_setup.py
-/adoorback/adoorback/assets/questions.tsv
 
 # pycache
 /__pycache__/
