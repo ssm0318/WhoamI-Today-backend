@@ -93,7 +93,8 @@ class ResponseComments(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        return Response.objects.get(id=self.kwargs.get('pk')).response_comments.all()
+        current_user = self.request.user
+        return Response.objects.get(id=self.kwargs.get('pk')).response_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

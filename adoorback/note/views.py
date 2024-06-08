@@ -39,7 +39,8 @@ class NoteComments(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        return Note.objects.get(id=self.kwargs.get('pk')).note_comments.all()
+        current_user = self.request.user
+        return Note.objects.get(id=self.kwargs.get('pk')).note_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
