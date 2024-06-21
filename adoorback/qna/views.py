@@ -13,6 +13,7 @@ from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.pagination import PageNumberPagination
 
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
@@ -87,6 +88,7 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class ResponseComments(generics.ListAPIView):
     serializer_class = cs.CommentFriendSerializer
+    pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -98,8 +100,13 @@ class ResponseComments(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return DjangoResponse({'count': queryset.count(), 'results': serializer.data})
+
 
 class ResponseLikes(generics.ListAPIView):
     serializer_class = LikeSerializer
