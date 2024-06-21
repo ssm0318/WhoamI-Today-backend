@@ -165,6 +165,7 @@ class FriendListSerializer(UserMinimalSerializer):
     is_hidden = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
+    track_id = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -209,6 +210,14 @@ class FriendListSerializer(UserMinimalSerializer):
             return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
         return {}
 
+    def get_track_id(self, obj):
+        from check_in.serializers import CheckInBaseSerializer
+        user = self.context.get('request', None).user
+        check_in = obj.check_in_set.filter(is_active=True).first()
+        if check_in and CheckIn.is_audience(check_in, user):
+            return check_in.track_id
+        return {}
+
     def responses(self, obj):
         from qna.serializers import ResponseSerializer
         user = self.context.get('request', None).user
@@ -216,7 +225,7 @@ class FriendListSerializer(UserMinimalSerializer):
         response_queryset = Response.objects.filter(id__in=response_ids).order_by('question__id', 'created_at')
         responses = ResponseSerializer(response_queryset, many=True, read_only=True, context=self.context).data
         return responses
-    
+
     def notes(self, obj):
         from note.serializers import NoteSerializer
         user = self.context.get('request', None).user
@@ -227,7 +236,8 @@ class FriendListSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read', 'unread_cnt']
+        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read', 'unread_cnt',
+                                                      'bio', 'track_id']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):
