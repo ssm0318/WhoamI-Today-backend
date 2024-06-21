@@ -3,6 +3,7 @@ from django.http import Http404
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
@@ -33,6 +34,7 @@ class NoteCreate(generics.CreateAPIView):
 
 class NoteComments(generics.ListAPIView):
     serializer_class = cs.CommentFriendSerializer
+    pagination_class = PageNumberPagination
     permission_classes = [IsAuthenticated, IsNotBlocked]
 
     def get_exception_handler(self):
@@ -44,6 +46,10 @@ class NoteComments(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response({'count': queryset.count(), 'results': serializer.data})
 
