@@ -216,7 +216,7 @@ class FriendListSerializer(UserMinimalSerializer):
         check_in = obj.check_in_set.filter(is_active=True).first()
         if check_in and CheckIn.is_audience(check_in, user):
             return check_in.track_id
-        return {}
+        return None
 
     def responses(self, obj):
         from qna.serializers import ResponseSerializer
