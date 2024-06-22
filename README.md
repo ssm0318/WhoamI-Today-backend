@@ -27,13 +27,8 @@ exit()
 python manage.py runserver
 ```
 
-psycopg2, mysqlclient
-이 두 가지는 requirements.txt에서 제거하고 설치해도 됩니다
-```
-psycopg2==2.8.6
-django-mysql==3.9.0
-```
-
+## Local Postgresql settings
+[로컬 DB PostgreSQL 로 설정하기](https://www.notion.so/jinsungoo/DB-PostgreSQL-f2d9e2cf966e47c2954ed0f008bda068?pvs=4)
 
 ## Drop Postgresql DB
 ```
