@@ -1,4 +1,5 @@
 import urllib
+import uuid
 
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
@@ -32,7 +33,8 @@ class OverwriteStorage(FileSystemStorage):
 
 
 def note_image_path(instance, filename):
-    return f'note_images/{instance.note.author_id}/{filename}'
+    unique_id = str(uuid.uuid4())[:8]
+    return f'note_images/{instance.note.author_id}/{instance.note.id}/{unique_id}_{filename}'
 
 
 class Note(AdoorModel, SafeDeleteModel):
