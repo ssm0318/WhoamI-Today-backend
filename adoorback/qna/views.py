@@ -94,7 +94,8 @@ class ResponseComments(generics.ListAPIView):
 
     def get_queryset(self):
         current_user = self.request.user
-        return Response.objects.get(id=self.kwargs.get('pk')).response_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
+        return Response.objects.get(id=self.kwargs.get('pk')).response_comments.exclude(
+            author_id__in=current_user.user_report_blocked_ids).order_by('-created_at')
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
