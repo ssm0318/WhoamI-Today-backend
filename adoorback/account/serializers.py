@@ -304,14 +304,15 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     are_friends = serializers.SerializerMethodField(read_only=True, allow_null=True)
+    chat_room_id = serializers.SerializerMethodField(read_only=True, allow_null=True)
 
     def get_received_friend_request_from(self, obj):
-        return self.context.get('request', None).user.id in \
-            list(obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True))
+        user = self.context.get('request').user
+        return user.id in obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True)
 
     def get_sent_friend_request_to(self, obj):
-        return self.context.get('request', None).user.id in \
-            list(obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True))
+        user = self.context.get('request').user
+        return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
 
     def get_are_friends(self, obj):
         user = self.context.get('request', None).user
@@ -319,11 +320,22 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
             return None
         return User.are_friends(user, obj)
 
+    def get_chat_room_id(self, obj):
+        from chat.models import ChatRoom
+        user = self.context.get('request', None).user
+
+        if (obj not in user.friends.all()) or (obj == user):
+            return None
+
+        chat_room = ChatRoom.objects.filter(users=user).filter(users=obj) \
+            .filter(messages__isnull=False).first()
+        return chat_room.id if chat_room else None
+
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['sent_friend_request_to',
                                                       'received_friend_request_from',
-                                                      'are_friends']
+                                                      'are_friends', 'chat_room_id']
 
 
 class UserFriendRequestSerializer(serializers.ModelSerializer):
