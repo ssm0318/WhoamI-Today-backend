@@ -141,22 +141,30 @@ class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
 def send_firebase_notification(created, instance, **kwargs):
     if not created:
         return
-
+    
     message = Message(
+        notification=FirebaseNotification(
+            title='WhoAmI Today', 
+            body=instance.message_en # TODO: 일단은 message_en만 처리하고, 추후 message_ko도 처리
+        ),
         data={
-            'body': instance.message,
             'message_en': instance.message_en,
             'message_ko': instance.message_ko,
             'url': instance.redirect_url,
             'tag': str(instance.id),
             'type': 'new',
+            'content-available': '1',  # for ios silent notification,
+            'priority': 'high', # for android,
         }
     )
 
     try:
-        FCMDevice.objects.filter(user_id=instance.user.id).send_message(message, False)
+        devices = FCMDevice.objects.filter(user_id=instance.user.id)
+        for device in devices:
+            device.send_message(message, False)
+        print(f"Notification sent to {instance.user.id}")
     except Exception as e:
-        print("error while sending a firebase notification: ", e)
+        print("Error while sending a firebase notification:", e)
 
 
 @receiver(post_save, sender=Notification)
