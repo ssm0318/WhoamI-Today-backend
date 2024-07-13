@@ -115,7 +115,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
     is_visible = models.BooleanField(default=True)
     is_read = models.BooleanField(default=False)
 
-    notification_updated_at = models.DateTimeField(auto_now=True)
+    notification_updated_at = models.DateTimeField(auto_now=True, null=True)
 
     objects = NotificationManager()
 
