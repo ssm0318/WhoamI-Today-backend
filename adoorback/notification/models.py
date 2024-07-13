@@ -161,7 +161,7 @@ def send_firebase_notification(created, instance, **kwargs):
     try:
         devices = FCMDevice.objects.filter(user_id=instance.user.id)
         for device in devices:
-            device.send_message(message, False)
+            device.send_message(message)
         print(f"Notification sent to {instance.user.id}")
     except Exception as e:
         print("Error while sending a firebase notification:", e)
