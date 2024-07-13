@@ -41,48 +41,19 @@ class NotificationSerializer(serializers.ModelSerializer):
         now = timezone.now()
         delta = now - obj.created_at
         return delta.days <= 7
-    #
-    #
-    # def get_question_content(self, obj):
-    #     content = None
-    #     if obj.target and (obj.target.type == 'ResponseRequest' or obj.target.type == 'Response'):
-    #         content = obj.target.question.content
-    #     # if question/response was deleted
-    #     elif obj.target and obj.redirect_url[:11] == '/questions/' and obj.target.type != 'Like':
-    #         content = Question.objects.get(id=int(obj.redirect_url[11:]))
-    #     else:
-    #         return content
-    #     return content if len(content) <= 30 else content[:30] + '...'
+
 
     def get_question_content(self, obj):
         content = None
         if obj.target and (obj.target.type == 'ResponseRequest' or obj.target.type == 'Response'):
-            # Get the language preference of the user
-            lang = self.context.get('request', None).META.get('HTTP_ACCEPT_LANGUAGE', 'en')
-            # Return the question content in the appropriate language
-            if lang == 'en':
-                content = obj.target.question.content_en
-            elif lang == 'kr':
-                content = obj.target.question.content_kr
-            # Add more elif statements for other languages
-            else:
-                content = obj.target.question.content_en  # Default to English
+            content = obj.target.question.content
         # if question/response was deleted
         elif obj.target and obj.redirect_url[:11] == '/questions/' and obj.target.type != 'Like':
-            question = Question.objects.get(id=int(obj.redirect_url[11:]))
-            # Get the language preference of the user
-            lang = self.context.get('request', None).META.get('HTTP_ACCEPT_LANGUAGE', 'en')
-            # Return the question content in the appropriate language
-            if lang == 'en':
-                content = question.content_en
-            elif lang == 'kr':
-                content = question.content_kr
-            # Add more elif statements for other languages
-            else:
-                content = question.content_en  # Default to English
+            content = Question.objects.get(id=int(obj.redirect_url[11:]))
         else:
             return content
         return content if len(content) <= 30 else content[:30] + '...'
+
 
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
