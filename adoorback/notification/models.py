@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.content_types import get_response_request_type, get_question_type
@@ -68,6 +69,7 @@ class NotificationManager(SafeDeleteManager):
             noti_to_update.is_visible = True
             noti_to_update.is_read = False
             NotificationActor.objects.create(user=actor, notification=noti_to_update)
+            noti_to_update.notification_updated_at = timezone.now()
             noti_to_update.save()
             print(noti_to_update.message_ko)
             print(noti_to_update.message_en)
@@ -113,14 +115,16 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
     is_visible = models.BooleanField(default=True)
     is_read = models.BooleanField(default=False)
 
+    notification_updated_at = models.DateTimeField(auto_now=True)
+
     objects = NotificationManager()
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-notification_updated_at']
         indexes = [
-            models.Index(fields=['-created_at']),
+            models.Index(fields=['-notification_updated_at']),
         ]
 
     def __str__(self):
