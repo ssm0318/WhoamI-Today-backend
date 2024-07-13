@@ -27,7 +27,7 @@ class NoteSerializer(AdoorBaseSerializer):
         return current_user_id in obj.reader_ids
 
     def get_images(self, obj):
-        images = obj.images.all()
+        images = obj.images.all().order_by('created_at')
         return [image.image.url for image in images]
 
     def get_like_user_sample(self, obj):
