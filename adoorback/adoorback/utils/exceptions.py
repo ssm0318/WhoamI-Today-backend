@@ -68,3 +68,20 @@ class NotFriend(APIException):
     status_code = status.HTTP_406_NOT_ACCEPTABLE
     default_detail = _("친구가 아닙니다.")
     default_code = 'not_friend'
+
+
+class ExistingResponseRequest(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("이미 같은 유저에게 질문을 전송하였습니다.")
+    default_code = 'response_request_exists'
+
+
+class NoSuchQuestion(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("존재하지 않는 질문입니다.")
+    default_code = 'no_such_question'
+
+class DeletedQuestion(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("삭제된 질문입니다.")
+    default_code = 'deleted_question'

@@ -14,6 +14,7 @@ from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
+from adoorback.utils.exceptions import ExistingResponseRequest, NoSuchQuestion, DeletedQuestion
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
@@ -221,10 +222,10 @@ class ResponseRequestCreate(generics.CreateAPIView):
         requester = User.objects.get(id=self.request.data.get('requester_id'))
         requestee = User.objects.get(id=self.request.data.get('requestee_id'))
         question_id = self.request.data.get('question_id')
-        if not Question.objects.filter(id=question_id).exists():
-            raise IntegrityError('The provided question_id does not correspond to any existing Question.')
         if Question.all_objects.filter(id=question_id, deleted__isnull=False).exists():
-            raise IntegrityError('The provided question_id corresponds to a deleted Question.')
+            raise DeletedQuestion()
+        if not Question.objects.filter(id=question_id).exists():
+            raise NoSuchQuestion()
         if requester != current_user:
             raise PermissionDenied("requester가 본인이 아닙니다...")
         if not User.are_friends(requestee, current_user):
@@ -233,7 +234,7 @@ class ResponseRequestCreate(generics.CreateAPIView):
             serializer.save()
         except IntegrityError as e:
             if 'unique constraint' in e.args[0]:
-                raise IntegrityError('이미 response request를 보냈습니다...')
+                raise ExistingResponseRequest()
             else:
                 raise e
 

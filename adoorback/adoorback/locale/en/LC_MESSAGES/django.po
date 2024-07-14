@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-05-27 20:23+0900\n"
+"POT-Creation-Date: 2024-07-11 04:07-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -36,70 +36,70 @@ msgstr ""
 msgid "감사합니다."
 msgstr "Thank you."
 
-#: account/models.py:42 account/models.py:63
+#: account/models.py:32
 msgid "여성"
 msgstr "Female"
 
-#: account/models.py:43 account/models.py:64
+#: account/models.py:33
 msgid "남성"
 msgstr "Male"
 
-#: account/models.py:44 account/models.py:65
+#: account/models.py:34
 msgid "트랜스젠더 (transgender)"
 msgstr "Transgender"
 
-#: account/models.py:45 account/models.py:66
+#: account/models.py:35
 msgid "논바이너리 (non-binary/non-conforming)"
 msgstr "Non-binary/Non-conforming"
 
-#: account/models.py:46 account/models.py:67
+#: account/models.py:36
 msgid "응답하고 싶지 않음"
 msgstr "Do not want to reply"
 
-#: account/models.py:50 account/models.py:71
+#: account/models.py:40
 msgid "미국 원주민/알래스카 원주민 (American Indian/Alaska Native)"
 msgstr "American Indian/Alaska Native"
 
-#: account/models.py:51 account/models.py:72
+#: account/models.py:41
 msgid "아시아인 (Asian)"
 msgstr "Asian"
 
-#: account/models.py:52 account/models.py:73
+#: account/models.py:42
 msgid "흑인/아프리카계 미국인 (Black/African American)"
 msgstr "Black/African American"
 
-#: account/models.py:53 account/models.py:74
+#: account/models.py:43
 msgid "히스패닉/라틴계 미국인 (Hispanic/Latino)"
 msgstr "Hispanic/Latino"
 
-#: account/models.py:54 account/models.py:75
+#: account/models.py:44
 msgid ""
 "하와이 원주민/다른 태평양 섬 주민 (Native Hawaiian/Other Pacific Islander)"
 msgstr "Native Hawaiian/Other Pacific Islander"
 
-#: account/models.py:55 account/models.py:76
+#: account/models.py:45
 msgid "백인 (White)"
 msgstr "White"
 
-#: account/models.py:91
+#: account/models.py:75
 msgid "username"
 msgstr "닉네임"
 
-#: account/models.py:94
+#: account/models.py:78
 msgid ""
 "Required. 20 characters or fewer. Letters (alphabet & 한글), digits and _ "
 "only."
 msgstr "필수 항목. 20자 이하. 알파벳/한글, 숫자, _(언더바)만 허용됨."
 
-#: account/models.py:97
+#: account/models.py:81
 msgid "A user with that username already exists."
 msgstr "해당 닉네임은 이미 사용 중입니다."
 
-#: adoorback/settings/base.py:187
+#: adoorback/settings/base.py:194
 msgid "한국어"
 msgstr "Korean"
 
-#: adoorback/settings/base.py:188
+#: adoorback/settings/base.py:195
 msgid "영어"
 msgstr "English"
 
@@ -140,11 +140,38 @@ msgstr "An account with this email already exists."
 msgid "유효하지 않은 이메일 형식입니다."
 msgstr "Email format is invalid."
 
+#: adoorback/utils/exceptions.py:57
+msgid "이미 같은 게시물에 같은 이모지로 반응하였습니다."
+msgstr "You have already reacted to this post with a same emoji."
+
+#: adoorback/utils/exceptions.py:63
+msgid "존재하지 않는 게시물입니다."
+msgstr "Post does not exist."
+
+#: adoorback/utils/exceptions.py:69
+msgid "친구가 아닙니다."
+msgstr "You are not friends."
+
+#: adoorback/utils/exceptions.py:75
+msgid "이미 같은 유저에게 질문을 전송하였습니다."
+msgstr "You have already sent this question to the same friend."
+
+#: adoorback/utils/exceptions.py:81
+msgid "존재하지 않는 질문입니다."
+msgstr "Question does not exist."
+
+#: adoorback/utils/exceptions.py:86
+msgid "삭제된 질문입니다."
+msgstr "Question has been deleted."
+
 #: adoorback/utils/validators.py:38
 msgid ""
 "유효한 닉네임을 입력해주세요. 영문, 한글, 숫자, 일부 특수문자(_)만 허용합니"
 "다.공백, 한글 자음/모음만 있는 경우는 허용되지 않습니다."
 msgstr ""
+"Please enter a valid nickname. Only letters (English or Korean), numbers, "
+"and some special characters (_) are allowed. Spaces and standalone Korean "
+"consonants or vowels are not permitted."
 
 #: adoorback/utils/validators.py:48 adoorback/utils/validators.py:54
 msgid "비밀번호는 숫자(0-9)를 한 개 이상 포함해야 합니다."
