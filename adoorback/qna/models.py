@@ -181,14 +181,15 @@ def create_response_request_noti(instance, created, **kwargs):
     requester = instance.requester
     requestee = instance.requestee
 
-    content_preview = wrap_content(origin.content)
+    content_en = wrap_content(origin.content_en)
+    content_ko = wrap_content(origin.content_ko)
 
     if requester.id in requestee.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
     redirect_url = f'/questions/{origin.id}/new'
     Notification.objects.create_or_update_notification(user=requestee, actor=requester,
                                                        origin=origin, target=target, noti_type="response_request_noti",
-                                                       redirect_url=redirect_url, content_preview=content_preview)
+                                                       redirect_url=redirect_url, content_en=content_en, content_ko=content_ko)
 
 
 @transaction.atomic
