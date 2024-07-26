@@ -41,6 +41,7 @@ from notification.models import NotificationActor
 from qna.serializers import QuestionBaseSerializer
 from qna.models import Question, ResponseRequest
 from qna.models import Response as _Response
+from check_in.models import CheckIn
 
 User = get_user_model()
 
@@ -944,3 +945,35 @@ class UserFriendGroupOrderUpdate(generics.UpdateAPIView):
 
         FriendGroup.objects.bulk_update(queryset, ['order'])
         return Response("Friend group orders updated.", status=status.HTTP_200_OK)
+
+
+class UserMarkAllAsRead(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        username = request.data.get('username')
+        if not username:
+            return Response({'error': 'Username is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        try:
+            if username.isdigit():
+                target_user = get_object_or_404(User, pk=username)
+            else:
+                target_user = get_object_or_404(User, username=username)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        notes = Note.objects.filter(author=target_user).exclude(readers=request.user)
+        for note in notes:
+            note.readers.add(request.user)
+
+        check_ins = CheckIn.objects.filter(user=target_user).exclude(readers=request.user)
+        for check_in in check_ins:
+            check_in.readers.add(request.user)
+
+        responses = _Response.objects.filter(author=target_user).exclude(readers=request.user)
+        for response in responses:
+            response.readers.add(request.user)
+
+        return Response({'success': 'All content marked as read successfully'}, status=status.HTTP_200_OK)
