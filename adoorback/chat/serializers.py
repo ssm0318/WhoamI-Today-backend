@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+
 from chat.models import ChatRoom, Message, MessageLike
 from account.serializers import UserMinimalSerializer
 
@@ -30,8 +31,15 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         fields = ['id', 'participants', 'last_message_content', 'last_message_time', 'active', 'unread_cnt']
 
 
-class MessageSerializer(serializers.ModelSerializer):
+class MessageMinimalSerializer(serializers.ModelSerializer):
     sender = UserMinimalSerializer(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ['id', 'sender', 'content', 'timestamp']
+
+
+class ChatRoomMessageSerializer(MessageMinimalSerializer):
     parent_id = serializers.SerializerMethodField()
     parent_content = serializers.SerializerMethodField()
     current_user_message_like_id = serializers.SerializerMethodField(read_only=True)
@@ -55,9 +63,20 @@ class MessageSerializer(serializers.ModelSerializer):
     def get_message_like_cnt(self, obj):
         return MessageLike.objects.filter(message_id=obj.id).count()
 
-    class Meta:
+    class Meta(MessageMinimalSerializer.Meta):
         model = Message
-        fields = ['id', 'sender', 'content', 'timestamp', 'parent_id', 'parent_content', 'current_user_message_like_id', 'message_like_cnt']
+        fields = MessageMinimalSerializer.Meta.fields + ['parent_id', 'parent_content', 'current_user_message_like_id', 'message_like_cnt']
+
+
+class SearchMessageSerializer(MessageMinimalSerializer):
+    chat_room_id = serializers.SerializerMethodField()
+
+    def get_chat_room_id(self, obj):
+        return obj.chat_room.id
+
+    class Meta(MessageMinimalSerializer.Meta):
+        model = Message
+        fields = MessageMinimalSerializer.Meta.fields + ['chat_room_id']
 
 
 class MessageLikeSerializer(serializers.ModelSerializer):

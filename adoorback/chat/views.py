@@ -1,5 +1,7 @@
 from collections import OrderedDict
 
+from django.db.models import F, Value, TextField
+from django.db.models.functions import Lower, Replace
 from rest_framework import generics, exceptions
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -83,8 +85,36 @@ class ChatRoomFriendList(generics.ListAPIView):
         return chat_rooms
 
 
+class ChatMessageSearch(generics.ListAPIView):
+    '''
+    Get chatroom messages that contain query.
+    '''
+    serializer_class = cs.SearchMessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        query = self.request.GET.get('query', '').replace(" ", "").lower()
+        user = self.request.user
+        chat_rooms = user.chat_rooms.filter(active=True)
+
+        if query:
+            messages = Message.objects.filter(
+                chat_room__in=chat_rooms
+            ).annotate(
+                lower_content=Lower(Replace(F('content'), Value(" "), Value(""), output_field=TextField()))
+            ).filter(
+                lower_content__icontains=query
+            ).order_by('-timestamp')
+            return messages
+
+        return Message.objects.none()
+
+
 class ChatMessagesListView(generics.ListAPIView):
-    serializer_class = cs.MessageSerializer
+    serializer_class = cs.ChatRoomMessageSerializer
     pagination_class = ReversePagination
 
     def get_queryset(self):

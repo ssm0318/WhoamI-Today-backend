@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
 from django.db.models import F, Q, Max, Case, When, Value, IntegerField
+from django.db.models.functions import Lower
 from django.http import HttpResponse, HttpResponseNotAllowed, JsonResponse, Http404
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
@@ -369,15 +370,15 @@ class CurrentUserFriendSearch(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        query = self.request.GET.get('query')
+        query = self.request.GET.get('query', '').replace(" ", "").lower()
         user = self.request.user
-        friends = user.friends.all()
+        friends = user.friends.annotate(lower_username=Lower('username'))
 
         if query:
-            start_friends = friends.filter(username__startswith=query).order_by('username')
-            contain_friends = friends.filter(username__icontains=query).order_by('username')
+            start_friends = friends.filter(lower_username__startswith=query).order_by('username')
+            contain_friends = friends.filter(lower_username__icontains=query).order_by('username')
 
-            qs = start_friends.union(contain_friends, all=False) # start_friends first *then* contain_friends
+            qs = start_friends.union(contain_friends, all=False)  # start_friends first *then* contain_friends
 
             return qs
 
