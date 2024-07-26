@@ -951,16 +951,16 @@ class UserMarkAllAsRead(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request):
-        username_or_id = request.data.get('username')
-        if not username_or_id:
+        username = request.data.get('username')
+        if not username:
             return Response({'error': 'Username is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         User = get_user_model()
         try:
-            if username_or_id.isdigit():
-                target_user = get_object_or_404(User, pk=username_or_id)
+            if username.isdigit():
+                target_user = get_object_or_404(User, pk=username)
             else:
-                target_user = get_object_or_404(User, username=username_or_id)
+                target_user = get_object_or_404(User, username=username)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
