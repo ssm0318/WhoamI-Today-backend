@@ -46,10 +46,22 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_question_content(self, obj):
         content = None
         if obj.target and (obj.target.type == 'ResponseRequest' or obj.target.type == 'Response'):
-            content = obj.target.question.content
-        # if question/response was deleted
+            lang = self.context.get('request', None).META.get('HTTP_ACCEPT_LANGUAGE', 'en')
+            if lang == 'en':
+                content = obj.target.question.content_en
+            elif lang == 'kr':
+                content = obj.target.question.content_ko
+            else:
+                content = obj.target.question.content_en  # Default to English
         elif obj.target and obj.redirect_url[:11] == '/questions/' and obj.target.type != 'Like':
-            content = Question.objects.get(id=int(obj.redirect_url[11:]))
+            question = Question.objects.get(id=int(obj.redirect_url[11:]))
+            lang = self.context.get('request', None).META.get('HTTP_ACCEPT_LANGUAGE', 'en')
+            if lang == 'en':
+                content = question.content_en
+            elif lang == 'kr':
+                content = question.content_ko
+            else:
+                content = question.content_en  # Default to English
         else:
             return content
         return content if len(content) <= 30 else content[:30] + '...'

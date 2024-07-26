@@ -76,27 +76,32 @@ def create_like_noti(instance, created, **kwargs):
     if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
 
-    content_preview = wrap_content(origin)
+    content_en = wrap_content(origin.content_en)
+    content_ko = wrap_content(origin.content_ko)
 
     if origin.type == 'Comment' and origin.target.type == 'Comment':  # if is reply
         redirect_url = f'/{origin.target.target.type.lower()}s/' \
                        f'{origin.target.target.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_reply_noti",
-                                                           redirect_url=redirect_url, content_preview=content_preview)
+                                                           redirect_url=redirect_url,
+                                                           content_en=content_en, content_ko=content_ko)
     elif origin.type == 'Comment':  # if is comment
         redirect_url = f'/{origin.target.type.lower()}s/' \
                        f'{origin.target.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_comment_noti",
-                                                           redirect_url=redirect_url, content_preview=content_preview)
+                                                           redirect_url=redirect_url,
+                                                           content_en=content_en, content_ko=content_ko)
     elif origin.type == 'Response':
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_response_noti",
-                                                           redirect_url=redirect_url, content_preview=content_preview)
+                                                           redirect_url=redirect_url,
+                                                           content_en=content_en, content_ko=content_ko)
     elif origin.type == 'Note':
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_note_noti",
-                                                           redirect_url=redirect_url, content_preview=content_preview)
+                                                           redirect_url=redirect_url,
+                                                           content_en=content_en, content_ko=content_ko)

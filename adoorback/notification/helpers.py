@@ -32,54 +32,54 @@ def find_like_noti(user, origin, noti_type):
     return existing_notifications.first()
 
 
-def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, content_preview, emoji=None):
+def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, content_en, content_ko, emoji=None):
     if noti_type == "like_reply_noti" or noti_type == "like_comment_noti":
         if N == 1:
-            return f'{user_a_ko}이 회원님의 댓글을 좋아합니다: {content_preview}', \
-                f'{user_a_en} liked your comment: {content_preview}'
+            return f'{user_a_ko}이 회원님의 댓글을 좋아합니다: {content_ko}', \
+                f'{user_a_en} liked your comment: {content_en}'
         elif N == 2:
-            return f'{user_a_ko}과 {user_b_ko}이 회원님의 댓글을 좋아합니다: {content_preview}', \
-                f'{user_a_en} and {user_b_en} liked your comment: {content_preview}'
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 댓글을 좋아합니다: {content_ko}', \
+                f'{user_a_en} and {user_b_en} liked your comment: {content_en}'
         else:
-            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 댓글을 좋아합니다: {content_preview}', \
-                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your comment: {content_preview}'
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 댓글을 좋아합니다: {content_ko}', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your comment: {content_en}'
     elif noti_type == "like_response_noti":
         if N == 1:
-            return f'{user_a_ko}이 회원님의 답변을 좋아합니다: {content_preview}', \
-                f'{user_a_en} liked your response: {content_preview}'
+            return f'{user_a_ko}이 회원님의 답변을 좋아합니다: {content_ko}', \
+                f'{user_a_en} liked your response: {content_en}'
         elif N == 2:
-            return f'{user_a_ko}과 {user_b_ko}이 회원님의 답변을 좋아합니다: {content_preview}', \
-                f'{user_a_en} and {user_b_en} liked your response: {content_preview}'
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 답변을 좋아합니다: {content_ko}', \
+                f'{user_a_en} and {user_b_en} liked your response: {content_en}'
         else:
-            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 답변을 좋아합니다: {content_preview}', \
-                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your response: {content_preview}'
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 답변을 좋아합니다: {content_ko}', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your response: {content_en}'
     elif noti_type == "like_note_noti":
         if N == 1:
-            return f'{user_a_ko}이 회원님의 노트를 좋아합니다: {content_preview}', \
-                f'{user_a_en} liked your note: {content_preview}'
+            return f'{user_a_ko}이 회원님의 노트를 좋아합니다: {content_ko}', \
+                f'{user_a_en} liked your note: {content_en}'
         elif N == 2:
-            return f'{user_a_ko}과 {user_b_ko}이 회원님의 노트를 좋아합니다: {content_preview}', \
-                f'{user_a_en} and {user_b_en} liked your note: {content_preview}'
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 노트를 좋아합니다: {content_ko}', \
+                f'{user_a_en} and {user_b_en} liked your note: {content_en}'
         else:
-            return f'{user_a_ko}, {user_b_ko}, 외 {N - 1}명의 친구가 회원님의 노트를 좋아합니다: {content_preview}', \
-                f'{user_a_en}, {user_b_en}, and {N - 1} other friend(s) liked your note: {content_preview}'
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 1}명의 친구가 회원님의 노트를 좋아합니다: {content_ko}', \
+                f'{user_a_en}, {user_b_en}, and {N - 1} other friend(s) liked your note: {content_en}'
     elif noti_type == "response_request_noti":
         if N == 1:
-            return f'똑똑똑! {user_a_ko}으로부터 질문이 왔어요: {content_preview}', \
-                f'Knock knock! {user_a_en} has sent you a question: {content_preview}'
+            return f'똑똑똑! {user_a_ko}으로부터 질문이 왔어요: {content_ko}', \
+                f'Knock knock! {user_a_en} has sent you a question: {content_en}'
         elif N == 2:
-            return f'똑똑똑! {user_a_ko}과 {user_b_ko}으로부터 질문이 왔어요: {content_preview}', \
-                f'Knock knock! {user_a_en} and {user_b_en} have sent you a question: {content_preview}'
+            return f'똑똑똑! {user_a_ko}과 {user_b_ko}으로부터 질문이 왔어요: {content_ko}', \
+                f'Knock knock! {user_a_en} and {user_b_en} have sent you a question: {content_en}'
         else:
-            return f'똑똑똑! {user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구로부터 질문이 왔어요: {content_preview}', \
-                f'Knock knock! {user_a_en}, {user_b_en}, and {N - 2} other friend(s) have sent you a question: {content_preview}'
+            return f'똑똑똑! {user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구로부터 질문이 왔어요: {content_ko}', \
+                f'Knock knock! {user_a_en}, {user_b_en}, and {N - 2} other friend(s) have sent you a question: {content_en}'
     elif noti_type == "reaction_response_noti":
         if N == 1:
-            return f'{user_a_ko}이 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_preview}', \
-                f'{user_a_en} reacted with {emoji} to your response: {content_preview}'
+            return f'{user_a_ko}이 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
+                f'{user_a_en} reacted with {emoji} to your response: {content_en}'
         elif N == 2:
-            return f'{user_a_ko}과 {user_b_ko}이 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_preview}', \
-                f'{user_a_en} and {user_b_en} reacted with {emoji} to your response: {content_preview}'
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
+                f'{user_a_en} and {user_b_en} reacted with {emoji} to your response: {content_en}'
         else:
-            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_preview}', \
-                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) reacted with {emoji} to your response: {content_preview}'
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) reacted with {emoji} to your response: {content_en}'

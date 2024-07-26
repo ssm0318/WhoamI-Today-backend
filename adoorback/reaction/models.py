@@ -67,10 +67,11 @@ def create_reaction_noti(instance, created, **kwargs):
     if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
 
-    content_preview = wrap_content(origin)
+    content_en = wrap_content(origin.content_en)
+    content_ko = wrap_content(origin.content_ko)
 
     redirect_url = f'/{origin.type.lower()}s/{origin.id}'
     Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                        origin=origin, target=target, noti_type="reaction_response_noti",
-                                                       redirect_url=redirect_url, content_preview=content_preview,
+                                                       redirect_url=redirect_url, content_en=content_en, content_kr=content_ko,
                                                        emoji=target.emoji)

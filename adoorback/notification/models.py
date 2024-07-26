@@ -31,7 +31,7 @@ class NotificationManager(SafeDeleteManager):
         admin = get_user_model().objects.filter(is_superuser=True).first()
         return self.filter(actor=admin, **kwargs)
 
-    def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_preview,
+    def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_en, content_ko,
                                       emoji=None):
         noti_to_update = None
 
@@ -61,7 +61,8 @@ class NotificationManager(SafeDeleteManager):
                                                                        actor.username,
                                                                        new_actor.username,
                                                                        N + 1,
-                                                                       content_preview,
+                                                                       content_en,
+                                                                       content_ko,
                                                                        emoji)
 
             noti_to_update.message_ko = updated_message_ko
@@ -75,7 +76,7 @@ class NotificationManager(SafeDeleteManager):
             print(noti_to_update.message_en)
         else:
             message_ko, message_en = construct_message(noti_type, actor.username + "님", None,
-                                                       actor.username, None, 1, content_preview, emoji)
+                                                       actor.username, None, 1, content_en, content_ko, emoji)
             noti = Notification.objects.create(user=user, origin=origin, target=target, redirect_url=redirect_url,
                                                message_ko=message_ko, message_en=message_en)
             NotificationActor.objects.create(user=actor, notification=noti)
