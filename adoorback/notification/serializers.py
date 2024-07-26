@@ -54,6 +54,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             return content
         return content if len(content) <= 30 else content[:30] + '...'
 
+
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
         if unknown:
