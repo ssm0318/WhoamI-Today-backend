@@ -35,10 +35,10 @@ DATABASES = {
 #     send_default_pii=True
 # )
 
-ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', "127.0.0.1"]
+ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', "192.168.0.52"]
 
-CORS_ALLOWED_ORIGINS = ['http://localhost:3000']
-CSRF_TRUSTED_ORIGINS = ['http://localhost:3000']
+CORS_ALLOWED_ORIGINS = ['http://192.168.0.52:3000']
+CSRF_TRUSTED_ORIGINS = ['http://192.168.0.52:3000']
 CORS_ALLOW_CREDENTIALS = True
 
-FRONTEND_URL = 'http://localhost:3000'
+FRONTEND_URL = 'http://192.168.0.52:3000'
