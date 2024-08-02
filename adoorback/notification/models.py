@@ -152,30 +152,37 @@ def send_firebase_notification(created, instance, **kwargs):
     if not created:
         return
     
-    message = Message(
-        notification=FirebaseNotification(
-            title='WhoAmI Today', 
-            body=instance.message_en # TODO: 일단은 message_en만 처리하고, 추후 message_ko도 처리
-        ),
-        data={
-            'message_en': instance.message_en,
-            'message_ko': instance.message_ko,
-            'url': instance.redirect_url,
-            'tag': str(instance.id),
-            'type': 'new',
-            'content-available': '1',  # for ios silent notification,
-            'priority': 'high', # for android,
-        }
-    )
+    devices = FCMDevice.objects.filter(user_id=instance.user.id)
+    
+    for device in devices:
+        if device.language == 'ko':
+            title = 'WhoAmI Today'
+            body = instance.message_ko
+        else:
+            title = 'WhoAmI Today'
+            body = instance.message_en
+        
+        message = Message(
+            notification=FirebaseNotification(
+                title=title,
+                body=body
+            ),
+            data={
+                'message_en': instance.message_en,
+                'message_ko': instance.message_ko,
+                'url': instance.redirect_url,
+                'tag': str(instance.id),
+                'type': 'new',
+                'content-available': '1',  # for ios silent notification
+                'priority': 'high',  # for android
+            }
+        )
 
-    try:
-        devices = FCMDevice.objects.filter(user_id=instance.user.id)
-        for device in devices:
+        try:
             device.send_message(message)
-        print(f"Notification sent to {instance.user.id}")
-    except Exception as e:
-        print("Error while sending a firebase notification:", e)
-
+            print(f"Notification sent to user {instance.user.id} in {device.language}")
+        except Exception as e:
+            print(f"Error while sending firebase notification to device {device.id}:", e)
 
 @receiver(post_save, sender=Notification)
 def cancel_firebase_notification(sender, instance, **kwargs):
