@@ -1,6 +1,10 @@
-from django.urls import path
-from .views import FCMRegisterView
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import CustomFCMDeviceViewSet
+
+router = DefaultRouter()
+router.register(r'devices', CustomFCMDeviceViewSet)
 
 urlpatterns = [
-    path('register/', FCMRegisterView.as_view(), name='fcm_register'),
+    path('', include(router.urls)),
 ]

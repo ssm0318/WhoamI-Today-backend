@@ -37,7 +37,7 @@ urlpatterns = i18n_patterns(
 
     path('api/secret/', admin.site.urls),
     path('api/user/', include('rest_framework.urls', namespace='rest_framework')),
-    path('api/devices/', FCMDeviceAuthorizedViewSet.as_view({'post': 'create'}), name='create_fcm_device'),
+    path('api/', include('custom_fcm.urls')), 
     path('api/tracking/', include('tracking.urls')),
     path('api/chat/', include('chat.urls')),
     prefix_default_language=False
