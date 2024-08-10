@@ -43,24 +43,9 @@ class CommentBaseSerializer(AdoorBaseSerializer):
 class CommentFriendSerializer(CommentBaseSerializer):
     author = serializers.SerializerMethodField(read_only=True)
     author_detail = UserMinimalSerializer(source='author', read_only=True)
-    replies = serializers.SerializerMethodField()
 
     def get_author(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.author.username})
-
-    def get_replies(self, obj):
-        current_user = self.context.get('request', None).user
-        replies = obj.replies.exclude(author_id__in=current_user.user_report_blocked_ids).order_by('id')
-
-        def serialize_reply(reply):
-            if (reply.author != current_user
-                and reply.target.author != current_user
-                and reply.is_private):
-                return {'is_private': True}
-            else:
-                return self.__class__(reply, read_only=True, context=self.context).data
-
-        return [serialize_reply(reply) for reply in replies]
 
     def to_representation(self, instance):
         current_user = self.context.get('request', None).user
@@ -74,7 +59,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
 
     class Meta(CommentBaseSerializer.Meta):
         model = Comment
-        fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail', 'replies']
+        fields = CommentBaseSerializer.Meta.fields + ['author', 'author_detail']
 
 
 class ReplySerializer(CommentFriendSerializer):
