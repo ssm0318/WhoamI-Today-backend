@@ -41,19 +41,16 @@ class NoteComments(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        from comment.models import Comment
         current_user = self.request.user
         note = Note.objects.get(id=self.kwargs.get('pk'))
         comments = note.note_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
 
         if note.author == current_user:
-            # If the note's author is the current user, exclude comments from blocked users
             all_comments_and_replies = comments
             for comment in comments:
                 replies = comment.replies.exclude(author_id__in=current_user.user_report_blocked_ids)
                 all_comments_and_replies = all_comments_and_replies.union(replies)
         else:
-            # Otherwise, filter comments based on privacy settings
             comments = comments.filter(
                 Q(is_private=False) |
                 Q(is_private=True, author=current_user)

@@ -2,12 +2,14 @@ import os
 import pandas as pd
 from datetime import date
 
+
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError
 from django.http import HttpResponseBadRequest
 from django.utils import translation
 from django.db.models import Max
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 
 from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
@@ -95,17 +97,29 @@ class ResponseComments(generics.ListAPIView):
 
     def get_queryset(self):
         current_user = self.request.user
-        return Response.objects.get(id=self.kwargs.get('pk')).response_comments.exclude(
-            author_id__in=current_user.user_report_blocked_ids).order_by('-created_at')
+        response = Response.objects.get(id=self.kwargs.get('pk'))
+        comments = response.response_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return DjangoResponse({'count': queryset.count(), 'results': serializer.data})
+        if response.author == current_user:
+            all_comments_and_replies = comments
+            for comment in comments:
+                replies = comment.replies.exclude(author_id__in=current_user.user_report_blocked_ids)
+                all_comments_and_replies = all_comments_and_replies.union(replies)
+        else:
+            comments = comments.filter(
+                Q(is_private=False) |
+                Q(is_private=True, author=current_user)
+            )
+            all_comments_and_replies = comments
+            for comment in comments:
+                replies = comment.replies.exclude(author_id__in=current_user.user_report_blocked_ids)
+                replies = replies.filter(
+                    Q(is_private=False) |
+                    Q(is_private=True, author=current_user)
+                )
+                all_comments_and_replies = all_comments_and_replies.union(replies)
+
+        return all_comments_and_replies.order_by('-created_at')
 
 
 class ResponseLikes(generics.ListAPIView):
