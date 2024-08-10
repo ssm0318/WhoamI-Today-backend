@@ -40,5 +40,6 @@ class AdoorBaseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = None
-        fields = ['id', 'type', 'content', 'comment_count' ,'like_count', 'current_user_like_id', 'created_at']
+        fields = ['id', 'type', 'content', 'comment_count' ,'like_count', 'current_user_like_id', 'created_at',
+                  'updated_at']
         validators = []
