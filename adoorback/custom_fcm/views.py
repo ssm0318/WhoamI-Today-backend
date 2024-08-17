@@ -5,7 +5,7 @@ from fcm_django.models import FCMDevice
 
 class CustomFCMDeviceViewSet(FCMDeviceAuthorizedViewSet):
     
-    def get_language_from_request(self, request):
+    def __get_language_from_request(self, request):
         accept_language = request.META.get('HTTP_ACCEPT_LANGUAGE', '')
         return accept_language.split(',')[0].split('-')[0] if accept_language else 'en'
 
@@ -18,7 +18,7 @@ class CustomFCMDeviceViewSet(FCMDeviceAuthorizedViewSet):
         return serializer
 
     def create(self, request, *args, **kwargs):
-        language = self.get_language_from_request(request)
+        language = self.__get_language_from_request(request)
         registration_id = request.data.get('registration_id')
         existing_device = FCMDevice.objects.filter(registration_id=registration_id).first()
 
@@ -36,5 +36,3 @@ class CustomFCMDeviceViewSet(FCMDeviceAuthorizedViewSet):
             device.save()
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
-
