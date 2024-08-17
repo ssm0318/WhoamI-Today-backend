@@ -152,19 +152,17 @@ def send_firebase_notification(created, instance, **kwargs):
     if not created:
         return
     
-    devices = FCMDevice.objects.filter(user_id=instance.user.id)
-    
+    devices = FCMDevice.objects.filter(user_id=instance.user.id, active=True)
+
     for device in devices:
         if device.language == 'ko':
-            title = 'WhoAmI Today'
             body = instance.message_ko
         else:
-            title = 'WhoAmI Today'
             body = instance.message_en
         
         message = Message(
             notification=FirebaseNotification(
-                title=title,
+                title='WhoAmI Today',
                 body=body
             ),
             data={
