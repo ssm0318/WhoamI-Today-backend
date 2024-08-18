@@ -63,8 +63,8 @@ CORS_ORIGIN_WHITELIST = [
 # Application definition
 
 INSTALLED_APPS = [
-    'account.apps.AccountConfig',
     'daphne',
+    'account.apps.AccountConfig',
     'channels',
     'chat.apps.ChatConfig',
     'qna.apps.QnaConfig',
@@ -257,11 +257,19 @@ TRACK_IGNORE_STATUS_CODES = [400, 404, 403, 405, 410, 500]
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} {levelname} {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
     'handlers': {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
             'filename': 'error.log',
+            'formatter': 'verbose',
         },
     },
     'loggers': {
