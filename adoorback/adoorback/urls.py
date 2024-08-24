@@ -19,7 +19,6 @@ from django.conf.urls.static import static
 from django.urls import include, path, re_path
 from django.views.static import serve
 from django.conf.urls.i18n import i18n_patterns
-from fcm_django.api.rest_framework import FCMDeviceAuthorizedViewSet
 
 
 urlpatterns = i18n_patterns(
