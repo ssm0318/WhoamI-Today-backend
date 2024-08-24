@@ -38,5 +38,6 @@ class NoteSerializer(AdoorBaseSerializer):
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Note
-        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_like_id', 'current_user_read', 'like_user_sample']
+        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_like_id', 
+                                                    'current_user_read', 'like_user_sample', 'is_edited']
 
