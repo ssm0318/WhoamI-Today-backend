@@ -50,10 +50,6 @@ ETHNICITY_CHOICES = (
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
 
-    # def get_available_name(self, name, max_length=None):
-    #     if self.exists(name):
-    #         os.remove(os.path.join(settings.MEDIA_ROOT, name))
-    #     return name
 
 def to_profile_images(instance, filename):
     return 'profile_images/{username}.png'.format(username=instance)
