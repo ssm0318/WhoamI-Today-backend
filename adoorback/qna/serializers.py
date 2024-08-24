@@ -61,7 +61,7 @@ class ResponseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'question_id', 'created_at', 'current_user_read', 'like_user_sample']
+                  'question', 'question_id', 'created_at', 'current_user_read', 'like_user_sample', 'is_edited']
         
 
 class QuestionResponseSerializer(QuestionBaseSerializer):

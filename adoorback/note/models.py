@@ -43,6 +43,7 @@ class Note(AdoorModel, SafeDeleteModel):
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
     readers = models.ManyToManyField(User, related_name='read_notes')
+    is_edited = models.BooleanField(default=False)
 
     note_targetted_notis = GenericRelation(Notification,
                                            content_type_field='target_type',
@@ -55,6 +56,13 @@ class Note(AdoorModel, SafeDeleteModel):
 
     def __str__(self):
         return self.content
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:  # not when created
+            original = Note.objects.get(pk=self.pk)
+            if original.content != self.content:
+                self.is_edited = True
+        super().save(*args, **kwargs)
 
     @property
     def type(self):
