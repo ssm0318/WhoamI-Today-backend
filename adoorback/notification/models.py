@@ -13,7 +13,7 @@ from notification.helpers import find_like_noti, construct_message
 
 from firebase_admin.messaging import Message
 from firebase_admin.messaging import Notification as FirebaseNotification
-from fcm_django.models import FCMDevice
+from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
 from safedelete.managers import SafeDeleteManager
@@ -152,7 +152,7 @@ def send_firebase_notification(created, instance, **kwargs):
     if not created:
         return
     
-    devices = FCMDevice.objects.filter(user_id=instance.user.id, active=True)
+    devices = FCMDeCustomFCMDevicevice.objects.filter(user_id=instance.user.id, active=True)
 
     for device in devices:
         if device.language == 'ko':
@@ -197,6 +197,6 @@ def cancel_firebase_notification(sender, instance, **kwargs):
     )
 
     try:
-        FCMDevice.objects.filter(user_id=instance.user.id).send_message(message, False)
+        CustomFCMDevice.objects.filter(user_id=instance.user.id).send_message(message, False)
     except Exception as e:
         print("error while canceling firebase notification: ", e)
