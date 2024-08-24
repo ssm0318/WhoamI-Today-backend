@@ -34,7 +34,7 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
-    NoUsername, WrongPassword
+    NoUsername, WrongPassword, ExistingUsername
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
 from note.serializers import NoteSerializer
@@ -436,28 +436,30 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
         return adoor_exception_handler
 
     def get_object(self):
-        # since the obtained user object is the authenticated user,
-        # no further permission checking unnecessary
         return User.objects.get(id=self.request.user.id)
 
     @transaction.atomic
     def perform_update(self, serializer):
         if serializer.is_valid(raise_exception=True):
-            serializer.save()
-        updating_data = list(self.request.data.keys())
-        if len(updating_data) == 1 and updating_data[0] == 'question_history':
+            # 사용자 이름 중복 확인
+            new_username = serializer.validated_data.get('username')
+            if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
+                raise ExistingUsername()
+            
             obj = serializer.save()
-            Notification = apps.get_model('notification', 'Notification')
-            admin = User.objects.filter(is_superuser=True).first()
+            
+            updating_data = list(self.request.data.keys())
+            if len(updating_data) == 1 and updating_data[0] == 'question_history':
+                Notification = apps.get_model('notification', 'Notification')
+                admin = User.objects.filter(is_superuser=True).first()
 
-            # NOTE: 질문 선택이 없어져서 업데이트 필요할 듯
-            noti = Notification.objects.create(user=obj,
-                                               target=admin,
-                                               origin=admin,
-                                               message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
-                                               message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
-                                               redirect_url='/questions')
-            NotificationActor.objects.create(user=admin, notification=noti)
+                noti = Notification.objects.create(user=obj,
+                                                   target=admin,
+                                                   origin=admin,
+                                                   message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
+                                                   message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
+                                                   redirect_url='/questions')
+                NotificationActor.objects.create(user=admin, notification=noti)
 
 
 class CurrentUserDelete(generics.DestroyAPIView):
