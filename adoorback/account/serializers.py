@@ -115,7 +115,6 @@ class UserProfileSerializer(UserMinimalSerializer):
     is_favorite = serializers.SerializerMethodField(read_only=True)
     mutuals = serializers.SerializerMethodField(read_only=True)
     are_friends = serializers.SerializerMethodField(read_only=True)
-    pronouns = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -153,10 +152,6 @@ class UserProfileSerializer(UserMinimalSerializer):
         if user == obj:
             return None
         return User.are_friends(user, obj)
-    
-    def get_pronouns(self, obj):
-        return obj.pronouns
-
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
