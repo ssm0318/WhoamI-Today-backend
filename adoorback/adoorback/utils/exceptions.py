@@ -39,11 +39,6 @@ class InvalidUsername(APIException):
     default_detail = _("유효하지 않은 닉네임입니다. 닉네임은 영어, 한글, 숫자, 특수문자(_)만 포함할 수 있습니다.")
     default_code = 'username_invalid'
 
-class ExistingUsername(APIException):
-    status_code = status.HTTP_406_NOT_ACCEPTABLE
-    default_detail = _("이미 존재하는 닉네임입니다.")
-    default_code = 'username_exists'
-
 class ExistingEmail(APIException):
     status_code = status.HTTP_406_NOT_ACCEPTABLE
     default_detail = _("이미 가입된 이메일입니다.")
