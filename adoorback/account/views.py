@@ -794,6 +794,7 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
 
 class UserRecommendedFriendsList(generics.ListAPIView):
     serializer_class = UserMinimumSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user_id = self.request.user.id

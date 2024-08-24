@@ -3,12 +3,12 @@ import pandas as pd
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
 from django.http import HttpResponseBadRequest
 from django.utils import translation
 from django.db.models import Max
 from django.core.exceptions import ValidationError
-
 from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
@@ -88,15 +88,30 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class ResponseComments(generics.ListAPIView):
     serializer_class = cs.CommentFriendSerializer
-    permission_classes = [IsAuthenticated, IsNotBlocked]
+    permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
+        from comment.models import Comment
+        from content_report.models import ContentReport
+
         current_user = self.request.user
-        return Response.objects.get(id=self.kwargs.get('pk')).response_comments.exclude(
-            author_id__in=current_user.user_report_blocked_ids).order_by('-created_at')
+        
+        response_ = Response.objects.get(id=self.kwargs.get('pk'))
+        if not response_.is_audience(current_user):
+            raise PermissionDenied("You do not have permission to view these comments.")
+        
+        blocked_content_ids = ContentReport.objects.filter(
+            user=current_user,
+            content_type=ContentType.objects.get_for_model(Comment)
+        ).values_list('object_id', flat=True)
+
+        return response_.response_comments.exclude(
+            id__in=blocked_content_ids,
+            author_id__in=current_user.user_report_blocked_ids
+        ).order_by('-created_at')
 
     def list(self, request, *args, **kwargs):
         comments = self.get_queryset()
@@ -239,9 +254,9 @@ class ResponseRequestCreate(generics.CreateAPIView):
         if not Question.objects.filter(id=question_id).exists():
             raise NoSuchQuestion()
         if requester != current_user:
-            raise PermissionDenied("requester가 본인이 아닙니다...")
+            raise PermissionDenied("requester가 본인이 아닙니다.")
         if not User.are_friends(requestee, current_user):
-            raise PermissionDenied("친구에게만 response request를 보낼 수 있습니다...")
+            raise PermissionDenied("친구에게만 response request를 보낼 수 있습니다.")
         try:
             serializer.save()
         except IntegrityError as e:

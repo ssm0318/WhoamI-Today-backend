@@ -116,6 +116,7 @@ class ChatMessageSearch(generics.ListAPIView):
 class ChatMessagesListView(generics.ListAPIView):
     serializer_class = cs.ChatRoomMessageSerializer
     pagination_class = ReversePagination
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         try:
