@@ -1,6 +1,7 @@
 from datetime import time
-import secrets
+import glob
 import os
+import secrets
 import urllib.parse
 
 from django.apps import apps
@@ -422,3 +423,24 @@ def user_created(created, instance, **kwargs):
             user=instance
         )
         instance.friend_groups.add(default_group)
+
+
+@transaction.atomic
+@receiver(post_save, sender=User)
+def delete_old_profile_image(sender, instance, **kwargs):
+    if instance.pk:
+        if instance.profile_image:
+            profile_images_dir = os.path.join(settings.MEDIA_ROOT, 'profile_images')
+            current_image_name = os.path.basename(instance.profile_image.name)
+            current_hash = current_image_name.split('_')[-1].split('.')[0]
+
+            # username_{hash}.png 형태의 모든 파일을 찾습니다.
+            pattern = os.path.join(profile_images_dir, f'{instance.username}_*.png')
+            existing_images = glob.glob(pattern)
+            print(len(existing_images))
+
+            for image_path in existing_images:
+                image_name = os.path.basename(image_path)
+                image_hash = image_name.split('_')[-1].split('.')[0]
+                if image_hash != current_hash:
+                    os.remove(image_path)  # 해시 값이 다른 파일을 삭제합니다.
