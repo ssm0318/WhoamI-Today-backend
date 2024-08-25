@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'reaction.apps.ReactionConfig',
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
+    'fcm_django',
     'custom_fcm.apps.CustomFcmConfig',
     'modeltranslation',
     'django.contrib.admin',
@@ -93,7 +94,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'import_export',
     'trackstats',
-    'fcm_django',
     'safedelete',
     'tracking',
 ]
