@@ -70,7 +70,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     username = models.CharField(
         _('username'),
         max_length=20,
-        # unique=True,
+        unique=True,
         help_text=_('Required. 20 characters or fewer. Letters (alphabet & 한글), digits and _ only.'),
         validators=[username_validator],
         error_messages={
@@ -115,7 +115,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     class Meta:
         indexes = [
             models.Index(fields=['id']),
-            models.Index(fields=['username'], condition=models.Q(deleted__isnull=True), name='unique_active_username'),
+            models.Index(fields=['username'], condition=models.Q(deleted__isnull=True), name='username_active_idx'),
         ]
         constraints = [
             models.UniqueConstraint(fields=['username'], condition=Q(deleted__isnull=True), name='unique_active_username')
