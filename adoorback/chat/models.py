@@ -6,7 +6,6 @@ from django.db.models.signals import m2m_changed, post_save, post_delete
 from django.dispatch import receiver
 
 from firebase_admin.messaging import Message
-from fcm_django.models import FCMDevice
 
 from adoorback.models import AdoorModel, AdoorTimestampedModel
 from safedelete.models import SafeDeleteModel
