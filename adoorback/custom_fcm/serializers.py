@@ -1,13 +1,7 @@
-from fcm_django.api.rest_framework import FCMDeviceSerializer
+from rest_framework import serializers
+from .models import CustomFCMDevice
 
-from adoorback.adoorback import serializers
-
-class CustomFCMDeviceSerializer(FCMDeviceSerializer):
-    language = serializers.CharField(max_length=10, required=False)
-
-    class Meta(FCMDeviceSerializer.Meta):
-        fields = FCMDeviceSerializer.Meta.fields + ['language']
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        return attrs
+class CustomFCMDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomFCMDevice
+        fields = '__all__'  

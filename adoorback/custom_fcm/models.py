@@ -3,6 +3,3 @@ from django.db import models
 
 class CustomFCMDevice(AbstractFCMDevice):
     language = models.CharField(max_length=10, blank=True, null=True)
-
-    class Meta:
-        app_label = 'custom_fcm'
