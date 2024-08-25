@@ -78,7 +78,7 @@ INSTALLED_APPS = [
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
     'fcm_django',
-    'custom_fcm.apps.CustomFcmConfig',
+    'custom_fcm.apps.CustomFCMDeviceConfig',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -243,7 +243,7 @@ FCM_DJANGO_SETTINGS = {
     # "Update of device with duplicate registration ID" for more details.
     # default: False
     "UPDATE_ON_DUPLICATE_REG_ID": True,
-    "FCM_DEVICE_MODEL": "custom_fcm.CustomFCMDevice",
+    "FCM_DEVICE_MODEL": "fcm.CustomFCMDevice",
 }
 LOCALE_PATHS = [
     os.path.join(BASE_DIR, 'locale'),

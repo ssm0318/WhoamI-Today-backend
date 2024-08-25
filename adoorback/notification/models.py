@@ -152,7 +152,7 @@ def send_firebase_notification(created, instance, **kwargs):
     if not created:
         return
     
-    devices = FCMDeCustomFCMDevicevice.objects.filter(user_id=instance.user.id, active=True)
+    devices = CustomFCMDevice.objects.filter(user_id=instance.user.id, active=True)
 
     for device in devices:
         if device.language == 'ko':
