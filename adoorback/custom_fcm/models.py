@@ -1,8 +1,8 @@
-from fcm_django.models import FCMDevice
+from fcm_django.models import AbstractFCMDevice
 from django.db import models
 
-class CustomFCMDevice(FCMDevice):
+class CustomFCMDevice(AbstractFCMDevice):
     language = models.CharField(max_length=10, blank=True, null=True)
 
     class Meta:
-        proxy = False
+        app_label = 'custom_fcm'
