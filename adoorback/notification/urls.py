@@ -8,4 +8,5 @@ urlpatterns = [
     path('response-requests/', views.ResponseRequestNotiList.as_view(), name='response-request-noti-list'),
     path(r'unread/', views.notification_id, name='notification-id'),
     path('read/', views.NotificationDetail.as_view(), name='notification-read'),
+    path('mark-all-read/', views.MarkAllNotificationsRead.as_view(), name='mark-all-notifications-read'),
 ]

@@ -86,3 +86,18 @@ class NotificationDetail(generics.UpdateAPIView):
         serializer = self.get_serializer(queryset, many=True)
 
         return Response(serializer.data)
+
+
+class MarkAllNotificationsRead(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, *args, **kwargs):
+        user = request.user
+        notifications = Notification.objects.unread_only(user=user)
+        notifications.update(is_read=True)
+        
+        return Response(status=200)
