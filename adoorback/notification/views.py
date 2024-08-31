@@ -59,7 +59,16 @@ class ResponseRequestNotiList(generics.ListAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        return Notification.objects.visible_only().filter(target_type=get_response_request_type(), user=self.request.user)
+        current_user = self.request.user
+        queryset = Notification.objects.visible_only().filter(target_type=get_response_request_type(), user=current_user)
+
+        # filter out answered response-requests
+        filtered_queryset = []
+        for noti in queryset:
+            response = noti.target.question.response_set.filter(author=current_user).filter(created_at__gt=noti.notification_updated_at)
+            if not response.exists():
+                filtered_queryset.append(noti)
+        return filtered_queryset
 
 
 def notification_id(request):

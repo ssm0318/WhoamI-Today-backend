@@ -59,7 +59,7 @@ def set_seed(n):
     for _ in range(n):
         user = random.choice(users)
         (Question.objects.create(
-            author=admin, is_admin_question=True, content=faker.word()))
+            author=admin, is_admin_question=True, content_en=faker.word(), content_ko=faker.word()))
     logging.info(f"{Question.objects.count()} Question(s) created!") \
         if DEBUG else None
 
