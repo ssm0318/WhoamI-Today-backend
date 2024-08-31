@@ -97,11 +97,17 @@ def set_seed(n):
         user = random.choice(users)
         availability = random.choice(availability_options)
         track_id = random.choice(spotify_ids)
+        original_check_in = CheckIn.objects.filter(user=user, is_active=True)
+        if original_check_in.exists():
+            for check_in in original_check_in:
+                check_in.is_active = False
+                check_in.save()
         checkin, created = CheckIn.objects.get_or_create(user=user,
                                                 availability=availability,
                                                 mood=faker.text(max_nb_chars=5),
                                                 description=faker.text(max_nb_chars=20),
-                                                track_id=track_id)
+                                                track_id=track_id,
+                                                is_active=True)
     logging.info(
         f"{CheckIn.objects.count()} Check-in(s) created!") if DEBUG else None
 

@@ -55,6 +55,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
         def serialize_reply(reply):
             if (reply.author != current_user
                 and reply.target.author != current_user
+                and reply.target.target.author != current_user
                 and reply.is_private):
                 return {'is_private': True}
             else:
