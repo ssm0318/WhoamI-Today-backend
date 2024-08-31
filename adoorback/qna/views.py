@@ -99,13 +99,27 @@ class ResponseComments(generics.ListAPIView):
             author_id__in=current_user.user_report_blocked_ids).order_by('-created_at')
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+        current_user = self.request.user
+        response = Response.objects.get(id=self.kwargs.get('pk'))
+        comments = response.response_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
+
+        all_comments_and_replies = comments
+        for comment in comments:
+            replies = comment.replies.exclude(author_id__in=current_user.user_report_blocked_ids)
+            all_comments_and_replies = all_comments_and_replies.union(replies)
+
+        queryset = self.get_queryset()
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            extra_field = {'count_including_replies': all_comments_and_replies.count()}
+            paginated_response = self.get_paginated_response(serializer.data)
+            paginated_response.data.update(extra_field)
+            return paginated_response
+
         serializer = self.get_serializer(queryset, many=True)
-        return DjangoResponse({'count': queryset.count(), 'results': serializer.data})
+        extra_field = {'count_including_replies': all_comments_and_replies.count()}
+        return Response({'results': serializer.data, **extra_field})
 
 
 class ResponseLikes(generics.ListAPIView):
