@@ -155,7 +155,7 @@ class UserProfileSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'notes', 'is_favorite', 'mutuals', 'are_friends', 'pronouns']
+        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'notes', 'is_favorite', 'mutuals', 'are_friends', 'pronouns', 'bio']
 
 
 class FriendListSerializer(UserMinimalSerializer):
