@@ -28,8 +28,8 @@ class NotificationManager(SafeDeleteManager):
         return self.filter(is_read=False, **kwargs)
 
     def admin_only(self, **kwargs):
-        admin = get_user_model().objects.filter(is_superuser=True).first()
-        return self.filter(actor=admin, **kwargs)
+        admin_users = get_user_model().objects.filter(is_superuser=True)
+        return self.filter(actors__in=admin_users, **kwargs)
 
     def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_en, content_ko,
                                       emoji=None):

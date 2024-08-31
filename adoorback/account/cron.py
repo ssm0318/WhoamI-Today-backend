@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import time, datetime, timedelta
 
 from django.utils import timezone
 from backports.zoneinfo import ZoneInfo
@@ -13,10 +13,7 @@ User = get_user_model()
 
 class SendDailyWhoAmINotiCronJob(CronJobBase):
     # run every hour at 0 minute
-    RUN_AT_TIMES = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00',
-                    '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-                    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
-                    '19:00', '20:00', '21:00', '22:00', '23:00']
+    RUN_AT_TIMES = [(datetime.min + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
 
     schedule = Schedule(run_at_times=RUN_AT_TIMES)
     code = 'account.send_daily_who_am_i_noti_cron_job'
