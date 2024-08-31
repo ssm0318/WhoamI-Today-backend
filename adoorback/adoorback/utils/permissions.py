@@ -28,7 +28,7 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
 
 class IsShared(permissions.BasePermission):
     """
-    Custom permission to only allow friends of author to view author profile.
+    Custom permission to only allow friends of author to view.
     """
 
     def has_object_permission(self, request, view, obj):

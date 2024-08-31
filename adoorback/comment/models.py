@@ -6,20 +6,20 @@ from django.contrib.auth import get_user_model
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from django.db import IntegrityError
-
-from like.models import Like
-from account.models import User
-from notification.models import Notification, NotificationActor
-from user_tag.models import UserTag
-from adoorback.models import AdoorModel
-
-from adoorback.utils.helpers import wrap_content
-from adoorback.utils.content_types import get_comment_type, get_generic_relation_type
-from utils.helpers import parse_user_tag_from_content
-
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
 from safedelete.managers import SafeDeleteManager
+
+from account.models import User
+from adoorback.models import AdoorModel
+from adoorback.utils.helpers import wrap_content
+from adoorback.utils.content_types import get_comment_type, get_generic_relation_type
+from content_report.models import ContentReport
+from like.models import Like
+from notification.models import Notification, NotificationActor
+from user_tag.models import UserTag
+from utils.helpers import parse_user_tag_from_content
+
 
 User = get_user_model()
 
@@ -67,6 +67,9 @@ class Comment(AdoorModel, SafeDeleteModel):
     @property
     def participants(self):
         return self.replies.values_list('author_id', flat=True).distinct()
+
+    def is_reply(self):
+        return isinstance(self.target, Comment)
 
 
 @receiver(post_save, sender=Comment)

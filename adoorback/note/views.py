@@ -1,17 +1,19 @@
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.http import Http404
 from django.db.models import Q
 from rest_framework import generics, status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
+import comment.serializers as cs
 from like.serializers import LikeSerializer
 from note.models import Note, NoteImage
 from note.serializers import NoteSerializer
-import comment.serializers as cs
 import qna.serializers as qs
 
 
@@ -34,15 +36,30 @@ class NoteCreate(generics.CreateAPIView):
 
 class NoteComments(generics.ListAPIView):
     serializer_class = cs.CommentFriendSerializer
-    permission_classes = [IsAuthenticated, IsNotBlocked]
+    permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
+        from comment.models import Comment
+        from content_report.models import ContentReport
+
         current_user = self.request.user
-        return Note.objects.get(id=self.kwargs.get('pk')).note_comments.exclude(
-            author_id__in=current_user.user_report_blocked_ids).order_by('-created_at')
+
+        note = Note.objects.get(id=self.kwargs.get('pk'))
+        if not note.is_audience(current_user):
+            return PermissionDenied("You do not have permission to view these comments.")
+        
+        blocked_content_ids = ContentReport.objects.filter(
+            user=current_user,
+            content_type=ContentType.objects.get_for_model(Comment)
+        ).values_list('object_id', flat=True)
+
+        return note.note_comments.exclude(
+            id__in=blocked_content_ids,
+            author_id__in=current_user.user_report_blocked_ids
+        ).order_by('-created_at')
 
     def list(self, request, *args, **kwargs):
         current_user = self.request.user

@@ -16,7 +16,7 @@ from adoorback.utils.content_types import get_friend_request_type, get_response_
 
 class NotificationList(generics.ListAPIView):
     serializer_class = NotificationSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -34,7 +34,7 @@ class NotificationList(generics.ListAPIView):
 
 class FriendRequestNotiList(generics.ListAPIView):
     serializer_class = NotificationSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -49,7 +49,7 @@ class FriendRequestNotiList(generics.ListAPIView):
 
 class ResponseRequestNotiList(generics.ListAPIView):
     serializer_class = NotificationSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
