@@ -50,7 +50,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
 
     def get_replies(self, obj):
         current_user = self.context.get('request', None).user
-        replies = obj.replies.exclude(author_id__in=current_user.user_report_blocked_ids).order_by('id')
+        replies = obj.replies.exclude(author_id__in=current_user.user_report_blocked_ids).order_by('-created_at')
 
         def serialize_reply(reply):
             if (reply.author != current_user

@@ -35,7 +35,6 @@ class NoteCreate(generics.CreateAPIView):
 class NoteComments(generics.ListAPIView):
     serializer_class = cs.CommentFriendSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
-    # ordering = ['-created_at']
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -47,16 +46,14 @@ class NoteComments(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         current_user = self.request.user
-        note = Note.objects.get(id=self.kwargs.get('pk'))
-        comments = note.note_comments.exclude(author_id__in=current_user.user_report_blocked_ids)
+        comments = self.get_queryset()
 
         all_comments_and_replies = comments
         for comment in comments:
             replies = comment.replies.exclude(author_id__in=current_user.user_report_blocked_ids)
             all_comments_and_replies = all_comments_and_replies.union(replies)
 
-        queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset(comments)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             extra_field = {'count_including_replies': all_comments_and_replies.count()}
@@ -64,7 +61,7 @@ class NoteComments(generics.ListAPIView):
             paginated_response.data.update(extra_field)
             return paginated_response
 
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(comments, many=True)
         extra_field = {'count_including_replies': all_comments_and_replies.count()}
         return Response({'results': serializer.data, **extra_field})
 
