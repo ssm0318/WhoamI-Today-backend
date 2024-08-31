@@ -120,28 +120,29 @@ def create_noti(instance, created, **kwargs):
             NotificationActor.objects.create(user=actor, notification=noti)
 
         # send notifications to participants of the origin comment
-        for participant_id in origin.participants:
-            if participant_id == origin_author.id:
-                continue
-            if participant_id == post_author.id:
-                continue
-            if participant_id == actor.id:
-                continue
-            participant = User.objects.get(id=participant_id)
-            if actor.id in participant.user_report_blocked_ids:
-                continue
-            content_type = ContentType.objects.get_for_model(origin).model
-            if (content_type, origin.id) in participant.content_report_blocked_model_ids:
-                return
-            noti = Notification.objects.create(user=participant,
-                                               origin_id=origin.id,
-                                               origin_type=get_generic_relation_type(origin.type),
-                                               target_id=target.id,
-                                               target_type=get_comment_type(),
-                                               message_ko=f'회원님이 답글을 남긴 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
-                                               message_en=f'There\'s a new reply in the comment thread where you left a reply: "{content_preview}"',
-                                               redirect_url=redirect_url)
-            NotificationActor.objects.create(user=actor, notification=noti)
+        if not instance.is_private:
+            for participant_id in origin.participants:
+                if participant_id == origin_author.id:
+                    continue
+                if participant_id == post_author.id:
+                    continue
+                if participant_id == actor.id:
+                    continue
+                participant = User.objects.get(id=participant_id)
+                if actor.id in participant.user_report_blocked_ids:
+                    continue
+                content_type = ContentType.objects.get_for_model(origin).model
+                if (content_type, origin.id) in participant.content_report_blocked_model_ids:
+                    return
+                noti = Notification.objects.create(user=participant,
+                                                origin_id=origin.id,
+                                                origin_type=get_generic_relation_type(origin.type),
+                                                target_id=target.id,
+                                                target_type=get_comment_type(),
+                                                message_ko=f'회원님이 답글을 남긴 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
+                                                message_en=f'There\'s a new reply in the comment thread where you left a reply: "{content_preview}"',
+                                                redirect_url=redirect_url)
+                NotificationActor.objects.create(user=actor, notification=noti)
 
     # if not reply
     else:
@@ -165,26 +166,27 @@ def create_noti(instance, created, **kwargs):
             NotificationActor.objects.create(user=actor, notification=noti)
 
         # send notifications to participants of the origin qna
-        for participant_id in origin.participants:
-            if participant_id == origin_author.id:
-                continue
-            if participant_id == actor.id:
-                continue
-            participant = User.objects.get(id=participant_id)
-            if actor.id in participant.user_report_blocked_ids:
-                continue
-            content_type = ContentType.objects.get_for_model(origin).model
-            if (content_type, origin.id) in participant.content_report_blocked_model_ids:
-                return
-            noti = Notification.objects.create(user=participant,
-                                               origin_id=origin.id,
-                                               origin_type=get_generic_relation_type(origin.type),
-                                               target_id=target.id,
-                                               target_type=get_comment_type(),
-                                               message_ko=f'회원님이 댓글을 남긴 {origin_target_name_ko}에 새로운 댓글이 달렸습니다: "{content_preview}"',
-                                               message_en=f'There\'s a new comment on the {origin_target_name_en} you commented on: "{content_preview}"',
-                                               redirect_url=redirect_url)
-            NotificationActor.objects.create(user=actor, notification=noti)
+        if not instance.is_private:
+            for participant_id in origin.participants:
+                if participant_id == origin_author.id:
+                    continue
+                if participant_id == actor.id:
+                    continue
+                participant = User.objects.get(id=participant_id)
+                if actor.id in participant.user_report_blocked_ids:
+                    continue
+                content_type = ContentType.objects.get_for_model(origin).model
+                if (content_type, origin.id) in participant.content_report_blocked_model_ids:
+                    return
+                noti = Notification.objects.create(user=participant,
+                                                origin_id=origin.id,
+                                                origin_type=get_generic_relation_type(origin.type),
+                                                target_id=target.id,
+                                                target_type=get_comment_type(),
+                                                message_ko=f'회원님이 댓글을 남긴 {origin_target_name_ko}에 새로운 댓글이 달렸습니다: "{content_preview}"',
+                                                message_en=f'There\'s a new comment on the {origin_target_name_en} you commented on: "{content_preview}"',
+                                                redirect_url=redirect_url)
+                NotificationActor.objects.create(user=actor, notification=noti)
 
 
 @transaction.atomic
