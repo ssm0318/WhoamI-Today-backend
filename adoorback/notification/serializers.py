@@ -78,4 +78,5 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = ['id', 'is_response_request', 'is_friend_request', 'recent_actors', 'notification_type', 
-                  'is_recent', 'message', 'question_content', 'is_read', 'created_at', 'redirect_url']
+                  'is_recent', 'message', 'question_content', 'is_read', 'created_at', 'redirect_url',
+                  'notification_updated_at']
