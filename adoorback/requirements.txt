@@ -50,8 +50,8 @@ docopt>=0.6.2
 environ>=1.0
 et-xmlfile>=1.0.1
 Faker>=4.14.0
-fcm-django==1.0.12
-firebase-admin==5.4.0
+fcm-django==2.2.1
+firebase-admin==6.2
 Flask>=1.1.2
 Flask-BasicAuth>=0.2.0
 gevent>=20.9.0

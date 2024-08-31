@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'reaction.apps.ReactionConfig',
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
+    'custom_fcm',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -92,7 +93,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'import_export',
     'trackstats',
-    'fcm_django',
     'safedelete',
     'tracking',
 ]
@@ -242,7 +242,9 @@ FCM_DJANGO_SETTINGS = {
     # "Update of device with duplicate registration ID" for more details.
     # default: False
     "UPDATE_ON_DUPLICATE_REG_ID": True,
+    "FCM_DEVICE_MODEL": "custom_fcm.CustomFCMDevice", 
 }
+
 LOCALE_PATHS = [
     os.path.join(BASE_DIR, 'locale'),
 ]

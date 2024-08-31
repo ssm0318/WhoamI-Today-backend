@@ -70,7 +70,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     username = models.CharField(
         _('username'),
         max_length=20,
-        # unique=True,
         help_text=_('Required. 20 characters or fewer. Letters (alphabet & 한글), digits and _ only.'),
         validators=[username_validator],
         error_messages={
@@ -110,12 +109,19 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
+    # Django 기본 설정에서는 username이 고유해야 하지만 (USERNAME_FIELD)를 우리는 고유하지 않은 username을 허용하고 싶음.
+    # USERNAME_FIELD를 email로 설정하여 이메일을 인증에 사용하고, username은 고유하지 않아도 되도록 함.
+    USERNAME_FIELD = 'email'  
+    
+    # USERNAME_FIELD를 email로 바꾼대신, 반드시 username을 입력하도록 요구.
+    REQUIRED_FIELDS = ['username'] 
+
     objects = UserCustomManager()
 
     class Meta:
         indexes = [
             models.Index(fields=['id']),
-            models.Index(fields=['username'], condition=models.Q(deleted__isnull=True), name='unique_active_username'),
+            models.Index(fields=['username'], condition=models.Q(deleted__isnull=True), name='username_active_idx'),
         ]
         constraints = [
             models.UniqueConstraint(fields=['username'], condition=Q(deleted__isnull=True), name='unique_active_username')
