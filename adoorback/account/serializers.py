@@ -111,10 +111,11 @@ class UserUsernameSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(UserMinimalSerializer):
     check_in = serializers.SerializerMethodField(read_only=True)
-    notes = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
     mutuals = serializers.SerializerMethodField(read_only=True)
     are_friends = serializers.SerializerMethodField(read_only=True)
+    sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
+    received_friend_request_from = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -129,14 +130,6 @@ class UserProfileSerializer(UserMinimalSerializer):
         if check_in and CheckIn.is_audience(check_in, user):
             return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
         return {}
-
-    def get_notes(self, obj):
-        from note.serializers import NoteSerializer
-        user = self.context.get('request', None).user
-        note_ids = [note.id for note in obj.note_set.all() if Note.is_audience(note, user)]
-        note_queryset = Note.objects.filter(id__in=note_ids).order_by('-created_at')[:10]
-        notes = NoteSerializer(note_queryset, many=True, read_only=True, context=self.context).data
-        return notes
 
     def get_mutuals(self, obj):
         request = self.context.get('request')
@@ -153,9 +146,20 @@ class UserProfileSerializer(UserMinimalSerializer):
             return None
         return User.are_friends(user, obj)
 
+    def get_received_friend_request_from(self, obj):
+        user = self.context.get('request').user
+        return user.id in obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True)
+
+    def get_sent_friend_request_to(self, obj):
+        user = self.context.get('request').user
+        return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
+
+
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'notes', 'is_favorite', 'mutuals', 'are_friends', 'pronouns', 'bio']
+        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
+                                                      'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
+                                                      'pronouns', 'bio']
 
 
 class FriendListSerializer(UserMinimalSerializer):
