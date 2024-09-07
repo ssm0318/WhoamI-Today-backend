@@ -111,7 +111,6 @@ class UserUsernameSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(UserMinimalSerializer):
     check_in = serializers.SerializerMethodField(read_only=True)
-    notes = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
     mutuals = serializers.SerializerMethodField(read_only=True)
     are_friends = serializers.SerializerMethodField(read_only=True)
@@ -130,14 +129,6 @@ class UserProfileSerializer(UserMinimalSerializer):
             return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
         return {}
 
-    def get_notes(self, obj):
-        from note.serializers import NoteSerializer
-        user = self.context.get('request', None).user
-        note_ids = [note.id for note in obj.note_set.all() if Note.is_audience(note, user)]
-        note_queryset = Note.objects.filter(id__in=note_ids).order_by('-created_at')[:10]
-        notes = NoteSerializer(note_queryset, many=True, read_only=True, context=self.context).data
-        return notes
-
     def get_mutuals(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -155,7 +146,7 @@ class UserProfileSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'notes', 'is_favorite', 'mutuals', 'are_friends', 'pronouns', 'bio']
+        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 'are_friends', 'pronouns', 'bio']
 
 
 class FriendListSerializer(UserMinimalSerializer):
