@@ -421,6 +421,9 @@ class UserResponseList(generics.ListAPIView):
         return ResponseSerializer
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         user = self.request.user
         all_responses = _Response.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
         response_ids = [response.id for response in all_responses if response.is_audience(user)]
@@ -528,6 +531,9 @@ class CurrentUserResponseList(generics.ListAPIView):
         return ResponseSerializer
 
     def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
         user = self.request.user
         return _Response.objects.filter(author=user).order_by('-created_at')
 
