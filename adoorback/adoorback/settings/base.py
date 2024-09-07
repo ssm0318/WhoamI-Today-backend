@@ -18,6 +18,7 @@ from datetime import timedelta
 from firebase_admin import credentials
 from firebase_admin import initialize_app
 from django.utils.translation import gettext_lazy as _
+import ssl
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -163,11 +164,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'adoorback.wsgi.application'
 ASGI_APPLICATION = 'adoorback.asgi.application'
+
+REDIS_URL = os.getenv('REDIS_URL')
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [{
+                "address": REDIS_URL,
+                "ssl_cert_reqs": None,  # This disables SSL certificate validation
+            }],
         },
     },
 }
