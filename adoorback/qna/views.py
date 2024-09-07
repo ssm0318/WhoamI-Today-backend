@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
 from django.http import HttpResponseBadRequest
-from django.utils import translation
+from django.utils import translation, timezone
 from django.db.models import Max
 from django.core.exceptions import ValidationError
 from rest_framework import generics, exceptions, status
@@ -178,17 +178,29 @@ class QuestionList(generics.ListCreateAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        queryset = Question.objects.raw("""
+
+        # get 30 recent questions excluding future questions
+        today = timezone.now().date()
+        daily_questions = list(Question.objects.daily_questions())  # DailyQuestionList와 순서 일치를 위해
+        if daily_questions:
+            queryset = Question.objects.raw("""
                 SELECT * FROM qna_question
                 WHERE array_length(selected_dates, 1) IS NOT NULL
+                AND selected_dates[array_upper(selected_dates, 1)] <= %s
+                AND id NOT IN %s
                 ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
                 LIMIT 30;
-            """)
-        # exclude tomorrow's question if exists
-        if queryset and queryset[0].selected_dates[-1] > date.today():
-            queryset = queryset[1:]
+            """, [today, tuple(q.id for q in daily_questions)])
+        else:
+            queryset = Question.objects.raw("""
+                SELECT * FROM qna_question
+                WHERE array_length(selected_dates, 1) IS NOT NULL
+                AND selected_dates[array_upper(selected_dates, 1)] <= %s
+                ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
+                LIMIT 30;
+            """, [today])
 
-        return queryset
+        return daily_questions + list(queryset)
 
     @transaction.atomic
     def perform_create(self, serializer):
@@ -292,9 +304,7 @@ class DailyQuestionList(generics.ListAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        daily_questions = Question.objects.daily_questions()
-        daily_questions = daily_questions.annotate(max_selected_date=Max('selected_dates'))
-        return daily_questions.order_by('-max_selected_date')
+        return Question.objects.daily_questions()
 
 
 class DateQuestionList(generics.ListAPIView):

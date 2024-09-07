@@ -36,9 +36,7 @@ class QuestionManager(SafeDeleteManager):
 
     def daily_questions(self, **kwargs):
         today = timezone.now().date()
-        six_days_ago = today - datetime.timedelta(days=6)
-        date_list = [six_days_ago + datetime.timedelta(days=x) for x in range(0, (today - six_days_ago).days + 1)]
-        return self.filter(selected_dates__overlap=date_list, **kwargs)
+        return self.filter(selected_dates__contains=[today], **kwargs)
 
     def date_questions(self, date, **kwargs):
         return self.filter(selected_dates__contains=[date], **kwargs)

@@ -22,9 +22,10 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         print('=========================')
         print("Creating daily notifications for WhoAmI...............")
 
-        admin = User.objects.filter(is_superuser=True).first()
+        admin = User.objects.filter(is_superuser=True).get(email='team.whoami.today@gmail.com')
         try:
-            daily_question = Question.objects.daily_questions()[0].content
+            daily_question_en = Question.objects.daily_questions()[0].content_en
+            daily_question_ko = Question.objects.daily_questions()[0].content_ko
         except:
             print('=========================')
             print('daily question does not exist!')
@@ -42,8 +43,8 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                 noti = Notification.objects.create(user=user,
                                                    target=admin,
                                                    origin=admin,
-                                                   message_ko=f"{user.username}님, 오늘의 후엠아이를 남겨보세요! - {daily_question}",
-                                                   message_en=f"{user.username}, time to leave your whoami for today! - {daily_question}",
+                                                   message_ko=f"{user.username}님, 오늘의 후엠아이를 남겨보세요! - {daily_question_ko}",
+                                                   message_en=f"{user.username}, time to leave your whoami for today! - {daily_question_en}",
                                                    redirect_url='/')
                 NotificationActor.objects.create(user=admin, notification=noti)
 

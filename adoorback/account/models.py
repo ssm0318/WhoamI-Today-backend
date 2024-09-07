@@ -128,6 +128,9 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         ]
         ordering = ['id']
 
+    def __str__(self):
+        return self.username
+
     def save(self, *args, **kwargs):
         # Ensure that only friends can be added to favorites or hidden
         if self.id is not None:  # Existing user
