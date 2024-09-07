@@ -4,7 +4,7 @@ from .base import *
 
 DEBUG = False
 
-BASE_URL = 'https://diivers.world'
+BASE_URL = 'https://whoami.gina-park.site'
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
@@ -40,14 +40,16 @@ DATABASES = {
 #    "develop.d3t1tnno5uz3sa.amplifyapp.com",
 #    "localhost"
 # ]
-CSRF_TRUSTED_ORIGINS = ['https://diivers.world']
+CSRF_TRUSTED_ORIGINS = ['https://whoami.gina-park.site']
 
 
-ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', '3.39.220.146', 'ip-172-31-19-133']
+ALLOWED_HOSTS = ['ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com', 'localhost', '43.203.123.225', 'ip-172-31-12-68']
 
-# CORS_ALLOWED_ORIGINS = [
+CORS_ALLOWED_ORIGINS = [
 #    "https://develop.d3t1tnno5uz3sa.amplifyapp.com",
 #    "http://localhost:3000",
-# ]
+    "https://ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com",  # Public DNS 이름
+    "https://43.203.123.225",  # Public IP 주소
+]
 
-FRONTEND_URL = 'https://diivers.world'
+FRONTEND_URL = 'https://whoami.gina-park.site'
