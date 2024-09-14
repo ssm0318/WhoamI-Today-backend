@@ -26,6 +26,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         try:
             daily_question_en = Question.objects.daily_questions()[0].content_en
             daily_question_ko = Question.objects.daily_questions()[0].content_ko
+            daily_question_id = Question.objects.daily_questions()[0].id
         except:
             print('=========================')
             print('daily question does not exist!')
@@ -45,7 +46,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                                                    origin=admin,
                                                    message_ko=f"{user.username}님, 오늘의 후엠아이를 남겨보세요! - {daily_question_ko}",
                                                    message_en=f"{user.username}, time to leave your whoami for today! - {daily_question_en}",
-                                                   redirect_url='/')
+                                                   redirect_url=f"/questions/{daily_question_id}/new")
                 NotificationActor.objects.create(user=admin, notification=noti)
 
         num_notis_after = Notification.objects.admin_only().count()
