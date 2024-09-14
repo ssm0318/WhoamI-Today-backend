@@ -94,7 +94,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     timezone = models.CharField(default=settings.TIME_ZONE, max_length=50)
     noti_time = models.TimeField(default=time(16, 0))
     pronouns = models.CharField(null=True, max_length=30)
-    bio = models.CharField(null=True, max_length=120)
+    bio = models.CharField(null=True, max_length=118)
 
     friends = models.ManyToManyField('self', symmetrical=True, blank=True)
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
