@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
+from like.serializers import LikeSerializer
 from comment.models import Comment
 from comment.serializers import CommentFriendSerializer
 
@@ -45,3 +46,13 @@ class CommentDetail(generics.DestroyAPIView):
 
     def get_exception_handler(self):
         return adoor_exception_handler
+
+
+class CommentLikes(generics.ListAPIView):
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        from like.models import Like
+        comment_id = self.kwargs['pk']
+        return Like.objects.filter(content_type__model='comment', object_id=comment_id)
