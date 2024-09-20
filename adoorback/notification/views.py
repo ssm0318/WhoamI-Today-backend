@@ -71,14 +71,6 @@ class ResponseRequestNotiList(generics.ListAPIView):
         return filtered_queryset
 
 
-def notification_id(request):
-    notifications = Notification.objects.unread_only().filter(user__username=request.GET.get('username'))
-    if notifications.count() == 0:
-        return JsonResponse({"id": 0, "num_unread": 0})
-    return JsonResponse({"id": notifications.first().id,
-                         "num_unread": notifications.count()})
-
-
 class NotificationDetail(generics.UpdateAPIView):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer

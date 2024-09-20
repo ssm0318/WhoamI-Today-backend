@@ -104,26 +104,3 @@ class CheckInRead(generics.UpdateAPIView):
         instance.readers.add(current_user)
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class TrackRecentSearches(generics.ListAPIView):
-    """
-    Get recent 15 searched tracks.
-    """
-    serializer_class = cs.TrackSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-    
-    def get(self, request, *args, **kwargs):
-        current_user = self.request.user
-        recent_check_ins = CheckIn.objects.filter(user=current_user).order_by('-created_at')
-        recent_track_ids = []
-        for check_in in recent_check_ins:
-            if len(recent_track_ids) >= 15:
-                break
-            if check_in.track_id and check_in.track_id not in recent_track_ids:
-                recent_track_ids.append(check_in.track_id)
-        serializer = self.get_serializer({'track_ids': recent_track_ids})
-        return Response(serializer.data)
