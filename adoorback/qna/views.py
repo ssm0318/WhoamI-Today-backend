@@ -37,29 +37,6 @@ class ResponseCreate(generics.CreateAPIView):
         serializer.save(author=self.request.user)
 
 
-class QuestionResponseList(generics.RetrieveAPIView):
-    serializer_class = qs.QuestionResponseSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_serializer_context(self):
-        return {
-            'request': self.request,
-            'format': self.format_kwarg,
-            'view': self,
-            'kwargs': self.kwargs,
-        }
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        queryset = Question.objects.all()
-        return queryset
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
@@ -207,7 +184,7 @@ class QuestionList(generics.ListCreateAPIView):
         serializer.save(author=self.request.user)
 
 
-class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
+class QuestionDetail(generics.RetrieveAPIView):
     serializer_class = qs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
@@ -220,28 +197,6 @@ class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
             translation.activate(lang)
         queryset = Question.objects.all()
         return queryset
-
-
-class ResponseRequestList(generics.ListAPIView):
-    serializer_class = qs.ResponseRequestSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = None
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    @transaction.atomic
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        try:
-            question = Question.objects.get(id=self.kwargs['qid'])
-        except Question.DoesNotExist:
-            return HttpResponseBadRequest
-        sent_response_request_set = self.request.user.sent_response_request_set.all()
-        response_requests = sent_response_request_set.filter(question=question).order_by('-id')
-        return response_requests
 
 
 class ResponseRequestCreate(generics.CreateAPIView):
@@ -278,20 +233,6 @@ class ResponseRequestCreate(generics.CreateAPIView):
                 raise e
 
 
-class ResponseRequestDestroy(generics.DestroyAPIView):
-    serializer_class = qs.ResponseRequestSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_object(self):
-        # since the requester is the authenticated user, no further permission checking unnecessary
-        return ResponseRequest.objects.get(requester_id=self.request.user.id,
-                                           requestee_id=self.kwargs.get('rid'),
-                                           question_id=self.kwargs.get('qid'))
-
-
 class DailyQuestionList(generics.ListAPIView):
     serializer_class = qs.DailyQuestionSerializer
     permission_classes = [IsAuthenticated]
@@ -305,50 +246,3 @@ class DailyQuestionList(generics.ListAPIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
         return Question.objects.daily_questions()
-
-
-class DateQuestionList(generics.ListAPIView):
-    serializer_class = qs.DailyQuestionSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = None
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        year = self.kwargs.get('year')
-        month = self.kwargs.get('month')
-        day = self.kwargs.get('day')
-        return Question.objects.date_questions(date=date(year=year, month=month, day=day))
-
-
-class RecommendedQuestionList(generics.ListAPIView):
-    serializer_class = qs.QuestionBaseSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    @transaction.atomic
-    def get_queryset(self):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        try:
-            dir_name = os.path.dirname(os.path.abspath(__file__))
-            path = os.path.join(dir_name, 'algorithms', 'recommendations.csv')
-            df = pd.read_csv(path)
-        except FileNotFoundError:
-            return Question.objects.daily_questions().order_by('?')[:5]
-
-        df = df[df.userId == self.request.user.id]
-        rank_ids = df['questionId'].tolist()
-        daily_question_ids = set(list(Question.objects.daily_questions().values_list('id', flat=True)))
-        recommended_ids = [x for x in rank_ids if x in daily_question_ids][:5]
-        recommended_ids = recommended_ids if len(recommended_ids) == 5 else \
-            Question.objects.daily_questions().values_list('id', flat=True)[:5]
-
-        return Question.objects.filter(pk__in=recommended_ids).order_by('?')

@@ -218,16 +218,6 @@ class UserSignup(generics.CreateAPIView):
         return response
 
 
-class SignupQuestions(generics.ListAPIView):
-    queryset = Question.objects.order_by('?')[:10]
-    serializer_class = QuestionBaseSerializer
-    model = serializer_class.Meta.model
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-
 class SendResetPasswordEmail(generics.CreateAPIView):
     serializer_class = CurrentUserSerializer
 
@@ -246,31 +236,6 @@ class SendResetPasswordEmail(generics.CreateAPIView):
             email_manager.send_reset_password_email(user)
 
         return HttpResponse(status=200)  # whether email is valid or not, response will be always success-response
-
-
-class ResetPasswordWithToken(generics.UpdateAPIView):
-    serializer_class = CurrentUserSerializer
-    queryset = User.objects.all()
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def update(self, request, *args, **kwargs):
-        token = self.kwargs.get('token')
-        user = self.get_object()
-        if email_manager.check_reset_password_token(user, token):
-            self.update_password(user, self.request.data['password'])
-            return HttpResponse(status=200)
-        return HttpResponse(status=400)
-
-    @transaction.atomic
-    def update_password(self, user, raw_password):
-        try:
-            validate_password(password=raw_password, user=user)
-        except exceptions.ValidationError as e:
-            raise e
-        user.set_password(raw_password)
-        user.save()
 
 
 class ResetPassword(generics.UpdateAPIView):
