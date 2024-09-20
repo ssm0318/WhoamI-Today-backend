@@ -27,9 +27,7 @@ class NotificationList(generics.ListAPIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
 
-        thirty_days_ago = timezone.now() - timezone.timedelta(days=30)
-
-        return Notification.objects.visible_only().filter(user=self.request.user, updated_at__gte=thirty_days_ago)
+        return Notification.objects.visible_only().filter(user=self.request.user)
 
 
 class FriendRequestNotiList(generics.ListAPIView):
