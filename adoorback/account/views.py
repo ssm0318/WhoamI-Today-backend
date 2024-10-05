@@ -24,6 +24,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
+from .models import Subscription
 from account.models import FriendRequest, FriendGroup, BlockRec
 from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -33,6 +34,7 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserFriendGroupOrderSerializer, FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
+from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername
 from adoorback.utils.validators import adoor_exception_handler
@@ -967,3 +969,61 @@ class UserMarkAllResponsesAsRead(APIView):
             response.readers.add(request.user)
 
         return Response({'success': 'All content marked as read successfully'}, status=status.HTTP_200_OK)
+
+
+class SubscribeUserContent(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        friend_id = kwargs.get('user_id')
+        user = request.user
+        user_to_subscribe = get_object_or_404(User, id=friend_id)
+        content_type_str = request.data.get('content_type')  # 'note' or 'response'
+
+        content_type = get_generic_relation_type(content_type_str)
+        if not content_type:
+            return Response({'error': 'Invalid content type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if Subscription.objects.filter(subscriber=request.user, subscribed_to=user_to_subscribe, content_type=content_type).exists():
+            return Response({'error': f'You are already subscribed to this user\'s {content_type_str}.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.friends.filter(id=friend_id).exists():
+            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        Subscription.objects.create(
+            subscriber=user,
+            subscribed_to=user_to_subscribe,
+            content_type=content_type
+        )
+
+        return Response({'message': f'Subscribed to {user_to_subscribe.username}\'s {content_type_str} successfully.'}, status=status.HTTP_201_CREATED)
+
+
+class UnsubscribeUserContent(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def delete(self, request, *args, **kwargs):
+        user_to_unsubscribe = get_object_or_404(User, id=kwargs.get('user_id'))
+        content_type_str = request.data.get('content_type')  # 'note' or 'response'
+
+        content_type = get_generic_relation_type(content_type_str)
+        if not content_type:
+            return Response({'error': 'Invalid content type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find the subscription
+        subscription = get_object_or_404(
+            Subscription, 
+            subscriber=request.user, 
+            subscribed_to=user_to_unsubscribe, 
+            content_type=content_type
+        )
+
+        subscription.delete()
+
+        return Response({'message': f'Unsubscribed from {user_to_unsubscribe.username}\'s {content_type_str} successfully.'}, status=status.HTTP_204_NO_CONTENT)

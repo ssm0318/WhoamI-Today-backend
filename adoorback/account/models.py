@@ -7,7 +7,7 @@ import urllib.parse
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser, UserManager
-from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.db.models.signals import post_save, m2m_changed
@@ -305,6 +305,23 @@ class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
+
+
+class Subscription(AdoorTimestampedModel, SafeDeleteModel):
+    subscriber = models.ForeignKey(get_user_model(), related_name='subscriptions', on_delete=models.CASCADE)
+    subscribed_to = models.ForeignKey(get_user_model(), related_name='subscribed_by', on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['subscriber', 'subscribed_to', 'content_type'], condition=Q(deleted__isnull=True),
+                                    name='unique_subscription'),
+        ]
+
+    def __str__(self):
+        return f'{self.subscriber} subscribed to {self.content_type} of {self.subscribed_to}'
 
 
 @transaction.atomic

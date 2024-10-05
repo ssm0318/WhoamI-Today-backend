@@ -10,7 +10,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
 from django.utils import timezone
 
-from account.models import FriendGroup
+from account.models import Subscription
 from comment.models import Comment
 from content_report.models import ContentReport
 from like.models import Like
@@ -237,3 +237,30 @@ def add_author_to_readers(instance, created, **kwargs):
         return
     instance.readers.add(instance.author)
     instance.save()
+
+
+@receiver(post_save, sender=Response)
+def send_notifications_to_subscribers(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    author = instance.author
+    response_content_type = ContentType.objects.get_for_model(Response)
+    
+    subscribers = Subscription.objects.filter(
+        subscribed_to=author,
+        content_type=response_content_type,
+    ).values_list('subscriber', flat=True)
+
+    for subscriber_id in subscribers:
+        subscriber = get_user_model().objects.get(id=subscriber_id)
+        
+        noti = Notification.objects.create(
+            user=subscriber,
+            origin=instance,
+            target=instance,
+            message_ko=f'{author.username}님이 새 답변을 작성했습니다.',
+            message_en=f'{author.username} has posted a new response.',
+            redirect_url=f'/responses/{instance.id}'
+        )
+        NotificationActor.objects.create(user=author, notification=noti)
