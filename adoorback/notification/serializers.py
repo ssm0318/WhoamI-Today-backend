@@ -54,7 +54,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             else:
                 content = obj.target.question.content_en  # Default to English
         elif obj.target and obj.redirect_url[:11] == '/questions/' and obj.target.type != 'Like':
-            question = Question.objects.get(id=int(obj.redirect_url[11:]))
+            question = Question.objects.get(id=int(obj.redirect_url.split('/')[-2]))
             lang = self.context.get('request', None).META.get('HTTP_ACCEPT_LANGUAGE', 'en')
             if lang == 'en':
                 content = question.content_en
