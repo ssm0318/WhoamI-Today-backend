@@ -27,7 +27,8 @@ urlpatterns = [
     path('<str:username>/profile/', views.UserProfile.as_view(), name='user-detail'),
     path('<str:username>/notes/', views.UserNoteList.as_view(), name='user-note-list'),
     path('<str:username>/responses/', views.UserResponseList.as_view(), name='user-response-list'),
-    path('mark-all-as-read/', views.UserMarkAllAsRead.as_view(), name='user-mark-all-as-read'),
+    path('mark-all-notes-as-read/', views.UserMarkAllNotesAsRead.as_view(), name='user-mark-all-as-read'),
+    path('mark-all-responses-as-read/', views.UserMarkAllResponsesAsRead.as_view(), name='user-mark-all-as-read'),
 
     # Friend List related
     path('friends/', views.FriendList.as_view(), name='friend-list'),
