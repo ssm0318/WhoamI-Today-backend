@@ -122,7 +122,7 @@ class ResponseLikes(generics.ListAPIView):
         response = Response.objects.get(pk=response_id)
 
         if response.author != self.request.user:
-            raise PermissionDenied("You do not have permission to view likes on this comment.")
+            raise PermissionDenied("You do not have permission to view likes on this response.")
 
         return Like.objects.filter(content_type__model='response', object_id=response_id)
 

@@ -134,7 +134,7 @@ class NoteLikes(generics.ListAPIView):
         note = Note.objects.get(pk=note_id)
 
         if note.author != self.request.user:
-            raise PermissionDenied("You do not have permission to view likes on this comment.")
+            raise PermissionDenied("You do not have permission to view likes on this note.")
 
         return Like.objects.filter(content_type__model='note', object_id=note_id)
 
