@@ -114,11 +114,16 @@ class ResponseComments(generics.ListAPIView):
 
 class ResponseLikes(generics.ListAPIView):
     serializer_class = LikeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
     def get_queryset(self):
         from like.models import Like
         response_id = self.kwargs['pk']
+        response = Response.objects.get(pk=response_id)
+
+        if response.author != self.request.user:
+            raise PermissionDenied("You do not have permission to view likes on this response.")
+
         return Like.objects.filter(content_type__model='response', object_id=response_id)
 
 

@@ -126,11 +126,16 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class NoteLikes(generics.ListAPIView):
     serializer_class = LikeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
     def get_queryset(self):
         from like.models import Like
         note_id = self.kwargs['pk']
+        note = Note.objects.get(pk=note_id)
+
+        if note.author != self.request.user:
+            raise PermissionDenied("You do not have permission to view likes on this note.")
+
         return Like.objects.filter(content_type__model='note', object_id=note_id)
 
 
