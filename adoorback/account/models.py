@@ -7,7 +7,7 @@ import urllib.parse
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser, UserManager
-from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
 from django.db.models.signals import post_save, m2m_changed
