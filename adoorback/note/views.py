@@ -112,10 +112,7 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
         serializer.is_valid(raise_exception=True)
 
         new_images = request.FILES.getlist('images', [])
-        existing_images = instance.images.all()
-
-        for image in existing_images:
-            image.delete(force_policy=SOFT_DELETE_CASCADE)
+        instance.images.all().delete()  # hard delete images
 
         for image in new_images:
             n = NoteImage.objects.create(note=instance, image=image)
