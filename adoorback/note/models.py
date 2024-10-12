@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.storage import FileSystemStorage
 from django.db import models, transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from safedelete import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.models import SafeDeleteModel
@@ -126,3 +126,9 @@ def add_author_to_readers(instance, created, **kwargs):
         return
     instance.readers.add(instance.author)
     instance.save()
+
+
+@receiver(post_delete, sender=NoteImage)
+def delete_image_file(sender, instance, **kwargs):
+    # Ensure the file itself is deleted from storage
+    instance.image.delete(save=False)
