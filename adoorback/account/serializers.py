@@ -169,6 +169,7 @@ class FriendListSerializer(UserMinimalSerializer):
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
+    description = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -186,9 +187,10 @@ class FriendListSerializer(UserMinimalSerializer):
         return False
 
     def get_current_user_read(self, obj):
+        from check_in.serializers import CheckInBaseSerializer
         responses = self.responses(obj)
         notes = self.notes(obj)
-        check_in = self.check_in(obj)
+        check_in = CheckInBaseSerializer(self.check_in(obj), read_only=True, context=self.context).data
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
                             and not any(not note['current_user_read'] for note in notes) \
@@ -206,20 +208,25 @@ class FriendListSerializer(UserMinimalSerializer):
         return 0
 
     def check_in(self, obj):
-        from check_in.serializers import CheckInBaseSerializer
         user = self.context.get('request', None).user
         check_in = obj.check_in_set.filter(is_active=True).first()
         if check_in and CheckIn.is_audience(check_in, user):
-            return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
-        return {}
+            return check_in
+        return None
 
     def get_track_id(self, obj):
-        from check_in.serializers import CheckInBaseSerializer
-        user = self.context.get('request', None).user
-        check_in = obj.check_in_set.filter(is_active=True).first()
-        if check_in and CheckIn.is_audience(check_in, user):
+        check_in = self.check_in(obj)
+        if check_in:
             return check_in.track_id
-        return None
+        else:
+            return None
+
+    def get_description(self, obj):
+        check_in = self.check_in(obj)
+        if check_in:
+            return check_in.description
+        else:
+            return None
 
     def responses(self, obj):
         from qna.serializers import ResponseSerializer
@@ -240,7 +247,7 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read', 'unread_cnt',
-                                                      'bio', 'track_id']
+                                                      'bio', 'track_id', 'description']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):
