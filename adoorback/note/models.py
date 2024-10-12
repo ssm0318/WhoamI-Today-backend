@@ -8,7 +8,7 @@ from django.core.files.storage import FileSystemStorage
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from safedelete import SOFT_DELETE_CASCADE
+from safedelete import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.models import SafeDeleteModel
 
 from django.conf import settings
@@ -110,7 +110,7 @@ class NoteImage(SafeDeleteModel):
     image = models.ImageField(upload_to=note_image_path, storage=OverwriteStorage())
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
-    _safedelete_policy = SOFT_DELETE_CASCADE
+    _safedelete_policy = HARD_DELETE
 
     def __str__(self):
         return f'image id {self.id} of {self.note}'
