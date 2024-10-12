@@ -13,12 +13,12 @@ from safedelete.models import SafeDeleteModel
 
 from django.conf import settings
 
-from account.models import FriendGroup
+from account.models import Subscription
 from adoorback.models import AdoorModel
 from comment.models import Comment
 from content_report.models import ContentReport
 from like.models import Like
-from notification.models import Notification
+from notification.models import Notification, NotificationActor
 
 User = get_user_model()
 
@@ -132,3 +132,30 @@ def add_author_to_readers(instance, created, **kwargs):
 def delete_image_file(sender, instance, **kwargs):
     # Ensure the file itself is deleted from storage
     instance.image.delete(save=False)
+
+
+@receiver(post_save, sender=Note)
+def send_notifications_to_subscribers(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    author = instance.author
+    note_content_type = ContentType.objects.get_for_model(Note)
+    
+    subscribers = Subscription.objects.filter(
+        subscribed_to=author,
+        content_type=note_content_type,
+    ).values_list('subscriber', flat=True)
+
+    for subscriber_id in subscribers:
+        subscriber = get_user_model().objects.get(id=subscriber_id)
+        
+        noti = Notification.objects.create(
+            user=subscriber,
+            origin=instance,
+            target=instance,
+            message_ko=f'{author.username}님이 새 노트를 작성했습니다.',
+            message_en=f'{author.username} has posted a new note.',
+            redirect_url=f'/notes/{instance.id}'
+        )
+        NotificationActor.objects.create(user=author, notification=noti)

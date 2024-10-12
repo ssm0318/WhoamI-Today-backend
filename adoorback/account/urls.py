@@ -66,4 +66,8 @@ urlpatterns = [
          name='user-friend-group-order-update'),
     path('friend-groups/<int:pk>/', views.UserFriendGroupDetail.as_view(),
          name='user-friend-request-detail'),
+
+     # Subscribe related
+    path('friends/subscribe/', views.SubscribeUserContent.as_view(), name='subscribe-user-content'),
+    path('friends/<int:pk>/subscribe/', views.UnsubscribeUserContent.as_view(), name='unsubscribe-user-content'),
 ]
