@@ -978,7 +978,7 @@ class SubscribeUserContent(generics.CreateAPIView):
         return adoor_exception_handler
 
     def create(self, request, *args, **kwargs):
-        friend_id = kwargs.get('user_id')
+        friend_id = request.data.get('user_id')
         user = request.user
         user_to_subscribe = get_object_or_404(User, id=friend_id)
         content_type_str = request.data.get('content_type')  # 'note' or 'response'
@@ -1009,21 +1009,9 @@ class UnsubscribeUserContent(generics.DestroyAPIView):
         return adoor_exception_handler
 
     def delete(self, request, *args, **kwargs):
-        user_to_unsubscribe = get_object_or_404(User, id=kwargs.get('user_id'))
-        content_type_str = request.data.get('content_type')  # 'note' or 'response'
-
-        content_type = get_generic_relation_type(content_type_str)
-        if not content_type:
-            return Response({'error': 'Invalid content type.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Find the subscription
-        subscription = get_object_or_404(
-            Subscription, 
-            subscriber=request.user, 
-            subscribed_to=user_to_unsubscribe, 
-            content_type=content_type
-        )
+        subscription_id = kwargs.get('pk')
+        subscription = get_object_or_404(Subscription, id=subscription_id, subscriber=request.user)
 
         subscription.delete()
 
-        return Response({'message': f'Unsubscribed from {user_to_unsubscribe.username}\'s {content_type_str} successfully.'}, status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_204_NO_CONTENT)
