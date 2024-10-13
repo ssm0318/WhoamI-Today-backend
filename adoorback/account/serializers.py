@@ -190,11 +190,15 @@ class FriendListSerializer(UserMinimalSerializer):
         from check_in.serializers import CheckInBaseSerializer
         responses = self.responses(obj)
         notes = self.notes(obj)
-        check_in = CheckInBaseSerializer(self.check_in(obj), read_only=True, context=self.context).data
+        check_in = self.check_in(obj)
+        if check_in:
+            check_in_data = CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
+        else:
+            check_in_data = {}
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
                             and not any(not note['current_user_read'] for note in notes) \
-                            and not (check_in and not check_in['current_user_read'])
+                            and not (check_in_data and not check_in_data['current_user_read'])
         return current_user_read
     
     def get_unread_cnt(self, obj):
