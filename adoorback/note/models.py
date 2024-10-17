@@ -19,6 +19,7 @@ from comment.models import Comment
 from content_report.models import ContentReport
 from like.models import Like
 from notification.models import Notification, NotificationActor
+from reaction.models import Reaction
 
 User = get_user_model()
 
@@ -79,6 +80,12 @@ class Note(AdoorModel, SafeDeleteModel):
     @property
     def reader_ids(self):
         return self.readers.values_list('id', flat=True)
+
+    @property
+    def reactions(self):
+        from django.contrib.contenttypes.models import ContentType
+        note_content_type = ContentType.objects.get_for_model(self)
+        return Reaction.objects.filter(content_type=note_content_type, object_id=self.id)
 
     def is_audience(self, user):
         content_type = ContentType.objects.get_for_model(self)
