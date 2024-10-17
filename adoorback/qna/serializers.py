@@ -9,7 +9,7 @@ from account.serializers import UserMinimalSerializer
 from adoorback.serializers import AdoorBaseSerializer
 from adoorback.utils.content_types import get_generic_relation_type
 from qna.models import Response, Question, ResponseRequest
-from like.models import Like
+from reaction.models import Reaction
 
 User = get_user_model()
 
@@ -38,15 +38,9 @@ class ResponseSerializer(AdoorBaseSerializer):
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     question = QuestionMinimumSerializer(read_only=True)
     question_id = serializers.IntegerField(write_only=True)
-    current_user_like_id = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
-
-    def get_current_user_like_id(self, obj):
-        current_user_id = self.context['request'].user.id
-        content_type_id = get_generic_relation_type(obj.type).id
-        like = Like.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
-        return like[0].id if like else None
+    current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
@@ -58,10 +52,16 @@ class ResponseSerializer(AdoorBaseSerializer):
         recent_users = [like.user for like in recent_likes]
         return UserMinimalSerializer(recent_users, many=True, context=self.context).data
 
+    def get_current_user_reaction_id_list(self, obj):
+        current_user_id = self.context['request'].user.id
+        content_type_id = get_generic_relation_type(obj.type).id
+        reactions = Reaction.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
+        return [{"id": reaction.id, "emoji": reaction.emoji} for reaction in reactions]
+
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'question_id', 'created_at', 'current_user_read', 'like_user_sample', 'is_edited']
+                  'question', 'question_id', 'created_at', 'current_user_read', 'like_user_sample', 'current_user_reaction_id_list', 'is_edited']
         
 
 class QuestionResponseSerializer(QuestionBaseSerializer):
