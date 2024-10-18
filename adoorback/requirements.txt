@@ -27,7 +27,7 @@ daphne==4.0.0
 defusedxml>=0.6.0
 diff-match-patch>=20200713
 dill>=0.3.3
-Django>=4.2.10
+Django==4.2.14
 django-common-helpers>=0.9.2
 django-cors-headers>=3.5.0
 django-cron>=0.5.1
