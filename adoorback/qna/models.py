@@ -123,6 +123,12 @@ class Response(AdoorModel, SafeDeleteModel):
     def reader_ids(self):
         return self.readers.values_list('id', flat=True)
 
+    @property
+    def reactions(self):
+        from django.contrib.contenttypes.models import ContentType
+        response_content_type = ContentType.objects.get_for_model(self)
+        return Reaction.objects.filter(content_type=response_content_type, object_id=self.id)
+
     def is_audience(self, user):
         content_type = ContentType.objects.get_for_model(self)
         if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():

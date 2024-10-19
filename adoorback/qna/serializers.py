@@ -1,6 +1,8 @@
 from datetime import timedelta
+from itertools import chain
 
 from django.contrib.auth import get_user_model
+from django.db.models import F, Value, CharField, BooleanField
 from django.core.paginator import Paginator
 from django.utils import timezone
 from rest_framework import serializers
@@ -39,18 +41,44 @@ class ResponseSerializer(AdoorBaseSerializer):
     question = QuestionMinimumSerializer(read_only=True)
     question_id = serializers.IntegerField(write_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
-    like_user_sample = serializers.SerializerMethodField(read_only=True)
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
+    like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
+
     
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
         return current_user_id in obj.reader_ids
 
-    def get_like_user_sample(self, obj):
+    def get_like_reaction_user_sample(self, obj):
         from account.serializers import UserMinimalSerializer
-        recent_likes = obj.response_likes.order_by('-created_at')[:3]
-        recent_users = [like.user for like in recent_likes]
-        return UserMinimalSerializer(recent_users, many=True, context=self.context).data
+        
+        likes = obj.response_likes.annotate(
+            created=F('created_at'),
+            like=Value(True, output_field=BooleanField()),
+            reaction=Value(None, output_field=CharField())
+        ).values('user', 'created', 'like', 'reaction')
+
+        reactions = obj.reactions.annotate(
+            created=F('created_at'),
+            like=Value(False, output_field=BooleanField()),
+            reaction=F('emoji')
+        ).values('user', 'created', 'like', 'reaction')
+
+        combined = sorted(
+            chain(likes, reactions),
+            key=lambda x: x['created'],
+            reverse=True
+        )[:3]
+
+        serialized_data = []
+        for reaction in combined:
+            user = User.objects.get(id=reaction['user'])
+            user_data = UserMinimalSerializer(user, context=self.context).data
+            user_data['like'] = reaction['like']
+            user_data['reaction'] = reaction['reaction']
+            serialized_data.append(user_data)
+
+        return serialized_data
 
     def get_current_user_reaction_id_list(self, obj):
         current_user_id = self.context['request'].user.id
@@ -61,7 +89,7 @@ class ResponseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'question_id', 'created_at', 'current_user_read', 'like_user_sample', 'current_user_reaction_id_list', 'is_edited']
+                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited']
         
 
 class QuestionResponseSerializer(QuestionBaseSerializer):
