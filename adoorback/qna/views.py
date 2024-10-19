@@ -1,14 +1,10 @@
-import os
-import pandas as pd
-from datetime import date
+from itertools import chain
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
-from django.http import HttpResponseBadRequest
+from django.db.models import F, Value, CharField
 from django.utils import translation, timezone
-from django.db.models import Max
-from django.core.exceptions import ValidationError
 from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
@@ -19,7 +15,7 @@ from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlock
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
 import qna.serializers as qs
-from like.serializers import LikeSerializer
+from like.serializers import InteractionSerializer
 from qna.models import Response, Question, ResponseRequest
 
 User = get_user_model()
@@ -112,19 +108,35 @@ class ResponseComments(generics.ListAPIView):
         return Response({'results': serializer.data, **extra_field})
 
 
-class ResponseLikes(generics.ListAPIView):
-    serializer_class = LikeSerializer
+class ResponseInteractions(generics.ListAPIView):
+    serializer_class = InteractionSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
     def get_queryset(self):
         from like.models import Like
+        from reaction.models import Reaction
+
         response_id = self.kwargs['pk']
         response = Response.objects.get(pk=response_id)
 
         if response.author != self.request.user:
             raise PermissionDenied("You do not have permission to view likes on this response.")
 
-        return Like.objects.filter(content_type__model='response', object_id=response_id)
+        likes = Like.objects.filter(content_type__model='response', object_id=response_id).annotate(
+            reaction=Value(None, output_field=CharField())
+        )
+
+        reactions = Reaction.objects.filter(content_type__model='response', object_id=response_id).annotate(
+            reaction=F('emoji')
+        )
+
+        combined_interactions = sorted(
+            chain(likes, reactions),
+            key=lambda x: x.created_at,
+            reverse=True
+        )
+
+        return combined_interactions
 
 
 class ResponseRead(generics.UpdateAPIView):
