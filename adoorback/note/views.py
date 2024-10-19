@@ -1,7 +1,9 @@
+from itertools import chain
+
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import F, Value, CharField
 from django.http import Http404
-from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -11,7 +13,7 @@ from safedelete.models import SOFT_DELETE_CASCADE
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
-from like.serializers import LikeSerializer
+from like.serializers import InteractionSerializer
 from note.models import Note, NoteImage
 from note.serializers import NoteSerializer
 import qna.serializers as qs
@@ -121,19 +123,35 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
         return Response(serializer.data)
 
 
-class NoteLikes(generics.ListAPIView):
-    serializer_class = LikeSerializer
+class NoteInteractions(generics.ListAPIView):
+    serializer_class = InteractionSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
     def get_queryset(self):
         from like.models import Like
+        from reaction.models import Reaction
+
         note_id = self.kwargs['pk']
         note = Note.objects.get(pk=note_id)
 
         if note.author != self.request.user:
             raise PermissionDenied("You do not have permission to view likes on this note.")
 
-        return Like.objects.filter(content_type__model='note', object_id=note_id)
+        likes = Like.objects.filter(content_type__model='note', object_id=note_id).annotate(
+            reaction=Value(None, output_field=CharField())
+        )
+
+        reactions = Reaction.objects.filter(content_type__model='note', object_id=note_id).annotate(
+            reaction=F('emoji')
+        )
+
+        combined_interactions = sorted(
+            chain(likes, reactions),
+            key=lambda x: x.created_at,
+            reverse=True
+        )
+
+        return combined_interactions
 
 
 class NoteRead(generics.UpdateAPIView):
