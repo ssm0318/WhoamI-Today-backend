@@ -1,22 +1,22 @@
 ---
 name: Bug report
-about: 버그. 기존 기능에 문제가 있는 경우
+about: Bug. If there is an issue with an existing feature
 title: "[Bug] "
 labels: bug
 assignees: ""
 ---
 
-**내용**
+**Description**
 
-**버그 재현 절차**
+**Steps to Reproduce the Bug**
 
 1.
 2.
 3.
 
-**정상 결과**
+**Expected Result**
 
-**이미지**
+**Images**
 
-**테스트 환경**
-데스크탑 / 모바일 / 브라우저 등
+**Test Environment**
+Desktop / Mobile / Browser, etc.

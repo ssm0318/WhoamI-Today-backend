@@ -2,8 +2,8 @@
 
 ## Self Check List
 
-- [ ] !!! PR이 머지되는 base branch을 꼭 확인해주세요 !!!
-- [ ] base branch로부터 rebase를 했나요?
+- [ ] Have you double-checked the base branch into which this PR will be merged?
+- [ ] Have you rebased from the base branch?
 
 ## Types of changes
 
