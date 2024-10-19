@@ -1,6 +1,6 @@
 ---
 name: New Feature
-about: 기능 추가 및 수정
+about: Adding or modifying a feature
 title: "[New Feature] "
 labels: feature
 assignees: ""
