@@ -8,7 +8,6 @@ from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from safedelete.models import SOFT_DELETE_CASCADE
 
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
@@ -16,7 +15,6 @@ import comment.serializers as cs
 from like.serializers import InteractionSerializer
 from note.models import Note, NoteImage
 from note.serializers import NoteSerializer
-import qna.serializers as qs
 
 
 class NoteCreate(generics.CreateAPIView):
