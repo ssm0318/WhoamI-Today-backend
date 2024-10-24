@@ -64,7 +64,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
                 and reply.target.author != current_user
                 and reply.target.target.author != current_user
                 and reply.is_private):
-                return {'is_private': True}
+                return {'id': reply.id, 'is_private': True}
             else:
                 return self.__class__(reply, read_only=True, context=self.context).data
 
@@ -75,7 +75,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
         if (instance.author != current_user
             and instance.target.author != current_user
             and instance.is_private):
-            return {'is_private': True}
+            return {'id': instance.id, 'is_private': True}
         else:
             return super().to_representation(instance)
 

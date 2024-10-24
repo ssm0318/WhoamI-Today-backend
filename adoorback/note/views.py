@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import F, Value, CharField
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -47,7 +48,7 @@ class NoteComments(generics.ListAPIView):
 
         current_user = self.request.user
 
-        note = Note.objects.get(id=self.kwargs.get('pk'))
+        note = get_object_or_404(Note, id=self.kwargs.get('pk'))
         if not note.is_audience(current_user):
             return PermissionDenied("You do not have permission to view these comments.")
         
