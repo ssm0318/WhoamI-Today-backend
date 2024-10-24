@@ -93,7 +93,8 @@ def set_seed(n):
     with open('adoorback/test/spotify_ids.txt', 'r') as file:
         spotify_ids = [line.strip() for line in file]
 
-    for _ in range(n):
+    emoji_list = ["🥳", "😳", "😤", "⚽️", "💥", "🍀", "🦁", "🕶️", "🧚🏻", "🐑"]
+    for i in range(n):
         user = random.choice(users)
         availability = random.choice(availability_options)
         track_id = random.choice(spotify_ids)
@@ -104,7 +105,7 @@ def set_seed(n):
                 check_in.save()
         checkin, created = CheckIn.objects.get_or_create(user=user,
                                                 availability=availability,
-                                                mood=faker.text(max_nb_chars=5),
+                                                mood=emoji_list[i%10],
                                                 description=faker.text(max_nb_chars=20),
                                                 track_id=track_id,
                                                 is_active=True)
