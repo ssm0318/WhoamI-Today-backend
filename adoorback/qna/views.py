@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
 from django.db.models import F, Value, CharField
+from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
 from rest_framework import generics, exceptions, status
 from rest_framework.response import Response as DjangoResponse
@@ -72,7 +73,7 @@ class ResponseComments(generics.ListAPIView):
 
         current_user = self.request.user
         
-        response_ = Response.objects.get(id=self.kwargs.get('pk'))
+        response_ = get_object_or_404(Response, id=self.kwargs.get('pk'))
         if not response_.is_audience(current_user):
             raise PermissionDenied("You do not have permission to view these comments.")
         
