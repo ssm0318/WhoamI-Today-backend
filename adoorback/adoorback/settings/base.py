@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     'reaction.apps.ReactionConfig',
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
+    'translate.apps.TranslateConfig',
     'custom_fcm',
     'modeltranslation',
     'django.contrib.admin',
