@@ -7,8 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.views import exception_handler
 
 
-USERNAME_REGEX = r'^[가-힣|\w|_]+\Z'
-
+USERNAME_REGEX = r'^[가-힣\w@.\-]+\Z'
 
 def validate_notification_message(message):
     if message not in ['sent friend request to',

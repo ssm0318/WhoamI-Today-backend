@@ -69,8 +69,8 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     username = models.CharField(
         _('username'),
-        max_length=20,
-        help_text=_('Required. 20 characters or fewer. Letters (alphabet & 한글), digits and _ only.'),
+        max_length=50,
+        help_text=_('Required. 50 characters or fewer. Letters (alphabet & 한글), digits, -, _, and @ only.'),
         validators=[username_validator],
         error_messages={
             'unique': _("A user with that username already exists."),
