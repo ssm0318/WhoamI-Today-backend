@@ -7,6 +7,8 @@
 
 ## Run Server
 ```
+brew install gettext
+
 # install redis
 brew install redis
 brew services start redis
