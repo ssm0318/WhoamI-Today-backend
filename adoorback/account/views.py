@@ -413,6 +413,10 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     def perform_update(self, serializer):
         if serializer.is_valid(raise_exception=True):
             if 'username' in self.request.data:
+                if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+                    lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+                    translation.activate(lang)
+
                 new_username = serializer.validated_data.get('username')
                 # check if @ or . is included in username
                 if '@' in new_username or '.' in new_username:
