@@ -15,7 +15,6 @@ from django.db.utils import IntegrityError
 from django.dispatch import receiver
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Max, Q
 
@@ -273,18 +272,6 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
         return self.__class__.__name__
 
 
-class FriendGroup(SafeDeleteModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='friend_groups')
-    name = models.CharField(max_length=30)
-    friends = models.ManyToManyField(User, blank=True)
-    order = models.IntegerField(default=0)
-
-    _safedelete_policy = SOFT_DELETE_CASCADE
-
-    def __str__(self):
-        return f'group "{self.name}" of user "{self.user.username}"'
-
-
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(
         get_user_model(), related_name='block_recs', on_delete=models.CASCADE)
@@ -438,13 +425,6 @@ def user_created(created, instance, **kwargs):
                                            message_en=f"{instance.username}, try making friends to share your whoami!",
                                            redirect_url='/friends/explore')
         NotificationActor.objects.create(user=admin, notification=noti)
-
-        # add default FriendGroup (close_friends)
-        default_group, created = FriendGroup.objects.get_or_create(
-            name='close friends',
-            user=instance
-        )
-        instance.friend_groups.add(default_group)
 
 
 @transaction.atomic

@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
-from account.models import FriendRequest, FriendGroup, BlockRec
+from account.models import FriendRequest, BlockRec
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
@@ -380,43 +380,3 @@ class BlockRecSerializer(serializers.ModelSerializer):
     class Meta:
         model = BlockRec
         fields = ['blocked_user_id']
-
-
-class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
-    member_cnt = serializers.SerializerMethodField(read_only=True)
-
-    def get_member_cnt(self, obj):
-        return len(obj.friends.all())
-
-    class Meta:
-        model = FriendGroup
-        fields = ['name', 'order', 'id', 'member_cnt']
-
-
-class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
-    friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    friends_details = UserMinimalSerializer(source='friends', read_only=True, many=True)
-
-    def validate_friends(self, value):
-        user = self.context['request'].user
-        friends = User.objects.filter(id__in=value)
-
-        for friend in friends:
-            if (not User.are_friends(user, friend)) or (user == friend):
-                raise serializers.ValidationError(
-                    "One or more of the specified users are not friends of the current user.")
-
-        return value
-
-    class Meta(UserFriendGroupBaseSerializer.Meta):
-        model = FriendGroup
-        fields = UserFriendGroupBaseSerializer.Meta.fields + ['friends', 'friends_details']
-
-
-class UserFriendGroupOrderSerializer(serializers.Serializer):
-    ids = serializers.ListField(child=serializers.IntegerField())
-
-    def validate(self, attrs):
-        if 'ids' not in attrs:
-            raise serializers.ValidationError("ids field is required.")
-        return attrs
