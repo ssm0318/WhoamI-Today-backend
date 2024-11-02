@@ -21,7 +21,7 @@ class TranslateV2(APIView):
 
       # Translate Text
       result = translate_client.translate(text, target_language=target_language)
-      return Response({"translated_text": result["translatedText"], "detectedSourceLanguage": result["detectedSourceLanguage"]})
+      return Response({"translatedText": result["translatedText"], "detectedSourceLanguage": result["detectedSourceLanguage"]})
     
     except Exception as e:
       return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
