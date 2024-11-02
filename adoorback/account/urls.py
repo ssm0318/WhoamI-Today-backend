@@ -11,6 +11,7 @@ urlpatterns = [
     path('signup/', views.UserSignup.as_view(), name='user-signup'),
     path('send-reset-password-email/', views.SendResetPasswordEmail.as_view(), name='user-send-reset-password-email'),
     path('reset-password/<int:pk>/', views.ResetPassword.as_view(), name='user-reset-password'),
+    path('reset-password/', views.CurrentUserResetPassword.as_view(), name='current-user-reset-password'),
     path('password-confirm/', views.UserPasswordConfirm.as_view(), name='user-password-confirm'),
 
     # Current User Related

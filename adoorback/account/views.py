@@ -242,6 +242,11 @@ class SendResetPasswordEmail(generics.CreateAPIView):
     
 
 class ResetPassword(generics.UpdateAPIView):
+    '''
+    Reset password API for users who haven't signed in.
+    (= Users who arrive at the reset password page through reset password email.)
+    (= Users who have forgotten their password.)
+    '''
     serializer_class = CurrentUserSerializer
     queryset = User.objects.all()
 
@@ -250,8 +255,51 @@ class ResetPassword(generics.UpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         user = self.get_object()
+
+        # Verify token
+        token = request.data.get('token')
+        if not token or not email_manager.check_reset_password_token(user, token):
+            return HttpResponse(status=403, content=b"Invalid or expired token.")
+
         self.update_password(user, self.request.data['password'])
         return HttpResponse(status=200)
+
+    @transaction.atomic
+    def update_password(self, user, raw_password):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        errors = dict()
+        try:
+            validate_password(password=raw_password, user=user)
+        except exceptions.ValidationError as e:
+            errors['password'] = [list(e.messages)[0]]
+        if errors:
+            raise ValidationError(errors)
+        user.set_password(raw_password)
+        user.save()
+
+
+class CurrentUserResetPassword(generics.UpdateAPIView):
+    '''
+    Reset password API for currently signed in users.
+    '''
+    serializer_class = CurrentUserSerializer
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def update(self, request, *args, **kwargs):
+        user = request.user
+
+        try:
+            self.update_password(user, request.data['password'])
+        except ValidationError as e:
+            return Response({"error": e.detail}, status=400)
+        return Response(status=200)
 
     @transaction.atomic
     def update_password(self, user, raw_password):
