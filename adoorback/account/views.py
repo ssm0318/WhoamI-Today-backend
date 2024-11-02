@@ -236,9 +236,10 @@ class SendResetPasswordEmail(generics.CreateAPIView):
             translation.activate(lang)
         if user:
             email_manager.send_reset_password_email(user)
-
-        return HttpResponse(status=200)  # whether email is valid or not, response will be always success-response
-
+            return HttpResponse(status=200)
+        else:
+            return HttpResponse(status=404, content=b"We couldn't find a user with the given email.")
+    
 
 class ResetPassword(generics.UpdateAPIView):
     serializer_class = CurrentUserSerializer
