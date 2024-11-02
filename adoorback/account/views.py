@@ -411,16 +411,17 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     @transaction.atomic
     def perform_update(self, serializer):
         if serializer.is_valid(raise_exception=True):
-            new_username = serializer.validated_data.get('username')
-            # check if @ or . is included in username
-            if '@' in new_username or '.' in new_username:
-                raise InvalidUsername()
-            # check if username exceeds 20 letters
-            if len(new_username) > 20:
-                raise LongUsername()
-            # check if username exists
-            if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
-                raise ExistingUsername()
+            if 'username' in self.request.data:
+                new_username = serializer.validated_data.get('username')
+                # check if @ or . is included in username
+                if '@' in new_username or '.' in new_username:
+                    raise InvalidUsername()
+                # check if username exceeds 20 letters
+                if len(new_username) > 20:
+                    raise LongUsername()
+                # check if username exists
+                if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
+                    raise ExistingUsername()
             
             obj = serializer.save()
             
