@@ -56,6 +56,7 @@ Flask>=1.1.2
 Flask-BasicAuth>=0.2.0
 gevent>=20.9.0
 geventhttpclient>=1.4.4
+google-cloud-translate==2.0.1
 greenlet>=0.4.17
 idna>=2.10
 importlib-metadata>=2.0.0

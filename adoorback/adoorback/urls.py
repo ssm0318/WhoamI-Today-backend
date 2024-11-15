@@ -39,6 +39,8 @@ urlpatterns = i18n_patterns(
     path('api/', include('custom_fcm.urls')), 
     path('api/tracking/', include('tracking.urls')),
     path('api/chat/', include('chat.urls')),
+
+    path('api/translate/', include('translate.urls')),
     prefix_default_language=False
 )
 
