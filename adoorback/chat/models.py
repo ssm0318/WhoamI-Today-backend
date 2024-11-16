@@ -31,7 +31,7 @@ class ChatRoom(AdoorTimestampedModel, SafeDeleteModel):
         if self.active:
             for user in self.users.all():
                 for other_user in self.users.exclude(id=user.id):
-                    if not User.are_friends(user, other_user):
+                    if not user.is_connected(other_user):
                         raise ValidationError("All users in the chatroom must be friends.")
 
     @property

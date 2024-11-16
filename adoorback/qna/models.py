@@ -140,7 +140,7 @@ class Response(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
 
-        if User.are_friends(self.author, user):
+        if self.author.is_connected(user):
             return True
 
         return False

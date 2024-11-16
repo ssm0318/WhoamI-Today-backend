@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from faker import Faker
 
-from account.models import FriendRequest
+from account.models import FriendRequest, Connection
 from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
 from chat.models import ChatRoom, Message
 from check_in.models import CheckIn
@@ -137,7 +137,12 @@ def set_seed(n):
     FriendRequest.objects.get_or_create(requester=user_8, requestee=user_10)
 
     # Seed Friendship
-    user_2.friends.add(user_1, user_3, user_4, user_5, user_6)
+    connections = [
+        Connection(user1=user_2, user2=user, user1_choice='friend', user2_choice='friend')
+        for user in [user_1, user_3, user_4, user_5, user_6]
+    ]
+    Connection.objects.bulk_create(connections)
+
     for u in [user_1, user_3, user_4, user_5, user_6]:
         chat_room = ChatRoom()
         chat_room.save()

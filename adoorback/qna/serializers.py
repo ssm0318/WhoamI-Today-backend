@@ -149,7 +149,7 @@ class QuestionDetailFriendResponsesSerializer(QuestionFriendSerializer):
 
     def get_response_set(self, obj):
         current_user = self.context.get('request', None).user
-        responses = obj.response_set.filter(author_id__in=current_user.friend_ids) | \
+        responses = obj.response_set.filter(author_id__in=current_user.connected_user_ids) | \
                     obj.response_set.filter(author_id=current_user.id)
         page_size = self.context['request'].query_params.get('size') or 15
         paginator = Paginator(responses, page_size)

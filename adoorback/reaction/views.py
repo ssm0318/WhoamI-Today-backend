@@ -42,7 +42,7 @@ class ReactionList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         target, content_type_id, object_id = self.validate_target()
 
-        if target.author != self.request.user and not target.author.friends.filter(id=self.request.user.id).exists():
+        if target.author != self.request.user and not target.author.is_connected(self.request.user):
             raise NotFriend()
 
         try:

@@ -25,11 +25,13 @@ class UserTagSearch(generics.ListAPIView):
         user = self.request.user
         qs = User.objects.none()
         if username:
-            qs_ids = list(user.friends.filter(
-                username__startswith=username).order_by('username')[:10].values_list('id', flat=True))
+            qs_ids = list(user.connected_users.filter(
+                username__startswith=username).order_by('username')[:10].values_list('id', flat=True)
+            )
             if len(qs_ids) < 10:
-                contain_ids = list(user.friends.filter(
-                        username__icontains=username).order_by('username').values_list('id', flat=True))
+                contain_ids = list(user.connected_users.filter(
+                    username__icontains=username).order_by('username').values_list('id', flat=True)
+                )
                 for id_ in contain_ids:
                     if id_ not in qs_ids:
                         qs_ids.append(id_)

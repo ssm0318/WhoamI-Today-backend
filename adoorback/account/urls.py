@@ -58,16 +58,6 @@ urlpatterns = [
     path('recommended-friends/', views.UserRecommendedFriendsList.as_view(), name='user-recommended-friends-list'),
     path('block-recommendation/', views.BlockRecCreate.as_view(), name='block-rec-create'),
 
-    # FriendGroup related
-    path('friend-groups/', views.UserFriendGroupList.as_view(),
-         name='user-friend-group-list'),
-    path('friend-groups/create/', views.UserFriendGroupCreate.as_view(),
-         name='user-friend-group-create'),
-    path('friend-groups/order/', views.UserFriendGroupOrderUpdate.as_view(),
-         name='user-friend-group-order-update'),
-    path('friend-groups/<int:pk>/', views.UserFriendGroupDetail.as_view(),
-         name='user-friend-request-detail'),
-
      # Subscribe related
     path('friends/subscribe/', views.SubscribeUserContent.as_view(), name='subscribe-user-content'),
     path('friends/<int:pk>/subscribe/', views.UnsubscribeUserContent.as_view(), name='unsubscribe-user-content'),

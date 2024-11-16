@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 
 from adoorback.models import AdoorTimestampedModel
+from account.models import Connection
 
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
@@ -47,8 +48,9 @@ def delete_blocked_user_friendship(instance, created, **kwargs):
     user = instance.user
     reported_user = instance.reported_user
 
-    if reported_user.id in user.friend_ids:
-        user.friends.remove(reported_user)
+    connection = Connection.get_connection_between(user, reported_user)
+    if connection:
+        connection.delete()
     
     from account.models import FriendRequest
     from qna.models import ResponseRequest

@@ -1,17 +1,13 @@
-import secrets
-
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.db.models import Q
-from django.utils import timezone
 
-from account.models import FriendRequest, FriendGroup, BlockRec
+from account.models import FriendRequest, BlockRec
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
@@ -134,17 +130,19 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_mutuals(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            current_user_friends = set(request.user.friends.all())
-            obj_user_friends = set(obj.friends.all())
-            mutual_friends = current_user_friends & obj_user_friends
-            return UserMinimalSerializer(mutual_friends, many=True).data
+            current_user_connections = set(request.user.connected_user_ids)
+            obj_user_connections = set(obj.connected_user_ids)
+
+            mutual_connections = current_user_connections & obj_user_connections
+            mutual_users = User.objects.filter(id__in=mutual_connections)
+            return UserMinimalSerializer(mutual_users, many=True).data
         return {}
 
-    def get_are_friends(self, obj):
+    def get_are_friends(self, obj):  # does not mean 'friend' in friend & follower, it means connection
         user = self.context.get('request', None).user
         if user == obj:
             return None
-        return User.are_friends(user, obj)
+        return user.is_connected(obj)
 
     def get_received_friend_request_from(self, obj):
         user = self.context.get('request').user
@@ -153,7 +151,6 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_sent_friend_request_to(self, obj):
         user = self.context.get('request').user
         return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
-
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
@@ -271,7 +268,14 @@ class UserFriendsUpdateSerializer(serializers.ModelSerializer):
             instance.hidden.set(validated_data['hidden'])
 
         if 'unfriend_ids' in validated_data:
-            instance.friends.remove(*validated_data['unfriend_ids'])
+            unfriended_user_ids = validated_data['unfriend_ids']
+
+            # Delete the Connection objects
+            from account.models import Connection
+            Connection.objects.filter(
+                Q(user1=instance, user2_id__in=unfriended_user_ids) |
+                Q(user2=instance, user1_id__in=unfriended_user_ids)
+            ).delete()
 
         instance.save()
         return instance
@@ -288,7 +292,7 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if data.get('requester_id') == data.get('requestee_id'):
-            raise serializers.ValidationError('본인과는 친구가 될 수 없어요...')
+            raise serializers.ValidationError('본인과는 친구가 될 수 없어요.')
         return data
 
     class Meta:
@@ -304,9 +308,9 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
         if unknown:
-            raise serializers.ValidationError("이 필드는 뭘까요...: {}".format(", ".join(unknown)))
+            raise serializers.ValidationError("이 필드는 뭘까요: {}".format(", ".join(unknown)))
         if self.instance.accepted is not None:
-            raise serializers.ValidationError("이미 friend request에 응답하셨습니다...")
+            raise serializers.ValidationError("이미 friend request에 응답하셨습니다.")
         return data
 
     class Meta:
@@ -328,17 +332,17 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
         user = self.context.get('request').user
         return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
 
-    def get_are_friends(self, obj):
+    def get_are_friends(self, obj):  # does not mean 'friend' in friend & follower, it means connection
         user = self.context.get('request', None).user
         if user == obj:
             return None
-        return User.are_friends(user, obj)
+        return user.is_connected(obj)
 
     def get_chat_room_id(self, obj):
         from chat.models import ChatRoom
         user = self.context.get('request', None).user
 
-        if (obj not in user.friends.all()) or (obj == user):
+        if (obj.id not in user.connected_user_ids) or (obj == user):
             return None
 
         chat_room = ChatRoom.objects.filter(users=user).filter(users=obj) \
@@ -380,43 +384,3 @@ class BlockRecSerializer(serializers.ModelSerializer):
     class Meta:
         model = BlockRec
         fields = ['blocked_user_id']
-
-
-class UserFriendGroupBaseSerializer(serializers.ModelSerializer):
-    member_cnt = serializers.SerializerMethodField(read_only=True)
-
-    def get_member_cnt(self, obj):
-        return len(obj.friends.all())
-
-    class Meta:
-        model = FriendGroup
-        fields = ['name', 'order', 'id', 'member_cnt']
-
-
-class UserFriendGroupMemberSerializer(UserFriendGroupBaseSerializer):
-    friends = serializers.ListField(child=serializers.IntegerField(), write_only=True)
-    friends_details = UserMinimalSerializer(source='friends', read_only=True, many=True)
-
-    def validate_friends(self, value):
-        user = self.context['request'].user
-        friends = User.objects.filter(id__in=value)
-
-        for friend in friends:
-            if (not User.are_friends(user, friend)) or (user == friend):
-                raise serializers.ValidationError(
-                    "One or more of the specified users are not friends of the current user.")
-
-        return value
-
-    class Meta(UserFriendGroupBaseSerializer.Meta):
-        model = FriendGroup
-        fields = UserFriendGroupBaseSerializer.Meta.fields + ['friends', 'friends_details']
-
-
-class UserFriendGroupOrderSerializer(serializers.Serializer):
-    ids = serializers.ListField(child=serializers.IntegerField())
-
-    def validate(self, attrs):
-        if 'ids' not in attrs:
-            raise serializers.ValidationError("ids field is required.")
-        return attrs
