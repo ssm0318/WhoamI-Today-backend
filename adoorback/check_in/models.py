@@ -56,7 +56,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         if self.user == user:
             return True
 
-        if User.are_friends(self.user, user):
+        if self.user.is_connected(user):
             return True
 
         return False

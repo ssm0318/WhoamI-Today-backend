@@ -101,7 +101,7 @@ class Note(AdoorModel, SafeDeleteModel):
             print("is_audience: author is user")
             return True
 
-        if User.are_friends(self.author, user):
+        if self.author.is_connected(user):
             return True
 
         return False

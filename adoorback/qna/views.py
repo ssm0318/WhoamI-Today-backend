@@ -240,7 +240,7 @@ class ResponseRequestCreate(generics.CreateAPIView):
             raise NoSuchQuestion()
         if requester != current_user:
             raise PermissionDenied("requester가 본인이 아닙니다.")
-        if not User.are_friends(requestee, current_user):
+        if not requestee.is_connected(current_user):
             raise PermissionDenied("친구에게만 response request를 보낼 수 있습니다.")
         try:
             serializer.save()

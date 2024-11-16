@@ -37,7 +37,7 @@ class IsShared(permissions.BasePermission):
 
         if obj.type == 'Question':
             return True
-        elif User.are_friends(request.user, obj.author):
+        elif request.user.is_connected(obj.author):
             return True
         else:
             return obj.author == request.user

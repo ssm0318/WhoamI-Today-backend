@@ -344,7 +344,7 @@ class UserSearch(generics.ListAPIView):
         query = self.request.GET.get('query')
         user = self.request.user
         user_id = user.id
-        friend_ids = user.friends.all().values_list('id', flat=True)
+        friend_ids = user.connected_ids
 
         qs = User.objects.none()
         if query:
@@ -385,7 +385,7 @@ class CurrentUserFriendSearch(generics.ListAPIView):
     def get_queryset(self):
         query = self.request.GET.get('query', '').replace(" ", "").lower()
         user = self.request.user
-        friends = user.friends.annotate(lower_username=Lower('username'))
+        friends = user.connected_users.annotate(lower_username=Lower('username'))
 
         if query:
             start_friends = friends.filter(lower_username__startswith=query).order_by('username')
@@ -592,7 +592,7 @@ class FriendList(generics.ListAPIView):
             translation.activate(lang)
 
         user = self.request.user
-        friends = user.friends.all()
+        friends = user.connected_users
 
         query_type = self.request.query_params.get('type')
 
@@ -647,10 +647,9 @@ class UserFavoriteAdd(generics.CreateAPIView):
         if user.favorites.filter(id=friend_id).exists():
             return Response({'error': 'Friend is already in favorites.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not user.friends.filter(id=friend_id).exists():
-            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
-
         user_to_add = get_object_or_404(User, id=friend_id)
+        if not user.is_connected(user_to_add):
+            return Response({'error': 'User is not connected.'}, status=status.HTTP_400_BAD_REQUEST)
 
         user.favorites.add(user_to_add)
 
@@ -690,10 +689,9 @@ class UserHiddenAdd(generics.CreateAPIView):
         if user.hidden.filter(id=friend_id).exists():
             return Response({'error': 'Friend is already in hidden.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not user.friends.filter(id=friend_id).exists():
-            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
-
         user_to_add = get_object_or_404(User, id=friend_id)
+        if not user.is_connected(user_to_add):
+            return Response({'error': 'User is not connected.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if user.favorites.filter(id=friend_id).exists():
             user.favorites.remove(user_to_add)
@@ -724,7 +722,12 @@ class UserFriendDestroy(generics.DestroyAPIView):
 
     @transaction.atomic
     def perform_destroy(self, obj):
-        self.request.user.friends.remove(obj)
+        user = self.request.user
+
+        if not user.is_connected(obj):
+            raise ValidationError({'error': 'No connection exists between these users.'})
+
+        connection.delete()
 
 
 class UserFriendRequest(generics.ListCreateAPIView):
@@ -741,7 +744,7 @@ class UserFriendRequest(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
-            raise PermissionDenied("requester가 본인이 아닙니다...")
+            raise PermissionDenied("requester가 본인이 아닙니다.")
         serializer.save(accepted=None)
 
 
@@ -755,7 +758,8 @@ class UserSentFriendRequestList(generics.ListAPIView):
 
     def get_queryset(self):
         return FriendRequest.objects.filter(requester=self.request.user).filter(
-            Q(accepted__isnull=True) | Q(accepted=False))
+            Q(accepted__isnull=True) | Q(accepted=False)
+        )
 
 
 class UserFriendRequestDestroy(generics.DestroyAPIView):
@@ -804,9 +808,9 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
         serializer.save()
 
         send_users = []
-        if len(requester.friend_ids) == 1:  # 디바이스 노티 설정이 켜져있는지 확인 필요 없을지?
+        if len(requester.connected_user_ids) == 1:  # 디바이스 노티 설정이 켜져있는지 확인 필요 없을지?
             send_users.append(requester)
-        if len(requestee.friend_ids) == 1:
+        if len(requestee.connected_user_ids) == 1:
             send_users.append(requestee)
 
         for user in send_users:
@@ -829,7 +833,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
     def get_queryset(self):
         user_id = self.request.user.id
         user = get_object_or_404(User, id=user_id)
-        user_friends = user.friends.all()
+        user_friends = user.connected_users
 
         user_friend_ids = user_friends.values_list('id', flat=True)
         user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
@@ -837,7 +841,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         mutual_friends_count_dict = {}
         for friend in user_friends:
-            potential_friends = friend.friends.exclude(id__in=user_friend_ids) \
+            potential_friends = friend.connected_users.exclude(id__in=user_friend_ids) \
                 .exclude(id=user_id).exclude(id__in=user_block_rec_ids) \
                 .exclude(id__in=sent_friend_request_ids)
 
@@ -900,6 +904,7 @@ class UserMarkAllNotesAsRead(APIView):
 
         return Response({'success': 'All content marked as read successfully'}, status=status.HTTP_200_OK)
 
+
 class UserMarkAllResponsesAsRead(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -943,8 +948,8 @@ class SubscribeUserContent(generics.CreateAPIView):
         if Subscription.objects.filter(subscriber=request.user, subscribed_to=user_to_subscribe, content_type=content_type).exists():
             return Response({'error': f'You are already subscribed to this user\'s {content_type_str}.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not user.friends.filter(id=friend_id).exists():
-            return Response({'error': 'User is not friend.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not user.is_connected(user_to_subscribe):
+            return Response({'error': 'User is not your friend.'}, status=status.HTTP_400_BAD_REQUEST)
 
         Subscription.objects.create(
             subscriber=user,

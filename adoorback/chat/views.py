@@ -73,7 +73,7 @@ class ChatRoomFriendList(generics.ListAPIView):
         friend_id = self.kwargs.get('pk')
         friend = User.objects.get(id=friend_id)
 
-        if (friend not in current_user.friends.all()):
+        if not current_user.is_connected(friend):
             raise exceptions.PermissionDenied("You are not friend with this user")
 
         if (friend == current_user):
@@ -145,7 +145,7 @@ class OneOnOneChatRoomId(generics.RetrieveAPIView):
         if friend == current_user:
             raise exceptions.PermissionDenied("You cannot chat with yourself")
 
-        if friend not in current_user.friends.all():
+        if not current_user.is_connected(friend):
             raise exceptions.PermissionDenied("You are not friends with this user")
 
         try:

@@ -5,28 +5,28 @@ import secrets
 import urllib.parse
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.core.files.storage import FileSystemStorage
 from django.db import models, transaction
-from django.db.models.signals import post_save, m2m_changed
+from django.db.models import Max, Q
+from django.db.models.signals import post_save, post_delete
 from django.db.utils import IntegrityError
 from django.dispatch import receiver
-from django.conf import settings
-from django.core.files.storage import FileSystemStorage
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Max, Q
-
 from django_countries.fields import CountryField
 from safedelete import DELETED_INVISIBLE
-from safedelete.models import SafeDeleteModel
-from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
+from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
 
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.validators import AdoorUsernameValidator
 from notification.models import NotificationActor
+
 
 GENDER_CHOICES = (
     (0, _('여성')),
@@ -95,7 +95,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
 
-    friends = models.ManyToManyField('self', symmetrical=True, blank=True)
+    friends = models.ManyToManyField('self', symmetrical=True, blank=True)  # TODO: fade out
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
 
@@ -131,18 +131,19 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return self.username
 
     def save(self, *args, **kwargs):
-        # Ensure that only friends can be added to favorites or hidden
+        # Ensure that only connected users can be added to favorites or hidden
         if self.id is not None:  # Existing user
-            current_friends = set(self.friends.all())
-            new_favorites = set(self.favorites.all())
-            new_hidden = set(self.hidden.all())
+            current_connected_users = set(self.connected_user_ids)
+            new_favorites = set(self.favorites.values_list('id', flat=True))
+            new_hidden = set(self.hidden.values_list('id', flat=True))
 
-            if not new_favorites.issubset(current_friends) or not new_hidden.issubset(current_friends):
-                raise ValueError("Favorites and hidden friends must be among the user's friends.")
+            if not new_favorites.issubset(current_connected_users) or not new_hidden.issubset(current_connected_users):
+                raise ValueError("Favorites and hidden must be among the user's connected users.")
 
         super().save(*args, **kwargs)
 
     @classmethod
+    # TODO: fade out
     def are_friends(cls, user1, user2):
         return user2.id in user1.friend_ids or user1 == user2
 
@@ -170,8 +171,109 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return self.__class__.__name__
 
     @property
+    def is_connected(self, user):
+        """Checks if self (current user) is connected with user"""
+        return Connection.objects.filter(
+            Q(user1=user, user2=self) | Q(user1=self, user2=user)
+        ).exists()
+
+    @property
+    def is_follower(self, user):
+        """Checks if self (current user) is a 'follower' of user"""
+        return Connection.objects.filter(
+            Q(user1=user, user2=self, user1_choice='follower') |
+            Q(user1=self, user2=user, user2_choice='follower')
+        ).exists()
+
+    @property
+    def is_friend(self, user):
+        """Checks if self (current user) is a 'friend' of user"""
+        return Connection.objects.filter(
+            Q(user1=user, user2=self, user1_choice='friend') |
+            Q(user1=self, user2=user, user2_choice='friend')
+        ).exists()
+
+    @property
+    def connected_users(self):
+        connections = Connection.objects.filter(
+            Q(user1=self) | Q(user2=self)
+        ).values_list('user1', 'user2')
+
+        id_list = [
+            user2_id if user1_id == self.id else user1_id
+            for user1_id, user2_id in connections
+        ]
+
+        return User.objects.filter(id__in=id_list)
+    
+    @property
+    def followers(self):
+        connections = Connection.objects.filter(
+            Q(user1=self, user1_choice='follower') | 
+            Q(user2=self, user2_choice='follower')
+        ).values_list('user1', 'user2')
+
+        id_list = [
+            user2_id if user1_id == self.id else user1_id
+            for user1_id, user2_id in connections
+        ]
+
+        return User.objects.filter(id__in=id_list)
+    
+    @property
+    def friends_(self):  # TODO: change to friends after 'friends' field is removed
+        connections = Connection.objects.filter(
+            Q(user1=self, user1_choice='friend') | 
+            Q(user2=self, user2_choice='friend')
+        ).values_list('user1', 'user2')
+
+        id_list = [
+            user2_id if user1_id == self.id else user1_id
+            for user1_id, user2_id in connections
+        ]
+
+        return User.objects.filter(id__in=id_list)
+
+    @property
+    def connected_user_ids(self):
+        connections = Connection.objects.filter(
+            Q(user1=self) | Q(user2=self)
+        ).values_list('user1', 'user2')
+
+        id_list = [
+            user2_id if user1_id == self.id else user1_id
+            for user1_id, user2_id in connections
+        ]
+
+        return id_list
+
+    @property
+    def follower_ids(self):
+        connections = Connection.objects.filter(
+            Q(user1=self, user1_choice='follower') | 
+            Q(user2=self, user2_choice='follower')
+        ).values_list('user1', 'user2')
+
+        id_list = [
+            user2_id if user1_id == self.id else user1_id
+            for user1_id, user2_id in connections
+        ]
+
+        return id_list
+
+    @property
     def friend_ids(self):
-        return list(self.friends.values_list('id', flat=True))
+        connections = Connection.objects.filter(
+            Q(user1=self, user1_choice='friend') | 
+            Q(user2=self, user2_choice='friend')
+        ).values_list('user1', 'user2')
+
+        id_list = [
+            user2_id if user1_id == self.id else user1_id
+            for user1_id, user2_id in connections
+        ]
+
+        return id_list
 
     @property
     def reported_user_ids(self):
@@ -244,6 +346,7 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
     requestee = models.ForeignKey(
         get_user_model(), related_name='received_friend_requests', on_delete=models.CASCADE)
     accepted = models.BooleanField(null=True)
+    requester_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('follower', 'Follower')], null=True)
 
     friend_request_targetted_notis = GenericRelation("notification.Notification",
                                                      content_type_field='target_type',
@@ -270,6 +373,74 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
     @property
     def type(self):
         return self.__class__.__name__
+
+
+class Connection(AdoorTimestampedModel, SafeDeleteModel):
+    CHOICES = (
+        ('friend', 'Friend'),
+        ('follower', 'Follower'),
+    )
+
+    user1 = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, related_name='connections_as_user1'
+    )
+    user2 = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, related_name='connections_as_user2'
+    )
+    user1_choice = models.CharField(max_length=10, choices=CHOICES)
+    user2_choice = models.CharField(max_length=10, choices=CHOICES)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user1', 'user2', ], condition=Q(deleted__isnull=True), name='unique_connection'),
+                models.CheckConstraint(check=~models.Q(user1=models.F('user2')), name='no_self_connection')
+        ]
+        indexes = [
+            models.Index(fields=['user1', 'user2']),
+            models.Index(fields=['user1', 'user1_choice']),
+            models.Index(fields=['user2', 'user2_choice']),
+        ]
+
+    def __str__(self):
+        return f"Connection between {self.user1} and {self.user2}"
+    
+    def save(self, *args, **kwargs):
+        # check if reverse Connection already exists
+        if Connection.objects.filter(user1=self.user2, user2=self.user1).exists():
+            raise ValueError("A reverse Connection already exists.")
+        
+        # Ensure that user1 always has the smaller ID to enforce consistency
+        if self.user1.id > self.user2.id:
+            self.user1, self.user2 = self.user2, self.user1
+            self.user1_choice, self.user2_choice = self.user2_choice, self.user1_choice
+
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_connection_between(cls, user_a, user_b):
+        """Fetch the Connection object between two users, if it exists."""
+        return cls.objects.filter(
+            Q(user1=user_a, user2=user_b) | Q(user1=user_b, user2=user_a)
+        ).first()
+
+    def user1_is_friend(self):
+        """Check if user2 set user1 as 'friend'."""
+        return self.user2_choice == 'friend'
+    
+    def user2_is_friend(self):
+        """Check if user1 set user2 as 'friend'."""
+        return self.user1_choice == 'friend'
+    
+    def user1_is_follower(self):
+        """Check if user2 set user1 as 'follower'."""
+        return self.user2_choice == 'follower'
+    
+    def user2_is_follower(self):
+        """Check if user1 set user2 as 'follower'."""
+        return self.user1_choice == 'follower'
 
 
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
@@ -312,47 +483,53 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
 
 
 @transaction.atomic
-@receiver(m2m_changed, sender=User.friends.through)
-def friend_removed(action, pk_set, instance, **kwargs):
+@receiver(post_delete, sender=Connection)
+def connection_removed(instance, **kwargs):
     '''
-    when Friendship is destroyed, 
+    when Connection is deleted, 
     1) remove related notis
-    2) remove friend from all share_friends of all posts
-    3) remove friend from favorites & hidden
-    4) inactivate chat room
+    2) remove connected user from favorites & hidden
+    3) inactivate chat room
     '''
-    if action == "post_remove":
-        friends = User.objects.filter(id__in=pk_set)
-        
-        for friend in friends:
-            # remove friendship related notis from both users
-            friend.friendship_targetted_notis.filter(user=instance).delete(force_policy=HARD_DELETE)
-            instance.friendship_targetted_notis.filter(user=friend).delete(force_policy=HARD_DELETE)
-            FriendRequest.objects.filter(requester=instance, requestee=friend).delete(force_policy=HARD_DELETE)
-            FriendRequest.objects.filter(requester=friend, requestee=instance).delete(force_policy=HARD_DELETE)
+    user1 = instance.user1
+    user2 = instance.user2
 
-            # remove friend from favorites and hidden
-            try:
-                instance.favorites.remove(friend)
-            except IntegrityError:
-                pass
-            try:
-                instance.hidden.remove(friend)
-            except IntegrityError:
-                pass
+    # 1. Remove friendship related notis from both users
+    user1.friendship_targetted_notis.filter(user=user2).delete(force_policy=HARD_DELETE)
+    user2.friendship_targetted_notis.filter(user=user1).delete(force_policy=HARD_DELETE)
+    FriendRequest.objects.filter(requester=user1, requestee=user2).delete(force_policy=HARD_DELETE)
+    FriendRequest.objects.filter(requester=user2, requestee=user1).delete(force_policy=HARD_DELETE)
 
-            # inactivate chat room
-            from chat.models import ChatRoom
-            chat_rooms = ChatRoom.objects.filter(users__in=[instance, friend])
-            for chat_room in chat_rooms:
-                if chat_room.users.count() == 2:
-                    chat_room.active = False
-                    chat_room.save()
+    # 2. Remove from favorites & hidden
+    try:
+        user1.favorites.remove(user2)
+    except IntegrityError:
+        pass
+    try:
+        user1.hidden.remove(user2)
+    except IntegrityError:
+        pass
+    try:
+        user2.favorites.remove(user1)
+    except IntegrityError:
+        pass
+    try:
+        user2.hidden.remove(user1)
+    except IntegrityError:
+        pass
+
+    # 3. Inactivate chat rooms
+    from chat.models import ChatRoom
+    chat_rooms = ChatRoom.objects.filter(users__in=[user1, user2])
+    for chat_room in chat_rooms:
+        if chat_room.users.count() == 2:
+            chat_room.active = False
+            chat_room.save()
 
 
 @transaction.atomic
 @receiver(post_save, sender=FriendRequest)
-def create_friend_noti(created, instance, **kwargs):
+def create_connection_noti(created, instance, **kwargs):
     if instance.deleted:
         return
 
@@ -373,7 +550,7 @@ def create_friend_noti(created, instance, **kwargs):
         NotificationActor.objects.create(user=requester, notification=noti)
         return
     elif accepted:
-        if User.are_friends(requestee, requester):  # receiver function was triggered by undelete
+        if requester.is_connected(requestee):  # receiver function was triggered by undelete
             return
 
         noti = Notification.objects.create(user=requestee,
@@ -388,8 +565,14 @@ def create_friend_noti(created, instance, **kwargs):
                                            message_en=f'You are now friends with {requestee.username}.',
                                            redirect_url=f'/users/{requestee.username}')
         NotificationActor.objects.create(user=requestee, notification=noti)
-        # add friendship
-        requester.friends.add(requestee)
+
+        # make connection
+        Connection.objects.create(
+            user1=requester,
+            user2=requestee,
+            user1_choice='friend',  # TODO: fix hard coded 'friend' option
+            user2_choice='friend',  # TODO: fix hard coded 'friend' option
+        )
 
         # make chat room
         from chat.models import ChatRoom
@@ -409,7 +592,6 @@ def user_created(created, instance, **kwargs):
     '''
     when User is created, 
     1) send notification
-    2) add default friend group 'close friends'
     '''
     if instance.deleted:
         return
