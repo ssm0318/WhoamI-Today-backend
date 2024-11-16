@@ -344,7 +344,7 @@ class UserSearch(generics.ListAPIView):
         query = self.request.GET.get('query')
         user = self.request.user
         user_id = user.id
-        friend_ids = user.connected_ids
+        friend_ids = user.connected_user_ids
 
         qs = User.objects.none()
         if query:
