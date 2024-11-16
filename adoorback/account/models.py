@@ -170,14 +170,12 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     def type(self):
         return self.__class__.__name__
 
-    @property
     def is_connected(self, user):
         """Checks if self (current user) is connected with user"""
         return Connection.objects.filter(
             Q(user1=user, user2=self) | Q(user1=self, user2=user)
         ).exists()
 
-    @property
     def is_follower(self, user):
         """Checks if self (current user) is a 'follower' of user"""
         return Connection.objects.filter(
@@ -185,7 +183,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             Q(user1=self, user2=user, user2_choice='follower')
         ).exists()
 
-    @property
     def is_friend(self, user):
         """Checks if self (current user) is a 'friend' of user"""
         return Connection.objects.filter(
