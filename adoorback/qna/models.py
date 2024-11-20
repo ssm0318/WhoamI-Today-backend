@@ -23,6 +23,8 @@ from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
 
+from category.models import Category
+
 User = get_user_model()
 
 
@@ -77,6 +79,17 @@ class Response(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='response_set', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
 
+    #added temporary null values, should change?
+    category = models.ForeignKey(
+        Category, 
+        related_name='responses', 
+        on_delete=models.CASCADE,
+        null=True, 
+        blank=True
+    )
+    sharing_scope = models.CharField(max_length=255, default='private')
+    archived_at = models.DateTimeField(null=True, blank=True)
+    
     response_comments = GenericRelation(Comment)
     # to be deleted
     response_likes = GenericRelation(Like)
@@ -100,6 +113,8 @@ class Response(AdoorModel, SafeDeleteModel):
         ]
 
     def save(self, *args, **kwargs):
+        if not self.sharing_scope:
+            self.sharing_scope = self.category.sharing_scope
         if self.pk is not None:  # not when created
             original = Response.objects.get(pk=self.pk)
             if original.content != self.content:
@@ -210,7 +225,7 @@ def create_request_answered_noti(instance, created, **kwargs):
     if instance.deleted:
         return
 
-    if not created:  # response edit만 해줬거나 익명으로만 공개한 경우
+    if not created:  # response edit만 해줬거나 익명로만 공개한 경우
         return
 
     author_id = instance.author.id

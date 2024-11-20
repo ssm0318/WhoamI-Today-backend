@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     'trackstats',
     'safedelete',
     'tracking',
+    'category',
 ]
 
 SITE_ID = 1

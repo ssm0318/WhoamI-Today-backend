@@ -26,6 +26,7 @@ from safedelete.managers import SafeDeleteManager
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.validators import AdoorUsernameValidator
 from notification.models import NotificationActor
+from category.models import Category  # Add this import
 
 
 GENDER_CHOICES = (
@@ -337,6 +338,33 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return note_queryset
 
 
+#added 11/18/24:
+    def get_subscribed_content(self, content_type=None):
+        from category.models import Subscription
+        subscriptions = Subscription.objects.filter(user=self)
+        scopes = [sub.sharing_scope for sub in subscriptions]
+        
+        if content_type == 'response':
+            from qna.models import Response
+            return Response.objects.filter(sharing_scope__in=scopes)
+        elif content_type == 'note':
+            from note.models import Note
+            return Note.objects.filter(sharing_scope__in=scopes)
+        else:
+            from qna.models import Response
+            from note.models import Note
+            responses = Response.objects.filter(sharing_scope__in=scopes)
+            notes = Note.objects.filter(sharing_scope__in=scopes)
+            return responses, notes
+
+    def get_unread_subscribed_content(self):
+        # Get unread content from subscribed categories
+        responses, notes = self.get_subscribed_content()
+        unread_responses = responses.exclude(readers=self)
+        unread_notes = notes.exclude(readers=self)
+        return unread_responses, unread_notes
+
+
 class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
     requester = models.ForeignKey(
         get_user_model(), related_name='sent_friend_requests', on_delete=models.CASCADE)
@@ -439,7 +467,6 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
         """Check if user1 set user2 as 'follower'."""
         return self.user1_choice == 'follower'
 
-
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(
         get_user_model(), related_name='block_recs', on_delete=models.CASCADE)
@@ -463,7 +490,11 @@ class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
 
 
 class Subscription(AdoorTimestampedModel, SafeDeleteModel):
-    subscriber = models.ForeignKey(get_user_model(), related_name='subscriptions', on_delete=models.CASCADE)
+    subscriber = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='account_subscriptions'
+    )
     subscribed_to = models.ForeignKey(get_user_model(), related_name='subscribed_by', on_delete=models.CASCADE)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
 

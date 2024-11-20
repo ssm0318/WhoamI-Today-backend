@@ -13,6 +13,7 @@ from check_in.models import CheckIn
 from note.models import Note
 from qna.models import Response
 from notification.models import Notification
+from category.models import Category, Subscription
 
 from django_countries.serializers import CountryFieldMixin
 
@@ -36,7 +37,8 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio',
-                  'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'timezone']
+                  'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'timezone',
+                  'subscriptions']
         extra_kwargs = {'password': {'write_only': True}}
 
     @transaction.atomic
