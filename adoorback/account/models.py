@@ -16,7 +16,6 @@ from django.db.models import Max, Q
 from django.db.models.signals import post_save, post_delete
 from django.db.utils import IntegrityError
 from django.dispatch import receiver
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_countries.fields import CountryField
 from safedelete import DELETED_INVISIBLE

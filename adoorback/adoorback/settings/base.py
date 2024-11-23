@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
     'translate.apps.TranslateConfig',
+    'ping.apps.PingConfig',
     'custom_fcm',
     'modeltranslation',
     'django.contrib.admin',
