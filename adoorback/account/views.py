@@ -24,7 +24,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
-from .models import Subscription
+from category.models import Category, Subscription
 from account.models import FriendRequest, BlockRec
 from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -126,8 +126,6 @@ class UserEmailCheck(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
-
-
 
 class UserPasswordCheck(generics.CreateAPIView):
     serializer_class = UserPasswordSerializer

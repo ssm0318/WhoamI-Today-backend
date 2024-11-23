@@ -20,6 +20,7 @@ from content_report.models import ContentReport
 from like.models import Like
 from notification.models import Notification, NotificationActor
 from reaction.models import Reaction
+from category.models import Category
 
 User = get_user_model()
 
@@ -41,6 +42,18 @@ def note_image_path(instance, filename):
 class Note(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='note_set', on_delete=models.CASCADE)
 
+    category = models.ForeignKey(
+        'category.Category',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+    sharing_scope = models.CharField(
+        max_length=255,
+        default='private'
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
+    
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
     readers = models.ManyToManyField(User, related_name='read_notes')
@@ -59,6 +72,8 @@ class Note(AdoorModel, SafeDeleteModel):
         return self.content
 
     def save(self, *args, **kwargs):
+        if not self.sharing_scope:
+            self.sharing_scope = self.category.sharing_scope
         if self.pk is not None:  # not when created
             original = Note.objects.get(pk=self.pk)
             if original.content != self.content:

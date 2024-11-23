@@ -12,6 +12,8 @@ from adoorback.serializers import AdoorBaseSerializer
 from adoorback.utils.content_types import get_generic_relation_type
 from qna.models import Response, Question, ResponseRequest
 from reaction.models import Reaction
+from category.serializers import CategorySerializer
+from account.models import Category
 
 User = get_user_model()
 
@@ -43,6 +45,10 @@ class ResponseSerializer(AdoorBaseSerializer):
     current_user_read = serializers.SerializerMethodField(read_only=True)
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.IntegerField(write_only=True)
+    sharing_scope = serializers.CharField(read_only=True)
+    archived_at = serializers.DateTimeField(read_only=True)
 
     
     def get_current_user_read(self, obj):
@@ -89,8 +95,15 @@ class ResponseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited']
+                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited',
+                  'category', 'category_id', 'sharing_scope', 'archived_at']
         
+    def create(self, validated_data):
+        category = Category.objects.get(id=validated_data.pop('category_id'))
+        validated_data['category'] = category
+        validated_data['sharing_scope'] = category.sharing_scope
+        return super().create(validated_data)
+
 
 class QuestionResponseSerializer(QuestionBaseSerializer):
     response_set = serializers.SerializerMethodField()
