@@ -7,6 +7,9 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('account', '0007_alter_user_username'),
+        ('qna', '0005_remove_response_share_everyone_and_more'),
+        ('note', '0005_remove_note_share_everyone_remove_note_share_friends_and_more'),
+        ('check_in', '0003_remove_checkin_share_everyone_and_more'),
     ]
 
     operations = [
