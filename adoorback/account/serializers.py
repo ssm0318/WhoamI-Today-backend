@@ -11,8 +11,9 @@ from account.models import FriendRequest, BlockRec
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
-from qna.models import Response
 from notification.models import Notification
+from ping.models import get_ping_room, get_or_create_ping_room
+from qna.models import Response
 
 from django_countries.serializers import CountryFieldMixin
 
@@ -112,6 +113,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     are_friends = serializers.SerializerMethodField(read_only=True)
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
+    has_unread_pings = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -151,12 +153,23 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_sent_friend_request_to(self, obj):
         user = self.context.get('request').user
         return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
+    
+    def get_has_unread_pings(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user = request.user
+            if user == obj:
+                return False
+            ping_room = get_ping_room(user, obj)
+            if ping_room:
+                return ping_room.pings.filter(receiver=user, is_read=False).exists()
+        return False
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'pronouns', 'bio']
+                                                      'pronouns', 'bio', 'has_unread_pings']
 
 
 class FriendListSerializer(UserMinimalSerializer):
@@ -167,6 +180,7 @@ class FriendListSerializer(UserMinimalSerializer):
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
     description = serializers.SerializerMethodField(read_only=True)
+    has_unread_pings = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -244,11 +258,19 @@ class FriendListSerializer(UserMinimalSerializer):
         note_queryset = Note.objects.filter(id__in=note_ids)
         notes = NoteSerializer(note_queryset, many=True, read_only=True, context=self.context).data
         return notes
+    
+    def get_has_unread_pings(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user = request.user
+            ping_room = get_or_create_ping_room(user, obj)
+            return ping_room.pings.filter(receiver=user, is_read=False).exists()
+        return False
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read', 'unread_cnt',
-                                                      'bio', 'track_id', 'description']
+                                                      'bio', 'track_id', 'description', 'has_unread_pings']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):

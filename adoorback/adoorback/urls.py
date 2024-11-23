@@ -33,12 +33,13 @@ urlpatterns = i18n_patterns(
     path('api/reactions/', include('reaction.urls')),
     path('api/check_in/', include('check_in.urls')),
     path('api/notes/', include('note.urls')),
-
+    
     path('api/secret/', admin.site.urls),
     path('api/user/', include('rest_framework.urls', namespace='rest_framework')),
     path('api/', include('custom_fcm.urls')), 
     path('api/tracking/', include('tracking.urls')),
     path('api/chat/', include('chat.urls')),
+    path('api/ping/', include('ping.urls')),
 
     path('api/translate/', include('translate.urls')),
     prefix_default_language=False

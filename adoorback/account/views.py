@@ -24,7 +24,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
-from .models import Subscription
+from .models import Subscription, Connection
 from account.models import FriendRequest, BlockRec
 from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -727,6 +727,7 @@ class UserFriendDestroy(generics.DestroyAPIView):
         if not user.is_connected(obj):
             raise ValidationError({'error': 'No connection exists between these users.'})
 
+        connection = Connection.get_connection_between(user, obj)
         connection.delete()
 
 
