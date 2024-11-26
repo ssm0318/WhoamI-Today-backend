@@ -10,7 +10,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
 from django.utils import timezone
 
-from account.models import Subscription
 from comment.models import Comment
 from content_report.models import ContentReport
 from like.models import Like
@@ -80,9 +79,9 @@ class Response(AdoorModel, SafeDeleteModel):
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
 
     #added temporary null values, should change?
+    #updated to a default value of 1, which should be ID of general category
     category = models.ForeignKey(
         Category, 
-        related_name='responses', 
         on_delete=models.CASCADE,
         null=True, 
         blank=True
@@ -285,3 +284,9 @@ def send_notifications_to_subscribers(sender, instance, created, **kwargs):
             redirect_url=f'/responses/{instance.id}'
         )
         NotificationActor.objects.create(user=author, notification=noti)
+
+# Check if the category exists
+if not Category.objects.filter(id=1).exists():
+    # Create and save the new category
+    new_category = Category(id=1, name='General')  # Replace 'General' with an appropriate name
+    new_category.save()

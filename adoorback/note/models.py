@@ -13,7 +13,6 @@ from safedelete.models import SafeDeleteModel
 
 from django.conf import settings
 
-from account.models import Subscription
 from adoorback.models import AdoorModel
 from comment.models import Comment
 from content_report.models import ContentReport

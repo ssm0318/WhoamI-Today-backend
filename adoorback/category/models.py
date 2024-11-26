@@ -38,8 +38,7 @@ class Category(AdoorTimestampedModel, SafeDeleteModel):
 class Subscription(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='category_subscriptions', on_delete=models.CASCADE)
     category = models.ForeignKey(Category, related_name='subscriptions', on_delete=models.CASCADE)
-    sharing_scope = models.CharField(max_length=255)
-
+    # removed sharing_scope, only implemented in Category model
     _safedelete_policy = SOFT_DELETE_CASCADE
     
     class Meta:
@@ -52,7 +51,6 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
         ]
         indexes = [
             models.Index(fields=['user', 'category']),
-            models.Index(fields=['sharing_scope']),
         ]
 
     def __str__(self):

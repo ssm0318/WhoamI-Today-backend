@@ -319,9 +319,16 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     def can_access_response_set(self, user):
         # return responses of user that self can access
         from qna.models import Response
-        response_ids = [response.id for response in user.response_set.all() if Response.is_audience(response, self)]
-        response_queryset = Response.objects.filter(id__in=response_ids)
-        return response_queryset
+        from category.models import Subscription
+
+        # get the user's subscribed categories
+        subscribed_categories = Subscription.objects.filter(user=self).values_list('category_id', flat=True)
+
+        # Then, filter each response by sharing_scope and category
+        return Response.objects.filter(
+            sharing_scope__in=scopes,
+            category_id__in=subscribed_categories
+        )
 
     def can_access_check_in(self, user):
         # return check-in of user that self can access
@@ -356,13 +363,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             responses = Response.objects.filter(sharing_scope__in=scopes)
             notes = Note.objects.filter(sharing_scope__in=scopes)
             return responses, notes
-
-    def get_unread_subscribed_content(self):
-        # Get unread content from subscribed categories
-        responses, notes = self.get_subscribed_content()
-        unread_responses = responses.exclude(readers=self)
-        unread_notes = notes.exclude(readers=self)
-        return unread_responses, unread_notes
 
 
 class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
@@ -488,27 +488,7 @@ class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
     def type(self):
         return self.__class__.__name__
 
-
-class Subscription(AdoorTimestampedModel, SafeDeleteModel):
-    subscriber = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='account_subscriptions'
-    )
-    subscribed_to = models.ForeignKey(get_user_model(), related_name='subscribed_by', on_delete=models.CASCADE)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-
-    _safedelete_policy = SOFT_DELETE_CASCADE
-    
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['subscriber', 'subscribed_to', 'content_type'], condition=Q(deleted__isnull=True),
-                                    name='unique_subscription'),
-        ]
-
-    def __str__(self):
-        return f'{self.subscriber} subscribed to {self.content_type} of {self.subscribed_to}'
-
+#removed deprecated Subscription model
 
 @transaction.atomic
 @receiver(post_delete, sender=Connection)
