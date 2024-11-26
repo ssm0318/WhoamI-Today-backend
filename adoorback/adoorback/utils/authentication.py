@@ -3,7 +3,7 @@ from rest_framework import authentication
 from rest_framework import exceptions
 from rest_framework.authentication import CSRFCheck
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from backports.zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo
 from django.utils import timezone
 
 
