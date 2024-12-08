@@ -31,13 +31,20 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         unread_notis = Notification.objects.filter(user=obj, is_read=False)
         return True if unread_notis else False
 
+    def validate_noti_period_days(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("noti_period_days must be a list.")
+        
+        return value
+
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio',
-                  'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'timezone']
+                  'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'noti_period_days',
+                  'timezone']
         extra_kwargs = {'password': {'write_only': True}}
 
     @transaction.atomic

@@ -11,6 +11,7 @@ from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.storage import FileSystemStorage
+from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
 from django.db.models import Max, Q
 from django.db.models.signals import post_save, post_delete
@@ -58,6 +59,10 @@ def random_profile_color():
     return '#{0:06X}'.format(secrets.randbelow(16777216))
 
 
+def default_noti_period_days():
+    return ['0', '1', '2', '3', '4', '5', '6']
+
+
 class UserCustomManager(UserManager, SafeDeleteManager):
     _safedelete_visibility = DELETED_INVISIBLE
 
@@ -91,6 +96,11 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
                                 default=settings.LANGUAGE_CODE)
     timezone = models.CharField(default=settings.TIME_ZONE, max_length=50)
     noti_time = models.TimeField(default=time(16, 0))
+    noti_period_days = ArrayField(
+        models.CharField(),
+        default=default_noti_period_days,
+        help_text="Days of the week for notifications, where 0=Sunday, 1=Monday, etc."
+    )
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
 
