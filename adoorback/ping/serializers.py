@@ -12,5 +12,5 @@ class PingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ping
-        fields = ['id', 'sender', 'emoji', 'content']
+        fields = ['id', 'sender', 'emoji', 'content', 'is_read']
 
