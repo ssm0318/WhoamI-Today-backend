@@ -41,7 +41,14 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         for user in all_users:
             if user.noti_time is None:
                 continue
-            if user.noti_time == time(timezone.now().astimezone(ZoneInfo(user.timezone)).hour, 0):
+
+            user_local_time = timezone.now().astimezone(ZoneInfo(user.timezone))
+            
+            current_weekday = user_local_time.weekday()  # Monday=0, Sunday=6
+            if str(current_weekday) not in user.noti_period_days:
+                continue
+
+            if user.noti_time == time(user_local_time.hour, 0):
                 noti = Notification.objects.create(user=user,
                                                    target=admin,
                                                    origin=admin,

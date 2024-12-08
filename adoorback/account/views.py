@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 
 from django.apps import apps
 from django.conf import settings
@@ -19,6 +20,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
@@ -472,7 +474,32 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 # check if username exists
                 if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
                     raise ExistingUsername()
+                
+            noti_period_days = self.request.data.get('noti_period_days')
+            if noti_period_days:
+                # Check if it's a JSON string and parse it
+                if isinstance(noti_period_days, str):
+                    try:
+                        noti_period_days = json.loads(noti_period_days)
+                    except json.JSONDecodeError:
+                        raise serializers.ValidationError("noti_period_days must be a valid JSON list.")
+                try:
+                    noti_period_days = [str(int(day)) for day in noti_period_days]
+                except ValueError:
+                    raise serializers.ValidationError({
+                        "noti_period_days": ["noti_period_days must only contain integers between 0 and 6."]
+                    })
             
+                if any(int(day) not in range(0, 7) for day in noti_period_days):
+                    raise serializers.ValidationError({
+                        "noti_period_days": ["noti_period_days must only contain integers between 0 and 6."]
+                    })
+                if len(noti_period_days) != len(set(noti_period_days)):
+                    raise serializers.ValidationError({
+                        "noti_period_days": ["There are duplicate values in noti_period_days."]
+                    })
+                serializer.validated_data['noti_period_days'] = noti_period_days
+
             obj = serializer.save()
             
             updating_data = list(self.request.data.keys())
