@@ -1,12 +1,16 @@
+from django.apps import apps
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models, transaction
 from django.db.models import Q, F
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE, HARD_DELETE
 
 from adoorback.models import AdoorTimestampedModel
-
+from notification.models import Notification, NotificationActor
 
 class PingRoom(AdoorTimestampedModel, SafeDeleteModel):
     user1 = models.ForeignKey(
@@ -68,6 +72,10 @@ class Ping(AdoorTimestampedModel, SafeDeleteModel):
 
     is_read = models.BooleanField(default=False)
 
+    ping_targetted_notis = GenericRelation(Notification,
+                                           content_type_field='target_type',
+                                           object_id_field='target_id')
+
     class Meta:
         indexes = [
             models.Index(fields=['ping_room', 'created_at']),
@@ -78,6 +86,10 @@ class Ping(AdoorTimestampedModel, SafeDeleteModel):
     def __str__(self):
         return f"{self.sender} sent a {self.get_content_display()} ping to {self.receiver}"
     
+    @property
+    def type(self):
+        return self.__class__.__name__
+
     def clean(self):
         if not self.emoji and not self.content:
             raise ValidationError("Either an emoji or a content must be provided.")
@@ -112,5 +124,23 @@ def get_ping_room(user1, user2):
 
 
 @transaction.atomic
-def mark_pings_as_read(user, ping_room):
-    Ping.objects.filter(receiver=user, ping_room=ping_room, is_read=False).update(is_read=True)
+@receiver(post_save, sender=Ping)
+def create_ping_notification(created, instance, **kwargs):
+    if not created:
+        return
+
+    receiver = instance.receiver
+    sender = instance.sender
+
+    if receiver.id in sender.user_report_blocked_ids:
+        return
+
+    noti = Notification.objects.create(
+        user=receiver,
+        origin=sender,
+        target=instance,
+        message_ko=f"{sender.username}님이 핑을 보냈습니다!",
+        message_en=f"{sender.username} sent you a Ping!",
+        redirect_url=f"/ping/user/{sender.id}",
+    )
+    NotificationActor.objects.create(user=sender, notification=noti)

@@ -52,6 +52,11 @@ def get_note_type():
     return ContentType.objects.get_for_model(Note)
 
 
+def get_ping_type():
+    from ping.models import Ping
+    return ContentType.objects.get_for_model(Ping)
+
+
 def get_generic_relation_type(model):
     model = model.capitalize()
     if model == 'Comment':
@@ -62,5 +67,7 @@ def get_generic_relation_type(model):
         return get_question_type()
     elif model == 'Note':
         return get_note_type()
+    elif model == 'Ping':
+        return get_ping_type()
     else:
         return None
