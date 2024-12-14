@@ -10,6 +10,11 @@ from safedelete import SOFT_DELETE_CASCADE
 
 from adoorback.models import AdoorTimestampedModel
 
+def get_default_owner():
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    return User.objects.filter(is_superuser=True).first().id if User.objects.filter(is_superuser=True).exists() else User.objects.first().id
+
 class Category(AdoorTimestampedModel, SafeDeleteModel):
     HIERARCHY_CHOICES = [
         ('public', 'Public'),
@@ -21,6 +26,12 @@ class Category(AdoorTimestampedModel, SafeDeleteModel):
     name = models.CharField(max_length=100)
     added_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='added_categories', blank=True)
     sharing_scope = models.CharField(max_length=255)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='owned_categories',
+        default=get_default_owner
+    )
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 

@@ -113,7 +113,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     # USERNAME_FIELD를 email로 설정하여 이메일을 인증에 사용하고, username은 고유하지 않아도 되도록 함.
     USERNAME_FIELD = 'email'  
     
-    # USERNAME_FIELD를 email로 바꾼대신, 반드시 username을 입력하도록 요구.
+    # USERNAME_FIELD를 email로 바꾼대신, 반드시 username을 입력하�� 요구.
     REQUIRED_FIELDS = ['username'] 
 
     objects = UserCustomManager()
@@ -317,18 +317,23 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             return None
 
     def can_access_response_set(self, user):
-        # return responses of user that self can access
         from qna.models import Response
         from category.models import Subscription
 
-        # get the user's subscribed categories
+        #gets the user's subscribed categories
         subscribed_categories = Subscription.objects.filter(user=self).values_list('category_id', flat=True)
 
-        # Then, filter each response by sharing_scope and category
-        return Response.objects.filter(
-            sharing_scope__in=scopes,
+        # Then, filters responses by:
+        # 1. Author (user parameter)
+        # 2. Category (must be in subscribed categories)
+        # 3. Sharing scope (user must be included in sharing scope)
+        responses = Response.objects.filter(
+            author=user,
             category_id__in=subscribed_categories
         )
+        
+        # Further filter by checking if self is in sharing_scope
+        return [response for response in responses if self in response.sharing_scope.get_members()]
 
     def can_access_check_in(self, user):
         # return check-in of user that self can access
@@ -340,29 +345,38 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     def can_access_note_set(self, user):
         from note.models import Note
-        note_ids = [note.id for note in user.note_set.all() if Note.is_audience(note, self)]
-        note_queryset = Note.objects.filter(id__in=note_ids)
-        return note_queryset
+        from category.models import Subscription
+        
+        subscribed_categories = Subscription.objects.filter(user=self).values_list('category_id', flat=True)
+        
+        notes = Note.objects.filter(
+            author=user,
+            category_id__in=subscribed_categories
+        )
+        return [note for note in notes if self in note.sharing_scope.get_members()]
 
 
 #added 11/18/24:
     def get_subscribed_content(self, content_type=None):
         from category.models import Subscription
-        subscriptions = Subscription.objects.filter(user=self)
-        scopes = [sub.sharing_scope for sub in subscriptions]
+        from qna.models import Response
+        from note.models import Note
+        
+        subscribed_categories = Subscription.objects.filter(user=self).values_list('category_id', flat=True)
         
         if content_type == 'response':
-            from qna.models import Response
-            return Response.objects.filter(sharing_scope__in=scopes)
+            responses = Response.objects.filter(category_id__in=subscribed_categories)
+            return [r for r in responses if self in r.sharing_scope.get_members()]
         elif content_type == 'note':
-            from note.models import Note
-            return Note.objects.filter(sharing_scope__in=scopes)
+            notes = Note.objects.filter(category_id__in=subscribed_categories)
+            return [n for n in notes if self in n.sharing_scope.get_members()]
         else:
-            from qna.models import Response
-            from note.models import Note
-            responses = Response.objects.filter(sharing_scope__in=scopes)
-            notes = Note.objects.filter(sharing_scope__in=scopes)
-            return responses, notes
+            responses = Response.objects.filter(category_id__in=subscribed_categories)
+            notes = Note.objects.filter(category_id__in=subscribed_categories)
+            return (
+                [r for r in responses if self in r.sharing_scope.get_members()],
+                [n for n in notes if self in n.sharing_scope.get_members()]
+            )
 
 
 class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
@@ -636,3 +650,14 @@ def delete_old_profile_image(sender, instance, **kwargs):
                 image_hash = image_name.split('_')[-1].split('.')[0]
                 if image_hash != current_hash:
                     os.remove(image_path)  # 해시 값이 다른 파일을 삭제합니다.
+
+def is_included(author, user, sharing_scope):
+    if sharing_scope == 'public':
+        return True
+    if sharing_scope == 'private':
+        return user == author
+    if sharing_scope == 'neighbor':
+        return user.is_connected(author)
+    if sharing_scope == 'friend':
+        return user.is_friend(author)
+    return False
