@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - adoorback/.env.development
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    command: >
+      sh -c '
+      sleep 5 &&
+      python manage.py migrate &&
+      python manage.py shell -c "from adoorback.test.seed import set_seed; set_seed(100)" &&
+      python manage.py runserver 0.0.0.0:8000
+      '
+
+  db:
+    image: postgres:13
+    env_file:
+      - adoorback/.env.development
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+    driver: local
