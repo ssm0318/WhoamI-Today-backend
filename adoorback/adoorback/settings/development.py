@@ -22,7 +22,7 @@ DATABASES = {
         'NAME': 'diivers',
         'USER': 'postgres',
         'PASSWORD': 'postgres',
-        'HOST': 'localhost',
+        'HOST': os.environ.get('DB_HOST', 'localhost'),  # 환경변수 없으면 localhost 사용
         'POST': '',
     },
 }
