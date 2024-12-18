@@ -137,16 +137,29 @@ def set_seed(n):
     FriendRequest.objects.get_or_create(requester=user_8, requestee=user_10)
 
     # Seed Friendship
-    connections = [
-        Connection(user1=user_2, user2=user, user1_choice='friend', user2_choice='friend')
-        for user in [user_1, user_3, user_4, user_5, user_6]
-    ]
-    Connection.objects.bulk_create(connections)
+    # 먼저 기존 connection과 chatroom 삭제
+    ChatRoom.objects.all().update(deleted=timezone.now())  # soft delete
+    Connection.objects.all().update(deleted=timezone.now())  # soft delete
 
-    for u in [user_1, user_3, user_4, user_5, user_6]:
+    # 그 다음 친구 관계 생성
+    for user in [user_1, user_3, user_4, user_5, user_6]:
+        connection, created = Connection.objects.get_or_create(
+            user1=user if user.id < user_2.id else user_2,
+            user2=user_2 if user.id < user_2.id else user,
+            defaults={
+                'user1_choice': 'friend',
+                'user2_choice': 'friend'
+            }
+        )
+        connection.deleted = None  # 삭제 표시 제거
+        connection.save()
+
+    # 마지막으로 채팅방 생성
+    for user in [user_1, user_3, user_4, user_5, user_6]:
         chat_room = ChatRoom()
         chat_room.save()
-        chat_room.users.add(user_2, u)
+        chat_room.users.add(user_2, user)
+
 
     # Test Notifications
     response = Response.objects.first()
@@ -210,12 +223,18 @@ def set_seed(n):
         f"{ResponseRequest.objects.count()} ResponseRequest(s) created!") if DEBUG else None
 
     # Seed Comment (target=Feed)
-    responses = Response.objects.all(author=user_2)
+    responses = Response.objects.filter(author=user_2)
     for _ in range(n):
         user = random.choice(users)
-        response = random.choice(responses)
-        Comment.objects.get_or_create(author=user, content_type=get_response_type(), object_id=response.id,
-                                      content=faker.catch_phrase(), is_private=_ % 2)
+        if responses.exists():  # responses가 비어있지 않은 경우에만 실행
+            response = random.choice(responses)
+            Comment.objects.get_or_create(
+                author=user, 
+                content_type=get_response_type(), 
+                object_id=response.id,
+                content=faker.catch_phrase(), 
+                is_private=_ % 2
+            )
     logging.info(
         f"{Comment.objects.count()} Comment(s) created!") if DEBUG else None
 
