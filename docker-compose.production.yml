@@ -3,7 +3,7 @@ services:
   web:
     image: whoamitoday/whoamitoday-backend:latest
     ports:
-      - "8000:8000"
+      - "80:8000" # 또는 "443:8000" (HTTPS용)
     env_file:
       - adoorback/.env.production
     depends_on:
