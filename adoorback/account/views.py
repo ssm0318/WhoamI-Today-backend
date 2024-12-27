@@ -481,7 +481,7 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 noti = Notification.objects.create(user=obj,
                                                    target=admin,
                                                    origin=admin,
-                                                   message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
+                                                   message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문��을 둘러보러 가볼까요?",
                                                    message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
                                                    redirect_url='/questions')
                 NotificationActor.objects.create(user=admin, notification=noti)
@@ -925,49 +925,3 @@ class UserMarkAllResponsesAsRead(APIView):
             response.readers.add(request.user)
 
         return Response({'success': 'All content marked as read successfully'}, status=status.HTTP_200_OK)
-
-
-class SubscribeUserContent(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def create(self, request, *args, **kwargs):
-        friend_id = request.data.get('user_id')
-        user = request.user
-        user_to_subscribe = get_object_or_404(User, id=friend_id)
-        content_type_str = request.data.get('content_type')  # 'note' or 'response'
-
-        content_type = get_generic_relation_type(content_type_str)
-        if not content_type:
-            return Response({'error': 'Invalid content type.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if Subscription.objects.filter(subscriber=request.user, subscribed_to=user_to_subscribe, content_type=content_type).exists():
-            return Response({'error': f'You are already subscribed to this user\'s {content_type_str}.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not user.is_connected(user_to_subscribe):
-            return Response({'error': 'User is not your friend.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        Subscription.objects.create(
-            subscriber=user,
-            subscribed_to=user_to_subscribe,
-            content_type=content_type
-        )
-
-        return Response({'message': f'Subscribed to {user_to_subscribe.username}\'s {content_type_str} successfully.'}, status=status.HTTP_201_CREATED)
-
-
-class UnsubscribeUserContent(generics.DestroyAPIView):
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def delete(self, request, *args, **kwargs):
-        subscription_id = kwargs.get('pk')
-        subscription = get_object_or_404(Subscription, id=subscription_id, subscriber=request.user)
-
-        subscription.delete()
-
-        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -57,8 +57,4 @@ urlpatterns = [
     # Friend Recommend related
     path('recommended-friends/', views.UserRecommendedFriendsList.as_view(), name='user-recommended-friends-list'),
     path('block-recommendation/', views.BlockRecCreate.as_view(), name='block-rec-create'),
-
-     # Subscribe related
-    path('friends/subscribe/', views.SubscribeUserContent.as_view(), name='subscribe-user-content'),
-    path('friends/<int:pk>/subscribe/', views.UnsubscribeUserContent.as_view(), name='unsubscribe-user-content'),
 ]

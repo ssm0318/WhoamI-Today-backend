@@ -318,21 +318,11 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     def can_access_response_set(self, user):
         from qna.models import Response
-        from category.models import Subscription
-
-        #gets the user's subscribed categories
-        subscribed_categories = Subscription.objects.filter(user=self).values_list('category_id', flat=True)
-
-        # Then, filters responses by:
-        # 1. Author (user parameter)
-        # 2. Category (must be in subscribed categories)
-        # 3. Sharing scope (user must be included in sharing scope)
-        responses = Response.objects.filter(
-            author=user,
-            category_id__in=subscribed_categories
-        )
         
-        # Further filter by checking if self is in sharing_scope
+        # Get all responses by the user
+        responses = Response.objects.filter(author=user)
+        
+        # Filter responses by checking if self is in sharing_scope
         return [response for response in responses if self in response.sharing_scope.get_members()]
 
     def can_access_check_in(self, user):
@@ -356,7 +346,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return [note for note in notes if self in note.sharing_scope.get_members()]
 
 
-#added 11/18/24:
     def get_subscribed_content(self, content_type=None):
         from category.models import Subscription
         from qna.models import Response
