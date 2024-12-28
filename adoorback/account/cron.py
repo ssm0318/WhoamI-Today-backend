@@ -49,6 +49,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                 continue
 
             if user.noti_time == time(user_local_time.hour, 0):
+                # daily notification
                 noti = Notification.objects.create(user=user,
                                                    target=admin,
                                                    origin=admin,
@@ -57,8 +58,62 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                                                    redirect_url=f'/questions/{daily_question_id}/new')
                 NotificationActor.objects.create(user=admin, notification=noti)
 
+                # signup notification
+                if not user.signup_noti_status:
+                    user.signup_noti_status = {
+                        "profile_noti_sent": False,
+                        "checkin_noti_sent": False,
+                        "note_noti_sent": False,
+                        "ping_noti_sent": False
+                    }
+                    user.save()
+
+                status = user.signup_noti_status
+                if not status["ping_noti_sent"]:  # need to send signup notification
+                    sent = False
+                    if not status["profile_noti_sent"]:
+                        if not (user.username != user.email or user.pronouns or user.bio):
+                            self.send_notification(
+                                user, admin, f"{user.username}님, 프로필을 업데이트 해보세요!", f"{user.username}, how about updating your profile information?", "/settings/edit-profile"
+                            )
+                            sent = True
+                        status["profile_noti_sent"] = True
+                    if not sent and not status["checkin_noti_sent"]:
+                        if not user.check_in_set.exists():
+                            self.send_notification(
+                                user, admin, f"{user.username}님, 체크인을 꾸며보세요!", f"{user.username}, create a check-in so your friends can check your status!", "/check-in/edit"
+                            )
+                            sent = True
+                        status["checkin_noti_sent"] = True
+                    if not sent and not status["note_noti_sent"]:
+                        if not user.note_set.exists():
+                            self.send_notification(
+                                user, admin, f"{user.username}님, 첫 노트를 작성해보세요!", f"{user.username}, write your first note and share your thoughts!", "/notes/new"
+                            )
+                            sent = True
+                        status["note_noti_sent"] = True
+                    if not sent and user.friends.exists():
+                        self.send_notification(
+                            user, admin, f"{user.username}님, 친구에게 쪽지를 보내보세요!", f"{user.username}, ping your friend to say hi!", "/friends"
+                        )
+                        status["ping_noti_sent"] = True
+
+                    user.signup_noti_status = status
+                    user.save()
+
         num_notis_after = Notification.objects.admin_only().count()
         print(f'{num_notis_after - num_notis_before} notifications sent!')
         print('=========================')
         print("Cron job complete...............")
         print('=========================')
+
+    def send_notification(self, user, admin, message_ko, message_en, redirect_url):       
+        noti = Notification.objects.create(
+            user=user,
+            target=admin,
+            origin=admin,
+            message_ko=message_ko,
+            message_en=message_en,
+            redirect_url=redirect_url
+        )
+        NotificationActor.objects.create(user=admin, notification=noti)
