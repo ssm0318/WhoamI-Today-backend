@@ -147,7 +147,7 @@ class UserProfileSerializer(UserMinimalSerializer):
             return UserMinimalSerializer(mutual_users, many=True).data
         return {}
 
-    def get_are_friends(self, obj):  # does not mean 'friend' in friend & follower, it means connection
+    def get_are_friends(self, obj):  # does not mean 'friend' in friend & neighbor, it means connection
         user = self.context.get('request', None).user
         if user == obj:
             return None
@@ -361,7 +361,7 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
         user = self.context.get('request').user
         return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
 
-    def get_are_friends(self, obj):  # does not mean 'friend' in friend & follower, it means connection
+    def get_are_friends(self, obj):  # does not mean 'friend' in friend & neighbor, it means connection
         user = self.context.get('request', None).user
         if user == obj:
             return None
