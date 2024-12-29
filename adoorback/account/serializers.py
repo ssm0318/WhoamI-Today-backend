@@ -195,6 +195,7 @@ class FriendListSerializer(UserMinimalSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
     is_hidden = serializers.SerializerMethodField(read_only=True)
+    connection_status = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
@@ -215,6 +216,17 @@ class FriendListSerializer(UserMinimalSerializer):
         if request and request.user.is_authenticated:
             return obj in request.user.hidden.all()
         return False
+    
+    def get_connection_status(self, obj):  # what user has set obj as
+        user = self.context.get('request', None).user
+        if user == obj:
+            return None
+        if user.is_connected(obj):
+            if obj.is_neighbor(user):
+                return 'neighbor'
+            if obj.is_friend(user):
+                return 'friend'
+        return None
 
     def get_current_user_read(self, obj):
         from check_in.serializers import CheckInBaseSerializer
@@ -288,8 +300,8 @@ class FriendListSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read', 'unread_cnt',
-                                                      'bio', 'track_id', 'description', 'unread_ping_count']
+        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
+                                                      'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):
