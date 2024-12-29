@@ -34,7 +34,8 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserEmailSerializer, UserUsernameSerializer, \
                                  FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
-                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
+                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
+                                 ConnectionChoiceUpdateSerializer)
 from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername
@@ -738,6 +739,24 @@ class UserHiddenDestroy(generics.DestroyAPIView):
     @transaction.atomic
     def perform_destroy(self, obj):
         self.request.user.hidden.remove(obj)
+
+
+class ConnectionChoiceUpdate(generics.UpdateAPIView):
+    queryset = Connection.objects.all()
+    serializer_class = ConnectionChoiceUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        try:
+            connected_user = User.objects.get(id=self.kwargs['pk'])
+            connection = Connection.get_connection_between(self.request.user, connected_user)
+        except User.DoesNotExist:
+            raise Http404("The specified connected user does not exist.")
+
+        if not connection:
+            raise Http404("No connection exists between the current user and the specified friend.")
+
+        return connection
 
 
 class UserFriendDestroy(generics.DestroyAPIView):
