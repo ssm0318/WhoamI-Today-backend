@@ -34,7 +34,8 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserEmailSerializer, UserUsernameSerializer, \
                                  FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
-                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
+                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
+                                 ConnectionChoiceUpdateSerializer)
 from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername
@@ -740,6 +741,24 @@ class UserHiddenDestroy(generics.DestroyAPIView):
         self.request.user.hidden.remove(obj)
 
 
+class ConnectionChoiceUpdate(generics.UpdateAPIView):
+    queryset = Connection.objects.all()
+    serializer_class = ConnectionChoiceUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        try:
+            connected_user = User.objects.get(id=self.kwargs['pk'])
+            connection = Connection.get_connection_between(self.request.user, connected_user)
+        except User.DoesNotExist:
+            raise Http404("The specified connected user does not exist.")
+
+        if not connection:
+            raise Http404("No connection exists between the current user and the specified friend.")
+
+        return connection
+
+
 class UserFriendDestroy(generics.DestroyAPIView):
     queryset = User.objects.all()
     permission_classes = [IsAuthenticated]
@@ -848,8 +867,8 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
             noti = Notification.objects.create(user=user,
                                                target=admin,
                                                origin=admin,
-                                               message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
-                                               message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
+                                               message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                                               message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
                                                redirect_url='/settings')
             NotificationActor.objects.create(user=admin, notification=noti)
 

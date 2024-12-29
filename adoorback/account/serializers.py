@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from account.models import FriendRequest, BlockRec
+from account.models import FriendRequest, BlockRec, Connection
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
@@ -118,6 +118,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     is_favorite = serializers.SerializerMethodField(read_only=True)
     mutuals = serializers.SerializerMethodField(read_only=True)
     are_friends = serializers.SerializerMethodField(read_only=True)
+    connection_status = serializers.SerializerMethodField(read_only=True)
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
@@ -147,11 +148,22 @@ class UserProfileSerializer(UserMinimalSerializer):
             return UserMinimalSerializer(mutual_users, many=True).data
         return {}
 
-    def get_are_friends(self, obj):  # does not mean 'friend' in friend & follower, it means connection
+    def get_are_friends(self, obj):  # does not mean 'friend' in friend & neighbor, it means connection
         user = self.context.get('request', None).user
         if user == obj:
             return None
         return user.is_connected(obj)
+    
+    def get_connection_status(self, obj):  # what user has set obj as
+        user = self.context.get('request', None).user
+        if user == obj:
+            return None
+        if user.is_connected(obj):
+            if obj.is_neighbor(user):
+                return 'neighbor'
+            if obj.is_friend(user):
+                return 'friend'
+        return None
 
     def get_received_friend_request_from(self, obj):
         user = self.context.get('request').user
@@ -176,13 +188,14 @@ class UserProfileSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'pronouns', 'bio', 'unread_ping_count']
+                                                      'pronouns', 'bio', 'unread_ping_count', 'connection_status']
 
 
 class FriendListSerializer(UserMinimalSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
     is_hidden = serializers.SerializerMethodField(read_only=True)
+    connection_status = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
@@ -203,6 +216,17 @@ class FriendListSerializer(UserMinimalSerializer):
         if request and request.user.is_authenticated:
             return obj in request.user.hidden.all()
         return False
+    
+    def get_connection_status(self, obj):  # what user has set obj as
+        user = self.context.get('request', None).user
+        if user == obj:
+            return None
+        if user.is_connected(obj):
+            if obj.is_neighbor(user):
+                return 'neighbor'
+            if obj.is_friend(user):
+                return 'friend'
+        return None
 
     def get_current_user_read(self, obj):
         from check_in.serializers import CheckInBaseSerializer
@@ -276,8 +300,8 @@ class FriendListSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'current_user_read', 'unread_cnt',
-                                                      'bio', 'track_id', 'description', 'unread_ping_count']
+        fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
+                                                      'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):
@@ -315,6 +339,7 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     requestee_id = serializers.IntegerField()
     accepted = serializers.BooleanField(allow_null=True, required=False)
     requester_detail = serializers.SerializerMethodField(read_only=True)
+    requester_choice = serializers.CharField()
 
     def get_requester_detail(self, obj):
         return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
@@ -326,25 +351,28 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail']
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail', 'requester_choice']
 
 
 class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField(required=False)
     requestee_id = serializers.IntegerField(required=False)
     accepted = serializers.BooleanField(required=True)
+    requestee_choice = serializers.CharField(required=True)
 
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
         if unknown:
-            raise serializers.ValidationError("이 필드는 뭘까요: {}".format(", ".join(unknown)))
+            raise serializers.ValidationError("Unknown field: {}".format(", ".join(unknown)))
         if self.instance.accepted is not None:
-            raise serializers.ValidationError("이미 friend request에 응답하셨습니다.")
+            raise serializers.ValidationError("You have already responded to this connection request.")
+        if 'requestee_choice' not in data:
+            raise serializers.ValidationError({"requestee_choice": "This field is required."})
         return data
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted']
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requestee_choice']
 
 
 class UserFriendshipStatusSerializer(UserMinimalSerializer):
@@ -361,7 +389,7 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
         user = self.context.get('request').user
         return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
 
-    def get_are_friends(self, obj):  # does not mean 'friend' in friend & follower, it means connection
+    def get_are_friends(self, obj):  # does not mean 'friend' in friend & neighbor, it means connection
         user = self.context.get('request', None).user
         if user == obj:
             return None
@@ -405,6 +433,43 @@ class UserMinimumSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'profile_image', 'url']
+
+
+class ConnectionChoiceUpdateSerializer(serializers.ModelSerializer):
+    choice = serializers.ChoiceField(choices=Connection.CHOICES, required=True)
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        choice = validated_data['choice']
+
+        if user == instance.user1:
+            if instance.user1_choice == choice:
+                raise ValidationError("You already set connected user as '{}'.".format(choice))
+            instance.user1_choice = choice
+        elif user == instance.user2:
+            if instance.user2_choice == choice:
+                raise ValidationError("You already set connected user as '{}'.".format(choice))
+            instance.user2_choice = choice
+        instance.save()
+
+        return instance
+    
+    def to_representation(self, instance):
+        user = self.context['request'].user
+
+        if user == instance.user1:
+            choice = instance.user1_choice
+        elif user == instance.user2:
+            choice = instance.user2_choice
+        else:
+            raise serializers.ValidationError("You are not part of this connection.")
+
+        return {'choice': choice}
+
+    
+    class Meta:
+        model = Connection
+        fields = ['choice']
 
 
 class BlockRecSerializer(serializers.ModelSerializer):

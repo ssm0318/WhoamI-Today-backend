@@ -185,11 +185,11 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             Q(user1=user, user2=self) | Q(user1=self, user2=user)
         ).exists()
 
-    def is_follower(self, user):
-        """Checks if self (current user) is a 'follower' of user"""
+    def is_neighbor(self, user):
+        """Checks if self (current user) is a 'neighbor' of user"""
         return Connection.objects.filter(
-            Q(user1=user, user2=self, user1_choice='follower') |
-            Q(user1=self, user2=user, user2_choice='follower')
+            Q(user1=user, user2=self, user1_choice='neighbor') |
+            Q(user1=self, user2=user, user2_choice='neighbor')
         ).exists()
 
     def is_friend(self, user):
@@ -213,10 +213,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return User.objects.filter(id__in=id_list)
     
     @property
-    def followers(self):
+    def neighbors(self):
         connections = Connection.objects.filter(
-            Q(user1=self, user1_choice='follower') | 
-            Q(user2=self, user2_choice='follower')
+            Q(user1=self, user1_choice='neighbor') | 
+            Q(user2=self, user2_choice='neighbor')
         ).values_list('user1', 'user2')
 
         id_list = [
@@ -254,10 +254,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return id_list
 
     @property
-    def follower_ids(self):
+    def neighbor_ids(self):
         connections = Connection.objects.filter(
-            Q(user1=self, user1_choice='follower') | 
-            Q(user2=self, user2_choice='follower')
+            Q(user1=self, user1_choice='neighbor') | 
+            Q(user2=self, user2_choice='neighbor')
         ).values_list('user1', 'user2')
 
         id_list = [
@@ -352,7 +352,8 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
     requestee = models.ForeignKey(
         get_user_model(), related_name='received_friend_requests', on_delete=models.CASCADE)
     accepted = models.BooleanField(null=True)
-    requester_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('follower', 'Follower')], null=True)
+    requester_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('neighbor', 'Neighbor')], null=True)
+    requestee_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('neighbor', 'Neighbor')], null=True)
 
     friend_request_targetted_notis = GenericRelation("notification.Notification",
                                                      content_type_field='target_type',
@@ -384,7 +385,7 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
 class Connection(AdoorTimestampedModel, SafeDeleteModel):
     CHOICES = (
         ('friend', 'Friend'),
-        ('follower', 'Follower'),
+        ('neighbor', 'Neighbor'),
     )
 
     user1 = models.ForeignKey(
@@ -440,13 +441,13 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
         """Check if user1 set user2 as 'friend'."""
         return self.user1_choice == 'friend'
     
-    def user1_is_follower(self):
-        """Check if user2 set user1 as 'follower'."""
-        return self.user2_choice == 'follower'
+    def user1_is_neighbor(self):
+        """Check if user2 set user1 as 'neighbor'."""
+        return self.user2_choice == 'neighbor'
     
-    def user2_is_follower(self):
-        """Check if user1 set user2 as 'follower'."""
-        return self.user1_choice == 'follower'
+    def user2_is_neighbor(self):
+        """Check if user1 set user2 as 'neighbor'."""
+        return self.user1_choice == 'neighbor'
 
 
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
@@ -550,8 +551,8 @@ def create_connection_noti(created, instance, **kwargs):
     if created:
         noti = Notification.objects.create(user=requestee,
                                            origin=requester, target=instance,
-                                           message_ko=f'{requester.username}님이 친구 요청을 보냈습니다.',
-                                           message_en=f'{requester.username} has requested to be your friend.',
+                                           message_ko=f'{requester.username}님이 연결 요청을 보냈습니다.',
+                                           message_en=f'{requester.username} has requested to be connected.',
                                            redirect_url=f'/users/{requester.username}')
         NotificationActor.objects.create(user=requester, notification=noti)
         return
@@ -561,14 +562,14 @@ def create_connection_noti(created, instance, **kwargs):
 
         noti = Notification.objects.create(user=requestee,
                                            origin=requester, target=requester,
-                                           message_ko=f'{requester.username}님과 친구가 되었습니다.',
-                                           message_en=f'You are now friends with {requester.username}.',
+                                           message_ko=f'{requester.username}님과 연결되었습니다.',
+                                           message_en=f'You are now connected with {requester.username}.',
                                            redirect_url=f'/users/{requester.username}')
         NotificationActor.objects.create(user=requester, notification=noti)
         noti = Notification.objects.create(user=requester,
                                            origin=requestee, target=requestee,
-                                           message_ko=f'{requestee.username}님과 친구가 되었습니다.',
-                                           message_en=f'You are now friends with {requestee.username}.',
+                                           message_ko=f'{requestee.username}님과 연결되었습니다.',
+                                           message_en=f'You are now connected with {requestee.username}.',
                                            redirect_url=f'/users/{requestee.username}')
         NotificationActor.objects.create(user=requestee, notification=noti)
 
@@ -576,8 +577,8 @@ def create_connection_noti(created, instance, **kwargs):
         Connection.objects.create(
             user1=requester,
             user2=requestee,
-            user1_choice='friend',  # TODO: fix hard coded 'friend' option
-            user2_choice='friend',  # TODO: fix hard coded 'friend' option
+            user1_choice=instance.requester_choice,
+            user2_choice=instance.requestee_choice,
         )
 
         # make chat room
