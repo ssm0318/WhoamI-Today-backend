@@ -315,6 +315,7 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     requestee_id = serializers.IntegerField()
     accepted = serializers.BooleanField(allow_null=True, required=False)
     requester_detail = serializers.SerializerMethodField(read_only=True)
+    requester_choice = serializers.CharField()
 
     def get_requester_detail(self, obj):
         return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
@@ -326,25 +327,28 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail']
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail', 'requester_choice']
 
 
 class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField(required=False)
     requestee_id = serializers.IntegerField(required=False)
     accepted = serializers.BooleanField(required=True)
+    requestee_choice = serializers.CharField(required=True)
 
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
         if unknown:
-            raise serializers.ValidationError("이 필드는 뭘까요: {}".format(", ".join(unknown)))
+            raise serializers.ValidationError("Unknown field: {}".format(", ".join(unknown)))
         if self.instance.accepted is not None:
-            raise serializers.ValidationError("이미 friend request에 응답하셨습니다.")
+            raise serializers.ValidationError("You have already responded to this connection request.")
+        if 'requestee_choice' not in data:
+            raise serializers.ValidationError({"requestee_choice": "This field is required."})
         return data
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted']
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requestee_choice']
 
 
 class UserFriendshipStatusSerializer(UserMinimalSerializer):

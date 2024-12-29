@@ -848,8 +848,8 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
             noti = Notification.objects.create(user=user,
                                                target=admin,
                                                origin=admin,
-                                               message_ko=f"{user.username}님, 투데이 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
-                                               message_en=f"{user.username}, if you don't want to miss writing today, try setting up notifications!",
+                                               message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                                               message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
                                                redirect_url='/settings')
             NotificationActor.objects.create(user=admin, notification=noti)
 

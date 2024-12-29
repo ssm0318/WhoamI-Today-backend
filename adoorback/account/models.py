@@ -353,6 +353,7 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
         get_user_model(), related_name='received_friend_requests', on_delete=models.CASCADE)
     accepted = models.BooleanField(null=True)
     requester_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('neighbor', 'Neighbor')], null=True)
+    requestee_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('neighbor', 'Neighbor')], null=True)
 
     friend_request_targetted_notis = GenericRelation("notification.Notification",
                                                      content_type_field='target_type',
@@ -550,8 +551,8 @@ def create_connection_noti(created, instance, **kwargs):
     if created:
         noti = Notification.objects.create(user=requestee,
                                            origin=requester, target=instance,
-                                           message_ko=f'{requester.username}님이 친구 요청을 보냈습니다.',
-                                           message_en=f'{requester.username} has requested to be your friend.',
+                                           message_ko=f'{requester.username}님이 연결 요청을 보냈습니다.',
+                                           message_en=f'{requester.username} has requested to be connected.',
                                            redirect_url=f'/users/{requester.username}')
         NotificationActor.objects.create(user=requester, notification=noti)
         return
@@ -561,14 +562,14 @@ def create_connection_noti(created, instance, **kwargs):
 
         noti = Notification.objects.create(user=requestee,
                                            origin=requester, target=requester,
-                                           message_ko=f'{requester.username}님과 친구가 되었습니다.',
-                                           message_en=f'You are now friends with {requester.username}.',
+                                           message_ko=f'{requester.username}님과 연결되었습니다.',
+                                           message_en=f'You are now connected with {requester.username}.',
                                            redirect_url=f'/users/{requester.username}')
         NotificationActor.objects.create(user=requester, notification=noti)
         noti = Notification.objects.create(user=requester,
                                            origin=requestee, target=requestee,
-                                           message_ko=f'{requestee.username}님과 친구가 되었습니다.',
-                                           message_en=f'You are now friends with {requestee.username}.',
+                                           message_ko=f'{requestee.username}님과 연결되었습니다.',
+                                           message_en=f'You are now connected with {requestee.username}.',
                                            redirect_url=f'/users/{requestee.username}')
         NotificationActor.objects.create(user=requestee, notification=noti)
 
@@ -576,8 +577,8 @@ def create_connection_noti(created, instance, **kwargs):
         Connection.objects.create(
             user1=requester,
             user2=requestee,
-            user1_choice='friend',  # TODO: fix hard coded 'friend' option
-            user2_choice='friend',  # TODO: fix hard coded 'friend' option
+            user1_choice=instance.requester_choice,
+            user2_choice=instance.requestee_choice,
         )
 
         # make chat room
