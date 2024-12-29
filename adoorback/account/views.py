@@ -36,7 +36,7 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
                                  ConnectionChoiceUpdateSerializer)
-from adoorback.utils.content_types import get_generic_relation_type
+from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername
 from adoorback.utils.validators import adoor_exception_handler
@@ -502,6 +502,15 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 serializer.validated_data['noti_period_days'] = noti_period_days
 
             obj = serializer.save()
+
+            # update notification redirect url when username changes
+            if 'username' in self.request.data:
+                friend_request_ct = get_friend_request_type()
+                self.request.user.friendship_originated_notis.filter(
+                    target_type=friend_request_ct
+                ).update(
+                    redirect_url=f"/users/{serializer.validated_data.get('username')}"
+                )
             
             updating_data = list(self.request.data.keys())
             if len(updating_data) == 1 and updating_data[0] == 'question_history':
