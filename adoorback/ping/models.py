@@ -42,6 +42,11 @@ class PingRoom(AdoorTimestampedModel, SafeDeleteModel):
             raise ValidationError("Users in the pingroom must be friends.")
     
     def save(self, *args, **kwargs):
+        # if deleting, do not clean
+        if self.deleted:
+            super().save(*args, **kwargs)
+            return
+
         self.full_clean()
 
         # check if reverse Connection already exists
