@@ -3,7 +3,8 @@ services:
     image: whoamitoday/whoamitoday-backend:latest
     working_dir: /app/adoorback
     ports:
-      - "80:8000" # 또는 "443:8000" (HTTPS용)
+      - "80:8000"
+      - "443:8000" # HTTPS
     env_file:
       - .env
     depends_on:
