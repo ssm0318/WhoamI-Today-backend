@@ -49,5 +49,5 @@ adoorback/.python-version
 # Google translation
 /adoorback/coherent-flame-438905-n8-31fc61ebb01c.json
 
-# .env
-/adoorback/.env.*
+# environment variables
+.env*
