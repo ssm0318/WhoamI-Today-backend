@@ -40,16 +40,26 @@ BASE_URL = 'https://whoami.gina-park.site'
 #    "develop.d3t1tnno5uz3sa.amplifyapp.com",
 #    "localhost"
 # ]
-CSRF_TRUSTED_ORIGINS = ['https://whoami.gina-park.site']
+CSRF_TRUSTED_ORIGINS = [
+    'https://whoami.gina-park.site',    
+    "https://*.gina-park.site",
+]
 
-
-ALLOWED_HOSTS = ['ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com', 'localhost', '43.203.123.225', 'ip-172-31-12-68']
+ALLOWED_HOSTS = [
+    'ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com',
+    'localhost',
+    '43.203.123.225',
+    'ip-172-31-12-68',
+    '.gina-park.site'
+]
 
 CORS_ALLOWED_ORIGINS = [
-#    "https://develop.d3t1tnno5uz3sa.amplifyapp.com",
-#    "http://localhost:3000",
     "https://ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com",  # Public DNS 이름
-    "https://43.203.123.225",  # Public IP 주소
+    "https://43.203.123.225",
+]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.gina-park\.site$"
 ]
 
 FRONTEND_URL = 'https://whoami.gina-park.site'
