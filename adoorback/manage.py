@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 def main():
     """Run administrative tasks."""
     # 환경에 따라 적절한 .env 파일 로드
+    print(os.environ.get('DJANGO_SETTINGS_MODULE'))
     if os.environ.get('DJANGO_SETTINGS_MODULE') == 'adoorback.settings.development':
         load_dotenv('.env.development')
     else:
