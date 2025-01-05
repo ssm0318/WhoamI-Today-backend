@@ -5,7 +5,7 @@ services:
     ports:
       - "80:8000" # 또는 "443:8000" (HTTPS용)
     env_file:
-      - adoorback/.env.production
+      - .env
     depends_on:
       - db
     healthcheck:
@@ -23,7 +23,7 @@ services:
   db:
     image: postgres:13
     env_file:
-      - adoorback/.env.production
+      - .env
     environment:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}
