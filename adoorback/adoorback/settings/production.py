@@ -12,9 +12,9 @@ BASE_URL = 'https://whoami.gina-park.site'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'whoamitoday',
-        'USER': 'postgres',
-        'PASSWORD': os.environ['DB_PASSWORD'],
+        'NAME': os.environ.get('DB_NAME', 'whoamitoday'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),  
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
     },
