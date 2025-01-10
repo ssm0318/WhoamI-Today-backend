@@ -1,4 +1,5 @@
 from datetime import timedelta
+from itertools import chain
 import json
 
 from django.apps import apps
@@ -1029,3 +1030,55 @@ class UnsubscribeUserContent(generics.DestroyAPIView):
         subscription.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FriendFeed(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        connected_user_ids = user.connected_user_ids
+        blocked_user_ids = user.user_report_blocked_ids
+
+        notes = Note.objects.filter(
+            author_id__in=connected_user_ids
+        ).exclude(author_id__in=blocked_user_ids).select_related('author')
+
+        responses = _Response.objects.filter(
+            author_id__in=connected_user_ids
+        ).exclude(author_id__in=blocked_user_ids).select_related('author', 'question')
+
+        combined_feed = sorted(
+            chain(notes, responses),
+            key=lambda x: x.created_at,
+            reverse=True
+        )
+        return combined_feed
+
+    def paginate_queryset(self, queryset):
+        page = super().paginate_queryset(queryset)
+        return page
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        from qna.serializers import ResponseSerializer
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serialized_data = [
+                NoteSerializer(item, context=self.get_serializer_context()).data
+                if isinstance(item, Note) else
+                ResponseSerializer(item, context=self.get_serializer_context()).data
+                for item in page
+            ]
+            return self.get_paginated_response(serialized_data)
+
+        # Fallback (if pagination is disabled)
+        serialized_data = [
+            NoteSerializer(item, context=self.get_serializer_context()).data
+            if isinstance(item, Note) else
+            ResponseSerializer(item, context=self.get_serializer_context()).data
+            for item in queryset
+        ]
+        return Response(serialized_data)
