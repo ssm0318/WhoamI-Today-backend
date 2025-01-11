@@ -15,7 +15,7 @@ from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
 from like.serializers import InteractionSerializer, LikeSerializer
 from note.models import Note, NoteImage
-from note.serializers import NoteSerializer
+from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 
 
 class NoteCreate(generics.CreateAPIView):
@@ -86,6 +86,44 @@ class NoteComments(generics.ListAPIView):
 
 class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        pk = self.kwargs.get('pk')
+        obj = queryset.filter(pk=pk).first()
+
+        if obj is None:
+            raise Http404('No Note matches the given query.')
+
+        self.check_object_permissions(self.request, obj)
+
+        return obj
+
+    def get_queryset(self):
+        return Note.objects.all()
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        new_images = request.FILES.getlist('images', [])
+        instance.images.all().delete()  # hard delete images
+
+        for image in new_images:
+            n = NoteImage.objects.create(note=instance, image=image)
+        
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+
+class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = DefaultFriendNoteSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared]
 
     def get_exception_handler(self):
