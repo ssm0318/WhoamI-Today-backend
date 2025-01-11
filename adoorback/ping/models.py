@@ -89,7 +89,7 @@ class Ping(AdoorTimestampedModel, SafeDeleteModel):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.sender} sent a {self.get_content_display()} ping to {self.receiver}"
+        return f"{self.sender} sent a {self.content} ping to {self.receiver}"
     
     @property
     def type(self):
