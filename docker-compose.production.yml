@@ -1,6 +1,8 @@
 services:
   web:
     image: whoamitoday/whoamitoday-backend:latest
+    environment:
+      - DB_HOST=db
     working_dir: /app/adoorback
     ports:
       - "8000:8000"
