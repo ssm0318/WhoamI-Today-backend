@@ -72,3 +72,40 @@ class NoteSerializer(AdoorBaseSerializer):
         model = Note
         fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_like_id', 
                                                     'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited']
+
+
+class DefaultFriendNoteSerializer(AdoorBaseSerializer):
+    '''
+    Friend Note Serializer for default ver.
+    1) includes like count even when viewing others' notes
+    2) excludes reactions
+    '''
+    like_count = serializers.SerializerMethodField(read_only=True)
+    author = serializers.HyperlinkedIdentityField(
+        view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
+    author_detail = UserMinimalSerializer(source='author', read_only=True)
+    images = serializers.SerializerMethodField()
+    current_user_read = serializers.SerializerMethodField(read_only=True)
+    like_user_sample = serializers.SerializerMethodField(read_only=True)
+
+    def get_current_user_read(self, obj):
+        current_user_id = self.context['request'].user.id
+        return current_user_id in obj.reader_ids
+
+    def get_images(self, obj):
+        images = obj.images.all().order_by('created_at')
+        return [image.image.url for image in images]
+    
+    def get_like_user_sample(self, obj):
+        from account.serializers import UserMinimalSerializer
+        recent_likes = obj.note_likes.order_by('-created_at')[:3]
+        recent_users = [like.user for like in recent_likes]
+        return UserMinimalSerializer(recent_users, many=True, context=self.context).data
+    
+    def get_like_count(self, obj):
+        return obj.liked_user_ids.count()
+
+    class Meta(AdoorBaseSerializer.Meta):
+        model = Note
+        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_like_id', 
+                                                    'current_user_read', 'like_user_sample', 'is_edited']

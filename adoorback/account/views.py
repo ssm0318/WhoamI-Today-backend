@@ -42,7 +42,7 @@ from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUs
     NoUsername, WrongPassword, ExistingUsername
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
-from note.serializers import NoteSerializer
+from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
@@ -414,6 +414,20 @@ class UserProfile(generics.RetrieveAPIView):
 
 class UserNoteList(generics.ListAPIView):
     serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        all_notes = Note.objects.filter(author__username=self.kwargs.get('username'))
+        note_ids = [note.id for note in all_notes if note.is_audience(user)]
+        return Note.objects.filter(id__in=note_ids).order_by('-created_at')
+
+
+class DefaultUserNoteList(generics.ListAPIView):
+    serializer_class = DefaultFriendNoteSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):

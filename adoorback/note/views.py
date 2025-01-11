@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
-from like.serializers import InteractionSerializer
+from like.serializers import InteractionSerializer, LikeSerializer
 from note.models import Note, NoteImage
 from note.serializers import NoteSerializer
 
@@ -120,6 +120,20 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
         
         self.perform_update(serializer)
         return Response(serializer.data)
+
+
+class NoteLikes(generics.ListAPIView):
+    '''
+    for default ver., visible to friends
+    '''
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
+
+    def get_queryset(self):
+        from like.models import Like
+        note_id = self.kwargs['pk']
+
+        return Like.objects.filter(content_type__model='note', object_id=note_id)
 
 
 class NoteInteractions(generics.ListAPIView):
