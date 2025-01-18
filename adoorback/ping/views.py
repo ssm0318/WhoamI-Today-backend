@@ -24,7 +24,7 @@ class PingList(generics.ListCreateAPIView):
 
         ping_room = get_or_create_ping_room(connected_user, user)
 
-        pings = list(ping_room.pings)  # to freeze the unread status
+        pings = list(ping_room.pings.all())  # to freeze the unread status
 
         oldest_unread = ping_room.pings.filter(receiver=user, is_read=False).order_by('id').first()
         
