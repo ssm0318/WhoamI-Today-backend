@@ -1059,16 +1059,7 @@ class FriendFeed(generics.ListAPIView):
             author_id__in=connected_user_ids
         ).exclude(author_id__in=blocked_user_ids).select_related('author')
 
-        responses = _Response.objects.filter(
-            author_id__in=connected_user_ids
-        ).exclude(author_id__in=blocked_user_ids).select_related('author', 'question')
-
-        combined_feed = sorted(
-            chain(notes, responses),
-            key=lambda x: x.created_at,
-            reverse=True
-        )
-        return combined_feed
+        return notes.order_by('-created_at')
 
     def paginate_queryset(self, queryset):
         page = super().paginate_queryset(queryset)
@@ -1077,22 +1068,11 @@ class FriendFeed(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
 
-        from qna.serializers import ResponseSerializer
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serialized_data = [
-                NoteSerializer(item, context=self.get_serializer_context()).data
-                if isinstance(item, Note) else
-                ResponseSerializer(item, context=self.get_serializer_context()).data
-                for item in page
-            ]
+            serialized_data = NoteSerializer(page, many=True, context=self.get_serializer_context()).data
             return self.get_paginated_response(serialized_data)
 
         # Fallback (if pagination is disabled)
-        serialized_data = [
-            NoteSerializer(item, context=self.get_serializer_context()).data
-            if isinstance(item, Note) else
-            ResponseSerializer(item, context=self.get_serializer_context()).data
-            for item in queryset
-        ]
+        serialized_data = NoteSerializer(queryset, many=True, context=self.get_serializer_context()).data
         return Response(serialized_data)
