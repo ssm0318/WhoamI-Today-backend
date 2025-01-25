@@ -23,7 +23,6 @@ class PingList(generics.ListCreateAPIView):
             raise exceptions.NotFound("Connected user not found")
 
         ping_room = get_or_create_ping_room(connected_user, user)
-
         pings = list(ping_room.pings.all())  # to freeze the unread status
 
         oldest_unread = ping_room.pings.filter(receiver=user, is_read=False).order_by('id').first()
@@ -36,15 +35,18 @@ class PingList(generics.ListCreateAPIView):
             page_number = 1
         self.oldest_unread_page = page_number
 
-        # mark all pings as read
-        unread_pings = ping_room.pings.filter(receiver=user, is_read=False)
-        unread_pings.update(is_read=True)
-
         return pings
     
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
+
         response.data['oldest_unread_page'] = self.oldest_unread_page
+
+        paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)
+        if paginated_queryset:
+            ping_ids = [ping.id for ping in paginated_queryset]
+            Ping.objects.filter(id__in=ping_ids, receiver=request.user, is_read=False).update(is_read=True)
+
         return response
 
     def perform_create(self, serializer):
