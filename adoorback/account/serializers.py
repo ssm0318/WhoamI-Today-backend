@@ -122,6 +122,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
+    friend_count = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -183,12 +184,16 @@ class UserProfileSerializer(UserMinimalSerializer):
             if ping_room:
                 return ping_room.pings.filter(receiver=user, is_read=False).count()
         return 0
+    
+    def get_friend_count(self, obj):
+        return Connection.objects.filter(Q(user1=obj) | Q(user2=obj)).count()
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'pronouns', 'bio', 'unread_ping_count', 'connection_status']
+                                                      'pronouns', 'bio', 'unread_ping_count', 'connection_status',
+                                                      'friend_count']
 
 
 class FriendListSerializer(UserMinimalSerializer):
