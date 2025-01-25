@@ -44,7 +44,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio',
                   'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'noti_period_days',
-                  'timezone']
+                  'timezone', 'current_ver']
         extra_kwargs = {'password': {'write_only': True}}
 
     @transaction.atomic
