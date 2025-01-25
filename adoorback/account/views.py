@@ -1096,3 +1096,17 @@ class FriendFeed(generics.ListAPIView):
             for item in queryset
         ]
         return Response(serialized_data)
+
+
+class CurrentUserVersionChange(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+
+        if user.ver_changed_at is None:
+            user.ver_changed_at = timezone.now()
+            user.save(update_fields=['ver_changed_at'])
+            return Response({"message": "Version change timestamp recorded.", "ver_changed_at": user.ver_changed_at}, status=200)
+
+        return Response({"message": "Version change timestamp was already set.", "ver_changed_at": user.ver_changed_at}, status=200)

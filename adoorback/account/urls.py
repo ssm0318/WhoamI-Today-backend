@@ -22,6 +22,7 @@ urlpatterns = [
     path('me/responses/', views.CurrentUserResponseList.as_view(), name='current-user-response-list'),
     path('me/response-requests/', views.ReceivedResponseRequestList.as_view(), name='received-response-request-list'),
     path('me/search/', views.CurrentUserFriendSearch.as_view(), name='current-user-friend-search'),
+    path('me/version-change/', views.CurrentUserVersionChange.as_view(), name='current-user-version-change'),
 
     # User Profile related
     path(r'search/', views.UserSearch.as_view(), name='user-search'),
