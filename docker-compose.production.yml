@@ -4,8 +4,8 @@ services:
     environment:
       - DB_HOST=db
     working_dir: /app/adoorback
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     env_file:
       - .env
     depends_on:
@@ -26,6 +26,8 @@ services:
         limits:
           cpus: "1"
           memory: 1G
+    networks:
+      - whoamitoday-network
     restart: unless-stopped
 
   db:
@@ -50,8 +52,14 @@ services:
         limits:
           cpus: "1"
           memory: 2G
+    networks:
+      - whoamitoday-network
     restart: unless-stopped
 
 volumes:
   postgres_data:
     driver: local
+
+networks:
+  whoamitoday-network:
+    external: true
