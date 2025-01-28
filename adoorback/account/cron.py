@@ -92,7 +92,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                             )
                             sent = True
                         status["note_noti_sent"] = True
-                    if not sent and user.friends.exists():
+                    if not sent and user.has_connected_users:
                         self.send_notification(
                             user, admin, f"{user.username}님, 친구에게 쪽지를 보내보세요!", f"{user.username}, ping your friend to say hi!", "/friends"
                         )
