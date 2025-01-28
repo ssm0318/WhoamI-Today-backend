@@ -53,12 +53,16 @@ urlpatterns = [
     # FriendRequest related
     path('friend-requests/', views.UserFriendRequest.as_view(),
          name='user-friend-request-list'),
+    path('friend-requests/default/', views.UserFriendRequestDefault.as_view(), 
+         name='user-friend-request-default'),
     path('friend-requests/sent/', views.UserSentFriendRequestList.as_view(),
          name='user-sent-friend-request-list'),
     path('friend-requests/<int:pk>/', views.UserFriendRequestDestroy.as_view(),
          name='user-friend-request-destroy'),
     path('friend-requests/<int:pk>/respond/', views.UserFriendRequestUpdate.as_view(),
          name='user-friend-request-update'),
+    path('friend-requests/<int:pk>/respond/default/', views.UserFriendRequestUpdateDefault.as_view(), 
+         name='user-friend-request-update-default'),
 
     # Friend Recommend related
     path('recommended-friends/', views.UserRecommendedFriendsList.as_view(), name='user-recommended-friends-list'),

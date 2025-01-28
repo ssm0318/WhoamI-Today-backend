@@ -344,14 +344,19 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     requestee_id = serializers.IntegerField()
     accepted = serializers.BooleanField(allow_null=True, required=False)
     requester_detail = serializers.SerializerMethodField(read_only=True)
-    requester_choice = serializers.CharField()
+    requester_choice = serializers.CharField(required=False)
 
     def get_requester_detail(self, obj):
         return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
 
     def validate(self, data):
         if data.get('requester_id') == data.get('requestee_id'):
-            raise serializers.ValidationError('본인과는 친구가 될 수 없어요.')
+            raise serializers.ValidationError('You cannot be friends with yourself.')
+
+        # requester_choice is required in ver.E
+        if not self.context.get("default_api") and "requester_choice" not in data:
+            raise serializers.ValidationError({"requester_choice": "This field is required."})
+
         return data
 
     class Meta:
@@ -363,7 +368,7 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField(required=False)
     requestee_id = serializers.IntegerField(required=False)
     accepted = serializers.BooleanField(required=True)
-    requestee_choice = serializers.CharField(required=True)
+    requestee_choice = serializers.CharField(required=False)
 
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
@@ -371,7 +376,8 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Unknown field: {}".format(", ".join(unknown)))
         if self.instance.accepted is not None:
             raise serializers.ValidationError("You have already responded to this connection request.")
-        if 'requestee_choice' not in data:
+        
+        if not self.context.get("default_api") and "requestee_choice" not in self.initial_data:
             raise serializers.ValidationError({"requestee_choice": "This field is required."})
         return data
 
