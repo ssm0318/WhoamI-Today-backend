@@ -41,7 +41,6 @@ urlpatterns = i18n_patterns(
     path('api/chat/', include('chat.urls')),
 
     path('api/translate/', include('translate.urls')),
-    path('api/categories/', include('category.urls')),
     prefix_default_language=False
 )
 

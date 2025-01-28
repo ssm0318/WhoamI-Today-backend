@@ -10,6 +10,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from safedelete import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.models import SafeDeleteModel
+from django.apps import apps
 
 from django.conf import settings
 
@@ -157,26 +158,24 @@ def delete_image_file(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Note)
 def send_notifications_to_subscribers(sender, instance, created, **kwargs):
-    if not created:
-        return
-
-    author = instance.author
-    note_content_type = ContentType.objects.get_for_model(Note)
+    from django.apps import apps
+    Subscription = apps.get_model('category', 'Subscription')
     
-    subscribers = Subscription.objects.filter(
-        subscribed_to=author,
-        content_type=note_content_type,
-    ).values_list('subscriber', flat=True)
+    if created:
+        author = instance.author
+        subscribers = Subscription.objects.filter(
+            category__owner=author
+        ).values_list('user', flat=True)
 
-    for subscriber_id in subscribers:
-        subscriber = get_user_model().objects.get(id=subscriber_id)
-        
-        noti = Notification.objects.create(
-            user=subscriber,
-            origin=instance,
-            target=instance,
-            message_ko=f'{author.username}님이 새 노트를 작성했습니다.',
-            message_en=f'{author.username} has posted a new note.',
-            redirect_url=f'/notes/{instance.id}'
-        )
-        NotificationActor.objects.create(user=author, notification=noti)
+        for subscriber_id in subscribers:
+            subscriber = get_user_model().objects.get(id=subscriber_id)
+            
+            noti = Notification.objects.create(
+                user=subscriber,
+                origin=instance,
+                target=instance,
+                message_ko=f'{author.username}님이 새 노트를 작성했습니다.',
+                message_en=f'{author.username} has posted a new note.',
+                redirect_url=f'/notes/{instance.id}'
+            )
+            NotificationActor.objects.create(user=author, notification=noti)

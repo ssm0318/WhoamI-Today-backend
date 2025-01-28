@@ -264,13 +264,17 @@ def send_notifications_to_subscribers(sender, instance, created, **kwargs):
     if not created:
         return
 
+    from django.apps import apps
+    from django.contrib.contenttypes.models import ContentType
+    
+    Subscription = apps.get_model('category', 'Subscription')
+    
     author = instance.author
     response_content_type = ContentType.objects.get_for_model(Response)
     
     subscribers = Subscription.objects.filter(
-        subscribed_to=author,
-        content_type=response_content_type,
-    ).values_list('subscriber', flat=True)
+        category__owner=author
+    ).values_list('user', flat=True)
 
     for subscriber_id in subscribers:
         subscriber = get_user_model().objects.get(id=subscriber_id)
@@ -285,8 +289,7 @@ def send_notifications_to_subscribers(sender, instance, created, **kwargs):
         )
         NotificationActor.objects.create(user=author, notification=noti)
 
-# Check if the category exists
-if not Category.objects.filter(id=1).exists():
-    # Create and save the new category
-    new_category = Category(id=1, name='General')  # Replace 'General' with an appropriate name
-    new_category.save()
+def ensure_default_category_exists():
+    from category.models import Category
+    if not Category.objects.filter(id=1).exists():
+        pass

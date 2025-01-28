@@ -1,7 +1,5 @@
 from django.db import models
 
-# Create your models here.
-
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -24,8 +22,16 @@ class Category(AdoorTimestampedModel, SafeDeleteModel):
     ]
 
     name = models.CharField(max_length=100)
-    added_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='added_categories', blank=True)
-    sharing_scope = models.CharField(max_length=255)
+    added_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, 
+        related_name='added_categories', 
+        blank=True
+    )
+    sharing_scope = models.CharField(
+        max_length=255,
+        choices=HIERARCHY_CHOICES,
+        default='public'
+    )
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -49,7 +55,6 @@ class Category(AdoorTimestampedModel, SafeDeleteModel):
 class Subscription(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='category_subscriptions', on_delete=models.CASCADE)
     category = models.ForeignKey(Category, related_name='subscriptions', on_delete=models.CASCADE)
-    # removed sharing_scope, only implemented in Category model
     _safedelete_policy = SOFT_DELETE_CASCADE
     
     class Meta:

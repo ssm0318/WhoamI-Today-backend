@@ -71,9 +71,12 @@ def set_seed(n):
     for _ in range(n):
         user = random.choice(users)
         question = random.choice(questions)
-        response, created = Response.objects.get_or_create(author=user,
-                                                  content=faker.text(max_nb_chars=50),
-                                                  question=question)
+        response, created = Response.objects.get_or_create(
+            author=user,
+            content=faker.text(max_nb_chars=50),
+            question=question,
+            sharing_scope='f'
+        )
     logging.info(
         f"{Response.objects.count()} Response(s) created!") if DEBUG else None
 
