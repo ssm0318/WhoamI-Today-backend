@@ -104,7 +104,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
 
-    friends = models.ManyToManyField('self', symmetrical=True, blank=True)  # TODO: fade out
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
 
@@ -152,11 +151,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         super().save(*args, **kwargs)
 
     @classmethod
-    # TODO: fade out
-    def are_friends(cls, user1, user2):
-        return user2.id in user1.friend_ids or user1 == user2
-
-    @classmethod
     def user_read(cls, user1, user2):
         # Check if user1 has read all of user2's responses
         user2_response_queryset = user1.can_access_response_set(user2)
@@ -185,19 +179,23 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             Q(user1=user, user2=self) | Q(user1=self, user2=user)
         ).exists()
 
-    def is_neighbor(self, user):
-        """Checks if self (current user) is a 'neighbor' of user"""
-        return Connection.objects.filter(
-            Q(user1=user, user2=self, user1_choice='neighbor') |
-            Q(user1=self, user2=user, user2_choice='neighbor')
-        ).exists()
-
     def is_friend(self, user):
         """Checks if self (current user) is a 'friend' of user"""
         return Connection.objects.filter(
             Q(user1=user, user2=self, user1_choice='friend') |
             Q(user1=self, user2=user, user2_choice='friend')
         ).exists()
+
+    def is_close_friend(self, user):
+        """Checks if self (current user) is a 'close_friend' of user"""
+        return Connection.objects.filter(
+            Q(user1=user, user2=self, user1_choice='close_friend') |
+            Q(user1=self, user2=user, user2_choice='close_friend')
+        ).exists()
+
+    @property
+    def has_connected_users(self):
+        return Connection.objects.filter(Q(user1=self) | Q(user2=self)).exists()
 
     @property
     def connected_users(self):
@@ -213,10 +211,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return User.objects.filter(id__in=id_list)
     
     @property
-    def neighbors(self):
+    def friends(self):
         connections = Connection.objects.filter(
-            Q(user1=self, user1_choice='neighbor') | 
-            Q(user2=self, user2_choice='neighbor')
+            Q(user1=self, user1_choice='friend') | 
+            Q(user2=self, user2_choice='friend')
         ).values_list('user1', 'user2')
 
         id_list = [
@@ -227,10 +225,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return User.objects.filter(id__in=id_list)
     
     @property
-    def friends_(self):  # TODO: change to friends after 'friends' field is removed
+    def close_friends(self):
         connections = Connection.objects.filter(
-            Q(user1=self, user1_choice='friend') | 
-            Q(user2=self, user2_choice='friend')
+            Q(user1=self, user1_choice='close_friend') | 
+            Q(user2=self, user2_choice='close_friend')
         ).values_list('user1', 'user2')
 
         id_list = [
@@ -254,10 +252,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return id_list
 
     @property
-    def neighbor_ids(self):
+    def friend_ids(self):
         connections = Connection.objects.filter(
-            Q(user1=self, user1_choice='neighbor') | 
-            Q(user2=self, user2_choice='neighbor')
+            Q(user1=self, user1_choice='friend') | 
+            Q(user2=self, user2_choice='friend')
         ).values_list('user1', 'user2')
 
         id_list = [
@@ -268,10 +266,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         return id_list
 
     @property
-    def friend_ids(self):
+    def close_friend_ids(self):
         connections = Connection.objects.filter(
-            Q(user1=self, user1_choice='friend') | 
-            Q(user2=self, user2_choice='friend')
+            Q(user1=self, user1_choice='close_friend') | 
+            Q(user2=self, user2_choice='close_friend')
         ).values_list('user1', 'user2')
 
         id_list = [
@@ -352,8 +350,8 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
     requestee = models.ForeignKey(
         get_user_model(), related_name='received_friend_requests', on_delete=models.CASCADE)
     accepted = models.BooleanField(null=True)
-    requester_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('neighbor', 'Neighbor')], null=True)
-    requestee_choice = models.CharField(max_length=10, choices=[('friend', 'Friend'), ('neighbor', 'Neighbor')], null=True)
+    requester_choice = models.CharField(max_length=15, choices=[('friend', 'Friend'), ('close_friend', 'Close Friend')], null=True)
+    requestee_choice = models.CharField(max_length=15, choices=[('friend', 'Friend'), ('close_friend', 'Close Friend')], null=True)
 
     friend_request_targetted_notis = GenericRelation("notification.Notification",
                                                      content_type_field='target_type',
@@ -385,7 +383,7 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
 class Connection(AdoorTimestampedModel, SafeDeleteModel):
     CHOICES = (
         ('friend', 'Friend'),
-        ('neighbor', 'Neighbor'),
+        ('close_friend', 'Close Friend'),
     )
 
     user1 = models.ForeignKey(
@@ -394,8 +392,8 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
     user2 = models.ForeignKey(
         get_user_model(), on_delete=models.CASCADE, related_name='connections_as_user2'
     )
-    user1_choice = models.CharField(max_length=10, choices=CHOICES)
-    user2_choice = models.CharField(max_length=10, choices=CHOICES)
+    user1_choice = models.CharField(max_length=15, choices=CHOICES)
+    user2_choice = models.CharField(max_length=15, choices=CHOICES)
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
@@ -441,13 +439,13 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
         """Check if user1 set user2 as 'friend'."""
         return self.user1_choice == 'friend'
     
-    def user1_is_neighbor(self):
-        """Check if user2 set user1 as 'neighbor'."""
-        return self.user2_choice == 'neighbor'
+    def user1_is_close_friend(self):
+        """Check if user2 set user1 as 'close_friend'."""
+        return self.user2_choice == 'close_friend'
     
-    def user2_is_neighbor(self):
-        """Check if user1 set user2 as 'neighbor'."""
-        return self.user1_choice == 'neighbor'
+    def user2_is_close_friend(self):
+        """Check if user1 set user2 as 'close_friend'."""
+        return self.user1_choice == 'close_friend'
 
 
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):

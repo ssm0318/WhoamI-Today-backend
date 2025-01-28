@@ -841,7 +841,7 @@ class UserFriendRequestDefault(generics.CreateAPIView):
     def perform_create(self, serializer):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
             raise PermissionDenied("The requester must be yourself.")
-        serializer.save(accepted=None, requester_choice='neighbor')
+        serializer.save(accepted=None, requester_choice='friend')
 
 
 class UserSentFriendRequestList(generics.ListAPIView):
@@ -907,7 +907,7 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
         requestee = User.objects.get(id=friend_request.requestee_id)
 
         if self.default_api:
-            serializer.save(requestee_choice='neighbor')
+            serializer.save(requestee_choice='friend')
         else:
             serializer.save()
 
