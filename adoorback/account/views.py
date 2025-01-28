@@ -812,11 +812,36 @@ class UserFriendRequest(generics.ListCreateAPIView):
     def get_queryset(self):
         return FriendRequest.objects.filter(requestee=self.request.user).filter(accepted__isnull=True)
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["default_api"] = False
+        return context
+
     @transaction.atomic
     def perform_create(self, serializer):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
-            raise PermissionDenied("requester가 본인이 아닙니다.")
+            raise PermissionDenied("The requester must be yourself.")
         serializer.save(accepted=None)
+
+
+class UserFriendRequestDefault(generics.CreateAPIView):
+    queryset = FriendRequest.objects.all()
+    serializer_class = UserFriendRequestCreateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["default_api"] = True
+        return context
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        if int(self.request.data.get('requester_id')) != int(self.request.user.id):
+            raise PermissionDenied("The requester must be yourself.")
+        serializer.save(accepted=None, requester_choice='neighbor')
 
 
 class UserSentFriendRequestList(generics.ListAPIView):
@@ -850,23 +875,28 @@ class UserFriendRequestDestroy(generics.DestroyAPIView):
         obj.delete(force_policy=SOFT_DELETE_CASCADE)
 
 
-class UserFriendRequestUpdate(generics.UpdateAPIView):
+class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
     serializer_class = UserFriendRequestUpdateSerializer
     permission_classes = [IsAuthenticated]
+    default_api = False
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_object(self):
-        # since the requestee is the authenticated user, no further permission checking unnecessary
         return FriendRequest.objects.get(requester_id=self.kwargs.get('pk'),
                                          requestee_id=self.request.user.id)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["default_api"] = self.default_api
+        return context
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)  # check `accepted` field
+        serializer.is_valid(raise_exception=True)  # `accepted` 필드 검사
         self.perform_update(serializer)
         return Response(serializer.data)
 
@@ -876,10 +906,13 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
         requester = User.objects.get(id=friend_request.requester_id)
         requestee = User.objects.get(id=friend_request.requestee_id)
 
-        serializer.save()
+        if self.default_api:
+            serializer.save(requestee_choice='neighbor')
+        else:
+            serializer.save()
 
         send_users = []
-        if len(requester.connected_user_ids) == 1:  # 디바이스 노티 설정이 켜져있는지 확인 필요 없을지?
+        if len(requester.connected_user_ids) == 1:
             send_users.append(requester)
         if len(requestee.connected_user_ids) == 1:
             send_users.append(requestee)
@@ -888,13 +921,23 @@ class UserFriendRequestUpdate(generics.UpdateAPIView):
             Notification = apps.get_model('notification', 'Notification')
             admin = User.objects.filter(is_superuser=True).first()
 
-            noti = Notification.objects.create(user=user,
-                                               target=admin,
-                                               origin=admin,
-                                               message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
-                                               message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
-                                               redirect_url='/settings')
+            noti = Notification.objects.create(
+                user=user,
+                target=admin,
+                origin=admin,
+                message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
+                redirect_url='/settings'
+            )
             NotificationActor.objects.create(user=admin, notification=noti)
+
+
+class UserFriendRequestUpdate(BaseUserFriendRequestUpdate):
+    default_api = False
+
+
+class UserFriendRequestUpdateDefault(BaseUserFriendRequestUpdate):
+    default_api = True
 
 
 class UserRecommendedFriendsList(generics.ListAPIView):
