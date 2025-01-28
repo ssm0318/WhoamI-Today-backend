@@ -73,6 +73,4 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
         return f'{self.user} subscribed to {self.category}'
 
     def save(self, *args, **kwargs):
-        if not self.sharing_scope:
-            self.sharing_scope = self.category.sharing_scope
         super().save(*args, **kwargs)
