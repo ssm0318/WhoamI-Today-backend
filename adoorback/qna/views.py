@@ -48,6 +48,8 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
         try:
             response = Response.objects.get(id=self.kwargs.get('pk'))
             self.check_object_permissions(self.request, response)
+            if not response.is_audience(self.request.user):
+                raise PermissionDenied("Sorry, you do not have permission to view this response.")
         except Response.DoesNotExist:
             raise exceptions.NotFound("Response not found")
         return response

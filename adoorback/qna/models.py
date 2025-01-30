@@ -79,7 +79,7 @@ class Response(AdoorModel, SafeDeleteModel):
     visibility = models.CharField(
         max_length=20,
         choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
-        default='friends'
+        default='close_friends'
     )
 
     response_comments = GenericRelation(Comment)
