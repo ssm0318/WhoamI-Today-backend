@@ -40,6 +40,11 @@ def note_image_path(instance, filename):
 
 class Note(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='note_set', on_delete=models.CASCADE)
+    visibility = models.CharField(
+        max_length=20,
+        choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
+        default='friends'
+    )
 
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)
@@ -101,10 +106,10 @@ class Note(AdoorModel, SafeDeleteModel):
             print("is_audience: author is user")
             return True
 
-        if self.author.is_connected(user):
-            return True
-
-        return False
+        if self.visibility == 'close_friends':
+            return self.author.is_close_friend(user)
+        
+        return self.author.is_connected(user)
 
     class Meta:
         indexes = [

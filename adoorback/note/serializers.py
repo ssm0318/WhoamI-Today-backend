@@ -22,6 +22,10 @@ class NoteSerializer(AdoorBaseSerializer):
     current_user_read = serializers.SerializerMethodField(read_only=True)
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
+    visibility = serializers.ChoiceField(
+        choices=['friends', 'close_friends'],
+        required=True
+    )
 
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
@@ -71,7 +75,7 @@ class NoteSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Note
         fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_like_id', 
-                                                    'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited']
+                                                    'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited', 'visibility']
 
 
 class DefaultFriendNoteSerializer(AdoorBaseSerializer):
@@ -104,6 +108,14 @@ class DefaultFriendNoteSerializer(AdoorBaseSerializer):
     
     def get_like_count(self, obj):
         return obj.liked_user_ids.count()
+
+    def create(self, validated_data):
+        validated_data['visibility'] = 'friends'
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data['visibility'] = 'friends'
+        return super().update(instance, validated_data)
 
     class Meta(AdoorBaseSerializer.Meta):
         model = Note
