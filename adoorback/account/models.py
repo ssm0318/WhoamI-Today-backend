@@ -51,10 +51,8 @@ VERSION_CHOICES = (
 )
 
 USER_GROUP_CHOICES = (
-    ('group_1', 'Group 1: only ver.D'),
-    ('group_2', 'Group 2: only ver.E'),
-    ('group_3', 'Group 3: ver.D -> ver.E'),
-    ('group_4', 'Group 4: ver.E -> ver.D'),
+    ('group_1', 'Group 1: ver.D -> ver.E'),
+    ('group_2', 'Group 2: ver.E -> ver.D'),
 )
 
 USER_TYPE_CHOICES = (
