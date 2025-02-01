@@ -109,12 +109,6 @@ class DefaultFriendNoteSerializer(AdoorBaseSerializer):
     def get_like_count(self, obj):
         return obj.liked_user_ids.count()
 
-    def create(self, validated_data):
-        return super().create(validated_data)
-
-    def update(self, instance, validated_data):
-        return super().update(instance, validated_data)
-
     class Meta(AdoorBaseSerializer.Meta):
         model = Note
         fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_like_id', 
