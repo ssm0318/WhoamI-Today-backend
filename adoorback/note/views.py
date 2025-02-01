@@ -143,6 +143,9 @@ class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
         self.check_object_permissions(self.request, obj)
 
+        if not obj.is_audience(self.request.user):
+            raise PermissionDenied("Sorry, you do not have permission to view this note.")
+
         return obj
 
     def get_queryset(self):
@@ -232,3 +235,15 @@ class NoteRead(generics.UpdateAPIView):
         serializer = self.get_serializer(queryset, many=True)
 
         return Response(serializer.data)
+
+class DefaultFriendNoteCreate(NoteCreate):
+    # view for version D that enforces initial visibility to friends
+    serializer_class = DefaultFriendNoteSerializer
+    permission_classes = [IsAuthenticated, IsNotBlocked]
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        images = self.request.FILES.getlist('images')
+        note_instance = serializer.save(author=self.request.user)
+        for image in images:
+            NoteImage.objects.create(note=note_instance, image=image)
