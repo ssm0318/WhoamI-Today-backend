@@ -27,7 +27,13 @@ class NotificationList(generics.ListAPIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
 
-        return Notification.objects.visible_only().filter(user=self.request.user)
+        user = self.request.user
+        notifications = Notification.objects.visible_only().filter(user=user)
+
+        if user.ver_changed_at:
+            notifications = notifications.filter(created_at__gte=user.ver_changed_at)
+
+        return notifications
 
 
 class FriendRequestNotiList(generics.ListAPIView):
@@ -78,7 +84,6 @@ class NotificationDetail(generics.UpdateAPIView):
         return adoor_exception_handler
 
     def patch(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
         ids = request.data.get('ids', [])
         queryset = Notification.objects.filter(id__in=ids)
         queryset.update(is_read=True)
