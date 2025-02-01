@@ -45,6 +45,21 @@ ETHNICITY_CHOICES = (
     (5, _('백인 (White)')),
 )
 
+VERSION_CHOICES = (
+    ('default', 'Default'),
+    ('experiment', 'Experiment'),
+)
+
+USER_GROUP_CHOICES = (
+    ('group_1', 'Group 1: ver.D -> ver.E'),
+    ('group_2', 'Group 2: ver.E -> ver.D'),
+)
+
+USER_TYPE_CHOICES = (
+    ('direct', 'Direct Participant'),
+    ('indirect', 'Indirect Participant'),
+)
+
 
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
@@ -106,6 +121,13 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
+
+    ver_changed_at = models.DateTimeField(null=True)
+    current_ver = models.CharField(max_length=20, choices=VERSION_CHOICES, default='default')
+    user_group = models.CharField(max_length=20, choices=USER_GROUP_CHOICES, default='group_1')
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='direct')
+    invited_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, 
+                                     related_name="invited_users")
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
