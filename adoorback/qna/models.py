@@ -76,11 +76,6 @@ class Question(AdoorModel, SafeDeleteModel):
 class Response(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='response_set', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
-    visibility = models.CharField(
-        max_length=20,
-        choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
-        default='close_friends'
-    )
 
     response_comments = GenericRelation(Comment)
     # to be deleted
@@ -145,10 +140,10 @@ class Response(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
 
-        if self.visibility == 'close_friends':
-            return self.author.is_close_friend(user)
-        
-        return self.author.is_connected(user)
+        if self.author.is_connected(user):
+            return True
+
+        return False
 
 
 class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):

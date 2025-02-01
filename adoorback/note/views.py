@@ -102,9 +102,6 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
         self.check_object_permissions(self.request, obj)
 
-        if not obj.is_audience(self.request.user):
-            raise PermissionDenied("Sorry, you do not have permission to view this note.")
-
         return obj
 
     def get_queryset(self):
@@ -173,10 +170,6 @@ class NoteLikes(generics.ListAPIView):
     def get_queryset(self):
         from like.models import Like
         note_id = self.kwargs['pk']
-
-        note = get_object_or_404(Note, id=note_id)
-        if not note.is_audience(self.request.user):
-            raise PermissionDenied("Sorry, you do not have permission to view this note's likes.")
 
         return Like.objects.filter(content_type__model='note', object_id=note_id)
 
