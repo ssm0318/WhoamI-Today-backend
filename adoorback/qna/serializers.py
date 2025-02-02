@@ -43,6 +43,10 @@ class ResponseSerializer(AdoorBaseSerializer):
     current_user_read = serializers.SerializerMethodField(read_only=True)
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
+    visibility = serializers.ChoiceField(
+        choices=['friends', 'close_friends'],
+        required=True
+    )
 
     
     def get_current_user_read(self, obj):
@@ -89,7 +93,7 @@ class ResponseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited']
+                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited', 'visibility']
         
 
 class QuestionResponseSerializer(QuestionBaseSerializer):
