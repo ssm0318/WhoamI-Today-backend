@@ -17,7 +17,7 @@ from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
@@ -26,6 +26,7 @@ from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
+from rest_framework.decorators import action
 
 from .email import email_manager
 from .models import Subscription, Connection
@@ -1182,6 +1183,7 @@ class FriendFeed(generics.ListAPIView):
         return Response(serialized_data)
 
 
+<<<<<<< HEAD
 class CurrentUserVersionChange(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1194,3 +1196,18 @@ class CurrentUserVersionChange(APIView):
             return Response({"message": "Version change timestamp recorded.", "ver_changed_at": user.ver_changed_at}, status=200)
 
         return Response({"message": "Version change timestamp was already set.", "ver_changed_at": user.ver_changed_at}, status=200)
+=======
+class ConnectionViewSet(viewsets.ModelViewSet):
+
+    @action(detail=True, methods=['post'])
+    def update_friendship(self, request, pk=None):
+        connection = self.get_object()
+        new_choice = request.data.get('choice')
+        update_past_posts = request.data.get('update_past_posts', False)
+        
+        if new_choice not in ['friend', 'close_friend']:
+            return Response({'error': 'Invalid choice'}, status=400)
+            
+        connection.update_friendship_level(request.user, new_choice, update_past_posts)
+        return Response({'status': 'Friendship level updated'})
+>>>>>>> f9dcb5b (initial changes in Connection model)

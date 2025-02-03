@@ -3,6 +3,7 @@ import glob
 import os
 import secrets
 import urllib.parse
+from django.utils import timezone
 
 from django.apps import apps
 from django.conf import settings
@@ -416,6 +417,10 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
     )
     user1_choice = models.CharField(max_length=15, choices=CHOICES)
     user2_choice = models.CharField(max_length=15, choices=CHOICES)
+    user1_upgrade_time = models.DateTimeField(null=True, blank=True)
+    user2_upgrade_time = models.DateTimeField(null=True, blank=True)
+    user1_update_past_posts = models.BooleanField(default=False)
+    user2_update_past_posts = models.BooleanField(default=False)
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
@@ -468,6 +473,62 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
     def user2_is_close_friend(self):
         """Check if user1 set user2 as 'close_friend'."""
         return self.user1_choice == 'close_friend'
+
+    @transaction.atomic
+    #new method to update friendship level and handle post visibility changes
+    def update_friendship_level(self, user, new_choice, update_past_posts=False):
+        current_time = timezone.now()
+        
+        # First, confirm which user is updating their friendship level
+        if user == self.user1:
+            old_choice = self.user1_choice
+            self.user1_choice = new_choice
+            if new_choice == 'close_friend' and old_choice == 'friend':
+                self.user1_upgrade_time = current_time
+                self.user1_update_past_posts = update_past_posts
+        elif user == self.user2:
+            old_choice = self.user2_choice
+            self.user2_choice = new_choice
+            if new_choice == 'close_friend' and old_choice == 'friend':
+                self.user2_upgrade_time = current_time
+                self.user2_update_past_posts = update_past_posts
+        
+        self.save()
+
+        # Update the post visibility if requested
+        if update_past_posts and new_choice == 'close_friend' and old_choice == 'friend':
+            from note.models import Note
+            from qna.models import Response
+            
+            # Update Note visibilities for posts created before the upgrade
+            if user == self.user1:
+                notes = Note.objects.filter(
+                    author=self.user2,
+                    visibility='friends',
+                    created_at__lt=current_time  # Only update posts created before upgrade
+                )
+            else:
+                notes = Note.objects.filter(
+                    author=self.user1,
+                    visibility='friends',
+                    created_at__lt=current_time  # Only update posts created before upgrade
+                )
+            notes.update(visibility='close_friends')
+            
+            # Update Response visibilities for posts created before the upgrade
+            if user == self.user1:
+                responses = Response.objects.filter(
+                    author=self.user2,
+                    visibility='friends',
+                    created_at__lt=current_time  # Only update posts created before upgrade
+                )
+            else:
+                responses = Response.objects.filter(
+                    author=self.user1,
+                    visibility='friends',
+                    created_at__lt=current_time  # Only update posts created before upgrade
+                )
+            responses.update(visibility='close_friends')
 
 
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
