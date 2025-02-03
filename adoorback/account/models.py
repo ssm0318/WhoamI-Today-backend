@@ -453,11 +453,10 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
         return self.user1_choice == 'close_friend'
 
     @transaction.atomic
-    #new method to update friendship level and handle post visibility changes
     def update_friendship_level(self, user, new_choice, update_past_posts=False):
         current_time = timezone.now()
         
-        # First, confirm which user is updating their friendship level
+        # Confirm which user is updating their choice
         if user == self.user1:
             old_choice = self.user1_choice
             self.user1_choice = new_choice
@@ -472,41 +471,6 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
                 self.user2_update_past_posts = update_past_posts
         
         self.save()
-
-        # Update the post visibility if requested
-        if update_past_posts and new_choice == 'close_friend' and old_choice == 'friend':
-            from note.models import Note
-            from qna.models import Response
-            
-            # Update Note visibilities for posts created before the upgrade
-            if user == self.user1:
-                notes = Note.objects.filter(
-                    author=self.user2,
-                    visibility='friends',
-                    created_at__lt=current_time  # Only update posts created before upgrade
-                )
-            else:
-                notes = Note.objects.filter(
-                    author=self.user1,
-                    visibility='friends',
-                    created_at__lt=current_time  # Only update posts created before upgrade
-                )
-            notes.update(visibility='close_friends')
-            
-            # Update Response visibilities for posts created before the upgrade
-            if user == self.user1:
-                responses = Response.objects.filter(
-                    author=self.user2,
-                    visibility='friends',
-                    created_at__lt=current_time  # Only update posts created before upgrade
-                )
-            else:
-                responses = Response.objects.filter(
-                    author=self.user1,
-                    visibility='friends',
-                    created_at__lt=current_time  # Only update posts created before upgrade
-                )
-            responses.update(visibility='close_friends')
 
 
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):

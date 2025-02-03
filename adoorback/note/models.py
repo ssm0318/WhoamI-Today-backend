@@ -10,10 +10,11 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from safedelete import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.models import SafeDeleteModel
+from django.db.models import Q
 
 from django.conf import settings
 
-from account.models import Subscription
+from account.models import Subscription, Connection
 from adoorback.models import AdoorModel
 from comment.models import Comment
 from content_report.models import ContentReport
@@ -106,8 +107,28 @@ class Note(AdoorModel, SafeDeleteModel):
             print("is_audience: author is user")
             return True
 
+        # Get connection between author and user
+        connection = Connection.objects.filter(
+            (Q(user1=self.author, user2=user) | Q(user1=user, user2=self.author))
+        ).first()
+
+        if not connection:
+            return False
+
         if self.visibility == 'close_friends':
-            return self.author.is_close_friend(user)
+            # Check if user is a close friend
+            if connection.user1 == user:
+                is_close = connection.user1_choice == 'close_friend'
+                if not connection.user1_update_past_posts:
+                    # If not updating past posts, only show posts created after upgrade
+                    return is_close and self.created_at > connection.user1_upgrade_time
+                return is_close
+            else:
+                is_close = connection.user2_choice == 'close_friend'
+                if not connection.user2_update_past_posts:
+                    # If not updating past posts, only show posts created after upgrade
+                    return is_close and self.created_at > connection.user2_upgrade_time
+                return is_close
         
         return self.author.is_connected(user)
 
