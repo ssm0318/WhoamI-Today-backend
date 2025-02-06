@@ -152,16 +152,9 @@ class Response(AdoorModel, SafeDeleteModel):
 
         if self.visibility == 'close_friends':
             is_close = self.author.is_close_friend(user)
-            if connection.user1 == user:
-                is_close = connection.user1_choice == 'close_friend'
-                if not connection.user1_update_past_posts:
-                    return is_close and self.created_at > connection.user1_upgrade_time
-                return is_close
-            else:
-                is_close = connection.user2_choice == 'close_friend'
-                if not connection.user2_update_past_posts:
-                    return is_close and self.created_at > connection.user2_upgrade_time
-                return is_close
+            if not connection.user1_update_past_posts:
+                return is_close and self.created_at > connection.user1_upgrade_time
+            return is_close
         
         return True
 

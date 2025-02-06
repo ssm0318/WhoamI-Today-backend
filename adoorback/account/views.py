@@ -826,7 +826,7 @@ class UserHiddenDestroy(generics.DestroyAPIView):
         self.request.user.hidden.remove(obj)
 
 
-class ConnectionChoiceUpdate(generics.UpdateAPIView):
+class ConnectionChoiceUpdate(generics.GenericAPIView):
     queryset = Connection.objects.all()
     permission_classes = [IsAuthenticated]
 
@@ -848,10 +848,12 @@ class ConnectionChoiceUpdate(generics.UpdateAPIView):
         update_past_posts = request.data.get('update_past_posts', False)
         
         if new_choice not in ['friend', 'close_friend']:
-            return Response({'error': 'Invalid choice'}, status=400)
+            return Response({'error': 'Invalid choice'}, status=status.HTTP_400_BAD_REQUEST)
             
         connection.update_friendship_level(request.user, new_choice, update_past_posts)
         return Response({'status': 'Friendship level updated'})
+
+    put = patch
 
 
 class UserFriendDestroy(generics.DestroyAPIView):
