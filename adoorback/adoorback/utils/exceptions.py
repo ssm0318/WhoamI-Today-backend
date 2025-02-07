@@ -80,7 +80,14 @@ class NoSuchQuestion(APIException):
     default_detail = _("존재하지 않는 질문입니다.")
     default_code = 'no_such_question'
 
+
 class DeletedQuestion(APIException):
     status_code = status.HTTP_406_NOT_ACCEPTABLE
     default_detail = _("삭제된 질문입니다.")
     default_code = 'deleted_question'
+
+
+class InvalidInviterEmail(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("해당 이메일을 가진 유저가 존재하지 않습니다.")
+    default_code = 'inviter_email_invalid'

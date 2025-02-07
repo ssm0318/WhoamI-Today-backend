@@ -143,6 +143,9 @@ class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
         self.check_object_permissions(self.request, obj)
 
+        if not obj.is_audience(self.request.user):
+            raise PermissionDenied("Sorry, you do not have permission to view this note.")
+
         return obj
 
     def get_queryset(self):

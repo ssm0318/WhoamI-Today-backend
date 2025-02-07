@@ -6,6 +6,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import authenticate, logout
 from django.core import exceptions
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
@@ -34,12 +35,13 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
                                  UserEmailSerializer, UserUsernameSerializer, \
-                                 FriendListSerializer, \
+                                 UserInviterEmailSerializer, FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
-    NoUsername, WrongPassword, ExistingUsername
+    NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
+from adoorback.utils.helpers import load_participant_info
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
 from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
@@ -128,9 +130,27 @@ class UserEmailCheck(generics.CreateAPIView):
                     raise InvalidEmail()
             raise e
 
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=201, headers=headers)
+        # check if email is in direct participant list
+        participant_info = load_participant_info()
+        email = request.data.get('email').strip().lower()
+        if email in participant_info:
+            user_type = 'direct'
+            user_group = participant_info[email]['user_group']
+            current_ver = participant_info[email]['current_ver']
+        else:
+            user_type = 'indirect'
+            user_group = None
+            current_ver = None
 
+        response_data = {
+            **serializer.data,
+            'user_type': user_type,
+            'user_group': user_group,
+            'current_ver': current_ver
+        }
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(response_data, status=201, headers=headers)
 
 
 class UserPasswordCheck(generics.CreateAPIView):
@@ -181,6 +201,47 @@ class UserUsernameCheck(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
+
+
+class UserInviterCheck(generics.CreateAPIView):
+    serializer_class = UserInviterEmailSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+        
+        serializer = self.get_serializer(data=request.data)
+        # check if email format is invalid
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            if 'email' in e.detail:
+                if 'invalid' in e.get_codes()['email']:
+                    raise InvalidEmail()
+            raise e
+
+        # check if user with invited email exists
+        invited_email = request.data.get('email').strip().lower()        
+        try:
+            inviter = User.objects.get(email=invited_email)
+            user_group = inviter.user_group
+            current_ver = inviter.current_ver
+        except ObjectDoesNotExist:
+            raise InvalidInviterEmail()
+
+        response_data = {
+            'email': invited_email,
+            'inviter_id': inviter.id,
+            'user_group': user_group,
+            'current_ver': current_ver
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class UserSignup(generics.CreateAPIView):
@@ -1131,4 +1192,3 @@ class FriendFeed(generics.ListAPIView):
         # Fallback (if pagination is disabled)
         serialized_data = NoteSerializer(queryset, many=True, context=self.get_serializer_context()).data
         return Response(serialized_data)
-
