@@ -3,7 +3,6 @@ import glob
 import os
 import secrets
 import urllib.parse
-from django.utils import timezone
 
 from django.apps import apps
 from django.conf import settings
@@ -417,10 +416,6 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
     )
     user1_choice = models.CharField(max_length=15, choices=CHOICES)
     user2_choice = models.CharField(max_length=15, choices=CHOICES)
-    user1_upgrade_time = models.DateTimeField(null=True, blank=True)
-    user2_upgrade_time = models.DateTimeField(null=True, blank=True)
-    user1_update_past_posts = models.BooleanField(default=False)
-    user2_update_past_posts = models.BooleanField(default=False)
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
@@ -473,26 +468,6 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
     def user2_is_close_friend(self):
         """Check if user1 set user2 as 'close_friend'."""
         return self.user1_choice == 'close_friend'
-
-    @transaction.atomic
-    def update_friendship_level(self, user, new_choice, update_past_posts=False):
-        current_time = timezone.now()
-        
-        # Confirm which user is updating their choice
-        if user == self.user1:
-            old_choice = self.user1_choice
-            self.user1_choice = new_choice
-            if new_choice == 'close_friend' and old_choice == 'friend':
-                self.user1_upgrade_time = current_time
-                self.user1_update_past_posts = update_past_posts
-        elif user == self.user2:
-            old_choice = self.user2_choice
-            self.user2_choice = new_choice
-            if new_choice == 'close_friend' and old_choice == 'friend':
-                self.user2_upgrade_time = current_time
-                self.user2_update_past_posts = update_past_posts
-        
-        self.save()
 
 
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):

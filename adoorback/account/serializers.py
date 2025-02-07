@@ -470,6 +470,44 @@ class UserMinimumSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'profile_image', 'url']
 
+
+class ConnectionChoiceUpdateSerializer(serializers.ModelSerializer):
+    choice = serializers.ChoiceField(choices=Connection.CHOICES, required=True)
+
+    def update(self, instance, validated_data):
+        user = self.context['request'].user
+        choice = validated_data['choice']
+
+        if user == instance.user1:
+            if instance.user1_choice == choice:
+                raise ValidationError("You already set connected user as '{}'.".format(choice))
+            instance.user1_choice = choice
+        elif user == instance.user2:
+            if instance.user2_choice == choice:
+                raise ValidationError("You already set connected user as '{}'.".format(choice))
+            instance.user2_choice = choice
+        instance.save()
+
+        return instance
+    
+    def to_representation(self, instance):
+        user = self.context['request'].user
+
+        if user == instance.user1:
+            choice = instance.user1_choice
+        elif user == instance.user2:
+            choice = instance.user2_choice
+        else:
+            raise serializers.ValidationError("You are not part of this connection.")
+
+        return {'choice': choice}
+
+    
+    class Meta:
+        model = Connection
+        fields = ['choice']
+
+
 class BlockRecSerializer(serializers.ModelSerializer):
     blocked_user_id = serializers.IntegerField()
 

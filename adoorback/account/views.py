@@ -17,7 +17,7 @@ from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
@@ -26,7 +26,6 @@ from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
-from rest_framework.decorators import action
 
 from .email import email_manager
 from .models import Subscription, Connection
@@ -37,7 +36,8 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserEmailSerializer, UserUsernameSerializer, \
                                  UserInviterEmailSerializer, FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
-                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
+                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
+                                 ConnectionChoiceUpdateSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -826,8 +826,9 @@ class UserHiddenDestroy(generics.DestroyAPIView):
         self.request.user.hidden.remove(obj)
 
 
-class ConnectionChoiceUpdate(generics.GenericAPIView):
+class ConnectionChoiceUpdate(generics.UpdateAPIView):
     queryset = Connection.objects.all()
+    serializer_class = ConnectionChoiceUpdateSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
@@ -841,19 +842,6 @@ class ConnectionChoiceUpdate(generics.GenericAPIView):
             raise Http404("No connection exists between the current user and the specified friend.")
 
         return connection
-    
-    def patch(self, request, *args, **kwargs):
-        connection = self.get_object()
-        new_choice = request.data.get('choice')
-        update_past_posts = request.data.get('update_past_posts', False)
-        
-        if new_choice not in ['friend', 'close_friend']:
-            return Response({'error': 'Invalid choice'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        connection.update_friendship_level(request.user, new_choice, update_past_posts)
-        return Response({'status': 'Friendship level updated'})
-
-    put = patch
 
 
 class UserFriendDestroy(generics.DestroyAPIView):
@@ -1192,3 +1180,17 @@ class FriendFeed(generics.ListAPIView):
         # Fallback (if pagination is disabled)
         serialized_data = NoteSerializer(queryset, many=True, context=self.get_serializer_context()).data
         return Response(serialized_data)
+
+
+class CurrentUserVersionChange(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+
+        if user.ver_changed_at is None:
+            user.ver_changed_at = timezone.now()
+            user.save(update_fields=['ver_changed_at'])
+            return Response({"message": "Version change timestamp recorded.", "ver_changed_at": user.ver_changed_at}, status=200)
+
+        return Response({"message": "Version change timestamp was already set.", "ver_changed_at": user.ver_changed_at}, status=200)
