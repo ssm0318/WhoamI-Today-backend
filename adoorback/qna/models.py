@@ -10,7 +10,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
 from django.utils import timezone
 
-from account.models import Subscription
+from account.models import Subscription, Connection
 from comment.models import Comment
 from content_report.models import ContentReport
 from like.models import Like
@@ -145,10 +145,18 @@ class Response(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
 
+        connection = Connection.get_connection_between(self.author, user)
+
+        if not connection:
+            return False
+
         if self.visibility == 'close_friends':
-            return self.author.is_close_friend(user)
+            is_close = self.author.is_close_friend(user)
+            if not connection.user1_update_past_posts:
+                return is_close and self.created_at > connection.user1_upgrade_time
+            return is_close
         
-        return self.author.is_connected(user)
+        return True
 
 
 class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):
