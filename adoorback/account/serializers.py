@@ -383,7 +383,6 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
         except User.DoesNotExist:
             raise serializers.ValidationError("User not found")
 
-        # check if requester and requestee are in the same experiment version
         if requester.current_ver != requestee.current_ver:
             raise serializers.ValidationError({
                 "error": "Cannot send friend requests to users using different versions"

@@ -892,7 +892,12 @@ class UserFriendRequest(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
             raise PermissionDenied("The requester must be yourself.")
-        serializer.save(accepted=None)
+        try:
+            serializer.save(accepted=None)
+        except serializers.ValidationError as e:
+            if 'error' in e.detail and "different versions" in str(e.detail['error']):
+                raise PermissionDenied("Users belong to different groups, so a friend request cannot be sent.")
+            raise e
 
 
 class UserFriendRequestDefault(generics.CreateAPIView):
