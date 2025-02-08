@@ -966,6 +966,13 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        
+        # catch version validation before update is processed
+        if instance.requester.current_ver != instance.requestee.current_ver:
+            raise ValidationError({
+                "error": "Cannot accept friend requests from users using different versions"
+            })
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)  # `accepted` 필드 검사
         self.perform_update(serializer)
