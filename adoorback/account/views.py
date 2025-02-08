@@ -1,23 +1,21 @@
 from datetime import timedelta
-from itertools import chain
 import json
 
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import authenticate, logout
 from django.core import exceptions
-from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
-from django.db.models import F, Q, Max, Case, When, Value, IntegerField
+from django.db.models import Q, Case, When, Value, IntegerField
 from django.db.models.functions import Lower
 from django.http import HttpResponse, HttpResponseNotAllowed, Http404
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
@@ -26,7 +24,6 @@ from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
-from rest_framework.decorators import action
 
 from .email import email_manager
 from .models import Subscription, Connection
@@ -35,13 +32,12 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
                                  UserEmailSerializer, UserUsernameSerializer, \
-                                 UserInviterEmailSerializer, FriendListSerializer, \
+                                 FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
-    NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
-from adoorback.utils.helpers import load_participant_info
+    NoUsername, WrongPassword, ExistingUsername
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
 from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
@@ -130,27 +126,8 @@ class UserEmailCheck(generics.CreateAPIView):
                     raise InvalidEmail()
             raise e
 
-        # check if email is in direct participant list
-        participant_info = load_participant_info()
-        email = request.data.get('email').strip().lower()
-        if email in participant_info:
-            user_type = 'direct'
-            user_group = participant_info[email]['user_group']
-            current_ver = participant_info[email]['current_ver']
-        else:
-            user_type = 'indirect'
-            user_group = None
-            current_ver = None
-
-        response_data = {
-            **serializer.data,
-            'user_type': user_type,
-            'user_group': user_group,
-            'current_ver': current_ver
-        }
-
         headers = self.get_success_headers(serializer.data)
-        return Response(response_data, status=201, headers=headers)
+        return Response(serializer.data, status=201, headers=headers)
 
 
 class UserPasswordCheck(generics.CreateAPIView):
@@ -201,47 +178,6 @@ class UserUsernameCheck(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
-
-
-class UserInviterCheck(generics.CreateAPIView):
-    serializer_class = UserInviterEmailSerializer
-    parser_classes = (MultiPartParser, FormParser)
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def create(self, request, *args, **kwargs):
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
-        
-        serializer = self.get_serializer(data=request.data)
-        # check if email format is invalid
-        try:
-            serializer.is_valid(raise_exception=True)
-        except ValidationError as e:
-            if 'email' in e.detail:
-                if 'invalid' in e.get_codes()['email']:
-                    raise InvalidEmail()
-            raise e
-
-        # check if user with invited email exists
-        invited_email = request.data.get('email').strip().lower()        
-        try:
-            inviter = User.objects.get(email=invited_email)
-            user_group = inviter.user_group
-            current_ver = inviter.current_ver
-        except ObjectDoesNotExist:
-            raise InvalidInviterEmail()
-
-        response_data = {
-            'email': invited_email,
-            'inviter_id': inviter.id,
-            'user_group': user_group,
-            'current_ver': current_ver
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class UserSignup(generics.CreateAPIView):
@@ -1190,17 +1126,3 @@ class FriendFeed(generics.ListAPIView):
         # Fallback (if pagination is disabled)
         serialized_data = NoteSerializer(queryset, many=True, context=self.get_serializer_context()).data
         return Response(serialized_data)
-
-
-class CurrentUserVersionChange(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, *args, **kwargs):
-        user = request.user
-
-        if user.ver_changed_at is None:
-            user.ver_changed_at = timezone.now()
-            user.save(update_fields=['ver_changed_at'])
-            return Response({"message": "Version change timestamp recorded.", "ver_changed_at": user.ver_changed_at}, status=200)
-
-        return Response({"message": "Version change timestamp was already set.", "ver_changed_at": user.ver_changed_at}, status=200)

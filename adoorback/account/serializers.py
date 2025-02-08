@@ -5,10 +5,10 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
+from django.core.exceptions import ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, \
-    VERSION_CHOICES, USER_GROUP_CHOICES, USER_TYPE_CHOICES
+    VERSION_CHOICES
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
@@ -24,10 +24,7 @@ User = get_user_model()
 class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     unread_noti = serializers.SerializerMethodField(read_only=True)
-    current_ver = serializers.ChoiceField(choices=VERSION_CHOICES, required=True)
-    user_group = serializers.ChoiceField(choices=USER_GROUP_CHOICES, required=True)
-    user_type = serializers.ChoiceField(choices=USER_TYPE_CHOICES, required=True)
-    invited_from_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    current_ver = serializers.ChoiceField(choices=VERSION_CHOICES)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -49,28 +46,12 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio',
                   'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'noti_period_days',
-                  'timezone', 'current_ver', 'user_type', 'user_group', 'invited_from_id']
+                  'timezone', 'current_ver']
         extra_kwargs = {'password': {'write_only': True}}
 
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop('password')
-        invited_from_id = validated_data.pop('invited_from_id', None)
-
-        if invited_from_id:
-            try:
-                invited_from_user = User.objects.get(id=invited_from_id)
-                validated_data['invited_from'] = invited_from_user
-            except ObjectDoesNotExist:
-                raise serializers.ValidationError({
-                    'invited_from_id': 'Failed to find a user with invited_from_id.'
-                })
-        else:
-            if validated_data.pop('user_type') == 'indirect':
-                raise serializers.ValidationError({
-                    'invited_from_id': 'invited_from_id is required for \'user_type=indirect\' users.'
-                })
-
         user = User(**validated_data)
         user.set_password(password)
         user.save()
@@ -132,10 +113,6 @@ class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username']
-
-
-class UserInviterEmailSerializer(serializers.Serializer):
-    email = serializers.EmailField()
 
 
 class UserProfileSerializer(UserMinimalSerializer):

@@ -38,9 +38,6 @@
 /adoorback/adoorback/media
 /adoorback/adoorback/adoorback/media
 
-# assets
-/adoorback/adoorback/assets/participant_info.csv
-
 # logging
 **/error.log
 **/log.django
