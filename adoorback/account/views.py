@@ -826,7 +826,7 @@ class UserHiddenDestroy(generics.DestroyAPIView):
         self.request.user.hidden.remove(obj)
 
 
-class ConnectionChoiceUpdate(generics.GenericAPIView):
+class ConnectionChoiceUpdate(generics.UpdateAPIView):
     queryset = Connection.objects.all()
     permission_classes = [IsAuthenticated]
 
@@ -848,12 +848,10 @@ class ConnectionChoiceUpdate(generics.GenericAPIView):
         update_past_posts = request.data.get('update_past_posts', False)
         
         if new_choice not in ['friend', 'close_friend']:
-            return Response({'error': 'Invalid choice'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid choice'}, status=400)
             
         connection.update_friendship_level(request.user, new_choice, update_past_posts)
         return Response({'status': 'Friendship level updated'})
-
-    put = patch
 
 
 class UserFriendDestroy(generics.DestroyAPIView):
@@ -1194,7 +1192,6 @@ class FriendFeed(generics.ListAPIView):
         return Response(serialized_data)
 
 
-<<<<<<< HEAD
 class CurrentUserVersionChange(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1207,18 +1204,3 @@ class CurrentUserVersionChange(APIView):
             return Response({"message": "Version change timestamp recorded.", "ver_changed_at": user.ver_changed_at}, status=200)
 
         return Response({"message": "Version change timestamp was already set.", "ver_changed_at": user.ver_changed_at}, status=200)
-=======
-class ConnectionViewSet(viewsets.ModelViewSet):
-
-    @action(detail=True, methods=['post'])
-    def update_friendship(self, request, pk=None):
-        connection = self.get_object()
-        new_choice = request.data.get('choice')
-        update_past_posts = request.data.get('update_past_posts', False)
-        
-        if new_choice not in ['friend', 'close_friend']:
-            return Response({'error': 'Invalid choice'}, status=400)
-            
-        connection.update_friendship_level(request.user, new_choice, update_past_posts)
-        return Response({'status': 'Friendship level updated'})
->>>>>>> f9dcb5b (initial changes in Connection model)
