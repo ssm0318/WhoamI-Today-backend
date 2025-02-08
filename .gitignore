@@ -18,10 +18,11 @@
 /adoorback/adoorback/test/admin_setup.py
 
 # pycache
-/__pycache__/
-/*/*/__pycache__/
-/*/__pycache__/
-/*/*/*/__pycache__/
+**/__pycache__/
+
+# compiled Python files
+*.pyc
+*.pyo
 
 # db
 /adoorback/db.sqlite3
