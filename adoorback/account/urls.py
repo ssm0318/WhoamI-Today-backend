@@ -8,7 +8,6 @@ urlpatterns = [
     path('signup/email/', views.UserEmailCheck.as_view(), name='user-email-check'),
     path('signup/password/', views.UserPasswordCheck.as_view(), name='user-password-check'),
     path('signup/username/', views.UserUsernameCheck.as_view(), name='user-username-check'),
-    path('signup/inviter/', views.UserInviterCheck.as_view(), name='user-inviter-check'),
     path('signup/', views.UserSignup.as_view(), name='user-signup'),
     path('send-reset-password-email/', views.SendResetPasswordEmail.as_view(), name='user-send-reset-password-email'),
     path('reset-password/<int:pk>/', views.ResetPassword.as_view(), name='user-reset-password'),
@@ -23,7 +22,6 @@ urlpatterns = [
     path('me/responses/', views.CurrentUserResponseList.as_view(), name='current-user-response-list'),
     path('me/response-requests/', views.ReceivedResponseRequestList.as_view(), name='received-response-request-list'),
     path('me/search/', views.CurrentUserFriendSearch.as_view(), name='current-user-friend-search'),
-    path('me/version-change/', views.CurrentUserVersionChange.as_view(), name='current-user-version-change'),
 
     # User Profile related
     path(r'search/', views.UserSearch.as_view(), name='user-search'),
