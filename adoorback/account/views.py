@@ -828,7 +828,12 @@ class UserFriendRequest(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
             raise PermissionDenied("The requester must be yourself.")
-        serializer.save(accepted=None)
+        try:
+            serializer.save(accepted=None)
+        except serializers.ValidationError as e:
+            if 'error' in e.detail and "different versions" in str(e.detail['error']):
+                raise PermissionDenied("Users belong to different groups, so a friend request cannot be sent.")
+            raise e
 
 
 class UserFriendRequestDefault(generics.CreateAPIView):
@@ -902,6 +907,13 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        
+        # catch version validation before update is processed
+        if instance.requester.current_ver != instance.requestee.current_ver:
+            raise ValidationError({
+                "error": "Cannot accept friend requests from users using different versions"
+            })
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)  # `accepted` 필드 검사
         self.perform_update(serializer)

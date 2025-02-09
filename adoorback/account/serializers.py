@@ -352,6 +352,19 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
         return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
 
     def validate(self, data):
+        data = super().validate(data)
+        
+        try:
+            requester = User.objects.get(id=data['requester_id'])
+            requestee = User.objects.get(id=data['requestee_id'])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+
+        if requester.current_ver != requestee.current_ver:
+            raise serializers.ValidationError({
+                "error": "Cannot send friend requests to users using different versions"
+            })
+
         if data.get('requester_id') == data.get('requestee_id'):
             raise serializers.ValidationError('You cannot be friends with yourself.')
 
