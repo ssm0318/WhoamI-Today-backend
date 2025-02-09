@@ -24,7 +24,7 @@ User = get_user_model()
 class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     unread_noti = serializers.SerializerMethodField(read_only=True)
-    current_ver = serializers.ChoiceField(choices=VERSION_CHOICES)
+    current_ver = serializers.ChoiceField(choices=VERSION_CHOICES, read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
