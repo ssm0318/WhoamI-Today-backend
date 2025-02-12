@@ -318,11 +318,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     def can_access_response_set(self, user):
         from qna.models import Response
-        
-        # Get all responses by the user
         responses = Response.objects.filter(author=user)
-        
-        # Filter responses by checking if self is in sharing_scope
         return [response for response in responses if self in response.sharing_scope.get_members()]
 
     def can_access_check_in(self, user):
@@ -335,14 +331,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     def can_access_note_set(self, user):
         from note.models import Note
-        from category.models import Subscription
-        
-        subscribed_categories = Subscription.objects.filter(user=self).values_list('category_id', flat=True)
-        
-        notes = Note.objects.filter(
-            author=user,
-            category_id__in=subscribed_categories
-        )
+        notes = Note.objects.filter(author=user)
         return [note for note in notes if self in note.sharing_scope.get_members()]
 
 
@@ -355,16 +344,16 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         
         if content_type == 'response':
             responses = Response.objects.filter(category_id__in=subscribed_categories)
-            return [r for r in responses if self in r.sharing_scope.get_members()]
+            return [response for response in responses if self in response.sharing_scope.get_members()]
         elif content_type == 'note':
             notes = Note.objects.filter(category_id__in=subscribed_categories)
-            return [n for n in notes if self in n.sharing_scope.get_members()]
+            return [note for note in notes if self in note.sharing_scope.get_members()]
         else:
             responses = Response.objects.filter(category_id__in=subscribed_categories)
             notes = Note.objects.filter(category_id__in=subscribed_categories)
             return (
-                [r for r in responses if self in r.sharing_scope.get_members()],
-                [n for n in notes if self in n.sharing_scope.get_members()]
+                [response for response in responses if self in response.sharing_scope.get_members()],
+                [note for note in notes if self in note.sharing_scope.get_members()]
             )
 
 
