@@ -1,5 +1,6 @@
 from django.urls import path
 from account import views
+from category import views as category_views
 
 urlpatterns = [
     # Auth related
@@ -57,4 +58,5 @@ urlpatterns = [
     # Friend Recommend related
     path('recommended-friends/', views.UserRecommendedFriendsList.as_view(), name='user-recommended-friends-list'),
     path('block-recommendation/', views.BlockRecCreate.as_view(), name='block-rec-create'),
+
 ]
