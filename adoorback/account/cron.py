@@ -5,10 +5,14 @@ from backports.zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django_cron import CronJobBase, Schedule
 
-from qna.models import Question
+from account.models import AppSession
 from notification.models import Notification, NotificationActor
+from qna.models import Question
+
 
 User = get_user_model()
+
+SESSION_TIMEOUT_MINUTES = 2 
 
 
 class SendDailyWhoAmINotiCronJob(CronJobBase):
@@ -117,3 +121,39 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
             redirect_url=redirect_url
         )
         NotificationActor.objects.create(user=admin, notification=noti)
+
+
+class AutoCloseSessionsCronJob(CronJobBase):
+    RUN_EVERY_MINS = SESSION_TIMEOUT_MINUTES
+
+    schedule = Schedule(run_every_mins=RUN_EVERY_MINS)
+    code = "session.auto_close_sessions"
+
+    def do(self):
+        print("Checking for inactive sessions...")
+
+        TIMEOUT_THRESHOLD = timezone.now() - timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+
+        # 1. Find expired sessions where a ping was received, 
+        # but no new ping has been sent for more than SESSION_TIMEOUT_MINUTES minutes
+        expired_sessions = AppSession.objects.filter(
+            end_time__isnull=True,
+            last_ping_time__lt=TIMEOUT_THRESHOLD
+        )
+
+        # 2. Include sessions where no ping was ever sent, 
+        # and the session has existed for more than SESSION_TIMEOUT_MINUTES minutes
+        expired_sessions |= AppSession.objects.filter(
+            end_time__isnull=True,
+            last_ping_time__isnull=True,
+            start_time__lt=TIMEOUT_THRESHOLD
+        )
+
+        count = 0
+        for session in expired_sessions:
+            session.end_time = timezone.now()
+            session.save()
+            count += 1
+
+        print(f"{count} sessions automatically closed.")
+        print("Cron job for session cleanup complete.")
