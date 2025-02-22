@@ -1,4 +1,3 @@
-from django.apps import apps
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models, transaction
 from django.db.models import Q, F
@@ -6,8 +5,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.utils import timezone
-from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE, HARD_DELETE
+from django.core.validators import MaxLengthValidator
+from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
 from adoorback.models import AdoorTimestampedModel
 from notification.models import Notification, NotificationActor
@@ -73,7 +72,7 @@ class Ping(AdoorTimestampedModel, SafeDeleteModel):
     sender = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='sent_pings')
     receiver = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='received_pings')
     emoji = models.CharField(max_length=20, choices=PING_CHOICES, blank=True, null=True)
-    content = models.TextField(blank=True)
+    content = models.TextField(blank=True, validators=[MaxLengthValidator(10000)])
 
     is_read = models.BooleanField(default=False)
 
