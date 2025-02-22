@@ -146,6 +146,6 @@ def create_ping_notification(created, instance, **kwargs):
         target=instance,
         message_ko=f"{sender.username}님이 핑을 보냈습니다!",
         message_en=f"{sender.username} sent you a Ping!",
-        redirect_url=f"/ping/user/{sender.id}",
+        redirect_url=f"/users/{sender.username}/ping",
     )
     NotificationActor.objects.create(user=sender, notification=noti)
