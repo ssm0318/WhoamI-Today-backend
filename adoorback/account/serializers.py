@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from account.models import FriendRequest, BlockRec, Connection, \
+from account.models import FriendRequest, BlockRec, Connection, AppSession, \
     VERSION_CHOICES
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -466,3 +466,10 @@ class BlockRecSerializer(serializers.ModelSerializer):
     class Meta:
         model = BlockRec
         fields = ['blocked_user_id']
+
+
+class AppSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppSession
+        fields = ["session_id", "user", "start_time", "end_time"]
+        read_only_fields = ["start_time", "end_time"]

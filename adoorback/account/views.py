@@ -1,5 +1,6 @@
 from datetime import timedelta
 import json
+import uuid
 
 from django.apps import apps
 from django.conf import settings
@@ -14,6 +15,7 @@ from django.http import HttpResponse, HttpResponseNotAllowed, Http404
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -26,7 +28,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
-from .models import Subscription, Connection
+from .models import Subscription, Connection, AppSession
 from account.models import FriendRequest, BlockRec
 from account.serializers import (CurrentUserSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -34,7 +36,8 @@ from account.serializers import (CurrentUserSerializer, \
                                  UserEmailSerializer, UserUsernameSerializer, \
                                  FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
-                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer)
+                                 UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
+                                 AppSessionSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername
@@ -44,6 +47,7 @@ from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
+
 
 User = get_user_model()
 
@@ -1138,3 +1142,75 @@ class FriendFeed(generics.ListAPIView):
         # Fallback (if pagination is disabled)
         serialized_data = NoteSerializer(queryset, many=True, context=self.get_serializer_context()).data
         return Response(serialized_data)
+
+
+class StartSession(generics.CreateAPIView):
+    queryset = AppSession.objects.all()
+    serializer_class = AppSessionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        while True:
+            session_id = str(uuid.uuid4())
+            try:
+                session = AppSession.objects.create(
+                    user=request.user,
+                    session_id=session_id,
+                    start_time=timezone.now()
+                )
+                return Response(
+                    {"message": "Session started", "session_id": session.session_id, "start_time": session.start_time},
+                    status=status.HTTP_201_CREATED
+                )
+            except IntegrityError:
+                continue
+
+
+class EndSession(generics.UpdateAPIView):
+    queryset = AppSession.objects.all()
+    serializer_class = AppSessionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        session = self.get_object()
+
+        if session.end_time is not None:
+            return Response({"error": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
+        if session.user != request.user:
+            raise PermissionDenied("You do not have permission to end this session.")
+
+        session.end_time = timezone.now()
+        session.save()
+        return Response({"message": "Session ended"}, status=status.HTTP_200_OK)
+
+    def get_object(self):
+        session_id = self.request.data.get("session_id")
+        session = AppSession.objects.filter(session_id=session_id).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=status.HTTP_404_NOT_FOUND)
+        return session
+
+
+class PingSession(generics.UpdateAPIView):
+    queryset = AppSession.objects.all()
+    serializer_class = AppSessionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        session = self.get_object()
+
+        if session.end_time is not None:
+            return Response({"error": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
+        if session.user != request.user:
+            raise PermissionDenied("You do not have permission to ping this session.")
+
+        session.last_ping_time = timezone.now()
+        session.save()
+        return Response({"message": "Ping received"}, status=status.HTTP_200_OK)
+    
+    def get_object(self):
+        session_id = self.request.data.get("session_id")
+        session = AppSession.objects.filter(session_id=session_id).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=status.HTTP_404_NOT_FOUND)
+        return session
