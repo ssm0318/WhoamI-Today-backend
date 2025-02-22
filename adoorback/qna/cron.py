@@ -1,10 +1,8 @@
 from django_cron import CronJobBase, Schedule
-from django.contrib.auth import get_user_model
 
 from qna.algorithms.data_crawler import select_daily_questions, \
     create_question_csv, create_user_csv
 from qna.algorithms.recommender import create_ranks_csv
-from notification.models import Notification
 
 
 class DailyQuestionCronJob(CronJobBase):

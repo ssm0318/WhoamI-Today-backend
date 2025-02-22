@@ -71,4 +71,9 @@ urlpatterns = [
      # Subscribe related
     path('friends/subscribe/', views.SubscribeUserContent.as_view(), name='subscribe-user-content'),
     path('friends/<int:pk>/subscribe/', views.UnsubscribeUserContent.as_view(), name='unsubscribe-user-content'),
+
+    # User Tracking related
+    path("app-sessions/start/", views.StartSession.as_view(), name="start_session"),
+    path("app-sessions/end/", views.EndSession.as_view(), name="end_session"),
+    path("app-sessions/ping/", views.PingSession.as_view(), name="ping_session"),
 ]

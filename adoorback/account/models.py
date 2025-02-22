@@ -3,7 +3,7 @@ import glob
 import os
 import secrets
 import urllib.parse
-from django.utils import timezone
+import uuid
 
 from django.apps import apps
 from django.conf import settings
@@ -18,6 +18,7 @@ from django.db.models import Max, Q
 from django.db.models.signals import post_save, post_delete
 from django.db.utils import IntegrityError
 from django.dispatch import receiver
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_countries.fields import CountryField
 from safedelete import DELETED_INVISIBLE
@@ -532,6 +533,20 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return f'{self.subscriber} subscribed to {self.content_type} of {self.subscribed_to}'
+
+
+class AppSession(SafeDeleteModel):
+    user = models.ForeignKey(
+        "User",
+        on_delete=models.CASCADE  # When user is soft deleted, app session is soft deleted as well
+    )
+    session_id = models.CharField(max_length=36, unique=True, default=uuid.uuid4)  # UUID + unique setting
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField(null=True, blank=True)
+    last_ping_time = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user} - {self.session_id} ({self.start_time} ~ {self.end_time})"
 
 
 @transaction.atomic
