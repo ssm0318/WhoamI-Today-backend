@@ -193,9 +193,8 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
 ]
 
-# Password reset token timeout (3 days in seconds)
-# 60 * 5 for 5 minutes to test
-PASSWORD_RESET_TIMEOUT = 60 * 60 * 24 * 3
+# Password reset token timeout (1 hour in seconds)
+PASSWORD_RESET_TIMEOUT = 60 * 60 
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
