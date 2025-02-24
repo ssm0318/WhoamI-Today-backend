@@ -22,7 +22,11 @@ services:
       python manage.py runserver 0.0.0.0:8000
       '
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health | grep 200",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
