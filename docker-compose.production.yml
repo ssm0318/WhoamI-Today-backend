@@ -25,7 +25,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health | grep 200",
+          "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health/ | grep 200",
         ]
       interval: 30s
       timeout: 10s
