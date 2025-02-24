@@ -37,30 +37,33 @@ class NotificationManager(SafeDeleteManager):
 
         if target.type == "Like":
             noti_to_update = find_like_noti(user, origin, noti_type)
-            if noti_to_update:
-                if hasattr(target, 'deleted') and target.deleted:
-                    NotificationActor.objects.filter(user=actor, notification=noti_to_update).delete()
-                    actors = noti_to_update.actors.all()
-                    N = actors.count()
-                    
-                    if N == 0:
-                        noti_to_update.is_visible = False
-                        noti_to_update.save()
-                        return noti_to_update
-                    
-                    first_actor = actors.first()
-                    updated_message_ko, updated_message_en = construct_message(
-                        noti_type,
-                        first_actor.username + "님",
-                        (actors[1].username + "님" if N > 1 else None),
-                        first_actor.username,
-                        (actors[1].username if N > 1 else None),
-                        N, content_en, content_ko, emoji
-                    )
-                    noti_to_update.message_ko = updated_message_ko
-                    noti_to_update.message_en = updated_message_en
+            if noti_to_update and hasattr(target, 'deleted') and target.deleted:
+                NotificationActor.objects.filter(user=actor, notification=noti_to_update).delete()
+                actors = noti_to_update.actors.all()
+                N = actors.count()
+                
+                if N == 0:
+                    noti_to_update.is_visible = False
                     noti_to_update.save()
                     return noti_to_update
+                
+                first_actor = actors.first()
+                other_actor = actors[1] if N > 1 else None
+                
+                updated_message_ko, updated_message_en = construct_message(
+                    noti_type,
+                    first_actor.username + "님",
+                    (other_actor.username + "님" if N == 2 else None),
+                    first_actor.username,
+                    (other_actor.username if N == 2 else None),
+                    N, content_en, content_ko, emoji
+                )
+                
+                noti_to_update.message_ko = updated_message_ko
+                noti_to_update.message_en = updated_message_en
+                noti_to_update.notification_updated_at = timezone.now()
+                noti_to_update.save()
+                return noti_to_update
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
                                                          origin_id=target.question.id, origin_type=get_question_type(),
