@@ -4,6 +4,7 @@ WORKDIR /app
 
 # 시스템 패키지 설치
 RUN apt-get update && apt-get install -y \
+    curl \
     gcc \
     python3-dev \
     postgresql-server-dev-all \
