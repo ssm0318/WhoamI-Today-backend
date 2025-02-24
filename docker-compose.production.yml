@@ -1,5 +1,6 @@
 services:
   web:
+    container_name: whoami-backend
     build:
       context: .
       dockerfile: Dockerfile
