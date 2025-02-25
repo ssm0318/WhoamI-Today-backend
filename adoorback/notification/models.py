@@ -31,11 +31,24 @@ class NotificationManager(SafeDeleteManager):
         admin_users = get_user_model().objects.filter(is_superuser=True)
         return self.filter(actors__in=admin_users, **kwargs)
 
+    def get_recent_ping(self, user, actor, seconds=10):
+        cutoff = timezone.now() - timezone.timedelta(minutes=minutes)
+        return self.filter(
+            user=user,
+            actors__in=[actor],
+            target_type__model='ping',
+            is_read=False,
+            is_visible=True,
+            notification_updated_at__gte=cutoff
+        ).first()
+
     def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_en, content_ko,
                                       emoji=None):
         noti_to_update = None
 
-        if target.type == "Like":
+        if target._meta.model_name == 'ping':
+            noti_to_update = self.find_recent_ping(user, actor)
+        elif target.type == "Like":
             noti_to_update = find_like_noti(user, origin, noti_type)
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
@@ -54,8 +67,15 @@ class NotificationManager(SafeDeleteManager):
         if noti_to_update:
             actors = noti_to_update.actors.all()
             N = actors.count()
-            new_actor = actors.first()
-            updated_message_ko, updated_message_en = construct_message(noti_type,
+            
+            if target._meta.model_name == 'ping':
+                updated_message_ko = f"{actor.username}님이 {N + 1}번 핑을 보냈습니다"
+                updated_message_en = f"{actor.username} sent you {N + 1} pings"
+                noti_to_update.message_ko = updated_message_ko
+                noti_to_update.message_en = updated_message_en
+            else:
+                new_actor = actors.first()
+                updated_message_ko, updated_message_en = construct_message(noti_type,
                                                                        actor.username + "님",
                                                                        new_actor.username + "님",
                                                                        actor.username,
@@ -65,8 +85,6 @@ class NotificationManager(SafeDeleteManager):
                                                                        content_ko,
                                                                        emoji)
 
-            noti_to_update.message_ko = updated_message_ko
-            noti_to_update.message_en = updated_message_en
             noti_to_update.is_visible = True
             noti_to_update.is_read = False
             NotificationActor.objects.create(user=actor, notification=noti_to_update)

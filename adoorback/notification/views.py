@@ -30,6 +30,14 @@ class NotificationList(generics.ListAPIView):
         user = self.request.user
         notifications = Notification.objects.visible_only().filter(user=user)
 
+        cutoff = timezone.now() - timezone.timedelta(hours=24) 
+        old_pings = notifications.filter(
+            target_type__model='ping',
+            is_read=False,
+            notification_updated_at__lt=cutoff
+        )
+        old_pings.update(is_read=True)
+
         if user.ver_changed_at:
             notifications = notifications.filter(created_at__gte=user.ver_changed_at)
 
