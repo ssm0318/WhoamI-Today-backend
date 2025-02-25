@@ -61,6 +61,11 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
         queryset = Response.objects.all()
         return queryset
 
+    def patch(self, request, *args, **kwargs):
+        if 'visibility' in request.data:
+            return self.partial_update(request, *args, **kwargs)
+        return super().patch(request, *args, **kwargs)
+
 
 class ResponseComments(generics.ListAPIView):
     serializer_class = cs.CommentFriendSerializer
