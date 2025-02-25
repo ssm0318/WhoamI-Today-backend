@@ -31,8 +31,9 @@ class NotificationManager(SafeDeleteManager):
         admin_users = get_user_model().objects.filter(is_superuser=True)
         return self.filter(actors__in=admin_users, **kwargs)
 
-    def get_recent_ping(self, user, actor, seconds=10):
-        cutoff = timezone.now() - timezone.timedelta(minutes=minutes)
+    def find_recent_ping(self, user, actor, seconds=300):
+        cutoff = timezone.now() - timezone.timedelta(seconds=seconds)
+        
         return self.filter(
             user=user,
             actors__in=[actor],
@@ -48,22 +49,7 @@ class NotificationManager(SafeDeleteManager):
 
         if target._meta.model_name == 'ping':
             noti_to_update = self.find_recent_ping(user, actor)
-        elif target.type == "Like":
-            noti_to_update = find_like_noti(user, origin, noti_type)
-        elif target.type == "ResponseRequest":
-            noti_to_update = Notification.objects.filter(user=user,
-                                                         origin_id=target.question.id, origin_type=get_question_type(),
-                                                         target_type=get_response_request_type()).first()
-        elif target.type == "Reaction":
-            notis = Notification.objects.filter(user=user, origin_id=origin.id,
-                                                origin_type=ContentType.objects.get_for_model(origin),
-                                                target_type=ContentType.objects.get_for_model(target))
-            if notis.count() > 0:
-                for noti in notis:
-                    if noti.target.emoji == emoji:
-                        noti_to_update = noti
-                        break
-
+        
         if noti_to_update:
             actors = noti_to_update.actors.all()
             N = actors.count()
@@ -73,33 +59,32 @@ class NotificationManager(SafeDeleteManager):
                 updated_message_en = f"{actor.username} sent you {N + 1} pings"
                 noti_to_update.message_ko = updated_message_ko
                 noti_to_update.message_en = updated_message_en
-            else:
-                new_actor = actors.first()
-                updated_message_ko, updated_message_en = construct_message(noti_type,
-                                                                       actor.username + "님",
-                                                                       new_actor.username + "님",
-                                                                       actor.username,
-                                                                       new_actor.username,
-                                                                       N + 1,
-                                                                       content_en,
-                                                                       content_ko,
-                                                                       emoji)
+                noti_to_update.message = updated_message_en
+                noti_to_update.is_visible = True
+                noti_to_update.is_read = False
+                NotificationActor.objects.create(user=actor, notification=noti_to_update)
+                noti_to_update.notification_updated_at = timezone.now()
+                noti_to_update.save()
+                return noti_to_update
 
-            noti_to_update.is_visible = True
-            noti_to_update.is_read = False
-            NotificationActor.objects.create(user=actor, notification=noti_to_update)
-            noti_to_update.notification_updated_at = timezone.now()
-            noti_to_update.save()
-            print(noti_to_update.message_ko)
-            print(noti_to_update.message_en)
+        if target._meta.model_name == 'ping':
+            message_ko = f"{actor.username}님이 핑을 보냈습니다"
+            message_en = f"{actor.username} sent you a Ping!"
         else:
             message_ko, message_en = construct_message(noti_type, actor.username + "님", None,
-                                                       actor.username, None, 1, content_en, content_ko, emoji)
-            noti = Notification.objects.create(user=user, origin=origin, target=target, redirect_url=redirect_url,
-                                               message_ko=message_ko, message_en=message_en)
-            NotificationActor.objects.create(user=actor, notification=noti)
-            print(noti.message_ko)
-            print(noti.message_en)
+                                                   actor.username, None, 1, content_en, content_ko, emoji)
+
+        noti = self.create(
+            user=user,
+            origin=origin,
+            target=target,
+            redirect_url=redirect_url,
+            message_ko=message_ko,
+            message_en=message_en,
+            message=message_en
+        )
+        NotificationActor.objects.create(user=actor, notification=noti)
+        return noti
 
 
 def default_user():

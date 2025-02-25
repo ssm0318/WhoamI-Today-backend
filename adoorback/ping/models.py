@@ -139,12 +139,13 @@ def create_ping_notification(created, instance, **kwargs):
     if receiver.id in sender.user_report_blocked_ids:
         return
 
-    noti = Notification.objects.create(
+    Notification.objects.create_or_update_notification(
+        actor=sender,
         user=receiver,
         origin=sender,
         target=instance,
-        message_ko=f"{sender.username}님이 핑을 보냈습니다!",
-        message_en=f"{sender.username} sent you a Ping!",
+        noti_type='Ping',
         redirect_url=f"/users/{sender.username}/ping",
+        content_en='',
+        content_ko=''
     )
-    NotificationActor.objects.create(user=sender, notification=noti)
