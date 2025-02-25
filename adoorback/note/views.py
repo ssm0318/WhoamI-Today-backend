@@ -124,6 +124,11 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
         self.perform_update(serializer)
         return Response(serializer.data)
 
+    def patch(self, request, *args, **kwargs):
+        if 'visibility' in request.data:
+            return self.partial_update(request, *args, **kwargs)
+        return super().patch(request, *args, **kwargs)
+
 
 class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = DefaultFriendNoteSerializer
