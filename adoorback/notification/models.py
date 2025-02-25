@@ -93,8 +93,9 @@ class NotificationManager(SafeDeleteManager):
             N = actors.count()
             
             if target._meta.model_name == 'ping':
-                updated_message_ko = f"{actor.username}님이 {N + 1}번 핑을 보냈습니다"
-                updated_message_en = f"{actor.username} sent you {N + 1} pings"
+                ping_count = noti_to_update.target_set.count() + 1
+                updated_message_ko = f"{actor.username}님이 {ping_count}번 핑을 보냈습니다"
+                updated_message_en = f"{actor.username} sent you {ping_count} pings"
                 noti_to_update.message_ko = updated_message_ko
                 noti_to_update.message_en = updated_message_en
                 noti_to_update.message = updated_message_en
