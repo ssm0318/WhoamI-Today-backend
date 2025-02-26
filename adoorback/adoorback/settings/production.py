@@ -48,9 +48,11 @@ CSRF_TRUSTED_ORIGINS = [
 ALLOWED_HOSTS = [
     'ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com',
     'localhost',
+    '127.0.0.1',
     '43.203.123.225',
     'ip-172-31-12-68',
-    '.gina-park.site'
+    '.gina-park.site',
+    r".*\.gina-park\.site", 
 ]
 
 CORS_ALLOWED_ORIGINS = [
