@@ -10,7 +10,7 @@ def health_check(request):
     return JsonResponse({"status": "ok"}, status=200)
 
 urlpatterns = [
-    path("health/", health_check),
+    path("api/health/", health_check),
 ]
 
 urlpatterns += i18n_patterns(
