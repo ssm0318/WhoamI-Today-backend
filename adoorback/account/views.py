@@ -1191,7 +1191,7 @@ class EndSession(generics.UpdateAPIView):
         return session
 
 
-class PingSession(generics.UpdateAPIView):
+class TouchSession(generics.UpdateAPIView):
     queryset = AppSession.objects.all()
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
@@ -1202,11 +1202,11 @@ class PingSession(generics.UpdateAPIView):
         if session.end_time is not None:
             return Response({"error": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
         if session.user != request.user:
-            raise PermissionDenied("You do not have permission to ping this session.")
+            raise PermissionDenied("You do not have permission to touch this session.")
 
-        session.last_ping_time = timezone.now()
+        session.last_touch_time = timezone.now()
         session.save()
-        return Response({"message": "Ping received"}, status=status.HTTP_200_OK)
+        return Response({"message": "Touch received"}, status=status.HTTP_200_OK)
     
     def get_object(self):
         session_id = self.request.data.get("session_id")

@@ -543,7 +543,7 @@ class AppSession(SafeDeleteModel):
     session_id = models.CharField(max_length=36, unique=True, default=uuid.uuid4)  # UUID + unique setting
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)
-    last_ping_time = models.DateTimeField(null=True, blank=True)
+    last_touch_time = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user} - {self.session_id} ({self.start_time} ~ {self.end_time})"
