@@ -48,22 +48,23 @@ class NotificationManager(SafeDeleteManager):
                     return noti_to_update
                 
                 first_actor = actors.first()
-                other_actor = actors[1] if N > 1 else None
-                
                 updated_message_ko, updated_message_en = construct_message(
                     noti_type,
                     first_actor.username + "님",
-                    (other_actor.username + "님" if N == 2 else None),
+                    None,
                     first_actor.username,
-                    (other_actor.username if N == 2 else None),
-                    N, content_en, content_ko, emoji
+                    None,
+                    N,
+                    content_en,
+                    content_ko,
+                    emoji
                 )
                 
                 noti_to_update.message_ko = updated_message_ko
                 noti_to_update.message_en = updated_message_en
                 noti_to_update.notification_updated_at = timezone.now()
                 noti_to_update.save()
-                return noti_to_update
+                return
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
                                                          origin_id=target.question.id, origin_type=get_question_type(),
