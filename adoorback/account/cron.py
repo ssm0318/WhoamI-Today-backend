@@ -26,7 +26,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         print('=========================')
         print("Creating daily notifications for WhoAmI...............")
 
-        admin = User.objects.filter(is_superuser=True).get(email='team.whoami.today@gmail.com')
+        admin = User.objects.filter(is_superuser=True).get(email='whoami.today.official@gmail.com')
         try:
             daily_question = Question.objects.daily_questions()[0]
             daily_question_en = daily_question.content_en
