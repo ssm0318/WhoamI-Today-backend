@@ -36,5 +36,9 @@ EXPOSE 8000
 
 # 환경 변수 설정
 ENV PYTHONUNBUFFERED=1
+# 슈퍼유저 생성을 위한 환경 변수 (실제 배포 시 수정 필요)
+ENV DJANGO_SUPERUSER_USERNAME=admin
+ENV DJANGO_SUPERUSER_EMAIL=admin@example.com
+ENV DJANGO_SUPERUSER_PASSWORD=adminpassword
 
 CMD ["/app/start.sh"]
