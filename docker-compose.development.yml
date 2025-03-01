@@ -9,7 +9,8 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy # ✅ DB가 정상 실행될 때까지 대기
     command: >
       sh -c '
       sleep 5 &&
@@ -30,6 +31,12 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck: # ✅ PostgreSQL 상태 확인
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
 
 volumes:
   postgres_data:
