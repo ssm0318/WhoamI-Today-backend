@@ -54,13 +54,22 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
 
             if user.noti_time == time(user_local_time.hour, 0):
                 # daily notification
-                noti = Notification.objects.create(user=user,
-                                                   target=admin,
-                                                   origin=admin,
-                                                   message_ko=f"{user.username}님, 오늘의 후엠아이를 남겨보세요! - {daily_question_ko}",
-                                                   message_en=f"{user.username}, time to leave your whoami for today! - {daily_question_en}",
-                                                   redirect_url=f'/questions/{daily_question_id}/new')
-                NotificationActor.objects.create(user=admin, notification=noti)
+                if user.current_ver == 'default':
+                    noti = Notification.objects.create(user=user,
+                                                    target=admin,
+                                                    origin=admin,
+                                                    message_ko=f"{user.username}님, 오늘도 후엠아이에 글을 남기러 가볼까요?",
+                                                    message_en=f"{user.username}, time to leave your whoami for today!",
+                                                    redirect_url=f'/feed')
+                    NotificationActor.objects.create(user=admin, notification=noti)
+                elif user.current_ver == 'experiment':
+                    noti = Notification.objects.create(user=user,
+                                                    target=admin,
+                                                    origin=admin,
+                                                    message_ko=f"{user.username}님, 오늘의 후엠아이를 남겨보세요! - {daily_question_ko}",
+                                                    message_en=f"{user.username}, time to leave your whoami for today! - {daily_question_en}",
+                                                    redirect_url=f'/questions/{daily_question_id}/new')
+                    NotificationActor.objects.create(user=admin, notification=noti)
 
         num_notis_after = Notification.objects.admin_only().count()
         print(f'{num_notis_after - num_notis_before} notifications sent!')
