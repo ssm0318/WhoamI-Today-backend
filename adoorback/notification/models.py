@@ -62,6 +62,7 @@ class NotificationManager(SafeDeleteManager):
         if target._meta.model_name == 'ping':
             noti_to_update = self.find_recent_ping(user, actor)
         elif target.type == "Like":
+<<<<<<< HEAD
             try:
                 noti_to_update = find_like_noti(user, origin, noti_type)
             except ValidationError:
@@ -74,6 +75,9 @@ class NotificationManager(SafeDeleteManager):
                 ).order_by('-notification_updated_at').first()
                 
                 noti_to_update = existing
+=======
+            noti_to_update = find_like_noti(user, origin, noti_type)
+>>>>>>> e0b2bc2 (refactor: #480 reinstate like, response request and reaction)
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
                                                          origin_id=target.question.id, origin_type=get_question_type(),
