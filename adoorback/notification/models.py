@@ -49,6 +49,21 @@ class NotificationManager(SafeDeleteManager):
 
         if target._meta.model_name == 'ping':
             noti_to_update = self.find_recent_ping(user, actor)
+        elif target.type == "Like":
+            noti_to_update = find_like_noti(user, origin, noti_type)
+        elif target.type == "ResponseRequest":
+            noti_to_update = Notification.objects.filter(user=user,
+                                                         origin_id=target.question.id, origin_type=get_question_type(),
+                                                         target_type=get_response_request_type()).first()
+        elif target.type == "Reaction":
+            notis = Notification.objects.filter(user=user, origin_id=origin.id,
+                                                origin_type=ContentType.objects.get_for_model(origin),
+                                                target_type=ContentType.objects.get_for_model(target))
+            if notis.count() > 0:
+                for noti in notis:
+                    if noti.target.emoji == emoji:
+                        noti_to_update = noti
+                        break
         
         if noti_to_update:
             actors = noti_to_update.actors.all()
