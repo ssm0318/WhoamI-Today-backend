@@ -134,18 +134,18 @@ class AutoCloseSessionsCronJob(CronJobBase):
 
         TIMEOUT_THRESHOLD = timezone.now() - timedelta(minutes=SESSION_TIMEOUT_MINUTES)
 
-        # 1. Find expired sessions where a ping was received, 
-        # but no new ping has been sent for more than SESSION_TIMEOUT_MINUTES minutes
+        # 1. Find expired sessions where a touch was received, 
+        # but no new touch has been sent for more than SESSION_TIMEOUT_MINUTES minutes
         expired_sessions = AppSession.objects.filter(
             end_time__isnull=True,
-            last_ping_time__lt=TIMEOUT_THRESHOLD
+            last_touch_time__lt=TIMEOUT_THRESHOLD
         )
 
-        # 2. Include sessions where no ping was ever sent, 
+        # 2. Include sessions where no touch was ever sent, 
         # and the session has existed for more than SESSION_TIMEOUT_MINUTES minutes
         expired_sessions |= AppSession.objects.filter(
             end_time__isnull=True,
-            last_ping_time__isnull=True,
+            last_touch_time__isnull=True,
             start_time__lt=TIMEOUT_THRESHOLD
         )
 
