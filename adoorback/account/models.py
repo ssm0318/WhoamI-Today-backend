@@ -117,7 +117,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         default=default_noti_period_days,
         help_text="Days of the week for notifications, where 0=Sunday, 1=Monday, etc."
     )
-    signup_noti_status = models.JSONField(default=dict)
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
 
@@ -659,7 +658,6 @@ def user_created(created, instance, **kwargs):
     '''
     when User is created, 
     1) send notification
-    2) initialize signup_noti_status
     '''
     if instance.deleted:
         return
@@ -675,16 +673,6 @@ def user_created(created, instance, **kwargs):
                                            message_en=f"{instance.username}, try making friends to share your whoami!",
                                            redirect_url='/friends/explore')
         NotificationActor.objects.create(user=admin, notification=noti)
-
-        # initialize signup_noti_status
-        if not instance.signup_noti_status:
-            instance.signup_noti_status = {
-                "profile_noti_sent": False,
-                "checkin_noti_sent": False,
-                "note_noti_sent": False,
-                "ping_noti_sent": False
-            }
-            instance.save()
 
 
 @transaction.atomic
