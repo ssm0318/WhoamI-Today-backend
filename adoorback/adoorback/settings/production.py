@@ -4,7 +4,8 @@ from .base import *
 
 DEBUG = False
 
-BASE_URL = 'https://whoami.gina-park.site'
+# BASE_URL = 'https://whoami.gina-park.site'
+BASE_URL = 'https://whoami-test-group.gina-park.site'
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
@@ -64,4 +65,5 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.gina-park\.site$"
 ]
 
-FRONTEND_URL = 'https://whoami.gina-park.site'
+# FRONTEND_URL = 'https://whoami.gina-park.site'
+FRONTEND_URL = 'https://whoami-test-group.gina-park.site'
