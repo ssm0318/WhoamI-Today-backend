@@ -873,6 +873,7 @@ class UserSentFriendRequestList(generics.ListAPIView):
     def get_queryset(self):
         return FriendRequest.objects.filter(requester=self.request.user).filter(
             Q(accepted__isnull=True) | Q(accepted=False)
+        )
 
 
 class UserFriendRequestDestroy(generics.DestroyAPIView):
