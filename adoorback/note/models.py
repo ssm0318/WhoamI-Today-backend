@@ -113,7 +113,7 @@ class Note(AdoorModel, SafeDeleteModel):
             return False
 
         if self.visibility == 'close_friends':
-            is_close = self.author.is_close_friend(user)
+            is_close = user.is_close_friend(self.author)
             if not is_close:
                 return False
 
