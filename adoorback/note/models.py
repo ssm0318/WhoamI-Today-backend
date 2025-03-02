@@ -126,6 +126,8 @@ class Note(AdoorModel, SafeDeleteModel):
 
             if update_past_posts:
                 return True
+            if upgrade_time is None:  # users were close friends from the beginning
+                return True
             return self.created_at > upgrade_time
         
         return True
