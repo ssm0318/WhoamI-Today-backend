@@ -1176,8 +1176,6 @@ class EndSession(generics.UpdateAPIView):
 
         if session.end_time is not None:
             return Response({"error": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
-        if session.user != request.user:
-            raise PermissionDenied("You do not have permission to end this session.")
 
         session.end_time = timezone.now()
         session.save()
@@ -1185,10 +1183,8 @@ class EndSession(generics.UpdateAPIView):
 
     def get_object(self):
         session_id = self.request.data.get("session_id")
-        session = AppSession.objects.filter(session_id=session_id).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=status.HTTP_404_NOT_FOUND)
-        return session
+
+        return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)
 
 
 class TouchSession(generics.UpdateAPIView):
@@ -1201,8 +1197,6 @@ class TouchSession(generics.UpdateAPIView):
 
         if session.end_time is not None:
             return Response({"error": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
-        if session.user != request.user:
-            raise PermissionDenied("You do not have permission to touch this session.")
 
         session.last_touch_time = timezone.now()
         session.save()
@@ -1210,7 +1204,5 @@ class TouchSession(generics.UpdateAPIView):
     
     def get_object(self):
         session_id = self.request.data.get("session_id")
-        session = AppSession.objects.filter(session_id=session_id).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=status.HTTP_404_NOT_FOUND)
-        return session
+
+        return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)
