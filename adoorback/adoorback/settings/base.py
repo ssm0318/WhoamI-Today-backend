@@ -64,6 +64,7 @@ CORS_ORIGIN_WHITELIST = [
 # Application definition
 
 INSTALLED_APPS = [
+    'adoorback.apps.AdoorbackConfig',
     'daphne',
     'account.apps.AccountConfig',
     'channels',
