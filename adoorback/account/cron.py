@@ -60,7 +60,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                                                     origin=admin,
                                                     message_ko=f"{user.username}님, 오늘도 후엠아이에 글을 남기러 가볼까요?",
                                                     message_en=f"{user.username}, time to leave your whoami for today!",
-                                                    redirect_url=f'/feed')
+                                                    redirect_url=f'/friends/feed')
                     NotificationActor.objects.create(user=admin, notification=noti)
                 elif user.current_ver == 'experiment':
                     noti = Notification.objects.create(user=user,
