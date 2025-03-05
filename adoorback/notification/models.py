@@ -50,7 +50,18 @@ class NotificationManager(SafeDeleteManager):
         if target._meta.model_name == 'ping':
             noti_to_update = self.find_recent_ping(user, actor)
         elif target.type == "Like":
-            noti_to_update = find_like_noti(user, origin, noti_type)
+            try:
+                noti_to_update = find_like_noti(user, origin, noti_type)
+            except ValidationError:
+                existing = Notification.objects.filter(
+                    user=user, 
+                    origin_id=origin.id,
+                    origin_type=ContentType.objects.get_for_model(origin),
+                    target_type=ContentType.objects.get_for_model(target),
+                    is_visible=True
+                ).order_by('-notification_updated_at').first()
+                
+                noti_to_update = existing
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
                                                          origin_id=target.question.id, origin_type=get_question_type(),
@@ -70,7 +81,7 @@ class NotificationManager(SafeDeleteManager):
             N = actors.count()
             
             if target._meta.model_name == 'ping':
-                ping_count = noti_to_update.target_set.count() + 1
+                ping_count = N + 1
                 updated_message_ko = f"{actor.username}님이 {ping_count}번 핑을 보냈습니다"
                 updated_message_en = f"{actor.username} sent you {ping_count} pings"
                 noti_to_update.message_ko = updated_message_ko
@@ -100,7 +111,7 @@ class NotificationManager(SafeDeleteManager):
             message=message_en
         )
         NotificationActor.objects.create(user=actor, notification=noti)
-        return noti
+        return noti_to_update or noti
 
 
 def default_user():
