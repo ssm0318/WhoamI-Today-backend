@@ -78,6 +78,11 @@ class VisitorTrackingMiddleware(MiddlewareMixin):
     def _refresh_visitor(self, user, request, visit_time):
         # A Visitor row is unique by session_key
         session_key = request.session.session_key
+        
+        # If there is a comma in the session key, use only the first part 
+        # (after comma may be token info)
+        if session_key and ',' in session_key:
+            session_key = session_key.split(',')[0]
 
         try:
             visitor = Visitor.objects.get(pk=session_key)

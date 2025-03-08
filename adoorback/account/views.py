@@ -1169,6 +1169,12 @@ class StartSession(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         while True:
             session_id = str(uuid.uuid4())
+            
+            # Process if session ID contains a comma 
+            # (use only the part before the comma)
+            if session_id and ',' in session_id:
+                session_id = session_id.split(',')[0]
+                
             try:
                 session = AppSession.objects.create(
                     user=request.user,
@@ -1221,5 +1227,13 @@ class TouchSession(generics.UpdateAPIView):
     
     def get_object(self):
         session_id = self.request.data.get("session_id")
-
+        
+        if not session_id:
+            raise Http404("No session_id provided")
+            
+        # Process if session ID contains a comma 
+        # (use only the part before the comma)
+        if session_id and ',' in session_id:
+            session_id = session_id.split(',')[0]
+        
         return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)
