@@ -83,6 +83,18 @@ class UserLogin(APIView):
 
         user = authenticate(username=username, password=password)
         if user is not None:
+            while True:
+                session_id = str(uuid.uuid4())
+                try:
+                    session = AppSession.objects.create(
+                        user=user,
+                        session_id=session_id,
+                        start_time=timezone.now()
+                    )
+                    break
+                except IntegrityError:
+                    continue
+
             access_token = get_access_token_for_user(user)
             response.set_cookie(
                 key=settings.SIMPLE_JWT['AUTH_COOKIE'],
@@ -94,15 +106,34 @@ class UserLogin(APIView):
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
             csrf.get_token(request)
+
+            response.data = {
+                "message": "Login successful",
+                "session_id": session.session_id,
+                "start_time": session.start_time
+            }
             return response
         else:
             raise WrongPassword()
 
 
 class UserLogout(APIView):
-    def get(self, request):
+    def post(self, request):
+        session_id = request.data.get("session_id")
+
+        if not session_id:
+            return Response({"error": "Session ID is required for logout"}, status=status.HTTP_400_BAD_REQUEST)
+
+        session = AppSession.objects.filter(user=request.user, session_id=session_id, end_time__isnull=True).first()
+
+        if not session:
+            return Response({"error": "Session not found or already ended"}, status=status.HTTP_404_NOT_FOUND)
+
+        session.end_time = timezone.now()
+        session.save()
+
         logout(request)
-        response = Response()
+        response = Response({"message": "Logout successful"})
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
         return response
 
