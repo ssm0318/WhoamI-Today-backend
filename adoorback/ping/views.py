@@ -40,6 +40,12 @@ class PingList(generics.ListCreateAPIView):
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
 
+        try:
+            connected_user = User.objects.get(id=self.kwargs.get('pk'))
+        except User.DoesNotExist:
+            raise exceptions.NotFound("Connected user not found")
+        response.data['username'] = connected_user.username
+
         response.data['oldest_unread_page'] = self.oldest_unread_page
 
         paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)

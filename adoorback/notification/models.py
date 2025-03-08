@@ -43,6 +43,18 @@ class NotificationManager(SafeDeleteManager):
             notification_updated_at__gte=cutoff
         ).first()
 
+    def find_recent_ping(self, user, actor, seconds=300):
+        cutoff = timezone.now() - timezone.timedelta(seconds=seconds)
+        
+        return self.filter(
+            user=user,
+            actors__in=[actor],
+            target_type__model='ping',
+            is_read=False,
+            is_visible=True,
+            notification_updated_at__gte=cutoff
+        ).first()
+
     def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_en, content_ko,
                                       emoji=None):
         noti_to_update = None
@@ -81,6 +93,23 @@ class NotificationManager(SafeDeleteManager):
             N = actors.count()
             
             if target._meta.model_name == 'ping':
+                updated_message_ko = f"{actor.username}님이 {N + 1}번 핑을 보냈습니다"
+                updated_message_en = f"{actor.username} sent you {N + 1} pings"
+                noti_to_update.message_ko = updated_message_ko
+                noti_to_update.message_en = updated_message_en
+                noti_to_update.message = updated_message_en
+                noti_to_update.is_visible = True
+                noti_to_update.is_read = False
+                NotificationActor.objects.create(user=actor, notification=noti_to_update)
+                noti_to_update.notification_updated_at = timezone.now()
+                noti_to_update.save()
+                return noti_to_update
+
+        if target._meta.model_name == 'ping':
+            message_ko = f"{actor.username}님이 핑을 보냈습니다"
+            message_en = f"{actor.username} sent you a Ping!"
+            
+            if target._meta.model_name == 'ping':
                 ping_count = N + 1
                 updated_message_ko = f"{actor.username}님이 {ping_count}번 핑을 보냈습니다"
                 updated_message_en = f"{actor.username} sent you {ping_count} pings"
@@ -111,7 +140,7 @@ class NotificationManager(SafeDeleteManager):
             message=message_en
         )
         NotificationActor.objects.create(user=actor, notification=noti)
-        return noti_to_update or noti
+        return noti
 
 
 def default_user():

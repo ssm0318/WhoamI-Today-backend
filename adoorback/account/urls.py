@@ -75,5 +75,5 @@ urlpatterns = [
     # User Tracking related
     path("app-sessions/start/", views.StartSession.as_view(), name="start_session"),
     path("app-sessions/end/", views.EndSession.as_view(), name="end_session"),
-    path("app-sessions/ping/", views.PingSession.as_view(), name="ping_session"),
+    path("app-sessions/touch/", views.TouchSession.as_view(), name="touch_session"),
 ]

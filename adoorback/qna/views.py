@@ -61,6 +61,11 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
         queryset = Response.objects.all()
         return queryset
 
+    def patch(self, request, *args, **kwargs):
+        if 'visibility' in request.data:
+            return self.partial_update(request, *args, **kwargs)
+        return super().patch(request, *args, **kwargs)
+
 
 class ResponseComments(generics.ListAPIView):
     serializer_class = cs.CommentFriendSerializer
@@ -87,7 +92,7 @@ class ResponseComments(generics.ListAPIView):
         return response_.response_comments.exclude(
             id__in=blocked_content_ids,
             author_id__in=current_user.user_report_blocked_ids
-        ).order_by('-created_at')
+        ).order_by('created_at')
 
     def list(self, request, *args, **kwargs):
         comments = self.get_queryset()

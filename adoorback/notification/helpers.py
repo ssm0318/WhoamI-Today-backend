@@ -61,8 +61,8 @@ def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, 
             return f'{user_a_ko}과 {user_b_ko}이 회원님의 노트를 좋아합니다: {content_ko}', \
                 f'{user_a_en} and {user_b_en} liked your note: {content_en}'
         else:
-            return f'{user_a_ko}, {user_b_ko}, 외 {N - 1}명의 친구가 회원님의 노트를 좋아합니다: {content_ko}', \
-                f'{user_a_en}, {user_b_en}, and {N - 1} other friend(s) liked your note: {content_en}'
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 노트를 좋아합니다: {content_ko}', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your note: {content_en}'
     elif noti_type == "response_request_noti":
         if N == 1:
             return f'똑똑똑! {user_a_ko}으로부터 질문이 왔어요: {content_ko}', \

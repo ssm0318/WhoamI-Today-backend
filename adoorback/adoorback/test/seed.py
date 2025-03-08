@@ -137,8 +137,15 @@ def set_seed(n):
     FriendRequest.objects.get_or_create(requester=user_8, requestee=user_10)
 
     # Seed Friendship
+    ## Since bulk_create does not call Connection model's save() method,
+    ## we explicitly assign user1 as the user with smaller id
     connections = [
-        Connection(user1=user_2, user2=user, user1_choice='friend', user2_choice='friend')
+        Connection(
+            user1=min(user_2, user, key=lambda u: u.id),
+            user2=max(user_2, user, key=lambda u: u.id),
+            user1_choice='friend',
+            user2_choice='friend'
+        )
         for user in [user_1, user_3, user_4, user_5, user_6]
     ]
     Connection.objects.bulk_create(connections)

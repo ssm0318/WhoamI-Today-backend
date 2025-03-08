@@ -47,6 +47,7 @@ from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
+from tracking.utils import clean_session_key
 
 
 User = get_user_model()
@@ -990,6 +991,23 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         # Sort the by number of mutual friends
         sorted_friends = sorted(mutual_friends_count_dict.items(), key=lambda x: x[1], reverse=True)[:25]
         sorted_friend_ids = [friend_id for friend_id, _ in sorted_friends]
+
+        if not sorted_friend_ids:
+            # If there is no user to recommend, recommend 3 random users
+            user_group = user.user_group
+            if user_group in ["group_1", "group_2"]:
+                allowed_groups = ["group_1", "group_2"]
+            elif user_group in ["group_3", "group_4"]:
+                allowed_groups = ["group_3", "group_4"]
+
+            potential_random_users = User.objects.filter(user_group__in=allowed_groups) \
+                .exclude(id=user_id) \
+                .exclude(id__in=user_friend_ids) \
+                .exclude(id__in=user_block_rec_ids)
+
+            random_users = potential_random_users.order_by("?")[:3]
+            return random_users
+
         recommended_friends = User.objects.filter(id__in=sorted_friend_ids) \
             .order_by(Case(*[When(id=id_, then=pos) for pos, id_ in enumerate(sorted_friend_ids)], default=0))
 
@@ -1152,6 +1170,10 @@ class StartSession(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         while True:
             session_id = str(uuid.uuid4())
+            
+            # Clean the session key using the utility function
+            session_id = clean_session_key(session_id)
+                
             try:
                 session = AppSession.objects.create(
                     user=request.user,
@@ -1176,8 +1198,6 @@ class EndSession(generics.UpdateAPIView):
 
         if session.end_time is not None:
             return Response({"error": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
-        if session.user != request.user:
-            raise PermissionDenied("You do not have permission to end this session.")
 
         session.end_time = timezone.now()
         session.save()
@@ -1185,13 +1205,11 @@ class EndSession(generics.UpdateAPIView):
 
     def get_object(self):
         session_id = self.request.data.get("session_id")
-        session = AppSession.objects.filter(session_id=session_id).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=status.HTTP_404_NOT_FOUND)
-        return session
+
+        return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)
 
 
-class PingSession(generics.UpdateAPIView):
+class TouchSession(generics.UpdateAPIView):
     queryset = AppSession.objects.all()
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
@@ -1201,16 +1219,18 @@ class PingSession(generics.UpdateAPIView):
 
         if session.end_time is not None:
             return Response({"error": "Session already ended"}, status=status.HTTP_400_BAD_REQUEST)
-        if session.user != request.user:
-            raise PermissionDenied("You do not have permission to ping this session.")
 
-        session.last_ping_time = timezone.now()
+        session.last_touch_time = timezone.now()
         session.save()
-        return Response({"message": "Ping received"}, status=status.HTTP_200_OK)
+        return Response({"message": "Touch received"}, status=status.HTTP_200_OK)
     
     def get_object(self):
         session_id = self.request.data.get("session_id")
-        session = AppSession.objects.filter(session_id=session_id).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=status.HTTP_404_NOT_FOUND)
-        return session
+        
+        if not session_id:
+            raise Http404("No session_id provided")
+            
+        # Clean the session key using the utility function
+        session_id = clean_session_key(session_id)
+        
+        return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)

@@ -28,23 +28,30 @@ class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
             current_user = self.request.user
             language = self.__get_language_from_request(request)
             registration_id = request.data.get('registration_id')
+            
+            # Check for existing device with same registration_id
             existing_device = CustomFCMDevice.objects.filter(registration_id=registration_id).first()
-
+            # If found a device with the same registration_id - update it to current user
             if existing_device:
-                # Update existing device
+                # If device belongs to a different user, update the user to current_user
+                if existing_device.user_id != current_user.id:
+                    print(f"Device previously belonged to user {existing_device.user_id}, updating to {current_user.id}")
+                
+                # Update the device with current user and other data
+                existing_device.user_id = current_user.id
                 serializer = self.update_device(existing_device, request.data, language)
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
-                # Create new device
-                serializer = self.get_serializer(data=request.data)
-                serializer.is_valid(raise_exception=True)
-                self.perform_create(serializer)
-                device = serializer.instance
-                device.language = language
-                device.user_id = current_user.id
-                device.save()
-                headers = self.get_success_headers(serializer.data)
-                return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+            
+            # Create new device if no existing device found
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            device = serializer.instance
+            device.language = language
+            device.user_id = current_user.id
+            device.save()
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         except Exception as e:
             print(f"Error in create method: {e}")
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

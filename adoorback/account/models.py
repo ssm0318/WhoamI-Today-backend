@@ -53,8 +53,10 @@ VERSION_CHOICES = (
 )
 
 USER_GROUP_CHOICES = (
-    ('group_1', 'Group 1: ver.D -> ver.E'),
-    ('group_2', 'Group 2: ver.E -> ver.D'),
+    ('group_1', 'Group 1: US / default (ver.R) -> experiment (ver.Q)'),
+    ('group_2', 'Group 2: US / experiment (ver.Q) -> default (ver.R)'),
+    ('group_3', 'Group 3: Korea / default (ver.R) -> experiment (ver.Q)'),
+    ('group_4', 'Group 4: Korea / experiment (ver.Q) -> default (ver.R)'),
 )
 
 USER_TYPE_CHOICES = (
@@ -117,7 +119,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         default=default_noti_period_days,
         help_text="Days of the week for notifications, where 0=Sunday, 1=Monday, etc."
     )
-    signup_noti_status = models.JSONField(default=dict)
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
 
@@ -543,7 +544,7 @@ class AppSession(SafeDeleteModel):
     session_id = models.CharField(max_length=36, unique=True, default=uuid.uuid4)  # UUID + unique setting
     start_time = models.DateTimeField()
     end_time = models.DateTimeField(null=True, blank=True)
-    last_ping_time = models.DateTimeField(null=True, blank=True)
+    last_touch_time = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user} - {self.session_id} ({self.start_time} ~ {self.end_time})"
@@ -659,7 +660,6 @@ def user_created(created, instance, **kwargs):
     '''
     when User is created, 
     1) send notification
-    2) initialize signup_noti_status
     '''
     if instance.deleted:
         return
@@ -675,16 +675,6 @@ def user_created(created, instance, **kwargs):
                                            message_en=f"{instance.username}, try making friends to share your whoami!",
                                            redirect_url='/friends/explore')
         NotificationActor.objects.create(user=admin, notification=noti)
-
-        # initialize signup_noti_status
-        if not instance.signup_noti_status:
-            instance.signup_noti_status = {
-                "profile_noti_sent": False,
-                "checkin_noti_sent": False,
-                "note_noti_sent": False,
-                "ping_noti_sent": False
-            }
-            instance.save()
 
 
 @transaction.atomic

@@ -113,12 +113,24 @@ class Note(AdoorModel, SafeDeleteModel):
             return False
 
         if self.visibility == 'close_friends':
-            is_close = self.author.is_close_friend(user)
-            if not connection.user1_update_past_posts:
-                return is_close and self.created_at > connection.user1_upgrade_time
-            return is_close
+            is_close = user.is_close_friend(self.author)
+            if not is_close:
+                return False
+
+            if self.author == connection.user1:
+                update_past_posts = connection.user1_update_past_posts
+                upgrade_time = connection.user1_upgrade_time
+            else:
+                update_past_posts = connection.user2_update_past_posts
+                upgrade_time = connection.user2_upgrade_time
+
+            if update_past_posts:
+                return True
+            if upgrade_time is None:  # users were close friends from the beginning
+                return True
+            return self.created_at > upgrade_time
         
-        return self.author.is_connected(user)
+        return True
 
     class Meta:
         indexes = [
