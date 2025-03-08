@@ -990,6 +990,23 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         # Sort the by number of mutual friends
         sorted_friends = sorted(mutual_friends_count_dict.items(), key=lambda x: x[1], reverse=True)[:25]
         sorted_friend_ids = [friend_id for friend_id, _ in sorted_friends]
+
+        if not sorted_friend_ids:
+            # If there is no user to recommend, recommend 3 random users
+            user_group = user.user_group
+            if user_group in ["group_1", "group_2"]:
+                allowed_groups = ["group_1", "group_2"]
+            elif user_group in ["group_3", "group_4"]:
+                allowed_groups = ["group_3", "group_4"]
+
+            potential_random_users = User.objects.filter(user_group__in=allowed_groups) \
+                .exclude(id=user_id) \
+                .exclude(id__in=user_friend_ids) \
+                .exclude(id__in=user_block_rec_ids)
+
+            random_users = potential_random_users.order_by("?")[:3]
+            return random_users
+
         recommended_friends = User.objects.filter(id__in=sorted_friend_ids) \
             .order_by(Case(*[When(id=id_, then=pos) for pos, id_ in enumerate(sorted_friend_ids)], default=0))
 
