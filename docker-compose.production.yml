@@ -77,7 +77,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - whoami-today-frontend_frontend_build_volume:/usr/share/nginx/html
+      - frontend_build_volume:/usr/share/nginx/html
       - ./nginx_conf:/etc/nginx/conf.d
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - whoami-backend-media:/app/adoorback/adoorback/adoorback/media
