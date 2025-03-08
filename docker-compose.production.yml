@@ -87,6 +87,8 @@ volumes:
     driver: local
   whoami-backend-media:
     driver: local
+  frontend_build_volume:
+    driver: local
 
 networks:
   whoamitoday-network:
