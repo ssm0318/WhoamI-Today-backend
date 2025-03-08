@@ -6,7 +6,7 @@ from account.models import User
 
 
 class Command(BaseCommand):
-    help = 'Automatically change the current_ver of user groups after 2 weeks.'
+    help = '(For US users) Automatically change the current_ver of user groups after 2 weeks.'
 
     def handle(self, *args, **kwargs):
         self.stdout.write(self.style.SUCCESS('Starting current version update...'))

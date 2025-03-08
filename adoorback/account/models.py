@@ -53,8 +53,10 @@ VERSION_CHOICES = (
 )
 
 USER_GROUP_CHOICES = (
-    ('group_1', 'Group 1: ver.D -> ver.E'),
-    ('group_2', 'Group 2: ver.E -> ver.D'),
+    ('group_1', 'Group 1: US / default (ver.R) -> experiment (ver.Q)'),
+    ('group_2', 'Group 2: US / experiment (ver.Q) -> default (ver.R)'),
+    ('group_3', 'Group 3: Korea / default (ver.R) -> experiment (ver.Q)'),
+    ('group_4', 'Group 4: Korea / experiment (ver.Q) -> default (ver.R)'),
 )
 
 USER_TYPE_CHOICES = (
