@@ -377,6 +377,7 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
     accepted = models.BooleanField(null=True)
     requester_choice = models.CharField(max_length=15, choices=[('friend', 'Friend'), ('close_friend', 'Close Friend')], null=True)
     requestee_choice = models.CharField(max_length=15, choices=[('friend', 'Friend'), ('close_friend', 'Close Friend')], null=True)
+    update_past_posts = models.BooleanField(default=False)
 
     friend_request_targetted_notis = GenericRelation("notification.Notification",
                                                      content_type_field='target_type',
@@ -640,6 +641,8 @@ def create_connection_noti(created, instance, **kwargs):
             user2=requestee,
             user1_choice=instance.requester_choice,
             user2_choice=instance.requestee_choice,
+            user1_update_past_posts=instance.update_past_posts if hasattr(instance, 'update_past_posts') else False,
+            user1_upgrade_time=timezone.now() if instance.requester_choice == 'close_friend' else None,
         )
 
         # make chat room
