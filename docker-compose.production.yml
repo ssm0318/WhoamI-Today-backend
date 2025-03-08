@@ -21,6 +21,8 @@ services:
       python manage.py migrate &&
       python manage.py runserver 0.0.0.0:8000
       '
+    volumes:
+      - whoami-backend-media:/app/adoorback/adoorback/adoorback/media
     healthcheck:
       test:
         [
@@ -65,8 +67,25 @@ services:
       - whoamitoday-network
     restart: unless-stopped
 
+  nginx-reverse-proxy:
+    image: nginx:alpine
+    container_name: nginx-reverse-proxy
+    restart: always
+    networks:
+      - whoamitoday-network
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - whoami-today-frontend_frontend_build_volume:/usr/share/nginx/html
+      - ./nginx_conf:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - whoami-backend-media:/app/adoorback/adoorback/adoorback/media
+
 volumes:
   postgres_data:
+    driver: local
+  whoami-backend-media:
     driver: local
 
 networks:
