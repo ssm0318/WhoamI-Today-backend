@@ -25,3 +25,14 @@ def get_ip_address(request):
 def total_seconds(delta):
     day_seconds = (delta.days * 24 * 3600) + delta.seconds
     return (delta.microseconds + day_seconds * 10**6) / 10**6
+
+
+def clean_session_key(session_key):
+    """
+    Clean the session key by removing any comma-separated parts.
+    If there is a comma in the session key, use only the first part
+    (after comma may be token info).
+    """
+    if session_key and ',' in session_key:
+        return session_key.split(',')[0]
+    return session_key

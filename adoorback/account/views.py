@@ -47,6 +47,7 @@ from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
+from tracking.utils import clean_session_key
 
 
 User = get_user_model()
@@ -1170,10 +1171,8 @@ class StartSession(generics.CreateAPIView):
         while True:
             session_id = str(uuid.uuid4())
             
-            # Process if session ID contains a comma 
-            # (use only the part before the comma)
-            if session_id and ',' in session_id:
-                session_id = session_id.split(',')[0]
+            # Clean the session key using the utility function
+            session_id = clean_session_key(session_id)
                 
             try:
                 session = AppSession.objects.create(
@@ -1231,9 +1230,7 @@ class TouchSession(generics.UpdateAPIView):
         if not session_id:
             raise Http404("No session_id provided")
             
-        # Process if session ID contains a comma 
-        # (use only the part before the comma)
-        if session_id and ',' in session_id:
-            session_id = session_id.split(',')[0]
+        # Clean the session key using the utility function
+        session_id = clean_session_key(session_id)
         
         return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)

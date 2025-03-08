@@ -11,7 +11,7 @@ except ImportError:
     MiddlewareMixin = object
 
 from tracking.models import Visitor, Pageview
-from tracking.utils import get_ip_address, total_seconds
+from tracking.utils import get_ip_address, total_seconds, clean_session_key
 from tracking.settings import (
     TRACK_AJAX_REQUESTS,
     TRACK_ANONYMOUS_USERS,
@@ -79,10 +79,8 @@ class VisitorTrackingMiddleware(MiddlewareMixin):
         # A Visitor row is unique by session_key
         session_key = request.session.session_key
         
-        # If there is a comma in the session key, use only the first part 
-        # (after comma may be token info)
-        if session_key and ',' in session_key:
-            session_key = session_key.split(',')[0]
+        # Clean the session key using the utility function
+        session_key = clean_session_key(session_key)
 
         try:
             visitor = Visitor.objects.get(pk=session_key)
