@@ -1,5 +1,4 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
@@ -15,7 +14,7 @@ from firebase_admin.messaging import Message
 from firebase_admin.messaging import Notification as FirebaseNotification
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
-from safedelete.models import SOFT_DELETE_CASCADE
+from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
 
 
@@ -37,6 +36,37 @@ class NotificationManager(SafeDeleteManager):
 
         if target.type == "Like":
             noti_to_update = find_like_noti(user, origin, noti_type)
+            if noti_to_update and hasattr(target, 'deleted') and target.deleted:
+                # need to hard delete because if soft deleted, NotificationActor is still accessible through notification.actors field (MTM)
+                NotificationActor.objects.filter(user=actor, notification=noti_to_update).delete(force_policy=HARD_DELETE)
+                actors = noti_to_update.actors.order_by('-notificationactor__created_at')  # make the most recent actor come first in the notification message
+                N = actors.count()
+
+                if N == 0:
+                    noti_to_update.delete()
+                    return
+
+                first_actor = actors.first()
+                second_actor = actors[1] if actors.count() > 1 else None
+                updated_message_ko, updated_message_en = construct_message(
+                    noti_type,
+                    first_actor.username + "님",
+                    second_actor.username + "님" if second_actor else None,
+                    first_actor.username,
+                    second_actor.username if second_actor else None,
+                    N,
+                    content_en,
+                    content_ko,
+                    emoji
+                )
+                
+                noti_to_update.message_ko = updated_message_ko
+                noti_to_update.message_en = updated_message_en
+                noti_to_update.save()
+
+                print(noti_to_update.message_ko)
+                print(noti_to_update.message_en)
+                return
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
                                                          origin_id=target.question.id, origin_type=get_question_type(),
@@ -52,7 +82,7 @@ class NotificationManager(SafeDeleteManager):
                         break
 
         if noti_to_update:
-            actors = noti_to_update.actors.all()
+            actors = noti_to_update.actors.order_by('-notificationactor__created_at')
             N = actors.count()
             new_actor = actors.first()
             updated_message_ko, updated_message_en = construct_message(noti_type,
@@ -111,7 +141,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
 
     # redirect: target의 근원지(?), origin != redirect_url의 모델일 경우가 있음 (e.g. reply)
     redirect_url = models.CharField(max_length=150)
-    message = models.CharField(max_length=100)
+    message = models.CharField(max_length=300)
 
     is_visible = models.BooleanField(default=True)
     is_read = models.BooleanField(default=False)
@@ -145,6 +175,9 @@ class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
 
     class Meta:
         ordering = ['-created_at']
+
+    def __str__(self):
+        return f"actor {self.user} of notification \"{self.notification.message}\" (id: {self.notification.id})"
 
 
 @receiver(post_save, sender=Notification)

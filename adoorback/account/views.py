@@ -47,6 +47,7 @@ from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
+from tracking.utils import clean_session_key
 
 
 User = get_user_model()
@@ -521,10 +522,18 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
 
             # update notification redirect url when username changes
             if 'username' in self.request.data:
+                # "friend request recieved" notification
                 friend_request_ct = get_friend_request_type()
                 self.request.user.friendship_originated_notis.filter(
                     target_type=friend_request_ct
                 ).update(
+                    redirect_url=f"/users/{serializer.validated_data.get('username')}"
+                )
+                
+                # "became friends" notification
+                Notification = apps.get_model('notification', 'Notification')
+                notis_to_change = Notification.objects.filter(redirect_url=f'/users/{self.request.user.username}')
+                notis_to_change.update(
                     redirect_url=f"/users/{serializer.validated_data.get('username')}"
                 )
             
@@ -975,12 +984,15 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         user_friend_ids = user_friends.values_list('id', flat=True)
         user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
         sent_friend_request_ids = FriendRequest.objects.filter(requester=user).values_list('requestee__id', flat=True)
+        received_friend_request_ids = FriendRequest.objects.filter(requestee=user).values_list('requester__id', flat=True)
 
         mutual_friends_count_dict = {}
         for friend in user_friends:
             potential_friends = friend.connected_users.exclude(id__in=user_friend_ids) \
                 .exclude(id=user_id).exclude(id__in=user_block_rec_ids) \
-                .exclude(id__in=sent_friend_request_ids)
+                .exclude(id__in=sent_friend_request_ids) \
+                .exclude(id__in=received_friend_request_ids) \
+                .exclude(is_superuser=True)
 
             for potential_friend in potential_friends:
                 if potential_friend.id not in mutual_friends_count_dict:
@@ -990,6 +1002,26 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         # Sort the by number of mutual friends
         sorted_friends = sorted(mutual_friends_count_dict.items(), key=lambda x: x[1], reverse=True)[:25]
         sorted_friend_ids = [friend_id for friend_id, _ in sorted_friends]
+
+        if not sorted_friend_ids:
+            # If there is no user to recommend, recommend 3 random users
+            user_group = user.user_group
+            if user_group in ["group_1", "group_2"]:
+                allowed_groups = ["group_1", "group_2"]
+            elif user_group in ["group_3", "group_4"]:
+                allowed_groups = ["group_3", "group_4"]
+
+            potential_random_users = User.objects.filter(user_group__in=allowed_groups) \
+                .exclude(id=user_id) \
+                .exclude(id__in=user_friend_ids) \
+                .exclude(id__in=user_block_rec_ids) \
+                .exclude(id__in=sent_friend_request_ids) \
+                .exclude(id__in=received_friend_request_ids) \
+                .exclude(is_superuser=True)
+
+            random_users = potential_random_users.order_by("?")[:3]
+            return random_users
+
         recommended_friends = User.objects.filter(id__in=sorted_friend_ids) \
             .order_by(Case(*[When(id=id_, then=pos) for pos, id_ in enumerate(sorted_friend_ids)], default=0))
 
@@ -1152,6 +1184,10 @@ class StartSession(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         while True:
             session_id = str(uuid.uuid4())
+            
+            # Clean the session key using the utility function
+            session_id = clean_session_key(session_id)
+                
             try:
                 session = AppSession.objects.create(
                     user=request.user,
@@ -1204,5 +1240,11 @@ class TouchSession(generics.UpdateAPIView):
     
     def get_object(self):
         session_id = self.request.data.get("session_id")
-
+        
+        if not session_id:
+            raise Http404("No session_id provided")
+            
+        # Clean the session key using the utility function
+        session_id = clean_session_key(session_id)
+        
         return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)
