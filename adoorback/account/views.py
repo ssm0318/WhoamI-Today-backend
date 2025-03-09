@@ -984,12 +984,15 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         user_friend_ids = user_friends.values_list('id', flat=True)
         user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
         sent_friend_request_ids = FriendRequest.objects.filter(requester=user).values_list('requestee__id', flat=True)
+        received_friend_request_ids = FriendRequest.objects.filter(requestee=user).values_list('requester__id', flat=True)
 
         mutual_friends_count_dict = {}
         for friend in user_friends:
             potential_friends = friend.connected_users.exclude(id__in=user_friend_ids) \
                 .exclude(id=user_id).exclude(id__in=user_block_rec_ids) \
-                .exclude(id__in=sent_friend_request_ids)
+                .exclude(id__in=sent_friend_request_ids) \
+                .exclude(id__in=received_friend_request_ids) \
+                .exclude(is_superuser=True)
 
             for potential_friend in potential_friends:
                 if potential_friend.id not in mutual_friends_count_dict:
@@ -1011,7 +1014,10 @@ class UserRecommendedFriendsList(generics.ListAPIView):
             potential_random_users = User.objects.filter(user_group__in=allowed_groups) \
                 .exclude(id=user_id) \
                 .exclude(id__in=user_friend_ids) \
-                .exclude(id__in=user_block_rec_ids)
+                .exclude(id__in=user_block_rec_ids) \
+                .exclude(id__in=sent_friend_request_ids) \
+                .exclude(id__in=received_friend_request_ids) \
+                .exclude(is_superuser=True)
 
             random_users = potential_random_users.order_by("?")[:3]
             return random_users
