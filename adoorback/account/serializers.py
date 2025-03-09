@@ -392,8 +392,10 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
         if self.instance.accepted is not None:
             raise serializers.ValidationError("You have already responded to this connection request.")
         
-        if not self.context.get("default_api") and "requestee_choice" not in self.initial_data:
-            raise serializers.ValidationError({"requestee_choice": "This field is required."})
+        if data.get("accepted") is True:
+            if not self.context.get("default_api") and "requestee_choice" not in self.initial_data:
+                raise serializers.ValidationError({"requestee_choice": "This field is required."})
+
         return data
 
     class Meta:
