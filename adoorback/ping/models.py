@@ -38,7 +38,7 @@ class PingRoom(AdoorTimestampedModel, SafeDeleteModel):
     def clean(self):
         super().clean()
         if not self.user1.is_connected(self.user2):
-            raise ValidationError("Users in the pingroom must be friends.")
+            raise ValidationError("Users in the message room must be friends.")
     
     def save(self, *args, **kwargs):
         # if deleting, do not clean
@@ -145,9 +145,9 @@ def create_ping_notification(created, instance, **kwargs):
         origin=sender,
         target=instance,
         noti_type='Ping',
-        message_ko=f"{sender.username}님이 핑을 보냈습니다!",
-        message_en=f"{sender.username} sent you a Ping!",
-        redirect_url=f"/users/{sender.id}/ping",
+        message_ko=f"{sender.username}님이 메시지를 보냈습니다!",
+        message_en=f"{sender.username} sent you a message!",
+        redirect_url=f"/users/{sender.username}/ping",
         content_en='',
         content_ko=''
     )

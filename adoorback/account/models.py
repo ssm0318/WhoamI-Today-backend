@@ -615,8 +615,8 @@ def create_connection_noti(created, instance, **kwargs):
     if created:
         noti = Notification.objects.create(user=requestee,
                                            origin=requester, target=instance,
-                                           message_ko=f'{requester.username}님이 연결 요청을 보냈습니다.',
-                                           message_en=f'{requester.username} has requested to be connected.',
+                                           message_ko=f'{requester.username}님이 친구 요청을 보냈습니다.',
+                                           message_en=f'{requester.username} has sent a friend request.',
                                            redirect_url=f'/users/{requester.username}')
         NotificationActor.objects.create(user=requester, notification=noti)
         return
@@ -626,14 +626,14 @@ def create_connection_noti(created, instance, **kwargs):
 
         noti = Notification.objects.create(user=requestee,
                                            origin=requester, target=requester,
-                                           message_ko=f'{requester.username}님과 연결되었습니다.',
-                                           message_en=f'You are now connected with {requester.username}.',
+                                           message_ko=f'{requester.username}님과 친구가 되었습니다.',
+                                           message_en=f'You are now friends with {requester.username}.',
                                            redirect_url=f'/users/{requester.username}')
         NotificationActor.objects.create(user=requester, notification=noti)
         noti = Notification.objects.create(user=requester,
                                            origin=requestee, target=requestee,
-                                           message_ko=f'{requestee.username}님과 연결되었습니다.',
-                                           message_en=f'You are now connected with {requestee.username}.',
+                                           message_ko=f'{requestee.username}님과 친구가 되었습니다.',
+                                           message_en=f'You are now friends with {requestee.username}.',
                                            redirect_url=f'/users/{requestee.username}')
         NotificationActor.objects.create(user=requestee, notification=noti)
 
@@ -675,7 +675,7 @@ def user_created(created, instance, **kwargs):
                                            target=admin,
                                            origin=admin,
                                            message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
-                                           message_en=f"{instance.username}, try making friends to share your whoami!",
+                                           message_en=f"{instance.username}, add your friends for a better WIT experience!",
                                            redirect_url='/friends/explore')
         NotificationActor.objects.create(user=admin, notification=noti)
 

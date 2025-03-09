@@ -187,8 +187,8 @@ def send_notifications_to_subscribers(sender, instance, created, **kwargs):
             user=subscriber,
             origin=instance,
             target=instance,
-            message_ko=f'{author.username}님이 새 노트를 작성했습니다.',
-            message_en=f'{author.username} has posted a new note.',
+            message_ko=f'{author.username}님이 새 게시글을 작성했습니다.',
+            message_en=f'{author.username} has posted a new post.',
             redirect_url=f'/notes/{instance.id}'
         )
         NotificationActor.objects.create(user=author, notification=noti)
