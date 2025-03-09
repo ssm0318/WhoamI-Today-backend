@@ -377,6 +377,8 @@ class FriendRequest(AdoorTimestampedModel, SafeDeleteModel):
     accepted = models.BooleanField(null=True)
     requester_choice = models.CharField(max_length=15, choices=[('friend', 'Friend'), ('close_friend', 'Close Friend')], null=True)
     requestee_choice = models.CharField(max_length=15, choices=[('friend', 'Friend'), ('close_friend', 'Close Friend')], null=True)
+    requester_update_past_posts = models.BooleanField(default=False)
+    requestee_update_past_posts = models.BooleanField(default=False)
 
     friend_request_targetted_notis = GenericRelation("notification.Notification",
                                                      content_type_field='target_type',
@@ -445,11 +447,12 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
         # check if reverse Connection already exists
         if Connection.objects.filter(user1=self.user2, user2=self.user1).exists():
             raise ValueError("A reverse Connection already exists.")
-        
         # Ensure that user1 always has the smaller ID to enforce consistency
         if self.user1.id > self.user2.id:
             self.user1, self.user2 = self.user2, self.user1
             self.user1_choice, self.user2_choice = self.user2_choice, self.user1_choice
+            self.user1_update_past_posts, self.user2_update_past_posts = self.user2_update_past_posts, self.user1_update_past_posts
+            self.user1_upgrade_time, self.user2_upgrade_time = self.user2_upgrade_time, self.user1_upgrade_time
 
         super().save(*args, **kwargs)
 
@@ -643,6 +646,10 @@ def create_connection_noti(created, instance, **kwargs):
             user2=requestee,
             user1_choice=instance.requester_choice,
             user2_choice=instance.requestee_choice,
+            user1_update_past_posts=instance.requester_update_past_posts,
+            user2_update_past_posts=instance.requestee_update_past_posts,
+            user1_upgrade_time=timezone.now() if instance.requester_choice == 'close_friend' else None,
+            user2_upgrade_time=timezone.now() if instance.requestee_choice == 'close_friend' else None,
         )
 
         # make chat room
