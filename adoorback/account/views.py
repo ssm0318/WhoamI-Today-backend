@@ -834,12 +834,15 @@ class UserFriendRequest(generics.ListCreateAPIView):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
             raise PermissionDenied("The requester must be yourself.")
         try:
-            update_past_posts = self.request.data.get('update_past_posts', False)
-            serializer.save(accepted=None, update_past_posts=update_past_posts)
+            requester_update_past_posts = self.request.data.get('requester_update_past_posts', False)
+            serializer.save(accepted=None, requester_update_past_posts=requester_update_past_posts)
         except serializers.ValidationError as e:
             if 'error' in e.detail and "different versions" in str(e.detail['error']):
                 raise PermissionDenied("Users belong to different groups, so a friend request cannot be sent.")
             raise e
+
+    def accept_request(self, request, *args, **kwargs):
+        requestee_update_past_posts = request.data.get('requestee_update_past_posts', False)
 
 
 class UserFriendRequestDefault(generics.CreateAPIView):
