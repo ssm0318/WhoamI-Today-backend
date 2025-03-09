@@ -141,7 +141,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
 
     # redirect: target의 근원지(?), origin != redirect_url의 모델일 경우가 있음 (e.g. reply)
     redirect_url = models.CharField(max_length=150)
-    message = models.CharField(max_length=100)
+    message = models.CharField(max_length=300)
 
     is_visible = models.BooleanField(default=True)
     is_read = models.BooleanField(default=False)
