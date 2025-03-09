@@ -545,8 +545,8 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 noti = Notification.objects.create(user=obj,
                                                    target=admin,
                                                    origin=admin,
-                                                   message_ko=f"{obj.username}님, 질문 선택을 완료해주셨네요 :) 그럼 오늘의 질문들을 둘러보러 가볼까요?",
-                                                   message_en=f"Nice job selecting your questions {obj.username} :) How about looking around today's questions?",
+                                                   message_ko=f"{obj.username}님, 질문 선택을 완료하셨네요! 이제 오늘의 질문들을 확인해볼까요?",
+                                                   message_en=f"Great choice, {obj.username}! Now, let's check out today's questions!",
                                                    redirect_url='/questions')
                 NotificationActor.objects.create(user=admin, notification=noti)
 
