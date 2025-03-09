@@ -68,9 +68,30 @@ class NotificationManager(SafeDeleteManager):
                 print(noti_to_update.message_en)
                 return
         elif target.type == "ResponseRequest":
-            noti_to_update = Notification.objects.filter(user=user,
-                                                         origin_id=target.question.id, origin_type=get_question_type(),
-                                                         target_type=get_response_request_type()).first()
+            # for response requests, we want to group identical questions
+            if noti_type == "response_request_noti":
+                # First, find notifications with the same question content
+                existing_notis = Notification.objects.filter(
+                    user=user,
+                    target_type=get_response_request_type(),
+                    is_visible=True
+                )
+                
+                for noti in existing_notis:
+                    if (noti.origin and hasattr(noti.origin, 'content') and 
+                        hasattr(origin, 'content') and
+                        noti.origin.content == origin.content):
+                        noti_to_update = noti
+                        break
+                
+                # then, if no matching notification found, use the original query
+                if not noti_to_update:
+                    noti_to_update = Notification.objects.filter(
+                        user=user,
+                        origin_id=origin.id, 
+                        origin_type=get_question_type(),
+                        target_type=get_response_request_type()
+                    ).first()
         elif target.type == "Reaction":
             notis = Notification.objects.filter(user=user, origin_id=origin.id,
                                                 origin_type=ContentType.objects.get_for_model(origin),
