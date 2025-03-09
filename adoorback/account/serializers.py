@@ -347,7 +347,6 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     accepted = serializers.BooleanField(allow_null=True, required=False)
     requester_detail = serializers.SerializerMethodField(read_only=True)
     requester_choice = serializers.CharField(required=False)
-    update_past_posts = serializers.BooleanField(required=False, default=False)
     requester_update_past_posts = serializers.BooleanField(required=False, default=False)
     requestee_update_past_posts = serializers.BooleanField(required=False, default=False)
 
@@ -377,9 +376,20 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
 
         return data
 
+    def create(self, validated_data):
+        requester_update_past_posts = validated_data.pop('requester_update_past_posts', False)
+        requestee_update_past_posts = validated_data.pop('requestee_update_past_posts', False)
+        
+        friend_request = FriendRequest.objects.create(**validated_data)
+        friend_request.requester_update_past_posts = requester_update_past_posts
+        friend_request.requestee_update_past_posts = requestee_update_past_posts
+        friend_request.save()
+        
+        return friend_request
+
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail', 'requester_choice', 'update_past_posts', 'requester_update_past_posts', 'requestee_update_past_posts']
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail', 'requester_choice', 'requester_update_past_posts', 'requestee_update_past_posts']
 
 
 class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
@@ -387,6 +397,8 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     requestee_id = serializers.IntegerField(required=False)
     accepted = serializers.BooleanField(required=True)
     requestee_choice = serializers.CharField(required=False)
+    requestee_update_past_posts = serializers.BooleanField(required=False, default=False)
+    requester_update_past_posts = serializers.BooleanField(required=False, default=False)
 
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
@@ -401,7 +413,7 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted', 'requestee_choice']
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requestee_choice', 'requestee_update_past_posts', 'requester_update_past_posts']
 
 
 class UserFriendshipStatusSerializer(UserMinimalSerializer):
@@ -443,6 +455,8 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
 
 
 class UserFriendRequestSerializer(serializers.ModelSerializer):
+    requester_update_past_posts = serializers.BooleanField()
+    requestee_update_past_posts = serializers.BooleanField()
     requestee_detail = serializers.SerializerMethodField(read_only=True)
 
     def get_requestee_detail(self, obj):
@@ -450,7 +464,7 @@ class UserFriendRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'requestee_detail']
+        fields = ['requester_id', 'requestee_id', 'requester_update_past_posts', 'requestee_update_past_posts', 'requestee_detail']
 
 
 class UserMinimumSerializer(serializers.ModelSerializer):
