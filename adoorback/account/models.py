@@ -555,7 +555,7 @@ class AppSession(SafeDeleteModel):
 def connection_removed(instance, **kwargs):
     if not instance.deleted:
         return
-    print('connection_removed')
+
     '''
     when Connection is deleted, 
     1) remove related notis
