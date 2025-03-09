@@ -551,8 +551,11 @@ class AppSession(SafeDeleteModel):
 
 
 @transaction.atomic
-@receiver(post_delete, sender=Connection)
+@receiver(post_save, sender=Connection)
 def connection_removed(instance, **kwargs):
+    if not instance.deleted:
+        return
+
     '''
     when Connection is deleted, 
     1) remove related notis
