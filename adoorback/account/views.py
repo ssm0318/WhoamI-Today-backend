@@ -522,10 +522,18 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
 
             # update notification redirect url when username changes
             if 'username' in self.request.data:
+                # "friend request recieved" notification
                 friend_request_ct = get_friend_request_type()
                 self.request.user.friendship_originated_notis.filter(
                     target_type=friend_request_ct
                 ).update(
+                    redirect_url=f"/users/{serializer.validated_data.get('username')}"
+                )
+                
+                # "became friends" notification
+                Notification = apps.get_model('notification', 'Notification')
+                notis_to_change = Notification.objects.filter(redirect_url=f'/users/{self.request.user.username}')
+                notis_to_change.update(
                     redirect_url=f"/users/{serializer.validated_data.get('username')}"
                 )
             
