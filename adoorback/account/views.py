@@ -1156,8 +1156,9 @@ class FriendFeed(generics.ListAPIView):
         notes = Note.objects.filter(
             author_id__in=connected_user_ids
         ).exclude(author_id__in=blocked_user_ids).select_related('author')
+        note_list = list(filter(lambda note: note.is_audience(user), notes))
 
-        return notes.order_by('-created_at')
+        return Note.objects.filter(id__in=[note.id for note in note_list]).order_by('-created_at')
 
     def paginate_queryset(self, queryset):
         page = super().paginate_queryset(queryset)
