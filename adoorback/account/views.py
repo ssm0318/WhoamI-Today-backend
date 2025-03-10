@@ -1167,14 +1167,22 @@ class FriendFeed(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
 
-        page = self.paginate_queryset(queryset)
+        # freeze notes before marking them as read
+        note_ids = queryset.values_list("id", flat=True)
+        notes_before_update = list(Note.objects.filter(id__in=note_ids).order_by('-created_at'))
+
+        page = self.paginate_queryset(notes_before_update)
         if page is not None:
             serialized_data = NoteSerializer(page, many=True, context=self.get_serializer_context()).data
-            return self.get_paginated_response(serialized_data)
+        else:
+            serialized_data = NoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
 
-        # Fallback (if pagination is disabled)
-        serialized_data = NoteSerializer(queryset, many=True, context=self.get_serializer_context()).data
-        return Response(serialized_data)
+        # mark all notes as read
+        unread_note_ids = queryset.exclude(readers=request.user).values_list("id", flat=True)
+        if unread_note_ids:
+            request.user.read_notes.add(*unread_note_ids)
+
+        return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
 
 
 class StartSession(generics.CreateAPIView):
