@@ -50,7 +50,7 @@ class NoteComments(generics.ListAPIView):
 
         note = get_object_or_404(Note, id=self.kwargs.get('pk'))
         if not note.is_audience(current_user):
-            return PermissionDenied("You do not have permission to view these comments.")
+            raise PermissionDenied("You do not have permission to view these comments.")
         
         blocked_content_ids = ContentReport.objects.filter(
             user=current_user,
