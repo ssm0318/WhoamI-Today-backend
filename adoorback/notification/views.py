@@ -66,17 +66,16 @@ class ResponseRequestNotiList(generics.ListAPIView):
         current_user = self.request.user
         queryset = Notification.objects.visible_only().filter(target_type=get_response_request_type(), user=current_user)
 
-        #implementation aims to group notifications by question content to avoid duplicates
         grouped_notifications = []
-        content_tracker = set()
+        id_tracker = set()
         
         for noti in queryset:
-            if not noti.origin or not hasattr(noti.origin, 'content'):
+            if not noti.origin or not hasattr(noti.origin, 'id'):
                 continue
                 
-            content = noti.origin.content
-            if content not in content_tracker:
-                content_tracker.add(content)
+            question_id = noti.origin.id
+            if question_id not in id_tracker:
+                id_tracker.add(question_id)
                 
                 response = noti.target.question.response_set.filter(
                     author=current_user
