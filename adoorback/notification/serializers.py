@@ -30,8 +30,14 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_recent_actors(self, obj):
         from account.serializers import UserMinimalSerializer
-        recent_actors = obj.actors.all()[:3]
-        return UserMinimalSerializer(recent_actors, many=True).data
+        if obj.target and obj.target._meta.model_name == 'ping':
+            actor = obj.actors.first()
+            count = obj.actors.count()
+            actors = [actor] * count 
+            return UserMinimalSerializer(actors, many=True).data
+        else:
+            recent_actors = obj.actors.order_by('-notificationactor__created_at').distinct()[:3]
+            return UserMinimalSerializer(recent_actors, many=True).data
 
     def get_notification_type(self, obj):
         return obj.target.type if obj.target else 'other'
