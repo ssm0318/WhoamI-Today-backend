@@ -69,8 +69,8 @@ class NotificationManager(SafeDeleteManager):
                 return
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
-                                                         origin_id=target.question.id, origin_type=get_question_type(),
-                                                         target_type=get_response_request_type()).first()
+                                                origin_id=target.question.id, origin_type=get_question_type(),
+                                                target_type=get_response_request_type()).first()
         elif target.type == "Reaction":
             notis = Notification.objects.filter(user=user, origin_id=origin.id,
                                                 origin_type=ContentType.objects.get_for_model(origin),
