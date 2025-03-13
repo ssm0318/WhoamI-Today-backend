@@ -67,16 +67,13 @@ class ResponseRequestNotiList(generics.ListAPIView):
         queryset = Notification.objects.visible_only().filter(target_type=get_response_request_type(), user=current_user)
 
         grouped_notifications = []
-        id_tracker = set()
         
         for noti in queryset:
             if not noti.origin or not hasattr(noti.origin, 'id'):
                 continue
                 
             question_id = noti.origin.id
-            if question_id not in id_tracker:
-                id_tracker.add(question_id)
-                
+            if not any(n.origin.id == question_id for n in grouped_notifications):
                 response = noti.target.question.response_set.filter(
                     author=current_user
                 ).filter(created_at__gt=noti.notification_updated_at)
