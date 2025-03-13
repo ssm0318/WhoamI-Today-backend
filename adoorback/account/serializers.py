@@ -405,8 +405,7 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
             'requestee_id', 
             'accepted', 
             'requestee_choice', 
-            'requestee_update_past_posts', 
-            'requester_update_past_posts'
+            'requestee_update_past_posts'
         ]
 
 
