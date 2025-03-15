@@ -1173,9 +1173,9 @@ class FriendFeed(generics.ListAPIView):
 
         page = self.paginate_queryset(notes_before_update)
         if page is not None:
-            serialized_data = NoteSerializer(page, many=True, context=self.get_serializer_context()).data
+            serialized_data = DefaultFriendNoteSerializer(page, many=True, context=self.get_serializer_context()).data
         else:
-            serialized_data = NoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
+            serialized_data = DefaultFriendNoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
 
         # mark all notes as read
         unread_note_ids = queryset.exclude(readers=request.user).values_list("id", flat=True)
