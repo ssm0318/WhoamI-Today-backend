@@ -493,6 +493,18 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
                     raise ExistingUsername()
                 
+            persona = self.request.data.get('persona')
+            if persona:
+                if isinstance(persona, str):  # JSON 문자열이면 변환
+                    try:
+                        persona = json.loads(persona)
+                    except json.JSONDecodeError:
+                        raise serializers.ValidationError({
+                            "persona": ["persona must be a valid JSON list."]
+                        })
+                print(persona)
+                serializer.validated_data['persona'] = persona
+
             noti_period_days = self.request.data.get('noti_period_days')
             if noti_period_days:
                 # Check if it's a JSON string and parse it
