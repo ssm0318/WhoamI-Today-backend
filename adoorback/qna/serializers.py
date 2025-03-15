@@ -48,7 +48,6 @@ class ResponseSerializer(AdoorBaseSerializer):
         required=True
     )
 
-    
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
         return current_user_id in obj.reader_ids

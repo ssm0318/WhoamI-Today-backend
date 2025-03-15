@@ -127,7 +127,7 @@ class ResponseInteractions(generics.ListAPIView):
         response_id = self.kwargs['pk']
         response = Response.objects.get(pk=response_id)
 
-        if response.author != self.request.user:
+        if not response.is_audience(self.request.user):
             raise PermissionDenied("You do not have permission to view likes on this response.")
 
         likes = Like.objects.filter(content_type__model='response', object_id=response_id).annotate(
