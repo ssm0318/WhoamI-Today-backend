@@ -200,7 +200,7 @@ class NoteInteractions(generics.ListAPIView):
         note_id = self.kwargs['pk']
         note = Note.objects.get(pk=note_id)
 
-        if note.author != self.request.user:
+        if not note.is_audience(self.request.user):
             raise PermissionDenied("You do not have permission to view likes on this note.")
 
         likes = Like.objects.filter(content_type__model='note', object_id=note_id).annotate(
