@@ -15,22 +15,19 @@ User = get_user_model()
 
 
 class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
-    AVAILABILITY_CHOICES = [
-        ('available', 'Available'),
-        ('busy', 'Busy'),
-        ('might_get_distracted', 'Might get distracted'),
-        ('urgent_only', 'Urgent only'),
-        ('about_to_sleep', 'About to sleep'),
-        ('studying', 'Studying'),
-        ('in_transit', 'In transit'),
-        ('feeling_social', 'Feeling social'),
-        ('feeling_quiet', 'Feeling quiet'),
+    SOCIAL_BATTERY_CHOICES = [
+        ('completely_drained', 'Completely Drained'),
+        ('low', 'Low Social Battery'),
+        ('needs_recharge', 'Needs Recharge'),
+        ('moderate', 'Moderate'),
+        ('fully_charged', 'Fully Charged'),
+        ('super_social', 'Super Social Mode (HMU!)'),
     ]
 
     user = models.ForeignKey(User, related_name='check_in_set', on_delete=models.CASCADE)
     is_active = models.BooleanField(default=False)
     mood = models.CharField(blank=True, null=True, max_length=5)
-    availability = models.CharField(blank=True, null=True, max_length=20, choices=AVAILABILITY_CHOICES)
+    social_battery = models.CharField(blank=True, null=True, max_length=30, choices=SOCIAL_BATTERY_CHOICES)
     description = models.CharField(blank=True, null=True, max_length=88)
     track_id = models.CharField(blank=True, null=True, max_length=50)
 
