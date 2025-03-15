@@ -1,3 +1,5 @@
+import json
+
 from django.db import transaction
 from django.db.models import Count, Q
 from django.conf import settings
@@ -8,7 +10,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES
+    VERSION_CHOICES, PERSONA_CHOICES
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
@@ -43,6 +45,22 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         if not isinstance(value, list):
             raise serializers.ValidationError("persona must be a list.")
         
+        return value
+    
+    def validate_persona(self, value):
+        if isinstance(value, list) and len(value) == 1 and isinstance(value[0], str):
+            try:
+                value = json.loads(value[0])
+            except json.JSONDecodeError:
+                raise serializers.ValidationError("persona must be a valid JSON list.")
+
+        if not isinstance(value, list):
+            raise serializers.ValidationError("persona must be a list.")
+
+        invalid_choices = [p for p in value if p not in dict(PERSONA_CHOICES)]
+        if invalid_choices:
+            raise serializers.ValidationError(f"Invalid choices: {invalid_choices}")
+
         return value
 
     class Meta:
