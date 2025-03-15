@@ -984,18 +984,21 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
             send_users.append(requestee)
 
         for user in send_users:
-            Notification = apps.get_model('notification', 'Notification')
-            admin = User.objects.filter(is_superuser=True).first()
+            from custom_fcm.models import CustomFCMDevice
+            has_enabled_notifications = CustomFCMDevice.objects.filter(user=user, active=True).exists()
+            if not has_enabled_notifications:
+                Notification = apps.get_model('notification', 'Notification')
+                admin = User.objects.filter(is_superuser=True).first()
 
-            noti = Notification.objects.create(
-                user=user,
-                target=admin,
-                origin=admin,
-                message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
-                message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
-                redirect_url='/settings'
-            )
-            NotificationActor.objects.create(user=admin, notification=noti)
+                noti = Notification.objects.create(
+                    user=user,
+                    target=admin,
+                    origin=admin,
+                    message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                    message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
+                    redirect_url='/settings'
+                )
+                NotificationActor.objects.create(user=admin, notification=noti)
 
 
 class UserFriendRequestUpdate(BaseUserFriendRequestUpdate):
