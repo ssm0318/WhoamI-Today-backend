@@ -81,6 +81,7 @@ class DefaultFriendNoteSerializer(BaseNoteSerializer):
     '''
     like_count = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
+    visibility = serializers.ChoiceField(choices=['friends', 'close_friends'], required=True)
 
     def get_like_count(self, obj):
         return obj.liked_user_ids.count()
@@ -91,4 +92,4 @@ class DefaultFriendNoteSerializer(BaseNoteSerializer):
         return UserMinimalSerializer(recent_users, many=True, context=self.context).data
 
     class Meta(BaseNoteSerializer.Meta):
-        fields = BaseNoteSerializer.Meta.fields + ['like_count', 'like_user_sample']
+        fields = BaseNoteSerializer.Meta.fields + ['like_count', 'like_user_sample', 'visibility']
