@@ -14,7 +14,7 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = CheckIn
         fields = ['id', 'created_at', 'is_active', 'mood', 'track_id',
-                  'availability', 'description', 'current_user_read']
+                  'social_battery', 'description', 'current_user_read']
 
 
 class MyCheckInSerializer(CheckInBaseSerializer):
