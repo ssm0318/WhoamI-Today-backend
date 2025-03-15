@@ -87,15 +87,21 @@ def load_test_data():
             
             # Call the set_seed function multiple times as in the script
             for i in range(3):
-                set_seed(30)
-                set_seed(10)
-                set_seed(20)
-                set_seed(5)
-                set_seed(30)
+                try:
+                    set_seed(30)
+                    set_seed(10)
+                    set_seed(20)
+                    set_seed(5)
+                    set_seed(30)
+                except Exception as e:
+                    print(f"Warning: Error during seeding (continuing anyway): {e}")
             
             # Final seed call
-            set_seed(30)
-            
+            try:
+                set_seed(30)
+            except Exception as e:
+                print(f"Warning: Error during final seeding (continuing anyway): {e}")
+                
             # Print some information about created data
             User = get_user_model()
             user_count = User.objects.count()
