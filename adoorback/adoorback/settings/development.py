@@ -4,7 +4,7 @@ from .base import *
 
 DEBUG = True
 
-BASE_URL = 'http://localhost:8000'
+BASE_URL = 'http://10.0.2.2:8000'  
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
@@ -17,16 +17,17 @@ BASE_URL = 'http://localhost:8000'
 # }
 #
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-#         'NAME': os.environ.get('DB_NAME', 'diivers'),
-#         'USER': os.environ.get('DB_USER', 'postgres'),
-#         'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
-#         'HOST': os.environ.get('DB_HOST', 'localhost'),  # 환경변수 없으면 localhost 사용
-#         'POST': os.environ.get('DB_PORT', '5432'),
-#     },
-# }
+# In development, we use a local PostgreSQL database
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'diivers',
+        'USER': 'postgres',
+        'PASSWORD': 'postgres',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    },
+}
 
 # sentry_sdk.init(
 #     dsn="https://3525cb8e094e49fe9973fd92ccbf456b@o486285.ingest.sentry.io/5543025",
@@ -38,10 +39,10 @@ BASE_URL = 'http://localhost:8000'
 
 ALLOWED_HOSTS = ['*']
 
-CORS_ALLOWED_ORIGINS = ['http://localhost:3000']
-CSRF_TRUSTED_ORIGINS = ['http://localhost:3000']
+CORS_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://10.0.2.2:3000']
+CSRF_TRUSTED_ORIGINS = ['http://localhost:3000', 'http://10.0.2.2:3000']
 CORS_ALLOW_CREDENTIALS = True
 CSRF_COOKIE_HTTPONLY = False 
 CSRF_COOKIE_SAMESITE = 'Lax'
 
-FRONTEND_URL = 'http://localhost:3000'
+FRONTEND_URL = 'http://10.0.2.2:3000'
