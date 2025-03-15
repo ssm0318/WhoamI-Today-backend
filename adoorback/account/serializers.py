@@ -39,12 +39,18 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         
         return value
 
+    def validate_persona(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("persona must be a list.")
+        
+        return value
+
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
-                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio',
+                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
                   'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'noti_period_days',
                   'timezone', 'current_ver']
         extra_kwargs = {'password': {'write_only': True}}
@@ -194,7 +200,7 @@ class UserProfileSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'pronouns', 'bio', 'unread_ping_count', 'connection_status',
+                                                      'pronouns', 'bio', 'persona', 'unread_ping_count', 'connection_status',
                                                       'friend_count']
 
 

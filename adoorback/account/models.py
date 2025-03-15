@@ -64,6 +64,53 @@ USER_TYPE_CHOICES = (
     ('indirect', 'Indirect Participant'),
 )
 
+PERSONA_CHOICES = [
+    ('lurker', 'Lurker'),
+    ('content_creator', 'Content Creator'),
+    ('private_reactor', 'Private Reactor'),
+    ('public_commenter', 'Public Commenter'),
+    ('instant_responder', 'Instant Responder'),
+    ('takes_my_time', 'Takes My Time'),
+    ('daily_scroller', 'Daily Scroller'),
+    ('occasional_checker', 'Occasional Checker'),
+    ('scheduled_checker', 'Scheduled Checker'),
+    ('night_owl', 'Night Owl'),
+    ('early_bird', 'Early Bird'),
+    ('emoji_fan', 'Emoji Fan'),
+    ('word_person', 'Word Person'),
+    ('poster', 'Poster'),
+    ('commenter', 'Commenter'),
+    ('selfie_poster', 'Selfie Poster'),
+    ('photo_heavy', 'Photo Heavy'),
+    ('text_poster', 'Text Poster'),
+    ('deep_talks', 'Deep Talks'),
+    ('curious_asker', 'Curious Asker'),
+    ('open_book', 'Open Book'),
+    ('closed_book', 'Closed Book'),
+    ('nofilter_purist', '#NoFilter Purist'),
+    ('curated_aesthetic', 'Curated Aesthetic'),
+    ('weekend_user', 'Weekend User'),
+    ('everyday_presence', 'Everyday Presence'),
+    ('trend_watcher', 'Trend Watcher'),
+    ('meme_lover', 'Meme Lover'),
+    ('frequent_poster', 'Frequent Poster'),
+    ('occasional_poster', 'Occasional Poster'),
+    ('shares_many_at_once', 'Shares Many at Once'),
+    ('random_and_casual', 'Random and Casual'),
+    ('stream_of_consciousness', 'Stream of Consciousness'),
+    ('one_liners', 'One Liners'),
+    ('throwbacks', 'Throwbacks'),
+    ('music_sharer', 'Music Sharer'),
+    ('opinion_poster', 'Opinion Poster'),
+    ('silent_supporter', 'Silent Supporter'),
+    ('always_online', 'Always Online'),
+    ('rarely_posts_but_watches_everything', 'Rarely Posts but Watches Everything'),
+    ('binge_scroller', 'Binge Scroller'),
+    ('silent_observer', 'Silent Observer'),
+    ('active_listener', 'Active Listener'),
+    ('thoughtful_responder', 'Thoughtful Responder'),
+]
+
 
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
@@ -121,6 +168,12 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     )
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
+    persona = ArrayField(
+        models.CharField(max_length=50, choices=PERSONA_CHOICES),
+        default=list,
+        blank=True,
+        help_text="Multiple persona choices for the user."
+    )
 
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
