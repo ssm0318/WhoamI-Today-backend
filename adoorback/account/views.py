@@ -495,14 +495,23 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 
             persona = self.request.data.get('persona')
             if persona:
-                if isinstance(persona, str):  # JSON 문자열이면 변환
+                if isinstance(persona, str):
                     try:
                         persona = json.loads(persona)
                     except json.JSONDecodeError:
                         raise serializers.ValidationError({
                             "persona": ["persona must be a valid JSON list."]
                         })
-                print(persona)
+                if not isinstance(persona, list):
+                    raise serializers.ValidationError({
+                        "persona": ["persona must be a list."]
+                    })
+                from .models import PERSONA_CHOICES
+                invalid_choices = [p for p in persona if p not in dict(PERSONA_CHOICES)]
+                if invalid_choices:
+                    raise serializers.ValidationError({
+                        "persona": [f"Invalid choices: {invalid_choices}"]
+                    })
                 serializer.validated_data['persona'] = persona
 
             noti_period_days = self.request.data.get('noti_period_days')
