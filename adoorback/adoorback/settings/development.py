@@ -4,7 +4,7 @@ from .base import *
 
 DEBUG = True
 
-BASE_URL = 'http://10.0.2.2:8000'  
+BASE_URL = 'http://localhost:8000'  
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
@@ -39,10 +39,10 @@ DATABASES = {
 
 ALLOWED_HOSTS = ['*']
 
-CORS_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://10.0.2.2:3000']
-CSRF_TRUSTED_ORIGINS = ['http://localhost:3000', 'http://10.0.2.2:3000']
+CORS_ALLOWED_ORIGINS = ['http://localhost:3000']
+CSRF_TRUSTED_ORIGINS = ['http://localhost:3000']
 CORS_ALLOW_CREDENTIALS = True
 CSRF_COOKIE_HTTPONLY = False 
 CSRF_COOKIE_SAMESITE = 'Lax'
 
-FRONTEND_URL = 'http://10.0.2.2:3000'
+FRONTEND_URL = 'http://localhost:3000'
