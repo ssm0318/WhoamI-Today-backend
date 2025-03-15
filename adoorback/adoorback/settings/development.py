@@ -4,7 +4,7 @@ from .base import *
 
 DEBUG = True
 
-BASE_URL = 'http://localhost:8000'
+BASE_URL = 'http://localhost:8000'  
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
@@ -16,6 +16,8 @@ BASE_URL = 'http://localhost:8000'
 #     }
 # }
 #
+
+# In development, we use a local PostgreSQL database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
@@ -23,7 +25,7 @@ DATABASES = {
         'USER': 'postgres',
         'PASSWORD': 'postgres',
         'HOST': 'localhost',
-        'POST': '',
+        'PORT': '5432',
     },
 }
 
@@ -35,10 +37,12 @@ DATABASES = {
 #     send_default_pii=True
 # )
 
-ALLOWED_HOSTS = ['ec2-3-39-220-146.ap-northeast-2.compute.amazonaws.com', 'localhost', "127.0.0.1"]
+ALLOWED_HOSTS = ['*']
 
 CORS_ALLOWED_ORIGINS = ['http://localhost:3000']
 CSRF_TRUSTED_ORIGINS = ['http://localhost:3000']
 CORS_ALLOW_CREDENTIALS = True
+CSRF_COOKIE_HTTPONLY = False 
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 FRONTEND_URL = 'http://localhost:3000'
