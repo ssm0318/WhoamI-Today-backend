@@ -815,7 +815,8 @@ class FriendFriendList(generics.ListAPIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
 
-        user = User.objects.filter(pk=self.kwargs.get('pk')).first()
+        username = self.kwargs.get('username')
+        user = User.objects.filter(username=username).first()
         if not user:
             return User.objects.none()
         if not self.request.user == user and not self.request.user.is_connected(user):
