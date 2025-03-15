@@ -44,6 +44,8 @@ urlpatterns = [
 
     path('connections/<int:pk>/', views.ConnectionChoiceUpdate.as_view(), name='connection-choice-update'),
 
+    path('friends/<int:pk>/list/', views.FriendFriendList.as_view(), name='friend-friend-list'),
+
     # Feed related
     path('feed/', views.FriendFeed.as_view(), name='friend-feed'),
 

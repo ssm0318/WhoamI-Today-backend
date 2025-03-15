@@ -37,7 +37,7 @@ from account.serializers import (CurrentUserSerializer, \
                                  FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
-                                 AppSessionSerializer)
+                                 AppSessionSerializer, FriendFriendListSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername
@@ -801,6 +801,27 @@ class ConnectionChoiceUpdate(generics.UpdateAPIView):
             
         connection.update_friendship_level(request.user, new_choice, update_past_posts)
         return Response({'status': 'Friendship level updated'})
+
+
+class FriendFriendList(generics.ListAPIView):
+    serializer_class = FriendFriendListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        user = User.objects.filter(pk=self.kwargs.get('pk')).first()
+        if not user:
+            return User.objects.none()
+        if not self.request.user == user and not self.request.user.is_connected(user):
+            raise PermissionDenied("You do not have permission to view this user's friends.")
+
+        return user.connected_users.order_by(Lower('username'))
 
 
 class UserFriendDestroy(generics.DestroyAPIView):

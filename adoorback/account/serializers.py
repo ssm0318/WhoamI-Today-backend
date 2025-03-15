@@ -311,6 +311,29 @@ class FriendListSerializer(UserMinimalSerializer):
                                                       'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count']
 
 
+class FriendFriendListSerializer(UserMinimalSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+    connection_status = serializers.SerializerMethodField(read_only=True)
+
+    def get_url(self, obj):
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+    
+    def get_connection_status(self, obj):  # what user has set obj as
+        user = self.context.get('request', None).user
+        if user == obj:
+            return None
+        if user.is_connected(obj):
+            if obj.is_close_friend(user):
+                return 'close_friend'
+            if obj.is_friend(user):
+                return 'friend'
+        return None
+
+    class Meta(UserMinimalSerializer.Meta):
+        model = User
+        fields = UserMinimalSerializer.Meta.fields + ['connection_status']
+
+
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):
     favorites = serializers.ListField(child=serializers.IntegerField(), write_only=True)
     hidden = serializers.ListField(child=serializers.IntegerField(), write_only=True)
