@@ -139,36 +139,30 @@ def set_seed(n):
     # Seed Friendship
     ## Since bulk_create does not call Connection model's save() method,
     ## we explicitly assign user1 as the user with smaller id
-    connections = [
-        Connection(
-            user1=min(user_2, user, key=lambda u: u.id),
-            user2=max(user_2, user, key=lambda u: u.id),
-            user1_choice='friend',
-            user2_choice='friend'
-        )
-        for user in [user_1, user_3, user_4, user_5, user_6]
-    ]
-    Connection.objects.bulk_create(connections)
-
-    # 그 다음 친구 관계 생성
+    connections = []
     for user in [user_1, user_3, user_4, user_5, user_6]:
-        connection, created = Connection.objects.get_or_create(
-            user1=user if user.id < user_2.id else user_2,
-            user2=user_2 if user.id < user_2.id else user,
-            defaults={
-                'user1_choice': 'friend',
-                'user2_choice': 'friend'
-            }
-        )
-        connection.deleted = None  # 삭제 표시 제거
-        connection.save()
+        user1 = min(user_2, user, key=lambda u: u.id)
+        user2 = max(user_2, user, key=lambda u: u.id)
+        # Check if connection already exists before adding it
+        if not Connection.objects.filter(user1=user1, user2=user2).exists():
+            connections.append(
+                Connection(
+                    user1=user1,
+                    user2=user2,
+                    user1_choice='friend',
+                    user2_choice='friend'
+                )
+            )
+    if connections:  # Only create connections if there are any new ones
+        Connection.objects.bulk_create(connections)
 
-    # 마지막으로 채팅방 생성
-    for user in [user_1, user_3, user_4, user_5, user_6]:
-        chat_room = ChatRoom()
-        chat_room.save()
-        chat_room.users.add(user_2, user)
-
+    for u in [user_1, user_3, user_4, user_5, user_6]:
+        # Check if chat room already exists with these two users
+        existing_chat_room = ChatRoom.objects.filter(users=user_2).filter(users=u)
+        if not existing_chat_room.exists():
+            chat_room = ChatRoom()
+            chat_room.save()
+            chat_room.users.add(user_2, u)
 
     # Test Notifications
     response = Response.objects.first()
@@ -232,18 +226,12 @@ def set_seed(n):
         f"{ResponseRequest.objects.count()} ResponseRequest(s) created!") if DEBUG else None
 
     # Seed Comment (target=Feed)
-    responses = Response.objects.filter(author=user_2)
+    responses = Response.objects.filter(author=user_2) if Response.objects.filter(author=user_2).exists() else Response.objects.all()
     for _ in range(n):
         user = random.choice(users)
-        if responses.exists():  # responses가 비어있지 않은 경우에만 실행
-            response = random.choice(responses)
-            Comment.objects.get_or_create(
-                author=user, 
-                content_type=get_response_type(), 
-                object_id=response.id,
-                content=faker.catch_phrase(), 
-                is_private=_ % 2
-            )
+        response = random.choice(responses)
+        Comment.objects.get_or_create(author=user, content_type=get_response_type(), object_id=response.id,
+                                      content=faker.catch_phrase(), is_private=_ % 2)
     logging.info(
         f"{Comment.objects.count()} Comment(s) created!") if DEBUG else None
 
