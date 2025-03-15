@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
@@ -14,7 +15,7 @@ from firebase_admin.messaging import Message
 from firebase_admin.messaging import Notification as FirebaseNotification
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
-from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
+from safedelete.models import SOFT_DELETE_CASCADE
 from safedelete.managers import SafeDeleteManager
 
 
@@ -30,16 +31,29 @@ class NotificationManager(SafeDeleteManager):
         admin_users = get_user_model().objects.filter(is_superuser=True)
         return self.filter(actors__in=admin_users, **kwargs)
 
+    def find_recent_ping(self, user, actor, seconds=300):
+        cutoff = timezone.now() - timezone.timedelta(seconds=seconds)
+        
+        return self.filter(
+            user=user,
+            actors__in=[actor],
+            target_type__model='ping',
+            is_visible=True, 
+            notification_updated_at__gte=cutoff
+        ).order_by('-notification_updated_at').first()
+
     def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_en, content_ko,
                                       emoji=None):
         noti_to_update = None
 
-        if target.type == "Like":
+        if target._meta.model_name == 'ping':
+            noti_to_update = self.find_recent_ping(user, actor)
+        elif target.type == "Like":
             noti_to_update = find_like_noti(user, origin, noti_type)
             if noti_to_update and hasattr(target, 'deleted') and target.deleted:
                 # need to hard delete because if soft deleted, NotificationActor is still accessible through notification.actors field (MTM)
                 NotificationActor.objects.filter(user=actor, notification=noti_to_update).delete(force_policy=HARD_DELETE)
-                actors = noti_to_update.actors.order_by('-notificationactor__created_at')  # make the most recent actor come first in the notification message
+                actors = noti_to_update.actors.order_by('-notificationactor__created_at')
                 N = actors.count()
 
                 if N == 0:
@@ -82,10 +96,29 @@ class NotificationManager(SafeDeleteManager):
                         break
 
         if noti_to_update:
-            actors = noti_to_update.actors.order_by('-notificationactor__created_at')
-            N = actors.count()
-            new_actor = actors.first()
-            updated_message_ko, updated_message_en = construct_message(noti_type,
+            if target._meta.model_name == 'ping':
+                NotificationActor.objects.create(user=actor, notification=noti_to_update)
+                ping_count = noti_to_update.actors.count()
+                
+                updated_message_ko = f"{actor.username}님이 {ping_count}번 핑을 보냈습니다"
+                updated_message_en = f"{actor.username} sent you {ping_count} pings"
+                noti_to_update.message_ko = updated_message_ko
+                noti_to_update.message_en = updated_message_en
+                noti_to_update.message = updated_message_en
+                
+                noti_to_update.notification_updated_at = timezone.now()
+                noti_to_update.is_visible = True
+                noti_to_update.is_read = False
+                noti_to_update.save()
+                
+                print(noti_to_update.message_ko)
+                print(noti_to_update.message_en)
+                return noti_to_update
+            else:
+                actors = noti_to_update.actors.order_by('-notificationactor__created_at')
+                N = actors.count()
+                new_actor = actors.first()
+                updated_message_ko, updated_message_en = construct_message(noti_type,
                                                                        actor.username + "님",
                                                                        new_actor.username + "님",
                                                                        actor.username,
@@ -94,9 +127,9 @@ class NotificationManager(SafeDeleteManager):
                                                                        content_en,
                                                                        content_ko,
                                                                        emoji)
+                noti_to_update.message_ko = updated_message_ko
+                noti_to_update.message_en = updated_message_en
 
-            noti_to_update.message_ko = updated_message_ko
-            noti_to_update.message_en = updated_message_en
             noti_to_update.is_visible = True
             noti_to_update.is_read = False
             NotificationActor.objects.create(user=actor, notification=noti_to_update)
@@ -104,14 +137,28 @@ class NotificationManager(SafeDeleteManager):
             noti_to_update.save()
             print(noti_to_update.message_ko)
             print(noti_to_update.message_en)
+            return noti_to_update
         else:
-            message_ko, message_en = construct_message(noti_type, actor.username + "님", None,
+            if target._meta.model_name == 'ping':
+                message_ko = f"{actor.username}님이 핑을 보냈습니다"
+                message_en = f"{actor.username} sent you a Ping!"
+            else:
+                message_ko, message_en = construct_message(noti_type, actor.username + "님", None,
                                                        actor.username, None, 1, content_en, content_ko, emoji)
-            noti = Notification.objects.create(user=user, origin=origin, target=target, redirect_url=redirect_url,
-                                               message_ko=message_ko, message_en=message_en)
+            
+            noti = Notification.objects.create(
+                user=user,
+                origin=origin,
+                target=target,
+                redirect_url=redirect_url,
+                message_ko=message_ko,
+                message_en=message_en,
+                message=message_en
+            )
             NotificationActor.objects.create(user=actor, notification=noti)
             print(noti.message_ko)
             print(noti.message_en)
+            return noti
 
 
 def default_user():
@@ -175,9 +222,6 @@ class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
 
     class Meta:
         ordering = ['-created_at']
-
-    def __str__(self):
-        return f"actor {self.user} of notification \"{self.notification.message}\" (id: {self.notification.id})"
 
 
 @receiver(post_save, sender=Notification)
