@@ -169,7 +169,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
     persona = ArrayField(
-        models.CharField(max_length=50),
+        models.CharField(max_length=500),
         default=list,
         blank=True,
         help_text="Multiple persona choices for the user."
