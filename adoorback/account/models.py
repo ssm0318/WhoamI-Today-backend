@@ -129,6 +129,9 @@ def default_noti_period_days():
     return ['0', '1', '2', '3', '4', '5', '6']
 
 
+def default_persona():
+    return []
+
 class UserCustomManager(UserManager, SafeDeleteManager):
     _safedelete_visibility = DELETED_INVISIBLE
 
@@ -170,7 +173,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     bio = models.CharField(null=True, max_length=118)
     persona = ArrayField(
         models.CharField(max_length=500),
-        default=list,
+        default=default_persona,
         blank=True,
         help_text="Multiple persona choices for the user."
     )
