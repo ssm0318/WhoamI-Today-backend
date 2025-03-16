@@ -1051,13 +1051,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         if not sorted_friend_ids:
             # If there is no user to recommend, recommend 3 random users
-            user_group = user.user_group
-            if user_group in ["group_1", "group_2"]:
-                allowed_groups = ["group_1", "group_2"]
-            elif user_group in ["group_3", "group_4"]:
-                allowed_groups = ["group_3", "group_4"]
-
-            potential_random_users = User.objects.filter(user_group__in=allowed_groups) \
+            potential_random_users = User.objects.filter(user_group=user.user_group) \
                 .exclude(id=user_id) \
                 .exclude(id__in=user_friend_ids) \
                 .exclude(id__in=user_block_rec_ids) \
