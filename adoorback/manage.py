@@ -7,96 +7,51 @@ from dotenv import load_dotenv
 from django.core.management import ManagementUtility
 from django.core.management import execute_from_command_line
 
-
 def main():
     """Run administrative tasks."""
-    
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(current_dir)
-    
+
     # 현재 환경이 Docker 환경인지 확인
     is_runserver_docker = os.path.exists('/.dockerenv')
     print('is_runserver_docker', is_runserver_docker)
 
-    # 중복 출력, 작업 중복 등을 피하기 위해 체크
-    is_main_process = os.environ.get('RUN_MAIN') != 'true'
-    
-    # 현재 디렉토리와 프로젝트 루트 둘 다에서 환경 파일 확인
-    # env_file_exists = (os.path.isfile('.env') or 
-    #                   os.path.isfile('.env.development') or
-    #                   os.path.isfile(os.path.join(project_root, '.env')) or 
-    #                   os.path.isfile(os.path.join(project_root, '.env.development')))
-    
-    # if is_main_process:
-    #     print(f"Current directory: {os.getcwd()}")
-    #     print(f"Project root directory: {project_root}")
-    #     print(f"Environment files exist: {env_file_exists}")
-    
-    # Docker 환경이 아닌 곳 (ex. 로컬 환경) 에서 runserver 명령어를 사용하는 경우
-    if not is_runserver_docker:
-        # runserver일 때는 항상 development.py 설정 사용 (환경 변수 강제 설정)
-        os.environ['DJANGO_SETTINGS_MODULE'] = 'adoorback.settings.development'
-        
-        # 로컬 개발을 위해 DB 설정 강제 지정
+    # 현재 환경이 production인지 확인
+    is_production = os.getenv('DJANGO_ENV', 'development') == 'production'
+
+    # local
+    if not is_runserver_docker:  
+        os.environ['DJANGO_ENV'] = 'development'
         os.environ['DB_HOST'] = 'localhost'
-        
-        if is_main_process:
-            print("Using development settings for runserver")
-            print("Set DB_HOST to localhost for local development")
+        db_host = 'localhost'
 
-        # 데이터베이스 설정은 무조건 postgres 사용
-        db_name = os.environ.get('DB_NAME', 'whoamitoday')
-        db_user = os.environ.get('DB_USER', 'postgres')
-        db_password = os.environ.get('DB_PASSWORD', 'postgres')
-        db_host = os.environ.get('DB_HOST', 'localhost')  # 항상 localhost가 될 것임
+    # docker compose > development
+    elif not is_production:
+        load_dotenv('.env.development', override=True)
         
-        # Try to create database if it doesn't exist
-        db_newly_created = create_database_if_not_exists(db_name, db_user, db_password, db_host)
+        # force db host
+        db_host = 'db'
 
-        # 서버 시작 전 마이그레이션 실행
-        print("Running migrations before starting server...")
-        migrate_utility = ManagementUtility(['manage.py', 'migrate', '--noinput'])
-        migrate_utility.execute()
-        print("Migrations completed.")
+    db_name = os.environ.get('DB_NAME', 'whoamitoday')
+    db_user = os.environ.get('DB_USER', 'postgres')
+    db_password = os.environ.get('DB_PASSWORD', 'postgres')
         
-        # 테스트 데이터 로드
-        if db_newly_created:
-            print("Loading test data before starting server...")
-            load_test_data()
+    # Try to create database if it doesn't exist
+    db_newly_created = create_database_if_not_exists(db_name, db_user, db_password, db_host)
 
-    # Docker에서 실행되는 경우
+    # run migrations
+    print("Running migrations before starting server...")
+    migrate_utility = ManagementUtility(['manage.py', 'migrate', '--noinput'])
+    migrate_utility.execute()
+    print("Migrations completed.")
+    
+    # load test data only when database is newly created
+    if db_newly_created:
+        print("Loading test data before starting server...")
+        load_test_data()
+
+    # docker compose > production
     else:
-        # Docker 환경에서는 DJANGO_ENV를 기준으로 환경 설정 결정
-        django_env = os.environ.get('DJANGO_ENV', 'development')
-        
-        if django_env == 'production':
-            # Production 환경이면 .env 파일 로드
-            if os.path.isfile('.env'):
-                load_dotenv('.env', override=True)
-                if is_main_process:
-                    print("Loaded production settings from .env file")
-            elif os.path.isfile(os.path.join(project_root, '.env')):
-                load_dotenv(os.path.join(project_root, '.env'), override=True)
-                if is_main_process:
-                    print("Loaded production settings from project root .env file")
-            else:
-                if is_main_process:
-                    print("Warning: .env file not found for production environment")
-        else:
-            # Development 환경이면 .env.development 파일 로드
-            if os.path.isfile('.env.development'):
-                load_dotenv('.env.development', override=True)
-                if is_main_process:
-                    print("Loaded development settings from .env.development file")
-            elif os.path.isfile(os.path.join(project_root, '.env.development')):
-                load_dotenv(os.path.join(project_root, '.env.development'), override=True)
-                if is_main_process:
-                    print("Loaded development settings from project root .env.development file")
-            else:
-                if is_main_process:
-                    print("Warning: .env.development file not found for development environment")
-            
-            load_test_data()
+        load_dotenv('.env', override=True)
+
 
     execute_from_command_line(sys.argv)
         
@@ -171,17 +126,16 @@ def load_test_data():
         print("Running seed function to create test data...")
         
         # Call the set_seed function multiple times as in the script
-        # FIXME(GINA) 잠시 주석 처리
-        # set_seed(30)
-        # for _ in range(3):
-        #     try:
-        #         set_seed(30)
-        #         set_seed(10)
-        #         set_seed(20)
-        #         set_seed(5)
-        #         set_seed(30)
-        #     except Exception as e:
-                # print(f"Warning: Error during seeding (continuing anyway): {e}")
+        set_seed(30)
+        for _ in range(3):
+            try:
+                set_seed(30)
+                set_seed(10)
+                set_seed(20)
+                set_seed(5)
+                set_seed(30)
+            except Exception as e:
+                print(f"Warning: Error during seeding (continuing anyway): {e}")
         
         # Final seed call
         try:
