@@ -4,9 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      - DB_HOST=db
-      - DJANGO_ENV=production
     working_dir: /app/adoorback
     expose:
       - "8000"
@@ -67,6 +64,22 @@ services:
     networks:
       - whoamitoday-network
     restart: unless-stopped
+
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile_cron
+    env_file:
+      - .env
+    volumes:
+      - ./cron:/app/cron
+      - ./db_backup:/app/db_backup
+      - ./.env:/app/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - whoamitoday-network
 
 volumes:
   postgres_data:
