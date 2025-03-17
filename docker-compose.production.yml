@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - DB_HOST=db
+      - DJANGO_ENV=production
     working_dir: /app/adoorback
     expose:
       - "8000"
