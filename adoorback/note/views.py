@@ -170,6 +170,11 @@ class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
         self.perform_update(serializer)
         return Response(serializer.data)
 
+    def patch(self, request, *args, **kwargs):
+        if 'visibility' in request.data:
+            return self.partial_update(request, *args, **kwargs)
+        return super().patch(request, *args, **kwargs)
+
 
 class NoteLikes(generics.ListAPIView):
     '''
@@ -200,7 +205,7 @@ class NoteInteractions(generics.ListAPIView):
         note_id = self.kwargs['pk']
         note = Note.objects.get(pk=note_id)
 
-        if note.author != self.request.user:
+        if not note.is_audience(self.request.user):
             raise PermissionDenied("You do not have permission to view likes on this note.")
 
         likes = Like.objects.filter(content_type__model='note', object_id=note_id).annotate(
@@ -237,6 +242,6 @@ class NoteRead(generics.UpdateAPIView):
                                   status=status.HTTP_404_NOT_FOUND)
         for note in queryset:
             note.readers.add(current_user)
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True, partial=True)
 
         return Response(serializer.data)

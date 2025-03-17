@@ -1,3 +1,5 @@
+import json
+
 from django.db import transaction
 from django.db.models import Count, Q
 from django.conf import settings
@@ -8,7 +10,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES
+    VERSION_CHOICES, PERSONA_CHOICES
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
@@ -39,12 +41,34 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         
         return value
 
+    def validate_persona(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("persona must be a list.")
+        
+        return value
+    
+    def validate_persona(self, value):
+        if isinstance(value, list) and len(value) == 1 and isinstance(value[0], str):
+            try:
+                value = json.loads(value[0])
+            except json.JSONDecodeError:
+                raise serializers.ValidationError("persona must be a valid JSON list.")
+
+        if not isinstance(value, list):
+            raise serializers.ValidationError("persona must be a list.")
+
+        invalid_choices = [p for p in value if p not in dict(PERSONA_CHOICES)]
+        if invalid_choices:
+            raise serializers.ValidationError(f"Invalid choices: {invalid_choices}")
+
+        return value
+
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
-                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio',
+                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
                   'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'noti_period_days',
                   'timezone', 'current_ver']
         extra_kwargs = {'password': {'write_only': True}}
@@ -194,7 +218,7 @@ class UserProfileSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'pronouns', 'bio', 'unread_ping_count', 'connection_status',
+                                                      'pronouns', 'bio', 'persona', 'unread_ping_count', 'connection_status',
                                                       'friend_count']
 
 
@@ -309,6 +333,29 @@ class FriendListSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
                                                       'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count']
+
+
+class FriendFriendListSerializer(UserMinimalSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+    connection_status = serializers.SerializerMethodField(read_only=True)
+
+    def get_url(self, obj):
+        return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
+    
+    def get_connection_status(self, obj):  # what user has set obj as
+        user = self.context.get('request', None).user
+        if user == obj:
+            return None
+        if user.is_connected(obj):
+            if obj.is_close_friend(user):
+                return 'close_friend'
+            if obj.is_friend(user):
+                return 'friend'
+        return None
+
+    class Meta(UserMinimalSerializer.Meta):
+        model = User
+        fields = UserMinimalSerializer.Meta.fields + ['connection_status']
 
 
 class UserFriendsUpdateSerializer(serializers.ModelSerializer):

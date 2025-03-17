@@ -37,7 +37,7 @@ from account.serializers import (CurrentUserSerializer, \
                                  FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
-                                 AppSessionSerializer)
+                                 AppSessionSerializer, FriendFriendListSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername
@@ -493,6 +493,27 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
                     raise ExistingUsername()
                 
+            persona = self.request.data.get('persona')
+            if persona:
+                if isinstance(persona, str):
+                    try:
+                        persona = json.loads(persona)
+                    except json.JSONDecodeError:
+                        raise serializers.ValidationError({
+                            "persona": ["persona must be a valid JSON list."]
+                        })
+                if not isinstance(persona, list):
+                    raise serializers.ValidationError({
+                        "persona": ["persona must be a list."]
+                    })
+                from .models import PERSONA_CHOICES
+                invalid_choices = [p for p in persona if p not in dict(PERSONA_CHOICES)]
+                if invalid_choices:
+                    raise serializers.ValidationError({
+                        "persona": [f"Invalid choices: {invalid_choices}"]
+                    })
+                serializer.validated_data['persona'] = persona
+
             noti_period_days = self.request.data.get('noti_period_days')
             if noti_period_days:
                 # Check if it's a JSON string and parse it
@@ -803,6 +824,28 @@ class ConnectionChoiceUpdate(generics.UpdateAPIView):
         return Response({'status': 'Friendship level updated'})
 
 
+class FriendFriendList(generics.ListAPIView):
+    serializer_class = FriendFriendListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        username = self.kwargs.get('username')
+        user = User.objects.filter(username=username).first()
+        if not user:
+            return User.objects.none()
+        if not self.request.user == user and not self.request.user.is_connected(user):
+            raise PermissionDenied("You do not have permission to view this user's friends.")
+
+        return user.connected_users.order_by(Lower('username'))
+
+
 class UserFriendDestroy(generics.DestroyAPIView):
     queryset = User.objects.all()
     permission_classes = [IsAuthenticated]
@@ -950,18 +993,21 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
             send_users.append(requestee)
 
         for user in send_users:
-            Notification = apps.get_model('notification', 'Notification')
-            admin = User.objects.filter(is_superuser=True).first()
+            from custom_fcm.models import CustomFCMDevice
+            has_enabled_notifications = CustomFCMDevice.objects.filter(user=user, active=True).exists()
+            if not has_enabled_notifications:
+                Notification = apps.get_model('notification', 'Notification')
+                admin = User.objects.filter(is_superuser=True).first()
 
-            noti = Notification.objects.create(
-                user=user,
-                target=admin,
-                origin=admin,
-                message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
-                message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
-                redirect_url='/settings'
-            )
-            NotificationActor.objects.create(user=admin, notification=noti)
+                noti = Notification.objects.create(
+                    user=user,
+                    target=admin,
+                    origin=admin,
+                    message_ko=f"{user.username}님, 답변 작성을 놓치고 싶지 않다면 알림 설정을 해보세요!",
+                    message_en=f"{user.username}, if you don't want to miss writing daily responses, try setting up notifications!",
+                    redirect_url='/settings'
+                )
+                NotificationActor.objects.create(user=admin, notification=noti)
 
 
 class UserFriendRequestUpdate(BaseUserFriendRequestUpdate):
@@ -1005,13 +1051,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         if not sorted_friend_ids:
             # If there is no user to recommend, recommend 3 random users
-            user_group = user.user_group
-            if user_group in ["group_1", "group_2"]:
-                allowed_groups = ["group_1", "group_2"]
-            elif user_group in ["group_3", "group_4"]:
-                allowed_groups = ["group_3", "group_4"]
-
-            potential_random_users = User.objects.filter(user_group__in=allowed_groups) \
+            potential_random_users = User.objects.filter(user_group=user.user_group) \
                 .exclude(id=user_id) \
                 .exclude(id__in=user_friend_ids) \
                 .exclude(id__in=user_block_rec_ids) \
@@ -1173,9 +1213,9 @@ class FriendFeed(generics.ListAPIView):
 
         page = self.paginate_queryset(notes_before_update)
         if page is not None:
-            serialized_data = NoteSerializer(page, many=True, context=self.get_serializer_context()).data
+            serialized_data = DefaultFriendNoteSerializer(page, many=True, context=self.get_serializer_context()).data
         else:
-            serialized_data = NoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
+            serialized_data = DefaultFriendNoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
 
         # mark all notes as read
         unread_note_ids = queryset.exclude(readers=request.user).values_list("id", flat=True)

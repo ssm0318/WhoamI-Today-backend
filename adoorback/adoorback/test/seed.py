@@ -78,16 +78,13 @@ def set_seed(n):
         f"{Response.objects.count()} Response(s) created!") if DEBUG else None
 
     # Seed Check-in
-    availability_options = [
-        'available',
-        'busy',
-        'might_get_distracted',
-        'urgent_only',
-        'about_to_sleep',
-        'studying',
-        'in_transit',
-        'feeling_social',
-        'feeling_quiet'
+    social_battery_options = [
+        'completely_drained',
+        'low',
+        'needs_recharge',
+        'moderate',
+        'fully_charged',
+        'super_social'
     ]
 
     with open('adoorback/test/spotify_ids.txt', 'r') as file:
@@ -96,7 +93,7 @@ def set_seed(n):
     emoji_list = ["🥳", "😳", "😤", "⚽️", "💥", "🍀", "🦁", "🕶️", "🧚🏻", "🐑"]
     for i in range(n):
         user = random.choice(users)
-        availability = random.choice(availability_options)
+        social_battery = random.choice(social_battery_options)
         track_id = random.choice(spotify_ids)
         original_check_in = CheckIn.objects.filter(user=user, is_active=True)
         if original_check_in.exists():
@@ -104,7 +101,7 @@ def set_seed(n):
                 check_in.is_active = False
                 check_in.save()
         checkin, created = CheckIn.objects.get_or_create(user=user,
-                                                availability=availability,
+                                                social_battery=social_battery,
                                                 mood=emoji_list[i%10],
                                                 description=faker.text(max_nb_chars=20),
                                                 track_id=track_id,

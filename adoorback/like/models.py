@@ -133,6 +133,7 @@ def update_like_noti_after_delete(instance, **kwargs):
             else:
                 return
         else:
+            noti.delete()
             return
 
 
