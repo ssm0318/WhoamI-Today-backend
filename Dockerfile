@@ -22,7 +22,6 @@ RUN ls -la /app/start.sh    # 권한 확인용
 # 프로젝트 파일 복사 - 중첩된 디렉토리 구조 방지
 COPY adoorback /app/adoorback
 COPY docker-compose.* .
-COPY init.sql .
 COPY .env* .
 COPY .dockerignore .
 COPY .gitignore .
