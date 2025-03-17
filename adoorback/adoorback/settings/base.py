@@ -279,20 +279,61 @@ LOGGING = {
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
+        'detailed': {
+            'format': '\n' + '='*50 + '\n{asctime} [{levelname}]\nLogger: {name}\nPath: {pathname}:{lineno}\nMessage: {message}\n' + '='*50 + '\n',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
     },
     'handlers': {
-        'file': {
+        'error_file': {
             'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': 'error.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'error.log'),
+            'when': 'midnight',
+            'interval': 1,  # daily rotation
+            'backupCount': 30,  # keep logs for 30 days
+            'formatter': 'detailed',
+        },
+        'info_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'info.log'),
+            'when': 'midnight',
+            'interval': 1,  # daily rotation
+            'backupCount': 7,  # keep logs for 7 days
+            'formatter': 'verbose',
+        },
+        'debug_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'debug.log'),
+            'when': 'midnight',
+            'interval': 1,  # daily rotation
+            'backupCount': 3,  # keep logs for 3 days
             'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
-            'level': 'ERROR',
+            'handlers': ['error_file', 'info_file', 'debug_file'],
+            'level': 'DEBUG',
             'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['error_file', 'info_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'adoorback': {
+            'handlers': ['error_file', 'info_file', 'debug_file'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
     },
 }
