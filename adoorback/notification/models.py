@@ -113,6 +113,17 @@ class NotificationManager(SafeDeleteManager):
             print(noti.message_ko)
             print(noti.message_en)
 
+    def find_recent_ping(self, user, actor):
+        cutoff = timezone.now() - timezone.timedelta(minutes=5)
+        return self.filter(
+            user=user,
+            actors__in=[actor],
+            target_type__model='ping',
+            is_read=False,
+            is_visible=True,
+            notification_updated_at__gte=cutoff
+        ).order_by('-notification_updated_at').first()
+
 
 def default_user():
     return get_user_model().objects.filter(is_superuser=True).first()

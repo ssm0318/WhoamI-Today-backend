@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxLengthValidator
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
+from django.utils import timezone
 
 from adoorback.models import AdoorTimestampedModel
 from notification.models import Notification, NotificationActor
@@ -138,13 +139,31 @@ def create_ping_notification(created, instance, **kwargs):
 
     if receiver.id in sender.user_report_blocked_ids:
         return
-
-    noti = Notification.objects.create(
-        user=receiver,
-        origin=sender,
-        target=instance,
-        message_ko=f"{sender.username}님이 메시지를 보냈습니다!",
-        message_en=f"{sender.username} sent you a message!",
-        redirect_url=f"/users/{sender.username}/ping",
-    )
-    NotificationActor.objects.create(user=sender, notification=noti)
+    
+    recent_noti = Notification.objects.find_recent_ping(receiver, sender)
+    
+    if recent_noti:
+        current_count = 1
+        if "메시지를" in recent_noti.message_ko:
+            try:
+                current_count = int(recent_noti.message_ko.split("님이 ")[1].split("메시지를")[0])
+            except (IndexError, ValueError):
+                pass
+        
+        new_count = current_count + 1
+        recent_noti.message_ko = f"{sender.username}님이 {new_count} 메시지를 보냈습니다!"
+        recent_noti.message_en = f"{sender.username} sent you {new_count} messages!"
+        recent_noti.notification_updated_at = timezone.now()
+        recent_noti.save()
+        
+        NotificationActor.objects.create(user=sender, notification=recent_noti)
+    else:
+        noti = Notification.objects.create(
+            user=receiver,
+            origin=sender,
+            target=instance,
+            message_ko=f"{sender.username}님이 메시지를 보냈습니다!",
+            message_en=f"{sender.username} sent you a message!",
+            redirect_url=f"/users/{sender.username}/ping",
+        )
+        NotificationActor.objects.create(user=sender, notification=noti)
