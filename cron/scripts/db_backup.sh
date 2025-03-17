@@ -40,7 +40,7 @@ mkdir -p "$DATA_D" "$LOG_DIR"
     # pipefail 활성화
     set -o pipefail
 
-    if PGPASSWORD=$DB_PASSWORD pg_dump -h abc -U "$DB_USER" -Fc -w whoamitoday | gzip > "$BACKUP_FILE" 2>> "$LOG_FILE"; then
+    if PGPASSWORD=$DB_PASSWORD pg_dump -h "$DB_HOST" -U "$DB_USER" -Fc -w whoamitoday | gzip > "$BACKUP_FILE" 2>> "$LOG_FILE"; then
         echo "DB backup completed successfully: $(date)"
     else
         echo "❌ DB backup failed: $(date)"
