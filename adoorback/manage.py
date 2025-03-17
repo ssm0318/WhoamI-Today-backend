@@ -29,6 +29,12 @@ def main():
         
         # force db host
         db_host = 'db'
+    
+    # docker compose > production
+    else:
+        load_dotenv('.env', override=True)
+        # Get DB_HOST from environment or default to 'db' if not provided
+        db_host = os.environ.get('DB_HOST', 'db')
 
     db_name = os.environ.get('DB_NAME', 'whoamitoday')
     db_user = os.environ.get('DB_USER', 'postgres')
@@ -47,11 +53,6 @@ def main():
     if db_newly_created:
         print("Loading test data before starting server...")
         load_test_data()
-
-    # docker compose > production
-    else:
-        load_dotenv('.env', override=True)
-
 
     execute_from_command_line(sys.argv)
         
