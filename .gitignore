@@ -51,3 +51,7 @@ adoorback/.python-version
 
 # environment variables
 .env*
+
+# cron
+db_backup
+cron/log
