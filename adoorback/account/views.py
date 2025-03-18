@@ -265,6 +265,10 @@ class ResetPassword(generics.UpdateAPIView):
             return HttpResponse(status=403, content=b"Invalid or expired token.")
 
         self.update_password(user, self.request.data['password'])
+
+        if not user.has_changed_pw:
+            user.has_changed_pw = True
+            user.save()
         return HttpResponse(status=200)
 
     @transaction.atomic
@@ -302,6 +306,10 @@ class CurrentUserResetPassword(generics.UpdateAPIView):
             self.update_password(user, request.data['password'])
         except ValidationError as e:
             return Response({"error": e.detail}, status=400)
+
+        if not user.has_changed_pw:
+            user.has_changed_pw = True
+            user.save()
         return Response(status=200)
 
     @transaction.atomic
