@@ -493,7 +493,7 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['sent_friend_request_to',
                                                       'received_friend_request_from',
-                                                      'are_friends', 'chat_room_id']
+                                                      'are_friends', 'chat_room_id', 'email']
 
 
 class UserFriendRequestSerializer(serializers.ModelSerializer):

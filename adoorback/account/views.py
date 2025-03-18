@@ -367,18 +367,32 @@ class UserSearch(generics.ListAPIView):
             friend_start_ids = list(start_users.filter(id__in=friend_ids).values_list('id', flat=True))
             nonfriend_start_ids = list(start_users.exclude(id__in=friend_ids).values_list('id', flat=True))
 
+            # email starts with query
+            email_start_users = User.objects.filter(email__startswith=query).order_by('email').exclude(id=user_id)
+            friend_email_start_ids = list(email_start_users.filter(id__in=friend_ids).values_list('id', flat=True))
+            nonfriend_email_start_ids = list(email_start_users.exclude(id__in=friend_ids).values_list('id', flat=True))
+
             # username contains query
             contain_users = User.objects.filter(username__icontains=query).order_by('username').exclude(id=user_id)
             friend_contain_ids = list(contain_users.filter(id__in=friend_ids).values_list('id', flat=True))
             nonfriend_contain_ids = list(contain_users.exclude(id__in=friend_ids).values_list('id', flat=True))
 
-            # all friend users
-            qs_ids = friend_start_ids + friend_contain_ids
+            # email contains query
+            email_contain_users = User.objects.filter(email__icontains=query).order_by('email').exclude(id=user_id)
+            friend_email_contain_ids = list(email_contain_users.filter(id__in=friend_ids).values_list('id', flat=True))
+            nonfriend_email_contain_ids = list(email_contain_users.exclude(id__in=friend_ids).values_list('id', flat=True))
 
-            # only 10 non-friend users
-            nonfriend_qs_ids = nonfriend_start_ids[:10]
-            if len(nonfriend_qs_ids) < 10:
-                nonfriend_qs_ids += nonfriend_contain_ids[:10 - len(nonfriend_qs_ids)]
+            # all friend users
+            qs_ids = friend_start_ids + friend_email_start_ids + friend_contain_ids + friend_email_contain_ids
+
+            # only 20 non-friend users
+            nonfriend_qs_ids = nonfriend_start_ids[:20]
+            if len(nonfriend_qs_ids) < 20:
+                nonfriend_qs_ids += nonfriend_email_start_ids[:20 - len(nonfriend_qs_ids)]
+            if len(nonfriend_qs_ids) < 20:
+                nonfriend_qs_ids += nonfriend_contain_ids[:20 - len(nonfriend_qs_ids)]
+            if len(nonfriend_qs_ids) < 20:
+                nonfriend_qs_ids += nonfriend_email_contain_ids[:20 - len(nonfriend_qs_ids)]
 
             # merge querysets while preserving order
             qs_ids += nonfriend_qs_ids
