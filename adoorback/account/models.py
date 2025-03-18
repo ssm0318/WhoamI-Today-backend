@@ -187,6 +187,8 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='direct')
     invited_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, 
                                      related_name="invited_users")
+    
+    has_changed_pw = models.BooleanField(default=False)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
