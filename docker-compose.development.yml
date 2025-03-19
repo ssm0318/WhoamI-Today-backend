@@ -1,0 +1,62 @@
+version: "3.8"
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.development
+    environment:
+      - DJANGO_ENV=development
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy # ✅ DB가 정상 실행될 때까지 대기
+    command: /app/start.sh
+    networks:
+      - whoamitoday-network
+
+  db:
+    image: postgres:13
+    env_file:
+      - .env.development
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck: # ✅ PostgreSQL 상태 확인
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    networks:
+      - whoamitoday-network
+
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile_cron
+    env_file:
+      - .env.development
+    volumes:
+      - ./cron:/app/cron
+      - ./db_backup:/app/db_backup
+      - ./.env.development:/app/.env.development
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - whoamitoday-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  whoamitoday-network:
+    external: true

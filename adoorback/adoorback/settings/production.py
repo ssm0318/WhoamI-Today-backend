@@ -4,7 +4,8 @@ from .base import *
 
 DEBUG = False
 
-BASE_URL = 'https://whoami.gina-park.site'
+# BASE_URL = 'https://whoami.gina-park.site'
+BASE_URL = 'https://whoami-test-group.gina-park.site'
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
@@ -12,11 +13,11 @@ BASE_URL = 'https://whoami.gina-park.site'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'whoamitoday',
-        'USER': 'postgres',
-        'PASSWORD': os.environ['DB_PASSWORD'],
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.environ.get('DB_NAME', 'whoamitoday'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),  
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     },
 }
 
@@ -40,16 +41,29 @@ DATABASES = {
 #    "develop.d3t1tnno5uz3sa.amplifyapp.com",
 #    "localhost"
 # ]
-CSRF_TRUSTED_ORIGINS = ['https://whoami.gina-park.site']
-
-
-ALLOWED_HOSTS = ['ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com', 'localhost', '43.203.123.225', 'ip-172-31-12-68']
-
-CORS_ALLOWED_ORIGINS = [
-#    "https://develop.d3t1tnno5uz3sa.amplifyapp.com",
-#    "http://localhost:3000",
-    "https://ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com",  # Public DNS 이름
-    "https://43.203.123.225",  # Public IP 주소
+CSRF_TRUSTED_ORIGINS = [
+    'https://whoami.gina-park.site',    
+    "https://*.gina-park.site",
 ]
 
-FRONTEND_URL = 'https://whoami.gina-park.site'
+ALLOWED_HOSTS = [
+    'ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com',
+    'localhost',
+    '127.0.0.1',
+    '43.203.123.225',
+    'ip-172-31-12-68',
+    '.gina-park.site',
+    r".*\.gina-park\.site", 
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "https://ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com",  # Public DNS 이름
+    "https://43.203.123.225",
+]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.gina-park\.site$"
+]
+
+# FRONTEND_URL = 'https://whoami.gina-park.site'
+FRONTEND_URL = 'https://whoami-test-group.gina-park.site'
