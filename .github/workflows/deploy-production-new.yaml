@@ -25,30 +25,22 @@ jobs:
           key: ${{ secrets.NEW_SERVER_KEY }}
           script: |
             echo "🚀 최신 코드 Pull 받기"
+            cd ~/WhoamI-Today-backend
             git pull
 
-            echo "🛑 기존 컨테이너 종료"
-            docker compose -f docker-compose.production.yml down
+            echo "🔄 현재 실행 중인 백엔드 컨테이너 확인"
+            CURRENT_BACKEND=$(docker ps --format '{{.Names}}' | grep whoami-backend | head -n 1)
 
-            echo "🔄 컨테이너 재배포 (Build & Run)"
-            docker compose -f docker-compose.production.yml up --build -d
+            if [ "$CURRENT_BACKEND" == "whoami-backend-blue" ]; then
+              TARGET_BACKEND="whoami-backend-green"
+            else
+              TARGET_BACKEND="whoami-backend-blue"
+            fi
 
-            echo "🛑 기존 nginx-reverse-proxy 컨테이너 종료"
-            docker stop nginx-reverse-proxy || true
-            docker rm nginx-reverse-proxy || true
+            echo "🛑 $TARGET_BACKEND 배포 시작"
+            docker compose -f docker-compose.production.yml up --build -d $TARGET_BACKEND
 
-            echo "🏠 홈으로 이동"
-            cd ~
-
-            echo "🔄 nginx-reverse-proxy 재시작"
-            docker run -d \
-              --name nginx-reverse-proxy \
-              --network whoamitoday-network \
-              -p 80:80 -p 443:443 \
-              -v frontend_build_volume:/usr/share/nginx/html \
-              -v /home/ubuntu/nginx_conf:/etc/nginx/conf.d \
-              -v /etc/letsencrypt:/etc/letsencrypt:ro \
-              -v whoami-today-backend_whoami-backend-media:/app/adoorback/adoorback/adoorback/media \
-              nginx:alpine
+            echo "🔄 Nginx 재시작"
+            docker exec nginx-reverse-proxy nginx -s reload
 
             echo "✅ 배포 완료!"
