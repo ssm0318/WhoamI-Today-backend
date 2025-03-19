@@ -1,7 +1,7 @@
 from datetime import time, datetime, timedelta
 
 from django.utils import timezone
-from backports.zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django_cron import CronJobBase, Schedule
 

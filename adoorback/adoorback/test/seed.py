@@ -29,7 +29,7 @@ def set_seed(n):
 
     if not User.objects.filter(username='adoor').exists():
         User.objects.create_superuser(
-            username='adoor', email='team.whoami.today@gmail.com', password='Adoor2020:)',
+            username='admin', email='whoami.today.official@gmail.com', password='Adoor2020:)',
             question_history=",".join(map(str, faker.random_elements(
                 elements=range(1, 1501),
                 length=random.randint(3, 10),
@@ -136,21 +136,30 @@ def set_seed(n):
     # Seed Friendship
     ## Since bulk_create does not call Connection model's save() method,
     ## we explicitly assign user1 as the user with smaller id
-    connections = [
-        Connection(
-            user1=min(user_2, user, key=lambda u: u.id),
-            user2=max(user_2, user, key=lambda u: u.id),
-            user1_choice='friend',
-            user2_choice='friend'
-        )
-        for user in [user_1, user_3, user_4, user_5, user_6]
-    ]
-    Connection.objects.bulk_create(connections)
+    connections = []
+    for user in [user_1, user_3, user_4, user_5, user_6]:
+        user1 = min(user_2, user, key=lambda u: u.id)
+        user2 = max(user_2, user, key=lambda u: u.id)
+        # Check if connection already exists before adding it
+        if not Connection.objects.filter(user1=user1, user2=user2).exists():
+            connections.append(
+                Connection(
+                    user1=user1,
+                    user2=user2,
+                    user1_choice='friend',
+                    user2_choice='friend'
+                )
+            )
+    if connections:  # Only create connections if there are any new ones
+        Connection.objects.bulk_create(connections)
 
     for u in [user_1, user_3, user_4, user_5, user_6]:
-        chat_room = ChatRoom()
-        chat_room.save()
-        chat_room.users.add(user_2, u)
+        # Check if chat room already exists with these two users
+        existing_chat_room = ChatRoom.objects.filter(users=user_2).filter(users=u)
+        if not existing_chat_room.exists():
+            chat_room = ChatRoom()
+            chat_room.save()
+            chat_room.users.add(user_2, u)
 
     # Test Notifications
     response = Response.objects.first()
@@ -214,7 +223,7 @@ def set_seed(n):
         f"{ResponseRequest.objects.count()} ResponseRequest(s) created!") if DEBUG else None
 
     # Seed Comment (target=Feed)
-    responses = Response.objects.all(author=user_2)
+    responses = Response.objects.filter(author=user_2) if Response.objects.filter(author=user_2).exists() else Response.objects.all()
     for _ in range(n):
         user = random.choice(users)
         response = random.choice(responses)

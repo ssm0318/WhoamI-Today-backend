@@ -1,0 +1,92 @@
+services:
+  web:
+    container_name: whoami-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/adoorback
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    command: >
+      sh -c '
+      sleep 5 &&
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000
+      '
+    volumes:
+      - whoami-backend-media:/app/adoorback/adoorback/adoorback/media
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/health/ | grep 200",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+    networks:
+      - whoamitoday-network
+    restart: unless-stopped
+
+  db:
+    image: postgres:13
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 2G
+    networks:
+      - whoamitoday-network
+    restart: unless-stopped
+
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile_cron
+    env_file:
+      - .env
+    volumes:
+      - ./cron:/app/cron
+      - ./db_backup:/app/db_backup
+      - ./.env:/app/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - whoamitoday-network
+
+volumes:
+  postgres_data:
+    driver: local
+  whoami-backend-media:
+    driver: local
+
+networks:
+  whoamitoday-network:
+    external: true
