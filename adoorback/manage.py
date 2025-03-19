@@ -21,6 +21,7 @@ def main():
     # local
     if not is_runserver_docker:
         os.environ['DJANGO_ENV'] = 'development'
+        os.environ['DJANGO_SETTINGS_MODULE'] = 'adoorback.settings.development'
         os.environ['DB_HOST'] = 'localhost'
         db_host = 'localhost'
 
