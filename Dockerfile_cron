@@ -1,0 +1,27 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    gcc \
+    python3-dev \
+    postgresql-server-dev-all \
+    libpq-dev \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade pip
+
+COPY . .
+
+WORKDIR /app/adoorback
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ./cron/crontab_jobs /etc/cron.d/crontab_jobs
+RUN chmod 0644 /etc/cron.d/crontab_jobs
+RUN crontab /etc/cron.d/crontab_jobs
+
+# 6) 컨테이너 실행 시 cron을 포그라운드로 실행
+CMD ["cron", "-f"]
