@@ -19,9 +19,13 @@ class AdoorBaseSerializer(serializers.ModelSerializer):
 
     def get_comment_count(self, obj):
         if obj.type == "Note":
-            return obj.note_comments.count()
+            comments = obj.note_comments.all()
+            replies_count = sum(comment.replies.count() for comment in comments)
+            return comments.count() + replies_count
         elif obj.type == "Response":
-            return obj.response_comments.count()
+            comments = obj.response_comments.all()
+            replies_count = sum(comment.replies.count() for comment in comments)
+            return comments.count() + replies_count
         elif obj.type == "Comment":
             return obj.replies.count()
         return None
