@@ -151,7 +151,7 @@ def create_ping_notification(created, instance, **kwargs):
                 pass
         
         new_count = current_count + 1
-        recent_noti.message_ko = f"{sender.username}님이 {new_count} 메시지를 보냈습니다!"
+        recent_noti.message_ko = f"{sender.username}님이 {new_count}개의 메시지를 보냈습니다!"
         recent_noti.message_en = f"{sender.username} sent you {new_count} messages!"
         recent_noti.notification_updated_at = timezone.now()
         recent_noti.save()
