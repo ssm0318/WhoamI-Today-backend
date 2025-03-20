@@ -72,7 +72,8 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
-                  'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'noti_period_days',
+                  'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
+                  'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'has_changed_pw']
         extra_kwargs = {'password': {'write_only': True}}
 
