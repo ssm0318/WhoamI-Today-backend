@@ -1056,7 +1056,8 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         mutual_friends_count_dict = {}
         for friend in user_friends:
-            potential_friends = friend.connected_users.exclude(id__in=user_friend_ids) \
+            potential_friends = friend.connected_users.filter(user_group=user.user_group) \
+                .exclude(id__in=user_friend_ids) \
                 .exclude(id=user_id).exclude(id__in=user_block_rec_ids) \
                 .exclude(id__in=sent_friend_request_ids) \
                 .exclude(id__in=received_friend_request_ids) \
