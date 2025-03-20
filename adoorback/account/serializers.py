@@ -26,14 +26,17 @@ User = get_user_model()
 class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     unread_noti = serializers.SerializerMethodField(read_only=True)
+    unread_noti_cnt = serializers.SerializerMethodField(read_only=True)
     current_ver = serializers.ChoiceField(choices=VERSION_CHOICES, read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
 
     def get_unread_noti(self, obj):
-        unread_notis = Notification.objects.filter(user=obj, is_read=False)
-        return True if unread_notis else False
+        return Notification.objects.filter(user=obj, is_read=False).exists()
+    
+    def get_unread_noti_cnt(self, obj):
+        return Notification.objects.filter(user=obj, is_read=False).count()
 
     def validate_noti_period_days(self, value):
         if not isinstance(value, list):
@@ -69,7 +72,8 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
-                  'signature', 'date_of_signature', 'unread_noti', 'noti_time', 'noti_period_days',
+                  'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
+                  'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'has_changed_pw']
         extra_kwargs = {'password': {'write_only': True}}
 
