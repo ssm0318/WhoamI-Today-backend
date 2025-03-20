@@ -74,6 +74,7 @@ class CommentFriendSerializer(CommentBaseSerializer):
         current_user = self.context.get('request', None).user
         if (instance.author != current_user
             and instance.target.author != current_user
+            and getattr(instance.target, 'target', None) is None
             and instance.is_private):
             return {'id': instance.id, 'is_private': True}
         else:
