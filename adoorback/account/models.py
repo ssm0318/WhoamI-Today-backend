@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -500,11 +501,16 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return f"Connection between {self.user1} and {self.user2}"
-    
+
     def save(self, *args, **kwargs):
         # check if reverse Connection already exists
         if Connection.objects.filter(user1=self.user2, user2=self.user1).exists():
             raise ValueError("A reverse Connection already exists.")
+
+        # check if both users belong to the same user group
+        if self.user1.user_group != self.user2.user_group:
+            raise ValidationError("Both users must belong to the same user group.")
+
         # Ensure that user1 always has the smaller ID to enforce consistency
         if self.user1.id > self.user2.id:
             self.user1, self.user2 = self.user2, self.user1
