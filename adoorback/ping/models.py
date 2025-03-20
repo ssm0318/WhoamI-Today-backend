@@ -146,7 +146,7 @@ def create_ping_notification(created, instance, **kwargs):
         current_count = 1
         if "메시지를" in recent_noti.message_ko:
             try:
-                current_count = int(recent_noti.message_ko.split("님이 ")[1].split("메시지를")[0])
+                current_count = int(recent_noti.message_ko.split("님이 ")[1].split("메시지를")[0][0])
             except (IndexError, ValueError):
                 pass
         
