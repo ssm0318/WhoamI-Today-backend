@@ -289,29 +289,29 @@ LOGGING = {
         'error_file': {
             'level': 'ERROR',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'adoorback', 'error.log'),
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'error.log'),
             'when': 'midnight',
-            'interval': 1,  # daily rotation
-            'backupCount': 30,  # keep logs for 30 days
+            'interval': 1,
             'formatter': 'detailed',
+            'suffix': '%Y-%m-%d',
         },
         'info_file': {
             'level': 'INFO',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'adoorback', 'info.log'),
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'info.log'),
             'when': 'midnight',
-            'interval': 1,  # daily rotation
-            'backupCount': 7,  # keep logs for 7 days
+            'interval': 1,
             'formatter': 'verbose',
+            'suffix': '%Y-%m-%d',
         },
         'debug_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'adoorback', 'debug.log'),
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'debug.log'),
             'when': 'midnight',
-            'interval': 1,  # daily rotation
-            'backupCount': 3,  # keep logs for 3 days
+            'interval': 1,
             'formatter': 'verbose',
+            'suffix': '%Y-%m-%d',
         },
     },
     'loggers': {
