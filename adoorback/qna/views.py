@@ -1,3 +1,4 @@
+from collections import defaultdict, OrderedDict
 from itertools import chain
 
 from django.contrib.auth import get_user_model
@@ -7,6 +8,7 @@ from django.db.models import F, Value, CharField
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
 from rest_framework import generics, exceptions, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response as DjangoResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
@@ -169,6 +171,10 @@ class ResponseRead(generics.UpdateAPIView):
         return DjangoResponse(serializer.data)
 
 
+class DateGroupPagination(PageNumberPagination):
+    page_size = 2  # paginate by 2 dates
+
+
 class QuestionList(generics.ListCreateAPIView):
     serializer_class = qs.QuestionBaseSerializer
     permission_classes = [IsAuthenticated]
@@ -176,7 +182,7 @@ class QuestionList(generics.ListCreateAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def get_queryset(self):
+    def get(self, request, *args, **kwargs):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
@@ -184,25 +190,56 @@ class QuestionList(generics.ListCreateAPIView):
         # get 30 recent questions excluding future questions
         today = timezone.now().date()
         daily_questions = list(Question.objects.daily_questions())  # DailyQuestionList와 순서 일치를 위해
-        if daily_questions:
-            queryset = Question.objects.raw("""
-                SELECT * FROM qna_question
-                WHERE array_length(selected_dates, 1) IS NOT NULL
-                AND selected_dates[array_upper(selected_dates, 1)] <= %s
-                AND id NOT IN %s
-                ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
-                LIMIT 30;
-            """, [today, tuple(q.id for q in daily_questions)])
-        else:
-            queryset = Question.objects.raw("""
-                SELECT * FROM qna_question
-                WHERE array_length(selected_dates, 1) IS NOT NULL
-                AND selected_dates[array_upper(selected_dates, 1)] <= %s
-                ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
-                LIMIT 30;
-            """, [today])
+        excluded_ids = tuple(q.id for q in daily_questions)
+        excluded_clause = "AND id NOT IN %s" if excluded_ids else ""
+        sql = f"""
+            SELECT * FROM qna_question
+            WHERE array_length(selected_dates, 1) IS NOT NULL
+            AND selected_dates[array_upper(selected_dates, 1)] <= %s
+            {excluded_clause}
+            ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
+            LIMIT 30;
+        """
+        params = [today]
+        if excluded_ids:
+            params.append(excluded_ids)
+        
+        queryset = list(Question.objects.raw(sql, params))
+        all_questions = daily_questions + queryset
 
-        return daily_questions + list(queryset)
+        # group by date
+        grouped = defaultdict(list)
+        for question in all_questions:
+            if question.selected_dates:
+                last_date = question.selected_dates[-1]
+                grouped[last_date].append(question)
+
+        grouped_ordered = OrderedDict(
+            sorted(grouped.items(), key=lambda x: x[0], reverse=True)
+        )
+
+        grouped_list = [
+            {"date": str(date), "questions": questions}
+            for date, questions in grouped_ordered.items()
+        ]
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(grouped_list, request)
+
+        serialized_data = []
+        for group in page:
+            serialized_group = {
+                "date": group["date"],
+                "questions": self.serializer_class(
+                    group["questions"], many=True, context={"request": request}
+                ).data
+            }
+            serialized_data.append(serialized_group)
+
+        return paginator.get_paginated_response(
+            qs.QuestionGroupSerializer(serialized_data, many=True).data
+        )
+
 
     @transaction.atomic
     def perform_create(self, serializer):
