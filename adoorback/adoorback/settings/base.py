@@ -279,20 +279,61 @@ LOGGING = {
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
+        'detailed': {
+            'format': '\n' + '='*50 + '\n{asctime} [{levelname}]\nLogger: {name}\nPath: {pathname}:{lineno}\nMessage: {message}\n' + '='*50 + '\n',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
     },
     'handlers': {
-        'file': {
+        'error_file': {
             'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': 'error.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'error.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'formatter': 'detailed',
+            'suffix': '%Y-%m-%d',
+        },
+        'info_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'info.log'),
+            'when': 'midnight',
+            'interval': 1,
             'formatter': 'verbose',
+            'suffix': '%Y-%m-%d',
+        },
+        'debug_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'debug.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'formatter': 'verbose',
+            'suffix': '%Y-%m-%d',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
-            'level': 'ERROR',
+            'handlers': ['error_file', 'info_file', 'debug_file'],
+            'level': 'DEBUG',
             'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['error_file', 'info_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'adoorback': {
+            'handlers': ['error_file', 'info_file', 'debug_file'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
     },
 }
