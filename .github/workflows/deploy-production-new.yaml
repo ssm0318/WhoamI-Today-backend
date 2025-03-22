@@ -1,0 +1,46 @@
+name: Deploy to New Production Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: pip install -r adoorback/requirements.txt
+
+      - name: Connect to EC2 and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.NEW_SERVER_HOST }}
+          username: ${{ secrets.NEW_SERVER_USER }}
+          key: ${{ secrets.NEW_SERVER_KEY }}
+          script: |
+            echo "🚀 최신 코드 Pull 받기"
+            cd ~/WhoamI-Today-backend
+            git pull
+
+            echo "🔄 현재 실행 중인 백엔드 컨테이너 확인"
+            CURRENT_BACKEND=$(docker ps --format '{{.Names}}' | grep whoami-backend | head -n 1)
+
+            if [ "$CURRENT_BACKEND" == "whoami-backend-blue" ]; then
+              TARGET_BACKEND="whoami-backend-green"
+            else
+              TARGET_BACKEND="whoami-backend-blue"
+            fi
+
+            echo "🛑 $TARGET_BACKEND 배포 시작"
+            docker compose -f docker-compose.production.yml up --build -d $TARGET_BACKEND
+
+            echo "🔄 Nginx 재시작"
+            docker exec nginx-reverse-proxy nginx -s reload
+
+            echo "✅ 배포 완료!"
