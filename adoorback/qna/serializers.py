@@ -34,6 +34,11 @@ class QuestionBaseSerializer(serializers.ModelSerializer):
                   'selected', 'is_admin_question']
 
 
+class QuestionGroupSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    questions = serializers.ListField()
+
+
 class ResponseSerializer(AdoorBaseSerializer):
     author = serializers.HyperlinkedIdentityField(
         view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
