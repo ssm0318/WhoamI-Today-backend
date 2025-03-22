@@ -1,3 +1,3 @@
 0 * * * * /app/cron/scripts/log_time.sh
 0 * * * * /app/cron/scripts/run_django_cron.sh
-59 23 * * * /app/cron/scripts/db_backup.sh
+0 * * * * /app/cron/scripts/db_backup.sh
