@@ -34,14 +34,14 @@ mkdir -p "$DATA_D" "$LOG_DIR"
     echo "DB Backup Script Started: $(date)"
 
     # Perform DB backup
-    BACKUP_FILE="$DATA_D/whoamitoday_$(date +%Y-%m-%d).backup.gz"
+    BACKUP_FILE="$DATA_D/whoamitoday_$(date +%Y-%m-%d_%H).backup.gz"
     echo "Backing up database to: $BACKUP_FILE"
 
     # pipefail 활성화
     set -o pipefail
 
     if PGPASSWORD=$DB_PASSWORD pg_dump -h "$DB_HOST" -U "$DB_USER" -Fc -w whoamitoday | gzip > "$BACKUP_FILE" 2>> "$LOG_FILE"; then
-        echo "DB backup completed successfully: $(date)"
+        echo "✅ DB backup completed successfully: $(date)"
     else
         echo "❌ DB backup failed: $(date)"
         exit 1
@@ -50,9 +50,9 @@ mkdir -p "$DATA_D" "$LOG_DIR"
     # pipefail 비활성화 (다른 명령어에 영향 안 주도록)
     set +o pipefail
 
-    # Remove backup data older than 7 days
-    echo "Removing old backups..."
-    find "$DATA_D" -type f -name "whoamitoday_*.backup.gz" -mtime +7 -exec rm -v {} \;
+    # Remove backup data older than 72 hours
+    echo "Removing old backups (older than 3 days)..."
+    find "$DATA_D" -type f -name "whoamitoday_*.backup.gz" -mmin +4320 -exec rm -v {} \;
 
     echo "Backup script finished: $(date)"
     echo "========================================="
