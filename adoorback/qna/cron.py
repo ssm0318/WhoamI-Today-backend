@@ -6,9 +6,8 @@ from qna.algorithms.recommender import create_ranks_csv
 
 
 class DailyQuestionCronJob(CronJobBase):
-    RUN_AT_TIMES = ['00:00']
+    schedule = Schedule(run_every_mins=0)
 
-    schedule = Schedule(run_at_times=RUN_AT_TIMES)
     code = 'qna.algorithms.data_crawler.select_daily_questions'
 
     def do(self):

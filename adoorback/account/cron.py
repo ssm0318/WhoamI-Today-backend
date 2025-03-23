@@ -16,10 +16,7 @@ SESSION_TIMEOUT_MINUTES = 2
 
 
 class SendDailyWhoAmINotiCronJob(CronJobBase):
-    # run every hour at 0 minute
-    RUN_AT_TIMES = [(datetime.min + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
-
-    schedule = Schedule(run_at_times=RUN_AT_TIMES)
+    schedule = Schedule(run_every_mins=0)
     code = 'account.send_daily_who_am_i_noti_cron_job'
 
     def do(self):
@@ -52,7 +49,10 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
             if str(current_weekday) not in user.noti_period_days:
                 continue
 
-            if user.noti_time == time(user_local_time.hour, 0):
+            user_now = user_local_time
+            noti_datetime = user_now.replace(hour=user.noti_time.hour, minute=user.noti_time.minute)
+            time_diff = abs(user_now - noti_datetime)
+            if time_diff <= timedelta(minutes=10):
                 # daily notification
                 if user.current_ver == 'default':
                     noti = Notification.objects.create(user=user,
@@ -67,7 +67,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                                                     target=admin,
                                                     origin=admin,
                                                     message_ko=f"{user.username}님, 오늘 친구들에게 한 마디 남겨보세요! — {daily_question_ko}",
-                                                    message_en=f"{user.username},quick reminder to share something with your friends today! — {daily_question_en}",
+                                                    message_en=f"{user.username}, quick reminder to share something with your friends today! — {daily_question_en}",
                                                     redirect_url=f'/questions/{daily_question_id}/new')
                     NotificationActor.objects.create(user=admin, notification=noti)
 
@@ -79,9 +79,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
 
 
 class AutoCloseSessionsCronJob(CronJobBase):
-    RUN_EVERY_MINS = SESSION_TIMEOUT_MINUTES
-
-    schedule = Schedule(run_every_mins=RUN_EVERY_MINS)
+    schedule = Schedule(run_every_mins=0)
     code = "session.auto_close_sessions"
 
     def do(self):
