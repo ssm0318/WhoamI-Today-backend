@@ -724,6 +724,7 @@ class ReceivedResponseRequestList(generics.GenericAPIView):
                     "question_content": rr.question.content,
                     "requester_username_list": [],
                     "created_at": rr.created_at,
+                    "id": rr.id,
                 }
             else:
                 # 가장 최근 created_at 유지
