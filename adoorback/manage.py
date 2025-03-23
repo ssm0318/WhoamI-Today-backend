@@ -28,6 +28,7 @@ def main():
         os.environ['DJANGO_SETTINGS_MODULE'] = 'adoorback.settings.development'
         os.environ['DB_HOST'] = 'localhost'
         db_host = 'localhost'
+        load_dotenv('.env.development', override=True)
 
     # docker compose > development
     elif not is_production:
