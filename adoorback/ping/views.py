@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, exceptions
 from rest_framework.permissions import IsAuthenticated
 
+from adoorback.utils.validators import adoor_exception_handler
 from .models import Ping, get_or_create_ping_room
 from .serializers import PingSerializer
 
@@ -12,6 +13,9 @@ User = get_user_model()
 class PingList(generics.ListCreateAPIView):
     serializer_class = PingSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
     def get_queryset(self):
         user = self.request.user

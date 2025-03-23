@@ -19,6 +19,9 @@ class ReactionList(generics.ListCreateAPIView):
     serializer_class = ReactionSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def validate_target(self):
         try:
             content_type = get_generic_relation_type(self.kwargs.get('ctype'))
