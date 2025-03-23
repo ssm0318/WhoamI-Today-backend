@@ -39,6 +39,12 @@
 /adoorback/adoorback/media
 /adoorback/adoorback/adoorback/media
 
+# user info
+/adoorback/adoorback/assets/user_list_ko.csv
+/adoorback/adoorback/assets/user_list_us.csv
+/adoorback/adoorback/assets/passwords_ko.csv
+/adoorback/adoorback/assets/passwords_us.csv
+
 # logging
 **/error.log
 **/log.django
