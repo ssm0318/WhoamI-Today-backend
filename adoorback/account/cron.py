@@ -16,10 +16,7 @@ SESSION_TIMEOUT_MINUTES = 2
 
 
 class SendDailyWhoAmINotiCronJob(CronJobBase):
-    # run every hour at 0 minute
-    RUN_AT_TIMES = [(datetime.min + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
-
-    schedule = Schedule(run_at_times=RUN_AT_TIMES)
+    schedule = Schedule(run_every_mins=0)
     code = 'account.send_daily_who_am_i_noti_cron_job'
 
     def do(self):
@@ -82,9 +79,7 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
 
 
 class AutoCloseSessionsCronJob(CronJobBase):
-    RUN_EVERY_MINS = SESSION_TIMEOUT_MINUTES
-
-    schedule = Schedule(run_every_mins=RUN_EVERY_MINS)
+    schedule = Schedule(run_every_mins=0)
     code = "session.auto_close_sessions"
 
     def do(self):
