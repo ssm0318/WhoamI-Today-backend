@@ -42,13 +42,13 @@ def adoor_exception_handler(exc, context):
     request = context.get('request', None)
     tb = traceback.format_exc()
 
+    # PermissionDenied 중 CSRF 실패 메시지가 아니면 무시
+    if isinstance(exc, PermissionDenied):
+        if not str(exc).startswith("CSRF Failed"):
+            return exception_handler(exc, context)
+
     # 인증 실패 + 사용자 입력 관련 예외는 무시
-    if isinstance(exc, (
-        NotAuthenticated,
-        AuthenticationFailed,
-        PermissionDenied,
-        *USER_INPUT_EXCEPTIONS
-    )):
+    if isinstance(exc, (NotAuthenticated, AuthenticationFailed)) or isinstance(exc, USER_INPUT_EXCEPTIONS):
         return exception_handler(exc, context)
 
     # 슬랙 알림
