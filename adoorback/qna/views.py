@@ -1,5 +1,6 @@
 from collections import defaultdict, OrderedDict
 from itertools import chain
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
@@ -191,8 +192,13 @@ class QuestionList(generics.ListCreateAPIView):
             translation.activate(lang)
 
         # get 30 recent questions excluding future questions
-        today = timezone.now().date()
-        daily_questions = list(Question.objects.daily_questions())  # DailyQuestionList와 순서 일치를 위해
+        user = request.user
+        try:
+            tz = ZoneInfo(user.timezone)
+        except Exception:
+            tz = ZoneInfo("America/Los_Angeles")
+        today = timezone.now().astimezone(tz).date()
+        daily_questions = list(Question.objects.daily_questions(request.user))  # DailyQuestionList와 순서 일치를 위해
         excluded_ids = tuple(q.id for q in daily_questions)
         excluded_clause = "AND id NOT IN %s" if excluded_ids else ""
         sql = f"""
@@ -310,4 +316,4 @@ class DailyQuestionList(generics.ListAPIView):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
-        return Question.objects.daily_questions()
+        return Question.objects.daily_questions(self.request.user)
