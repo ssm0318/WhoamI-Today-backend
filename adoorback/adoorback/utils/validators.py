@@ -4,7 +4,7 @@ import traceback
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from rest_framework.exceptions import NotAuthenticated, AuthenticationFailed
+from rest_framework.exceptions import NotAuthenticated, AuthenticationFailed, PermissionDenied
 from rest_framework.views import exception_handler
 
 from adoorback.utils.alerts import send_msg_to_slack, send_gmail_alert
@@ -43,7 +43,12 @@ def adoor_exception_handler(exc, context):
     tb = traceback.format_exc()
 
     # 인증 실패 + 사용자 입력 관련 예외는 무시
-    if isinstance(exc, (NotAuthenticated, AuthenticationFailed)) or isinstance(exc, USER_INPUT_EXCEPTIONS):
+    if isinstance(exc, (
+        NotAuthenticated,
+        AuthenticationFailed,
+        PermissionDenied,
+        *USER_INPUT_EXCEPTIONS
+    )):
         return exception_handler(exc, context)
 
     # 슬랙 알림
