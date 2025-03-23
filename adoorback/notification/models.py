@@ -1,3 +1,5 @@
+import traceback
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
@@ -8,6 +10,7 @@ from django.utils import timezone
 
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.content_types import get_response_request_type, get_question_type
+from adoorback.utils.alerts import send_msg_to_slack
 from notification.helpers import find_like_noti, construct_message
 
 from firebase_admin.messaging import Message
@@ -63,9 +66,6 @@ class NotificationManager(SafeDeleteManager):
                 noti_to_update.message_ko = updated_message_ko
                 noti_to_update.message_en = updated_message_en
                 noti_to_update.save()
-
-                print(noti_to_update.message_ko)
-                print(noti_to_update.message_en)
                 return
         elif target.type == "ResponseRequest":
             noti_to_update = Notification.objects.filter(user=user,
@@ -102,16 +102,12 @@ class NotificationManager(SafeDeleteManager):
             NotificationActor.objects.create(user=actor, notification=noti_to_update)
             noti_to_update.notification_updated_at = timezone.now()
             noti_to_update.save()
-            print(noti_to_update.message_ko)
-            print(noti_to_update.message_en)
         else:
             message_ko, message_en = construct_message(noti_type, actor.username + "님", None,
                                                        actor.username, None, 1, content_en, content_ko, emoji)
             noti = Notification.objects.create(user=user, origin=origin, target=target, redirect_url=redirect_url,
                                                message_ko=message_ko, message_en=message_en)
             NotificationActor.objects.create(user=actor, notification=noti)
-            print(noti.message_ko)
-            print(noti.message_en)
 
     def find_recent_ping(self, user, actor):
         cutoff = timezone.now() - timezone.timedelta(minutes=5)
@@ -191,19 +187,10 @@ class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
         return f"actor {self.user} of notification \"{self.notification.message}\" (id: {self.notification.id})"
 
 
-@receiver(post_save, sender=Notification)
-def send_firebase_notification(created, instance, **kwargs):
-    if not created:
-        return
-    
+def notify_firebase(instance):
     devices = CustomFCMDevice.objects.filter(user_id=instance.user.id, active=True)
-
     for device in devices:
-        if device.language == 'ko':
-            body = instance.message_ko
-        else:
-            body = instance.message_en
-        
+        body = instance.message_ko if device.language == 'ko' else instance.message_en
         message = Message(
             notification=FirebaseNotification(
                 title='WhoAmI Today',
@@ -219,12 +206,22 @@ def send_firebase_notification(created, instance, **kwargs):
                 'priority': 'high',  # for android
             }
         )
-
         try:
             device.send_message(message)
-            print(f"Notification sent to user {instance.user.id} in {device.language}")
         except Exception as e:
-            print(f"Error while sending firebase notification to device {device.id}:", e)
+            stack_trace = traceback.format_exc()
+            send_msg_to_slack(
+                text=f"🚨 Failed to send firebase notification to device {device.id}: {e}\n```{stack_trace}```",
+                level="ERROR"
+            )
+            return False
+
+
+@receiver(post_save, sender=Notification)
+def send_firebase_notification(sender, instance, created, **kwargs):
+    if created or (not created and instance.is_visible and not instance.is_read):
+        notify_firebase(instance)
+
 
 @receiver(post_save, sender=Notification)
 def cancel_firebase_notification(sender, instance, **kwargs):
