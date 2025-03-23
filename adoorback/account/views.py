@@ -1,4 +1,5 @@
 from datetime import timedelta
+from collections import defaultdict
 import json
 import uuid
 from zoneinfo import ZoneInfo
@@ -682,21 +683,48 @@ class CurrentUserResponseList(generics.ListAPIView):
         return _Response.objects.filter(author=user).order_by('-created_at')
 
 
-class ReceivedResponseRequestList(generics.ListAPIView):
-    queryset = ResponseRequest.objects.all()
+class ReceivedResponseRequestList(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = serializers.Serializer  # 바뀔 예정
 
-    def get_exception_handler(self):
-        return adoor_exception_handler
+    def get(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in request.META:
+            lang = request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
 
-    def get_serializer_class(self):
-        from qna.serializers import ReceivedResponseRequestSerializer
-        return ReceivedResponseRequestSerializer
+        user = request.user
+        tz_now = timezone.now().astimezone(ZoneInfo(user.timezone))
+        thirty_days_ago = tz_now - timedelta(days=30)
 
-    def get_queryset(self):
-        user = self.request.user
-        thirty_days_ago = timezone.now().astimezone(ZoneInfo(user.timezone)) - timedelta(days=30)
-        return ResponseRequest.objects.filter(requestee=user, created_at__gte=thirty_days_ago).order_by('-created_at')
+        response_requests = ResponseRequest.objects.filter(
+            requestee=user,
+            created_at__gte=thirty_days_ago
+        ).select_related('question', 'requester')
+
+        # unanswered only
+        unanswered = []
+        for rr in response_requests:
+            has_response = rr.question.response_set.filter(author=user).exists()
+            if not has_response:
+                unanswered.append(rr)
+
+        # 그룹핑: question_id -> [requesters]
+        grouped = defaultdict(list)
+        questions = {}
+        for rr in unanswered:
+            grouped[rr.question_id].append(rr.requester.username)
+            questions[rr.question_id] = rr.question
+
+        # 변환: list of dicts
+        grouped_list = []
+        for q_id, usernames in grouped.items():
+            grouped_list.append({
+                "question_id": q_id,
+                "question_content": questions[q_id].content,
+                "requester_username_list": usernames
+            })
+
+        return Response(grouped_list)
 
 
 class FriendList(generics.ListAPIView):
