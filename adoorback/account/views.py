@@ -21,6 +21,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import serializers
@@ -48,6 +49,7 @@ from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
+from qna.serializers import GroupedResponseRequestSerializer
 from tracking.utils import clean_session_key
 
 
@@ -683,9 +685,13 @@ class CurrentUserResponseList(generics.ListAPIView):
         return _Response.objects.filter(author=user).order_by('-created_at')
 
 
+class ReceivedResponseRequestPagination(PageNumberPagination):
+    page_size = 10
+
+
 class ReceivedResponseRequestList(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = serializers.Serializer  # 바뀔 예정
+    serializer_class = GroupedResponseRequestSerializer
 
     def get(self, request, *args, **kwargs):
         if 'HTTP_ACCEPT_LANGUAGE' in request.META:
@@ -708,23 +714,24 @@ class ReceivedResponseRequestList(generics.GenericAPIView):
             if not has_response:
                 unanswered.append(rr)
 
-        # 그룹핑: question_id -> [requesters]
-        grouped = defaultdict(list)
-        questions = {}
+        # group by question
+        grouped_dict = {}
         for rr in unanswered:
-            grouped[rr.question_id].append(rr.requester.username)
-            questions[rr.question_id] = rr.question
+            qid = rr.question.id
+            if qid not in grouped_dict:
+                grouped_dict[qid] = {
+                    "question_id": qid,
+                    "question_content": rr.question.content,
+                    "requester_username_list": []
+                }
+            grouped_dict[qid]["requester_username_list"].append(rr.requester.username)
 
-        # 변환: list of dicts
-        grouped_list = []
-        for q_id, usernames in grouped.items():
-            grouped_list.append({
-                "question_id": q_id,
-                "question_content": questions[q_id].content,
-                "requester_username_list": usernames
-            })
+        grouped_list = list(grouped_dict.values())
 
-        return Response(grouped_list)
+        # paginate manually
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(grouped_list, request, view=self)
+        return paginator.get_paginated_response(page)
 
 
 class FriendList(generics.ListAPIView):
