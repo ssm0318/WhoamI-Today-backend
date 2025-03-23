@@ -50,9 +50,6 @@ def adoor_exception_handler(exc, context):
             Traceback:
             {tb}
             """,
-            to_email="you@example.com",
-            from_email="your@gmail.com",
-            app_password=os.getenv("GMAIL_APP_PASSWORD"),
         )
     except Exception:
         traceback.print_exc()
