@@ -8,9 +8,23 @@ from rest_framework.exceptions import NotAuthenticated, AuthenticationFailed
 from rest_framework.views import exception_handler
 
 from adoorback.utils.alerts import send_msg_to_slack, send_gmail_alert
+from adoorback.utils.exceptions import (
+    WrongPassword, NoUsername, InActiveUser,
+    ExistingUsername, LongUsername, InvalidUsername,
+    ExistingEmail, InvalidEmail, ExistingReaction,
+    NoSuchTarget, NotFriend, ExistingResponseRequest,
+    NoSuchQuestion, DeletedQuestion,
+)
 
 
 USERNAME_REGEX = r'^[가-힣\w@.\-]+\Z'
+USER_INPUT_EXCEPTIONS = (
+    ExistingUsername, LongUsername, InvalidUsername,
+    ExistingEmail, InvalidEmail, ExistingReaction,
+    NoSuchTarget, NotFriend, ExistingResponseRequest,
+    NoSuchQuestion, DeletedQuestion,
+)
+
 
 def validate_notification_message(message):
     if message not in ['sent friend request to',
@@ -28,8 +42,8 @@ def adoor_exception_handler(exc, context):
     request = context.get('request', None)
     tb = traceback.format_exc()
 
-    # 인증 관련 예외는 슬랙/이메일 알림 생략
-    if isinstance(exc, (NotAuthenticated, AuthenticationFailed)):
+    # 인증 실패 + 사용자 입력 관련 예외는 무시
+    if isinstance(exc, (NotAuthenticated, AuthenticationFailed)) or isinstance(exc, USER_INPUT_EXCEPTIONS):
         return exception_handler(exc, context)
 
     # 슬랙 알림
