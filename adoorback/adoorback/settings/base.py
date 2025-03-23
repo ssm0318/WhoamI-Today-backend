@@ -270,6 +270,10 @@ SESSION_FILE_PATH = os.path.join(BASE_DIR, 'sessions')
 TRACK_ANONYMOUS_USERS = False
 TRACK_IGNORE_STATUS_CODES = [400, 404, 403, 405, 410, 500]
 
+
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -279,20 +283,58 @@ LOGGING = {
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
+        'detailed': {
+            'format': '\n' + '='*50 + '\n{asctime} [{levelname}]\nLogger: {name}\nPath: {pathname}:{lineno}\nMessage: {message}\n' + '='*50 + '\n',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
     },
     'handlers': {
-        'file': {
+        'error_file': {
             'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': 'error.log',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'error.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'formatter': 'detailed',
+        },
+        'info_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'info.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'formatter': 'verbose',
+        },
+        'debug_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'debug.log'),
+            'when': 'midnight',
+            'interval': 1,
             'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
-            'level': 'ERROR',
+            'handlers': ['error_file', 'info_file', 'debug_file'],
+            'level': 'DEBUG',
             'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['error_file', 'info_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'adoorback': {
+            'handlers': ['error_file', 'info_file', 'debug_file'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
     },
 }

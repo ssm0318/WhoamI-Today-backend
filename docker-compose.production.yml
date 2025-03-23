@@ -21,6 +21,8 @@ services:
       '
     volumes:
       - whoami-backend-media:/app/adoorback/adoorback/adoorback/media
+      - ./adoorback/adoorback/logs:/app/adoorback/adoorback/logs
+      - ./error.log:/app/error.log
     healthcheck:
       test:
         [

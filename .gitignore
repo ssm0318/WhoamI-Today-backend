@@ -42,6 +42,7 @@
 # logging
 **/error.log
 **/log.django
+logs/
 
 # python
 adoorback/.python-version
