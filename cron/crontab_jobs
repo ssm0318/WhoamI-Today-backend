@@ -1,4 +1,4 @@
-0 * * * * /app/cron/scripts/log_time.sh
+* * * * * /app/cron/scripts/log_time.sh
 0 * * * * /app/cron/scripts/db_backup.sh
 */15 * * * * /app/cron/scripts/run_django_cron.sh --force account.cron.SendDailyWhoAmINotiCronJob
 * * * * * /app/cron/scripts/run_django_cron.sh --force account.cron.AutoCloseSessionsCronJob
