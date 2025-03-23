@@ -30,7 +30,8 @@ def adoor_exception_handler(exc, context):
     # 슬랙 알림
     try:
         send_msg_to_slack(
-            text=f"*🚨 예외 발생 in {view.__class__.__name__ if view else 'Unknown'}*\n```{tb}```"
+            text=f"*🚨 예외 발생 in {view.__class__.__name__ if view else 'Unknown'}*\n```{tb}```",
+            level="ERROR"
         )
     except Exception:
         traceback.print_exc()

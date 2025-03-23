@@ -21,9 +21,9 @@ def send_msg_to_slack(
         return  # 중요하지 않은 레벨은 보내지 않음
 
     url = url or os.getenv("SLACK_URL")
-    channel = channel or os.getenv("SLACK_CHANNEL", "8_django_alert")
-    username = username or os.getenv("SLACK_USERNAME", "webhookbot")
-    icon_emoji = icon_emoji or os.getenv("SLACK_ICON", ":rotating_light:")
+    channel = channel or os.getenv("SLACK_CHANNEL")
+    username = username or os.getenv("SLACK_USERNAME")
+    icon_emoji = icon_emoji or os.getenv("SLACK_ICON")
     text = text or "Hello World!!"
 
     if not url:
