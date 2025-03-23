@@ -1,6 +1,7 @@
 from datetime import timedelta
 import json
 import uuid
+from zoneinfo import ZoneInfo
 
 from django.apps import apps
 from django.conf import settings
@@ -15,7 +16,6 @@ from django.http import HttpResponse, HttpResponseNotAllowed, Http404
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
-from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -695,7 +695,7 @@ class ReceivedResponseRequestList(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        thirty_days_ago = timezone.now() - timedelta(days=30)
+        thirty_days_ago = timezone.now().astimezone(ZoneInfo(user.timezone)) - timedelta(days=30)
         return ResponseRequest.objects.filter(requestee=user, created_at__gte=thirty_days_ago).order_by('-created_at')
 
 

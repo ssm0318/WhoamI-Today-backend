@@ -1,4 +1,4 @@
-from datetime import time, datetime, timedelta
+from datetime import timedelta
 
 from django.utils import timezone
 from zoneinfo import ZoneInfo
@@ -24,17 +24,6 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         print("Creating daily notifications for WhoAmI...............")
 
         admin = User.objects.filter(is_superuser=True).get(email='whoami.today.official@gmail.com')
-        try:
-            daily_question = Question.objects.daily_questions()[0]
-            daily_question_en = daily_question.content_en
-            daily_question_ko = daily_question.content_ko
-            daily_question_id = daily_question.id
-        except:
-            print('=========================')
-            print('daily question does not exist!')
-            print('Cron job did not perform successfully.')
-            print('=========================')
-            return
 
         num_notis_before = Notification.objects.admin_only().count()
         all_users = User.objects.all()
@@ -47,6 +36,16 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
             
             current_weekday = user_local_time.weekday()  # Monday=0, Sunday=6
             if str(current_weekday) not in user.noti_period_days:
+                continue
+
+            try:
+                daily_question = Question.objects.daily_questions(user)[0]
+                daily_question_en = daily_question.content_en
+                daily_question_ko = daily_question.content_ko
+                daily_question_id = daily_question.id
+            except:
+                print(f'🚨 ERROR: daily question does not exist for user {user.username} ({user.id})!')
+                print("Failed to send daily notification for this user.")
                 continue
 
             user_now = user_local_time

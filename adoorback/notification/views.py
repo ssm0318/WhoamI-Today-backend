@@ -1,7 +1,5 @@
 from django.db import transaction
-from django.http import JsonResponse
 from django.utils import translation
-from django.utils import timezone
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response

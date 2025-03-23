@@ -1,27 +1,26 @@
-import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from django.db import models, transaction
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import Q
 from django.utils import timezone
+from safedelete.models import SafeDeleteModel
+from safedelete.models import SOFT_DELETE_CASCADE
+from safedelete.managers import SafeDeleteManager
 
 from account.models import Subscription, Connection
+from adoorback.models import AdoorModel, AdoorTimestampedModel
+from adoorback.utils.helpers import wrap_content
 from comment.models import Comment
 from content_report.models import ContentReport
 from like.models import Like
-from reaction.models import Reaction
-from adoorback.models import AdoorModel, AdoorTimestampedModel
-from adoorback.utils.helpers import wrap_content
 from notification.models import Notification, NotificationActor
-
-from safedelete.models import SafeDeleteModel
-from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
-from safedelete.managers import SafeDeleteManager
+from reaction.models import Reaction
 
 User = get_user_model()
 
@@ -34,9 +33,14 @@ class QuestionManager(SafeDeleteManager):
     def custom_questions_only(self, **kwargs):
         return self.filter(is_admin_question=False, **kwargs)
 
-    def daily_questions(self, **kwargs):
-        today = timezone.now().date()
-        return self.filter(selected_dates__contains=[today], **kwargs)
+    def daily_questions(self, user, **kwargs):
+        try:
+            tz = ZoneInfo(user.timezone)
+        except (ZoneInfoNotFoundError, AttributeError):
+            tz = ZoneInfo('America/Los_Angeles')
+
+        user_today = timezone.now().astimezone(tz).date()
+        return self.filter(selected_dates__contains=[user_today], **kwargs)
 
     def date_questions(self, date, **kwargs):
         return self.filter(selected_dates__contains=[date], **kwargs)

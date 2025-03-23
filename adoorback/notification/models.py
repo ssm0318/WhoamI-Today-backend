@@ -214,6 +214,7 @@ def notify_firebase(instance):
                 text=f"🚨 Failed to send firebase notification to device {device.id}: {e}\n```{stack_trace}```",
                 level="ERROR"
             )
+            print(f"🚨 Failed to send firebase notification to device {device.id}: {e}\n```{stack_trace}```")
             return False
 
 
