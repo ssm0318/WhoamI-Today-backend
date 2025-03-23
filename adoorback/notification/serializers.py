@@ -2,6 +2,7 @@ from django.utils import timezone
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.utils.translation import get_language_from_request
 
 from notification.models import Notification
 from qna.models import Question
@@ -52,7 +53,8 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_question_content(self, obj):
         content = None
         if obj.target and (obj.target.type == 'ResponseRequest' or obj.target.type == 'Response'):
-            lang = self.context.get('request', None).META.get('HTTP_ACCEPT_LANGUAGE', 'en')
+            request = self.context.get('request')
+            lang = get_language_from_request(request) if request else 'en'
             if lang == 'en':
                 content = obj.target.question.content_en
             elif lang == 'kr':
@@ -61,7 +63,8 @@ class NotificationSerializer(serializers.ModelSerializer):
                 content = obj.target.question.content_en  # Default to English
         elif obj.target and obj.redirect_url[:11] == '/questions/' and obj.target.type != 'Like':
             question = Question.objects.get(id=int(obj.redirect_url.split('/')[-2]))
-            lang = self.context.get('request', None).META.get('HTTP_ACCEPT_LANGUAGE', 'en')
+            request = self.context.get('request')
+            lang = get_language_from_request(request) if request else 'en'
             if lang == 'en':
                 content = question.content_en
             elif lang == 'kr':
