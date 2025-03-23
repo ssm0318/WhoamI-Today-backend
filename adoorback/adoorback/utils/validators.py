@@ -1,10 +1,12 @@
-# import sentry_sdk
 import re
+import traceback
 
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from rest_framework.views import exception_handler
+
+from adoorback.utils.alerts import send_msg_to_slack, send_gmail_alert
 
 
 USERNAME_REGEX = r'^[가-힣\w@.\-]+\Z'
@@ -20,15 +22,42 @@ def validate_notification_message(message):
         )
 
 
-def adoor_exception_handler(e, context):
-    response = exception_handler(e, context)
-    # if response.status_code in [status.HTTP_400_BAD_REQUEST,
-    #                             status.HTTP_401_UNAUTHORIZED,
-    #                             status.HTTP_405_METHOD_NOT_ALLOWED,
-    #                             status.HTTP_404_NOT_FOUND,
-    #                             status.HTTP_403_FORBIDDEN]:
-    # sentry_sdk.capture_exception(e)
-    return response
+def adoor_exception_handler(exc, context):
+    view = context.get('view', None)
+    request = context.get('request', None)
+    tb = traceback.format_exc()
+
+    # 슬랙 알림
+    try:
+        send_msg_to_slack(
+            text=f"*🚨 예외 발생 in {view.__class__.__name__ if view else 'Unknown'}*\n```{tb}```"
+        )
+    except Exception:
+        traceback.print_exc()
+
+    # 이메일 알림
+    try:
+        send_gmail_alert(
+            subject="🚨 Django 예외 발생",
+            body=f"""
+            View: {view.__class__.__name__ if view else 'Unknown'}
+            Method: {request.method if request else 'N/A'}
+            URL: {request.build_absolute_uri() if request else 'N/A'}
+
+            Exception:
+            {str(exc)}
+
+            Traceback:
+            {tb}
+            """,
+            to_email="you@example.com",
+            from_email="your@gmail.com",
+            app_password=os.getenv("GMAIL_APP_PASSWORD"),
+        )
+    except Exception:
+        traceback.print_exc()
+
+    return exception_handler(exc, context)
 
 
 class AdoorUsernameValidator(validators.RegexValidator):

@@ -68,6 +68,10 @@ def get_access_token_for_user(user):
 
 
 class UserLogin(APIView):
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def post(self, request, format=None):
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
@@ -101,6 +105,10 @@ class UserLogin(APIView):
 
 
 class UserLogout(APIView):
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get(self, request):
         logout(request)
         response = Response()
@@ -330,6 +338,10 @@ class CurrentUserResetPassword(generics.UpdateAPIView):
 
 
 class UserPasswordConfirm(APIView):
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def post(self, request, format=None):
         user = request.user
 
@@ -598,6 +610,9 @@ class CurrentUserDelete(generics.DestroyAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get_object(self):
         return self.request.user
 
@@ -719,6 +734,9 @@ class FriendListUpdate(generics.UpdateAPIView):
     serializer_class = UserFriendsUpdateSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get_object(self):
         return self.request.user
 
@@ -821,6 +839,9 @@ class UserHiddenDestroy(generics.DestroyAPIView):
 class ConnectionChoiceUpdate(generics.UpdateAPIView):
     queryset = Connection.objects.all()
     permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
     def get_object(self):
         try:
@@ -1044,6 +1065,9 @@ class UserRecommendedFriendsList(generics.ListAPIView):
     serializer_class = UserMinimumSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get_queryset(self):
         user_id = self.request.user.id
         user = get_object_or_404(User, id=user_id)
@@ -1116,6 +1140,9 @@ class BlockRecCreate(generics.CreateAPIView):
 class UserMarkAllNotesAsRead(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def patch(self, request):
         username = request.data.get('username')
         if not username:
@@ -1139,6 +1166,9 @@ class UserMarkAllNotesAsRead(APIView):
 
 class UserMarkAllResponsesAsRead(APIView):
     permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
     def patch(self, request):
         username = request.data.get('username')
@@ -1210,6 +1240,9 @@ class UnsubscribeUserContent(generics.DestroyAPIView):
 class FriendFeed(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get_queryset(self):
         user = self.request.user
 
@@ -1253,6 +1286,9 @@ class StartSession(generics.CreateAPIView):
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def create(self, request, *args, **kwargs):
         while True:
             session_id = str(uuid.uuid4())
@@ -1279,6 +1315,9 @@ class EndSession(generics.UpdateAPIView):
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def update(self, request, *args, **kwargs):
         session = self.get_object()
 
@@ -1299,6 +1338,9 @@ class TouchSession(generics.UpdateAPIView):
     queryset = AppSession.objects.all()
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
     def update(self, request, *args, **kwargs):
         session = self.get_object()
