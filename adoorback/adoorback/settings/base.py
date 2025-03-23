@@ -270,6 +270,10 @@ SESSION_FILE_PATH = os.path.join(BASE_DIR, 'sessions')
 TRACK_ANONYMOUS_USERS = False
 TRACK_IGNORE_STATUS_CODES = [400, 404, 403, 405, 410, 500]
 
+
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -289,29 +293,26 @@ LOGGING = {
         'error_file': {
             'level': 'ERROR',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'error.log'),
+            'filename': os.path.join(LOG_DIR, 'error.log'),
             'when': 'midnight',
             'interval': 1,
             'formatter': 'detailed',
-            'suffix': '%Y-%m-%d',
         },
         'info_file': {
             'level': 'INFO',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'info.log'),
+            'filename': os.path.join(LOG_DIR, 'info.log'),
             'when': 'midnight',
             'interval': 1,
             'formatter': 'verbose',
-            'suffix': '%Y-%m-%d',
         },
         'debug_file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'adoorback', 'logs', 'debug.log'),
+            'filename': os.path.join(LOG_DIR, 'debug.log'),
             'when': 'midnight',
             'interval': 1,
             'formatter': 'verbose',
-            'suffix': '%Y-%m-%d',
         },
     },
     'loggers': {
