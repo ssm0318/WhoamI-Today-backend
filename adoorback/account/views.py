@@ -722,11 +722,20 @@ class ReceivedResponseRequestList(generics.GenericAPIView):
                 grouped_dict[qid] = {
                     "question_id": qid,
                     "question_content": rr.question.content,
-                    "requester_username_list": []
+                    "requester_username_list": [],
+                    "created_at": rr.created_at,
                 }
+            else:
+                # 가장 최근 created_at 유지
+                if rr.created_at > grouped_dict[qid]["created_at"]:
+                    grouped_dict[qid]["created_at"] = rr.created_at
             grouped_dict[qid]["requester_username_list"].append(rr.requester.username)
 
         grouped_list = list(grouped_dict.values())
+
+        seven_days_ago = timezone.now() - timedelta(days=7)
+        for group in grouped_dict.values():
+            group["is_recent"] = group["created_at"] >= seven_days_ago
 
         # paginate manually
         paginator = self.pagination_class()
