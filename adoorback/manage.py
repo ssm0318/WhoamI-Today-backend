@@ -4,8 +4,12 @@ import os
 import sys
 import subprocess
 from dotenv import load_dotenv
+import traceback
+
 from django.core.management import ManagementUtility
 from django.core.management import execute_from_command_line
+
+from adoorback.utils.alerts import send_msg_to_slack
 
 
 def main():
@@ -24,6 +28,7 @@ def main():
         os.environ['DJANGO_SETTINGS_MODULE'] = 'adoorback.settings.development'
         os.environ['DB_HOST'] = 'localhost'
         db_host = 'localhost'
+        load_dotenv('.env.development', override=True)
 
     # docker compose > development
     elif not is_production:
@@ -111,7 +116,11 @@ def create_database_if_not_exists(db_name, db_user='postgres', db_password='post
                 print(f"Error creating database with psql: {result.stderr}")
                 return False
         except Exception as sub_e:
-            print(f"Failed to run psql command: {sub_e}")
+            stack_trace = traceback.format_exc()
+            send_msg_to_slack(
+                text=f"🚨 Failed to run psql command: {sub_e}\n```{stack_trace}```",
+                level="ERROR"
+            )
             return False
 
 
@@ -139,13 +148,21 @@ def load_test_data():
                 set_seed(5)
                 set_seed(30)
             except Exception as e:
-                print(f"Warning: Error during seeding (continuing anyway): {e}")
+                stack_trace = traceback.format_exc()
+                send_msg_to_slack(
+                    text=f"🚨 Warning: Error during seeding (continuing anyway): \n```{stack_trace}```",
+                    level="ERROR"
+                )
 
         # Final seed call
         try:
             set_seed(30)
         except Exception as e:
-            print(f"Warning: Error during final seeding (continuing anyway): {e}")
+            stack_trace = traceback.format_exc()
+            send_msg_to_slack(
+                text=f"🚨 Warning: Error during seeding (continuing anyway): \n```{stack_trace}```",
+                level="ERROR"
+            )
 
         # Print some information about created data
         from django.contrib.auth import get_user_model
@@ -160,7 +177,11 @@ def load_test_data():
         return True
 
     except Exception as e:
-        print(f"Error loading test data: {e}")
+        stack_trace = traceback.format_exc()
+        send_msg_to_slack(
+            text=f"🚨 Error loading test data: \n```{stack_trace}```",
+            level="ERROR"
+        )
         return False
 
 

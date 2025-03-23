@@ -1,3 +1,5 @@
+import traceback
+
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework import status
@@ -5,11 +7,17 @@ from .models import CustomFCMDevice
 from .serializers import CustomFCMDeviceSerializer 
 from rest_framework.permissions import IsAuthenticated
 
+from adoorback.utils.alerts import send_msg_to_slack
+from adoorback.utils.validators import adoor_exception_handler
+
+
 class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
     queryset = CustomFCMDevice.objects.all()
     serializer_class = CustomFCMDeviceSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
     def __get_language_from_request(self, request):
         accept_language = request.META.get('HTTP_ACCEPT_LANGUAGE', '')
@@ -53,5 +61,10 @@ class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         except Exception as e:
-            print(f"Error in create method: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            error_message = str(e)
+            stack_trace = traceback.format_exc()
+            send_msg_to_slack(
+                text=f"🚨 예외 발생\n```{stack_trace}```",
+                level="ERROR"
+            )
+            return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)

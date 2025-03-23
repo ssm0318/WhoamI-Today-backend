@@ -122,6 +122,9 @@ class ResponseInteractions(generics.ListAPIView):
     serializer_class = InteractionSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get_queryset(self):
         from like.models import Like
         from reaction.models import Reaction

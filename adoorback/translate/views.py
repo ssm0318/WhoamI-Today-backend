@@ -4,9 +4,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+from adoorback.utils.validators import adoor_exception_handler
+
 
 class TranslateV2(APIView):
   serializer_class = TranslateSerializer
+
+  def get_exception_handler(self):
+    return adoor_exception_handler
 
   def post(self, request):
     text = request.data.get("text")

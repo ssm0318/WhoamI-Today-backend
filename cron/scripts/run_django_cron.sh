@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# 기본 환경 변수 파일 설정
+# === 환경 변수 로드 ===
 ENV_FILE="/app/.env"
 DEV_ENV_FILE="/app/.env.development"
 
-# .env 파일이 존재하면 로드하고, 없으면 .env.development를 로드
 if [ -f "$ENV_FILE" ]; then
     set -a
     source "$ENV_FILE"
@@ -20,9 +19,11 @@ else
     exit 1
 fi
 
+# === 로그 설정 ===
 LOG_DIR="/app/cron/log"
-# shellcheck disable=SC1001
+mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/$(date +\%Y-\%m-\%d).log"
 
-mkdir -p "$LOG_DIR"
-/usr/local/bin/python /app/adoorback/manage.py runcrons >> "$LOG_FILE" 2>&1
+# === runcrons 실행 ===
+echo "[INFO] Running: python manage.py runcrons $*" >> "$LOG_FILE"
+/usr/local/bin/python /app/adoorback/manage.py runcrons "$@" >> "$LOG_FILE" 2>&1

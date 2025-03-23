@@ -183,6 +183,9 @@ class NoteLikes(generics.ListAPIView):
     serializer_class = LikeSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get_queryset(self):
         from like.models import Like
         note_id = self.kwargs['pk']
@@ -197,6 +200,9 @@ class NoteLikes(generics.ListAPIView):
 class NoteInteractions(generics.ListAPIView):
     serializer_class = InteractionSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
 
     def get_queryset(self):
         from like.models import Like
