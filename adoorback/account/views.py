@@ -1057,6 +1057,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         mutual_friends_count_dict = {}
         for friend in user_friends:
             potential_friends = friend.connected_users.filter(user_group=user.user_group) \
+                .filter(current_ver=user.current_ver) \
                 .exclude(id__in=user_friend_ids) \
                 .exclude(id=user_id).exclude(id__in=user_block_rec_ids) \
                 .exclude(id__in=sent_friend_request_ids) \
@@ -1075,6 +1076,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         if not sorted_friend_ids:
             # If there is no user to recommend, recommend 3 random users
             potential_random_users = User.objects.filter(user_group=user.user_group) \
+                .filter(current_ver=user.current_ver) \
                 .exclude(id=user_id) \
                 .exclude(id__in=user_friend_ids) \
                 .exclude(id__in=user_block_rec_ids) \
