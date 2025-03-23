@@ -189,25 +189,40 @@ class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
 
 def notify_firebase(instance):
     devices = CustomFCMDevice.objects.filter(user_id=instance.user.id, active=True)
+
+    cancel_message = Message(
+        data={
+            'body': '삭제된 알림입니다.',
+            'url': '/home',
+            'tag': str(instance.id),
+            'type': 'cancel',
+        }
+    )
+
+    new_message = lambda body: Message(
+        notification=FirebaseNotification(
+            title='WhoAmI Today',
+            body=body
+        ),
+        data={
+            'message_en': instance.message_en,
+            'message_ko': instance.message_ko,
+            'url': instance.redirect_url,
+            'tag': str(instance.id),
+            'type': 'new',
+            'content-available': '1',
+            'priority': 'high',
+        }
+    )
+
     for device in devices:
-        body = instance.message_ko if device.language == 'ko' else instance.message_en
-        message = Message(
-            notification=FirebaseNotification(
-                title='WhoAmI Today',
-                body=body
-            ),
-            data={
-                'message_en': instance.message_en,
-                'message_ko': instance.message_ko,
-                'url': instance.redirect_url,
-                'tag': str(instance.id),
-                'type': 'new',
-                'content-available': '1',  # for ios silent notification
-                'priority': 'high',  # for android
-            }
-        )
         try:
-            device.send_message(message)
+            # 먼저 기존 알림 취소
+            device.send_message(cancel_message, silent=True)
+
+            # 새로 알림 전송
+            body = instance.message_ko if device.language == 'ko' else instance.message_en
+            device.send_message(new_message(body))
         except Exception as e:
             stack_trace = traceback.format_exc()
             send_msg_to_slack(
@@ -215,6 +230,8 @@ def notify_firebase(instance):
                 level="ERROR"
             )
             return False
+
+    return True
 
 
 @receiver(post_save, sender=Notification)
