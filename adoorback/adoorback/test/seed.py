@@ -82,7 +82,7 @@ def set_seed(n):
         'completely_drained',
         'low',
         'needs_recharge',
-        'moderate',
+        'moderately_social',
         'fully_charged',
         'super_social'
     ]
