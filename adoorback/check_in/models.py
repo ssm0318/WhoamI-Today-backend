@@ -19,7 +19,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         ('completely_drained', 'Completely Drained'),
         ('low', 'Low Social Battery'),
         ('needs_recharge', 'Needs Recharge'),
-        ('moderate', 'Moderate'),
+        ('moderately_social', 'Moderately Social'),
         ('fully_charged', 'Fully Charged'),
         ('super_social', 'Super Social Mode (HMU!)'),
     ]
