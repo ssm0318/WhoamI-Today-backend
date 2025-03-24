@@ -2,7 +2,7 @@ import csv
 import random
 import string
 from django.core.management.base import BaseCommand
-from account.models import User
+from account.models import User, Connection
 import os
 
 
@@ -37,7 +37,14 @@ class Command(BaseCommand):
 
         group_counts = {group: User.objects.filter(user_group=group).count() for group in group_map[country]}
 
+        whoami_r = User.objects.get(username='whoami_today_r')
+        whoami_q = User.objects.get(username='whoami_today_q')
+
         def create_user_by_email(email):
+            email = email.lower()
+            if User.objects.filter(email=email).exists():
+                return None
+
             if email in created_users:
                 return created_users[email]
 
@@ -69,8 +76,8 @@ class Command(BaseCommand):
                 user_type = 'direct'
 
             user = User.objects.create_user(
-                username=email,
-                email=email,
+                username=email.lower(),
+                email=email.lower(),
                 password=password,
                 user_group=user_group,
                 current_ver=current_ver,
@@ -82,8 +89,24 @@ class Command(BaseCommand):
             with open(password_file_path, 'a', newline='', encoding='utf-8') as pwfile:
                 writer = csv.writer(pwfile)
                 if os.stat(password_file_path).st_size == 0:
-                    writer.writerow(['email', 'password'])  # 헤더 한 번만
-                writer.writerow([email, password])
+                    writer.writerow(['email', 'password', 'user_group'])
+                writer.writerow([email.lower(), password, user_group])
+
+            # 👥 친구 연결
+            if current_ver == 'default':
+                Connection.objects.create(
+                    user1=user,
+                    user2=whoami_r,
+                    user1_choice='friend',
+                    user2_choice='friend',
+                )
+            elif current_ver == 'experiment':
+                Connection.objects.create(
+                    user1=user,
+                    user2=whoami_q,
+                    user1_choice='friend',
+                    user2_choice='friend',
+                )
 
             created_users[email] = user
             new_users.append(row)
