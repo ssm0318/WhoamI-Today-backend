@@ -41,7 +41,6 @@ urlpatterns += i18n_patterns(
     path('api/notes/', include('note.urls')),
     
     path('api/secret/', admin.site.urls),
-    path('api/user/', include('rest_framework.urls', namespace='rest_framework')),
     path('api/', include('custom_fcm.urls')), 
     path('api/tracking/', include('tracking.urls')),
     path('api/chat/', include('chat.urls')),
