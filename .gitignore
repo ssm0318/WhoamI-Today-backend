@@ -42,8 +42,7 @@
 # user info
 /adoorback/adoorback/assets/user_list_ko.csv
 /adoorback/adoorback/assets/user_list_us.csv
-/adoorback/adoorback/assets/passwords_ko.csv
-/adoorback/adoorback/assets/passwords_us.csv
+/adoorback/adoorback/assets/created_users.csv
 
 # logging
 **/error.log
