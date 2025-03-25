@@ -25,8 +25,7 @@ services:
       - ./error.log:/app/error.log
       - ./adoorback/adoorback/assets/user_list_ko.csv:/app/adoorback/adoorback/assets/user_list_ko.csv
       - ./adoorback/adoorback/assets/user_list_us.csv:/app/adoorback/adoorback/assets/user_list_us.csv
-      - ./adoorback/adoorback/assets/passwords_ko.csv:/app/adoorback/adoorback/assets/passwords_ko.csv
-      - ./adoorback/adoorback/assets/passwords_us.csv:/app/adoorback/adoorback/assets/passwords_us.csv
+      - ./adoorback/adoorback/assets/created_users.csv:/app/adoorback/adoorback/assets/created_users.csv
     healthcheck:
       test:
         [
