@@ -374,16 +374,19 @@ class UserSearch(generics.ListAPIView):
         user = self.request.user
         user_id = user.id
         friend_ids = user.connected_user_ids
+        user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
 
         qs = User.objects.none()
         if query:
             # username starts with query
-            start_users = User.objects.filter(username__startswith=query).order_by('username').exclude(id=user_id)
+            start_users = User.objects.filter(username__startswith=query, is_superuser=False) \
+                .order_by('username').exclude(id=user_id).exclude(id__in=user_block_rec_ids)
             friend_start_ids = list(start_users.filter(id__in=friend_ids).values_list('id', flat=True))
             nonfriend_start_ids = list(start_users.exclude(id__in=friend_ids).values_list('id', flat=True))
 
             # username contains query
-            contain_users = User.objects.filter(username__icontains=query).order_by('username').exclude(id=user_id)
+            contain_users = User.objects.filter(username__icontains=query, is_superuser=False) \
+                .order_by('username').exclude(id=user_id).exclude(id__in=user_block_rec_ids)
             friend_contain_ids = list(contain_users.filter(id__in=friend_ids).values_list('id', flat=True))
             nonfriend_contain_ids = list(contain_users.exclude(id__in=friend_ids).values_list('id', flat=True))
 
