@@ -721,7 +721,7 @@ class ReceivedResponseRequestList(generics.GenericAPIView):
                     grouped_dict[qid]["created_at"] = rr.created_at
             grouped_dict[qid]["requester_username_list"].append(rr.requester.username)
 
-        grouped_list = list(grouped_dict.values())
+        grouped_list = sorted(grouped_dict.values(), key=lambda x: x["created_at"], reverse=True)
 
         seven_days_ago = timezone.now() - timedelta(days=7)
         for group in grouped_dict.values():
