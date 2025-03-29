@@ -213,6 +213,14 @@ class QuestionList(generics.ListCreateAPIView):
             params.append(excluded_ids)
         
         queryset = list(Question.objects.raw(sql, params))
+
+        def is_valid_question_for_user(question, user_tz, today):
+            if not question.selected_dates:
+                return False
+            last_date_utc = question.selected_dates[-1]
+            return last_date_utc <= today
+        queryset = [q for q in queryset if is_valid_question_for_user(q, tz, today)]
+
         all_questions = daily_questions + queryset
 
         # group by date
