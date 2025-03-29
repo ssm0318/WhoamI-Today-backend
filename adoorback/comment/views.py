@@ -6,7 +6,7 @@ from like.serializers import LikeSerializer
 from comment.models import Comment
 from comment.serializers import CommentFriendSerializer
 
-from adoorback.utils.permissions import IsAuthorOrReadOnly
+from adoorback.utils.permissions import IsAuthorOrReadOnly, IsNotBlocked
 from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 from utils.helpers import parse_user_tag_from_content
@@ -43,7 +43,7 @@ class CommentCreate(generics.CreateAPIView):
 class CommentDetail(generics.DestroyAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentFriendSerializer
-    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler

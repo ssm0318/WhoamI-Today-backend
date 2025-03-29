@@ -6,7 +6,6 @@ from rest_framework import generics, exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from adoorback.utils.permissions import IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 
 from check_in.models import CheckIn

@@ -2,7 +2,7 @@ from itertools import chain
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import F, Value, CharField
+from django.db.models import F, Value, CharField, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
@@ -58,8 +58,7 @@ class NoteComments(generics.ListAPIView):
         ).values_list('object_id', flat=True)
 
         return note.note_comments.exclude(
-            id__in=blocked_content_ids,
-            author_id__in=current_user.user_report_blocked_ids
+            Q(id__in=blocked_content_ids) | Q(author_id__in=current_user.user_report_blocked_ids)
         ).order_by('created_at')
 
     def list(self, request, *args, **kwargs):
@@ -86,7 +85,7 @@ class NoteComments(generics.ListAPIView):
 
 class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = NoteSerializer
-    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared]
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -132,7 +131,7 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = DefaultFriendNoteSerializer
-    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared]
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
 
     def get_exception_handler(self):
         return adoor_exception_handler
