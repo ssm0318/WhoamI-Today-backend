@@ -52,8 +52,7 @@ class CustomAuthentication(JWTAuthentication):
 
         # for logging
         set_current_request(request)
-
-        enforce_csrf(request)
+        enforce_csrf(request)        
         user = self.get_user(validated_token)
         if user and user.is_authenticated and user.timezone:
             timezone.activate(ZoneInfo(user.timezone))
