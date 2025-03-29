@@ -23,8 +23,7 @@ services:
       - whoami-backend-media:/app/adoorback/adoorback/adoorback/media
       - ./adoorback/adoorback/logs:/app/adoorback/adoorback/logs
       - ./error.log:/app/error.log
-      - ./adoorback/adoorback/assets/user_list_ko.csv:/app/adoorback/adoorback/assets/user_list_ko.csv
-      - ./adoorback/adoorback/assets/user_list_us.csv:/app/adoorback/adoorback/assets/user_list_us.csv
+      - ./adoorback/adoorback/assets/user_list_ko.csv:/app/adoorback/adoorback/assets/user_list.csv
       - ./adoorback/adoorback/assets/created_users.csv:/app/adoorback/adoorback/assets/created_users.csv
     healthcheck:
       test:
