@@ -70,17 +70,6 @@ class Command(BaseCommand):
             user_country = row['country']
             current_ver = 'default' if user_group in ['group_1', 'group_3'] else 'experiment'
 
-            # ✅ country에 따라 language, timezone 설정
-            if user_country == 'Korea':
-                language = 'ko'
-                timezone = 'Asia/Seoul'
-            elif user_country == 'US':
-                language = 'en'
-                timezone = 'America/Los_Angeles'
-            else:
-                language = 'en'
-                timezone = 'UTC'
-
             friend_email = row.get('friend-email', '')
 
             # 친구 먼저 생성 (자기 자신이 아닌 경우에만)
