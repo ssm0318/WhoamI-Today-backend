@@ -26,6 +26,7 @@ class UserInfoFilter(Filter):
             record.token = token if token else 'NoToken'
         else:
             record.username = 'Anonymous'
-            record.token = 'NoToken'
+            record.token = 'N/A'
+            record.user_id = ''
 
         return True
