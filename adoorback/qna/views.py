@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
-from django.db.models import F, Value, CharField
+from django.db.models import F, Value, CharField, Q
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
 from rest_framework import generics, exceptions, status
@@ -93,8 +93,7 @@ class ResponseComments(generics.ListAPIView):
         ).values_list('object_id', flat=True)
 
         return response_.response_comments.exclude(
-            id__in=blocked_content_ids,
-            author_id__in=current_user.user_report_blocked_ids
+            Q(id__in=blocked_content_ids) | Q(author_id__in=current_user.user_report_blocked_ids)
         ).order_by('created_at')
 
     def list(self, request, *args, **kwargs):

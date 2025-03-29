@@ -376,7 +376,6 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     @property
     def content_report_blocked_model_ids(self):  # returns ids of posts
-        from content_report.models import ContentReport
         blocked_contents = []
         for report in self.content_report_set.all():
             content_type = ContentType.objects.get_for_id(report.content_type_id).model
