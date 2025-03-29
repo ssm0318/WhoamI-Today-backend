@@ -6,6 +6,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from zoneinfo import ZoneInfo
 from django.utils import timezone
 
+from adoorback.filters import set_current_request
+
 
 class SessionAuthentication(authentication.SessionAuthentication):
     """
@@ -47,6 +49,10 @@ class CustomAuthentication(JWTAuthentication):
             return None
 
         validated_token = self.get_validated_token(raw_token)
+
+        # for logging
+        set_current_request(request)
+
         enforce_csrf(request)
         user = self.get_user(validated_token)
         if user and user.is_authenticated and user.timezone:
