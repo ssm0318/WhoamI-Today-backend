@@ -23,7 +23,13 @@ class UserInfoFilter(Filter):
             token = request.META.get('HTTP_AUTHORIZATION')
             if not token and hasattr(request, 'auth') and request.auth:
                 token = str(request.auth)
-            record.token = token if token else 'NoToken'
+
+            if token:
+                masked_token = token[:10] + "..." + token[-5:]
+            else:
+                masked_token = "N/A"
+
+            record.token = masked_token if masked_token else 'N/A'
         else:
             record.username = 'Anonymous'
             record.token = 'N/A'

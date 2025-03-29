@@ -7,6 +7,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from adoorback.filters import get_current_request
+
 
 def send_msg_to_slack(
     url: Optional[str] = None,
@@ -20,6 +22,16 @@ def send_msg_to_slack(
     if level.upper() not in allowed_levels:
         return  # 중요하지 않은 레벨은 보내지 않음
 
+    request = get_current_request()
+    user_info = ""
+    if request and hasattr(request, "user") and request.user.is_authenticated:
+        user_info += f"\nUser: {request.user.username} (ID: {request.user.id})"
+        token = request.META.get("HTTP_AUTHORIZATION")
+        if not token and hasattr(request, "auth") and request.auth:
+            token = str(request.auth)
+        if token:
+            user_info += f"\nToken: {token[:10]}...{token[-5:]}"
+
     url = url or os.getenv("SLACK_URL")
     channel = channel or os.getenv("SLACK_CHANNEL")
     username = username or os.getenv("SLACK_USERNAME")
@@ -32,7 +44,7 @@ def send_msg_to_slack(
     payload = {
         "channel": channel,
         "username": username,
-        "text": f"[{level.upper()}] {text}",
+        "text": f"[{level.upper()}] {text}{user_info}",
         "icon_emoji": icon_emoji,
     }
 
@@ -50,6 +62,16 @@ def send_gmail_alert(
     from_email: Optional[str] = None,
     app_password: Optional[str] = None,
 ):
+    request = get_current_request()
+    if request and hasattr(request, "user") and request.user.is_authenticated:
+        user_info = f"\n\nUser: {request.user.username} (ID: {request.user.id})"
+        token = request.META.get("HTTP_AUTHORIZATION")
+        if not token and hasattr(request, "auth") and request.auth:
+            token = str(request.auth)
+        if token:
+            user_info += f"\nToken: {token[:10]}...{token[-5:]}"
+        body += user_info
+
     subject = subject or os.getenv("GMAIL_SUBJECT", "🚨 Error Alert")
     body = body or os.getenv("GMAIL_BODY", "An error has occurred.")
     to_email = to_email or os.getenv("GMAIL_TO")
