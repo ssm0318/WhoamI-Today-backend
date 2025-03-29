@@ -17,6 +17,7 @@ class UserInfoFilter(Filter):
 
         if request and hasattr(request, 'user') and request.user.is_authenticated:
             record.username = request.user.username
+            record.user_id = request.user.id
 
             # 인증 토큰 가져오기 (JWT, DRF Token 등 상황 고려)
             token = request.META.get('HTTP_AUTHORIZATION')
