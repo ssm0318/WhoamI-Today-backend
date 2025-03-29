@@ -279,14 +279,21 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{asctime} {levelname} {message}',
+            'format': '{asctime} {levelname} [{username}] {message} (Token: {token})',
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
+            'class': 'adoorback.safe_formatter.SafeFormatter',
         },
         'detailed': {
-            'format': '\n' + '='*50 + '\n{asctime} [{levelname}]\nLogger: {name}\nPath: {pathname}:{lineno}\nMessage: {message}\n' + '='*50 + '\n',
+            'format': '\n' + '='*50 + '\n{asctime} [{levelname}] User: {username}\nLogger: {name}\nPath: {pathname}:{lineno}\nMessage: {message}\nToken: {token}\n' + '='*50 + '\n',
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
+            'class': 'adoorback.safe_formatter.SafeFormatter',
+        },
+    },
+    'filters': {
+        'add_user_info': {
+            '()': 'adoorback.filters.UserInfoFilter',
         },
     },
     'handlers': {
@@ -297,6 +304,7 @@ LOGGING = {
             'when': 'midnight',
             'interval': 1,
             'formatter': 'detailed',
+            'filters': ['add_user_info'],
         },
         'info_file': {
             'level': 'INFO',
@@ -305,6 +313,7 @@ LOGGING = {
             'when': 'midnight',
             'interval': 1,
             'formatter': 'verbose',
+            'filters': ['add_user_info'],
         },
         'debug_file': {
             'level': 'DEBUG',
