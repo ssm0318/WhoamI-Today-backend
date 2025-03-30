@@ -17,7 +17,7 @@ class NoUsername(AuthenticationFailed):
 
 
 class WrongPassword(AuthenticationFailed):
-    status_code = status.HTTP_401_UNAUTHORIZED
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
     default_detail = _("비밀번호를 다시 확인해주세요.")
     default_code = 'wrong_password'
 
