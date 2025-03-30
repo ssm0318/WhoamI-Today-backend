@@ -27,7 +27,7 @@ def set_seed(n):
     User = get_user_model()
     faker = Faker()
 
-    if not User.objects.filter(username='adoor').exists():
+    if not User.objects.filter(username='admin').exists():
         User.objects.create_superuser(
             username='admin', email='whoami.today.official@gmail.com', password='Adoor2020:)',
             question_history=",".join(map(str, faker.random_elements(

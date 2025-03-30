@@ -1326,9 +1326,6 @@ class StartSession(generics.CreateAPIView):
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
     def create(self, request, *args, **kwargs):
         while True:
             session_id = str(uuid.uuid4())
@@ -1355,9 +1352,6 @@ class EndSession(generics.UpdateAPIView):
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
     def update(self, request, *args, **kwargs):
         session = self.get_object()
 
@@ -1378,9 +1372,6 @@ class TouchSession(generics.UpdateAPIView):
     queryset = AppSession.objects.all()
     serializer_class = AppSessionSerializer
     permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
 
     def update(self, request, *args, **kwargs):
         session = self.get_object()
