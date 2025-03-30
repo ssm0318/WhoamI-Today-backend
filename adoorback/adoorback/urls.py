@@ -25,9 +25,6 @@ def health_check(request):
 
 urlpatterns = [
     path("api/health/", health_check),
-]
-
-urlpatterns += i18n_patterns(
     path('api/content_reports/', include('content_report.urls')),
     path('api/user_reports/', include('user_report.urls')),
     path('api/user_tags/', include('user_tag.urls')),
@@ -47,8 +44,7 @@ urlpatterns += i18n_patterns(
     path('api/ping/', include('ping.urls')),
 
     path('api/translate/', include('translate.urls')),
-    prefix_default_language=False
-)
+]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

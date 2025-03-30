@@ -77,14 +77,6 @@ class UserLogin(APIView):
         return adoor_exception_handler
 
     def post(self, request, format=None):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         data = request.data
         response = Response(
             data={"message": "Login successful"},
@@ -136,14 +128,6 @@ class UserEmailCheck(generics.CreateAPIView):
         return adoor_exception_handler
 
     def create(self, request, *args, **kwargs):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         serializer = self.get_serializer(data=request.data)
 
         try:
@@ -168,14 +152,6 @@ class UserPasswordCheck(generics.CreateAPIView):
         return adoor_exception_handler
 
     def create(self, request, *args, **kwargs):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         serializer = self.get_serializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
@@ -194,14 +170,6 @@ class UserUsernameCheck(generics.CreateAPIView):
         return adoor_exception_handler
 
     def create(self, request, *args, **kwargs):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         serializer = self.get_serializer(data=request.data)
 
         try:
@@ -228,14 +196,6 @@ class UserSignup(generics.CreateAPIView):
         return adoor_exception_handler
 
     def create(self, request, *args, **kwargs):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         serializer = self.get_serializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
@@ -273,13 +233,6 @@ class SendResetPasswordEmail(generics.CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         user = self.get_object()
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
 
         if user:
             email_manager.send_reset_password_email(user)
@@ -317,14 +270,6 @@ class ResetPassword(generics.UpdateAPIView):
 
     @transaction.atomic
     def update_password(self, user, raw_password):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         errors = dict()
         try:
             validate_password(password=raw_password, user=user)
@@ -362,14 +307,6 @@ class CurrentUserResetPassword(generics.UpdateAPIView):
 
     @transaction.atomic
     def update_password(self, user, raw_password):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         errors = dict()
         try:
             validate_password(password=raw_password, user=user)
@@ -388,14 +325,6 @@ class UserPasswordConfirm(APIView):
 
     def post(self, request, format=None):
         user = request.user
-
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
 
         response = Response(data={"message": "Password confirmed"}, content_type="application/json")
         password = request.data.get('password', None)
@@ -525,14 +454,6 @@ class UserResponseList(generics.ListAPIView):
         return ResponseSerializer
 
     def get_queryset(self):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         user = self.request.user
         all_responses = _Response.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
         response_ids = [response.id for response in all_responses if response.is_audience(user)]
@@ -554,14 +475,6 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     def perform_update(self, serializer):
         if serializer.is_valid(raise_exception=True):
             if 'username' in self.request.data:
-                from adoorback.settings import LANGUAGES
-                if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-                    raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-                    lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-                    if lang_code in dict(LANGUAGES):
-                        translation.activate(lang_code)
-
                 new_username = serializer.validated_data.get('username')
                 # check if @ or . is included in username
                 if '@' in new_username or '.' in new_username:
@@ -734,14 +647,6 @@ class CurrentUserResponseList(generics.ListAPIView):
         return ResponseSerializer
 
     def get_queryset(self):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         user = self.request.user
         return _Response.objects.filter(author=user).order_by('-created_at')
 
@@ -755,14 +660,6 @@ class ReceivedResponseRequestList(generics.GenericAPIView):
     serializer_class = GroupedResponseRequestSerializer
 
     def get(self, request, *args, **kwargs):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         user = request.user
         tz_now = timezone.now().astimezone(ZoneInfo(user.timezone))
         thirty_days_ago = tz_now - timedelta(days=30)
@@ -817,14 +714,6 @@ class FriendList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         user = self.request.user
         friends = user.connected_users
 
@@ -989,14 +878,6 @@ class FriendFriendList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        from adoorback.settings import LANGUAGES
-        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
-
-            if lang_code in dict(LANGUAGES):
-                translation.activate(lang_code)
-
         username = self.kwargs.get('username')
         user = User.objects.filter(username=username).first()
         if not user:

@@ -137,15 +137,14 @@ CACHES = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.locale.LocaleMiddleware',
-    'tracking.middleware.VisitorTrackingMiddleware',
     'corsheaders.middleware.CorsMiddleware', # CorsMiddleware should be placed as high as possible, especially before any middleware that can generate responses such as Django's CommonMiddleware
+    'adoorback.middleware.CustomLocaleMiddleware',
+    'tracking.middleware.VisitorTrackingMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'adoorback.urls'
@@ -201,11 +200,11 @@ PASSWORD_RESET_TIMEOUT = 60 * 60
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
 
-LANGUAGE_CODE = 'ko'
+LANGUAGE_CODE = 'en'
 
 gettext = lambda s: s
 LANGUAGES = (
-    ('ko', gettext('한국어')),  # default language
+    ('ko', gettext('한국어')),
     ('en', gettext('영어')),
 )
 
