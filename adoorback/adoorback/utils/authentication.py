@@ -48,7 +48,11 @@ class CustomAuthentication(JWTAuthentication):
             timezone.deactivate()
             return None
 
-        validated_token = self.get_validated_token(raw_token)
+        try:
+            validated_token = self.get_validated_token(raw_token)
+        except Exception:
+            timezone.deactivate()
+            return None
 
         # for logging
         set_current_request(request)

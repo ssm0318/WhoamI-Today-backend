@@ -71,6 +71,7 @@ def get_access_token_for_user(user):
 
 
 class UserLogin(APIView):
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -93,7 +94,7 @@ class UserLogin(APIView):
         except:
             raise NoUsername()
 
-        user = authenticate(username=username, password=password)
+        user = authenticate(username=user.username, password=password)
         if user is not None:
             access_token = get_access_token_for_user(user)
             response.set_cookie(
