@@ -81,7 +81,11 @@ class UserLogin(APIView):
             translation.activate(lang)
 
         data = request.data
-        response = Response()
+        response = Response(
+            data={"message": "Login successful"},
+            content_type="application/json"
+        )
+
         username = data.get('username', None)
         password = data.get('password', None)
         try:
@@ -114,7 +118,7 @@ class UserLogout(APIView):
 
     def get(self, request):
         logout(request)
-        response = Response()
+        response = Response(data={"message": "Logout successful"}, content_type="application/json")
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
         return response
 
@@ -352,7 +356,7 @@ class UserPasswordConfirm(APIView):
             lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
             translation.activate(lang)
 
-        response = Response()
+        response = Response(data={"message": "Password confirmed"}, content_type="application/json")
         password = request.data.get('password', None)
 
         auth_user = authenticate(username=user.username, password=password)
