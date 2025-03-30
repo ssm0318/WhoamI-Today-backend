@@ -45,9 +45,14 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
         return adoor_exception_handler
 
     def get_object(self):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
+
         try:
             response = Response.objects.get(id=self.kwargs.get('pk'))
             self.check_object_permissions(self.request, response)
@@ -58,9 +63,14 @@ class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):
         return response
 
     def get_queryset(self):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
+
         queryset = Response.objects.all()
         return queryset
 
@@ -186,9 +196,13 @@ class QuestionList(generics.ListCreateAPIView):
         return adoor_exception_handler
 
     def get(self, request, *args, **kwargs):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
 
         # get 30 recent questions excluding future questions
         user = request.user
@@ -262,9 +276,14 @@ class QuestionDetail(generics.RetrieveAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
+
         queryset = Question.objects.all()
         return queryset
 
@@ -312,7 +331,12 @@ class DailyQuestionList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
+
         return Question.objects.daily_questions(self.request.user)

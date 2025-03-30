@@ -8,6 +8,7 @@ from .serializers import CustomFCMDeviceSerializer
 from rest_framework.permissions import IsAuthenticated
 
 from adoorback.utils.alerts import send_msg_to_slack
+from adoorback.settings import LANGUAGE_CODE, LANGUAGES
 from adoorback.utils.validators import adoor_exception_handler
 
 
@@ -21,7 +22,10 @@ class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
 
     def __get_language_from_request(self, request):
         accept_language = request.META.get('HTTP_ACCEPT_LANGUAGE', '')
-        return accept_language.split(',')[0].split('-')[0] if accept_language else 'en'
+        lang = accept_language.split(',')[0].split('-')[0].strip().lower() if accept_language else 'en'
+        if lang not in dict(LANGUAGES):  # 예: 'fr' 같은 미지원 언어 필터링
+            lang = LANGUAGE_CODE
+        return lang
 
     def update_device(self, device, data, language):
         serializer = self.get_serializer(device, data=data, partial=True)

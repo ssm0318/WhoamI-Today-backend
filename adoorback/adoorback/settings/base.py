@@ -137,8 +137,8 @@ CACHES = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'tracking.middleware.VisitorTrackingMiddleware',
     'django.middleware.locale.LocaleMiddleware',
+    'tracking.middleware.VisitorTrackingMiddleware',
     'corsheaders.middleware.CorsMiddleware', # CorsMiddleware should be placed as high as possible, especially before any middleware that can generate responses such as Django's CommonMiddleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

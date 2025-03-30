@@ -21,9 +21,13 @@ class NotificationList(generics.ListAPIView):
 
     @transaction.atomic
     def get_queryset(self):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
 
         user = self.request.user
         notifications = Notification.objects.visible_only().filter(user=user)
@@ -43,9 +47,14 @@ class FriendRequestNotiList(generics.ListAPIView):
 
     @transaction.atomic
     def get_queryset(self):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
+
         return Notification.objects.visible_only().filter(target_type=get_friend_request_type(), user=self.request.user)
 
 
@@ -58,9 +67,14 @@ class ResponseRequestNotiList(generics.ListAPIView):
 
     @transaction.atomic
     def get_queryset(self):
+        from adoorback.settings import LANGUAGES
         if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
-            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
-            translation.activate(lang)
+            raw_lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            lang_code = raw_lang.split(",")[0].split("-")[0].strip().lower()  # ex: "en-US" → "en"
+
+            if lang_code in dict(LANGUAGES):
+                translation.activate(lang_code)
+
         current_user = self.request.user
         queryset = Notification.objects.visible_only().filter(target_type=get_response_request_type(), user=current_user)
 
