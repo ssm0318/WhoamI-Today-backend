@@ -707,6 +707,19 @@ class CurrentUserNoteList(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         return Note.objects.filter(author=user).order_by('-created_at')
+    
+
+class DefaultCurrentUserNoteList(generics.ListAPIView):
+    queryset = Note.objects.all()
+    serializer_class = DefaultFriendNoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        return Note.objects.filter(author=user).order_by('-created_at')
 
 
 class CurrentUserResponseList(generics.ListAPIView):
