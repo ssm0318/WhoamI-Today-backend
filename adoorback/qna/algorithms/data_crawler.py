@@ -28,6 +28,33 @@ def select_daily_questions(set_date=None):
         question.save()
 
 
+def select_questions_for_period(start_date, end_date):
+    # 문자열이면 datetime.date로 변환
+    if isinstance(start_date, str):
+        start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+    if isinstance(end_date, str):
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+
+    if not isinstance(start_date, datetime.date) or not isinstance(end_date, datetime.date):
+        raise ValueError("start_date와 end_date는 datetime.date 객체여야 합니다.")
+    
+    delta = (end_date - start_date).days + 1
+    for i in range(delta):
+        current_date = start_date + datetime.timedelta(days=i)
+
+        questions = Question.objects.filter(selected=False).order_by('?')[:NUM_DAILY_QUESTIONS]
+        
+        if questions.count() < NUM_DAILY_QUESTIONS:
+            # reset all selected flags
+            Question.objects.update(selected=False)
+            questions |= Question.objects.filter(selected=False).order_by('?')[:(NUM_DAILY_QUESTIONS - questions.count())]
+
+        for question in questions:
+            question.selected_dates.append(current_date)
+            question.selected = True
+            question.save()
+
+
 def create_question_csv():
     csvfile = open('./qna/algorithms/question_contents.csv', 'w')
     writer = csv.writer(csvfile)

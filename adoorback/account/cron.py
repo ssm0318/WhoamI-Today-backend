@@ -45,7 +45,6 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                 daily_question_id = daily_question.id
             except:
                 print(f'🚨 ERROR: daily question does not exist for user {user.username} ({user.id})!')
-                print("Failed to send daily notification for this user.")
                 continue
 
             user_now = user_local_time
