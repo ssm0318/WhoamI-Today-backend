@@ -15,8 +15,8 @@ User = get_user_model()
 
 
 class BaseNoteSerializer(AdoorBaseSerializer):
-    author = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username'
+    author = serializers.HyperlinkedRelatedField(
+        view_name='user-detail', read_only=True, lookup_field='username', lookup_url_kwarg='username'
     )
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     images = serializers.SerializerMethodField()

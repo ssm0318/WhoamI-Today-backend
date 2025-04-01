@@ -11,8 +11,12 @@ User = get_user_model()
 
 
 class LikeSerializer(serializers.ModelSerializer):
-    user = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='user', lookup_url_kwarg='username')
+    user = serializers.HyperlinkedRelatedField(
+        view_name='user-detail',
+        read_only=True,
+        lookup_field='username',
+        lookup_url_kwarg='username'
+    )
     user_detail = UserMinimalSerializer(source='user', read_only=True)
     target_type = serializers.SerializerMethodField()
     target_id = serializers.SerializerMethodField()
@@ -38,8 +42,8 @@ class LikeSerializer(serializers.ModelSerializer):
 class InteractionSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     type = serializers.SerializerMethodField()
-    user = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='user', lookup_url_kwarg='username')
+    user = serializers.HyperlinkedRelatedField(
+        view_name='user-detail', read_only=True, lookup_field='username', lookup_url_kwarg='username')
     user_detail = UserMinimalSerializer(source='user', read_only=True)
     reaction = serializers.CharField(allow_null=True)
 
