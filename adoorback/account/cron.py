@@ -104,18 +104,6 @@ class SendDailySurveyNotiCronJob(CronJobBase):
                                                 redirect_url=f'')
                 NotificationActor.objects.create(user=admin, notification=noti)
 
-            if user.username == 'gina_park' or user.username == 'yuri':
-                noti_time = user_now.replace(hour=12, minute=40, second=0, microsecond=0)
-                time_diff = abs(user_now - noti_time)
-                if time_diff <= timedelta(minutes=10):
-                    noti = Notification.objects.create(user=user,
-                                                    target=admin,
-                                                    origin=admin,
-                                                    message_ko=f"{user.username}님, 데일리 설문을 작성해주세요!",
-                                                    message_en=f"{user.username}, time to fill out the daily survey!",
-                                                    redirect_url=f'')
-                    NotificationActor.objects.create(user=admin, notification=noti)
-
         num_notis_after = Notification.objects.admin_only().count()
         print(f'{num_notis_after - num_notis_before} notifications sent!')
         print('=========================')
