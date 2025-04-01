@@ -40,8 +40,8 @@ class QuestionGroupSerializer(serializers.Serializer):
 
 
 class ResponseSerializer(AdoorBaseSerializer):
-    author = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
+    author = serializers.HyperlinkedRelatedField(
+        view_name='user-detail', read_only=True, lookup_field='username', lookup_url_kwarg='username')
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     question = QuestionMinimumSerializer(read_only=True)
     question_id = serializers.IntegerField(write_only=True)
@@ -100,31 +100,6 @@ class ResponseSerializer(AdoorBaseSerializer):
                   'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited', 'visibility']
         
 
-class QuestionResponseSerializer(QuestionBaseSerializer):
-    response_set = serializers.SerializerMethodField()
-    
-    def get_response_set(self, obj):
-        current_user = self.context.get('request', None).user
-        question_id = self.context.get('kwargs', None).get('pk')
-        responses = Response.objects.filter(question__id=question_id, author=current_user).order_by('-created_at')
-        return ResponseSerializer(responses, many=True, read_only=True, context=self.context).data
-    
-    class Meta(QuestionBaseSerializer.Meta):
-        model = Question
-        fields = QuestionBaseSerializer.Meta.fields + ['response_set']
-
-
-class QuestionFriendSerializer(QuestionBaseSerializer):
-    author = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='author', lookup_url_kwarg='username')
-    author_detail = UserMinimalSerializer(source='author', read_only=True)
-
-    class Meta(QuestionBaseSerializer.Meta):
-        model = Question
-        fields = QuestionBaseSerializer.Meta.fields + \
-                 ['author', 'author_detail']
-
-
 class DailyQuestionSerializer(QuestionBaseSerializer):
     """
     (all profiles are anonymized, including that of the current user)
@@ -142,32 +117,6 @@ class DailyQuestionSerializer(QuestionBaseSerializer):
     class Meta(QuestionBaseSerializer.Meta):
         model = Question
         fields = QuestionBaseSerializer.Meta.fields + ['author', 'author_detail']
-
-
-class QuestionDetailFriendResponsesSerializer(QuestionFriendSerializer):
-    """
-    for question detail page w/ friend responses
-    """
-    max_page = serializers.SerializerMethodField(read_only=True)
-    response_set = serializers.SerializerMethodField()
-
-    def get_max_page(self, obj):
-        page_size = self.context['request'].query_params.get('size') or 15
-        return obj.response_set.count() // page_size + 1
-
-    def get_response_set(self, obj):
-        current_user = self.context.get('request', None).user
-        responses = obj.response_set.filter(author_id__in=current_user.connected_user_ids) | \
-                    obj.response_set.filter(author_id=current_user.id)
-        page_size = self.context['request'].query_params.get('size') or 15
-        paginator = Paginator(responses, page_size)
-        page = self.context['request'].query_params.get('page') or 1
-        responses = paginator.page(page)
-        return ResponseSerializer(responses, many=True, read_only=True, context=self.context).data
-
-    class Meta(QuestionFriendSerializer.Meta):
-        model = Question
-        fields = QuestionFriendSerializer.Meta.fields + ['max_page', 'response_set']
 
 
 class ResponseRequestSerializer(serializers.ModelSerializer):

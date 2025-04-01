@@ -23,15 +23,5 @@ class MyCheckInSerializer(CheckInBaseSerializer):
         fields = CheckInBaseSerializer.Meta.fields
 
 
-class CheckInDetailSerializer(MyCheckInSerializer):
-    user = serializers.HyperlinkedIdentityField(
-        view_name='user-detail', read_only=True, lookup_field='user', lookup_url_kwarg='username')
-    user_detail = UserMinimalSerializer(source='user', read_only=True)
-
-    class Meta:
-        model = CheckIn
-        fields = MyCheckInSerializer.Meta.fields + ['user', 'user_detail']
-
-
 class TrackSerializer(serializers.Serializer):
     track_ids = serializers.ListField(child=serializers.CharField())
