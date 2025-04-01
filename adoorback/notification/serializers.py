@@ -31,13 +31,11 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_recent_actors(self, obj):
         from account.serializers import UserMinimalSerializer
-        
-        #only show first actor for ping notifications 
+
         if obj.target and hasattr(obj.target, '_meta') and obj.target._meta.model_name == 'ping':
-            return UserMinimalSerializer([obj.actors.first()], many=True).data
-        
-        #keep implementation for other notification types
-        recent_actors = obj.actors.all()[:3]
+            recent_actors = obj.actors.all()[:1]
+        else:
+            recent_actors = obj.actors.all()[:3]
         return UserMinimalSerializer(recent_actors, many=True).data
 
     def get_notification_type(self, obj):
