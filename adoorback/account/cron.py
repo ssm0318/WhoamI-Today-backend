@@ -77,6 +77,52 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
         print('=========================')
 
 
+class SendDailySurveyNotiCronJob(CronJobBase):
+    schedule = Schedule(run_every_mins=0)
+    code = 'account.send_daily_survey_noti_cron_job'
+
+    def do(self):
+        print('=========================')
+        print("Creating daily survey notifications...............")
+
+        admin = User.objects.filter(is_superuser=True).get(email='whoami.today.official@gmail.com')
+
+        num_notis_before = Notification.objects.admin_only().count()
+        all_users = User.objects.all()
+
+        for user in all_users:
+            user_local_time = timezone.now().astimezone(ZoneInfo(user.timezone))
+            user_now = user_local_time
+            noti_time = user_now.replace(hour=20, minute=0, second=0, microsecond=0)
+            time_diff = abs(user_now - noti_time)
+            if time_diff <= timedelta(minutes=10):
+                noti = Notification.objects.create(user=user,
+                                                target=admin,
+                                                origin=admin,
+                                                message_ko=f"{user.username}님, 데일리 설문을 작성해주세요!",
+                                                message_en=f"{user.username}, time to fill out the daily survey!",
+                                                redirect_url=f'')
+                NotificationActor.objects.create(user=admin, notification=noti)
+
+            if user.username == 'gina_park' or user.username == 'yuri':
+                noti_time = user_now.replace(hour=12, minute=40, second=0, microsecond=0)
+                time_diff = abs(user_now - noti_time)
+                if time_diff <= timedelta(minutes=10):
+                    noti = Notification.objects.create(user=user,
+                                                    target=admin,
+                                                    origin=admin,
+                                                    message_ko=f"{user.username}님, 데일리 설문을 작성해주세요!",
+                                                    message_en=f"{user.username}, time to fill out the daily survey!",
+                                                    redirect_url=f'')
+                    NotificationActor.objects.create(user=admin, notification=noti)
+
+        num_notis_after = Notification.objects.admin_only().count()
+        print(f'{num_notis_after - num_notis_before} notifications sent!')
+        print('=========================')
+        print("Cron job complete...............")
+        print('=========================')
+
+
 class AutoCloseSessionsCronJob(CronJobBase):
     schedule = Schedule(run_every_mins=0)
     code = "session.auto_close_sessions"

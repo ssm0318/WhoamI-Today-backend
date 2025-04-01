@@ -41,6 +41,8 @@ class NotificationSerializer(serializers.ModelSerializer):
         return UserMinimalSerializer(recent_actors, many=True).data
 
     def get_notification_type(self, obj):
+        if obj.message_en.endswith('time to fill out the daily survey!'):
+            return 'DailySurvey'
         return obj.target.type if obj.target else 'other'
 
 
