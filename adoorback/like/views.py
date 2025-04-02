@@ -1,14 +1,13 @@
 from django.db import transaction, IntegrityError
 from rest_framework import generics
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 
-from account.serializers import UserMinimalSerializer
+from adoorback.utils.content_types import get_generic_relation_type
+from adoorback.utils.permissions import IsOwnerOrReadOnly
+from adoorback.utils.validators import adoor_exception_handler
 from like.models import Like
 from like.serializers import LikeSerializer
-
-from adoorback.utils.permissions import IsOwnerOrReadOnly
-from adoorback.utils.content_types import get_generic_relation_type
-from adoorback.utils.validators import adoor_exception_handler
 
 
 class LikeCreate(generics.CreateAPIView):
@@ -28,7 +27,7 @@ class LikeCreate(generics.CreateAPIView):
                             content_type_id=content_type_id,
                             object_id=self.request.data['target_id'])
         except IntegrityError:
-            pass
+            raise ValidationError("You have already liked this.")
 
 
 class LikeDestroy(generics.DestroyAPIView):
