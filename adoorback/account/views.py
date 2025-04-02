@@ -1084,28 +1084,29 @@ class UserRecommendedFriendsList(generics.ListAPIView):
             for potential_friend in potential_friends:
                 if potential_friend.id not in mutual_friends_count_dict:
                     mutual_friends_count_dict[potential_friend.id] = 1
-                mutual_friends_count_dict[potential_friend.id] += 1
+                else:
+                    mutual_friends_count_dict[potential_friend.id] += 1
 
-        # Sort the by number of mutual friends
+        # Sort by number of mutual friends
         sorted_friends = sorted(mutual_friends_count_dict.items(), key=lambda x: x[1], reverse=True)[:25]
         sorted_friend_ids = [friend_id for friend_id, _ in sorted_friends]
 
-        if not sorted_friend_ids:
-            # If there is no user to recommend, recommend 3 random users
-            potential_random_users = User.objects.filter(user_group=user.user_group) \
-                .filter(current_ver=user.current_ver) \
-                .exclude(id=user_id) \
-                .exclude(id__in=user_friend_ids) \
-                .exclude(id__in=user_block_rec_ids) \
-                .exclude(id__in=sent_friend_request_ids) \
-                .exclude(id__in=received_friend_request_ids) \
-                .exclude(is_superuser=True)
+        # Add 10 random users
+        potential_random_users = User.objects.filter(user_group=user.user_group) \
+            .filter(current_ver=user.current_ver) \
+            .exclude(id=user_id) \
+            .exclude(id__in=user_friend_ids) \
+            .exclude(id__in=user_block_rec_ids) \
+            .exclude(id__in=sent_friend_request_ids) \
+            .exclude(id__in=received_friend_request_ids) \
+            .exclude(is_superuser=True) \
+            .exclude(id__in=sorted_friend_ids)
 
-            random_users = potential_random_users.order_by("?")[:3]
-            return random_users
+        random_user_ids = list(potential_random_users.order_by("?").values_list('id', flat=True)[:10])
+        final_user_ids = sorted_friend_ids + random_user_ids
 
-        recommended_friends = User.objects.filter(id__in=sorted_friend_ids) \
-            .order_by(Case(*[When(id=id_, then=pos) for pos, id_ in enumerate(sorted_friend_ids)], default=0))
+        recommended_friends = User.objects.filter(id__in=final_user_ids) \
+            .order_by(Case(*[When(id=id_, then=pos) for pos, id_ in enumerate(final_user_ids)], default=0))
 
         return recommended_friends
 
