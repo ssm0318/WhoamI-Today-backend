@@ -476,6 +476,7 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
         if serializer.is_valid(raise_exception=True):
             if 'username' in self.request.data:
                 new_username = serializer.validated_data.get('username')
+                old_username = self.request.user.username
                 # check if @ or . is included in username
                 if '@' in new_username or '.' in new_username:
                     raise InvalidUsername()
@@ -485,7 +486,7 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 # check if username exists
                 if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
                     raise ExistingUsername()
-                
+
             persona = self.request.data.get('persona')
             if persona:
                 if isinstance(persona, str):
@@ -532,37 +533,30 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                     })
                 serializer.validated_data['noti_period_days'] = noti_period_days
 
-            obj = serializer.save()
+            serializer.save()
+            updated_user = self.get_object()
 
+            # record username history
             # update notification redirect url when username changes
             if 'username' in self.request.data:
+                if new_username != old_username and new_username and new_username not in updated_user.username_history:
+                    updated_user.username_history.append(new_username)
+                    updated_user.save()
+
                 # "friend request recieved" notification
                 friend_request_ct = get_friend_request_type()
                 self.request.user.friendship_originated_notis.filter(
                     target_type=friend_request_ct
                 ).update(
-                    redirect_url=f"/users/{serializer.validated_data.get('username')}"
+                    redirect_url=f"/users/{new_username}"
                 )
                 
                 # "became friends" notification
                 Notification = apps.get_model('notification', 'Notification')
-                notis_to_change = Notification.objects.filter(redirect_url=f'/users/{self.request.user.username}')
+                notis_to_change = Notification.objects.filter(redirect_url=f'/users/{old_username}')
                 notis_to_change.update(
-                    redirect_url=f"/users/{serializer.validated_data.get('username')}"
+                    redirect_url=f"/users/{new_username}"
                 )
-            
-            updating_data = list(self.request.data.keys())
-            if len(updating_data) == 1 and updating_data[0] == 'question_history':
-                Notification = apps.get_model('notification', 'Notification')
-                admin = User.objects.filter(is_superuser=True).first()
-
-                noti = Notification.objects.create(user=obj,
-                                                   target=admin,
-                                                   origin=admin,
-                                                   message_ko=f"{obj.username}님, 질문 선택을 완료하셨네요! 이제 오늘의 질문들을 확인해볼까요?",
-                                                   message_en=f"Great choice, {obj.username}! Now, let's check out today's questions!",
-                                                   redirect_url='/questions')
-                NotificationActor.objects.create(user=admin, notification=noti)
 
 
 class CurrentUserDelete(generics.DestroyAPIView):
