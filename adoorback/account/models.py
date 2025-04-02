@@ -133,6 +133,10 @@ def default_noti_period_days():
 def default_persona():
     return []
 
+def default_username_history():
+    return []
+
+
 class UserCustomManager(UserManager, SafeDeleteManager):
     _safedelete_visibility = DELETED_INVISIBLE
 
@@ -190,6 +194,12 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
                                      related_name="invited_users")
     
     has_changed_pw = models.BooleanField(default=False)
+    username_history = ArrayField(
+        base_field=models.CharField(max_length=50),
+        default=default_username_history,
+        blank=True,
+        help_text="History of previously used usernames"
+    )
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
@@ -221,8 +231,12 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return self.username
-
+    
     def save(self, *args, **kwargs):
+        # add initial username to username_history
+        if not self.pk and self.username and not self.username_history:
+            self.username_history = [self.username]
+
         # Ensure that only connected users can be added to favorites or hidden
         if self.id is not None:  # Existing user
             current_connected_users = set(self.connected_user_ids)
