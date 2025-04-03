@@ -66,7 +66,6 @@ class UserInfoFilter(Filter):
             record.username = 'No Request'
             record.user_id = 'N/A'
             record.token = ''
-            record.referer = 'N/A'
             record.page = 'N/A'
             record.body = ''
             record.os = 'N/A'

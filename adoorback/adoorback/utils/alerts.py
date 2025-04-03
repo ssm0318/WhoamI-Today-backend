@@ -1,3 +1,4 @@
+import json
 import os
 import traceback
 from typing import Optional
@@ -6,6 +7,7 @@ import requests
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from user_agents import parse
 
 from adoorback.filters import get_current_request
 
@@ -25,12 +27,34 @@ def send_msg_to_slack(
     request = get_current_request()
     user_info = ""
     if request and hasattr(request, "user") and request.user.is_authenticated:
-        user_info += f"\nUser: {request.user.username} (ID: {request.user.id})"
+        user_info += f"\n👤 User: {request.user.username} (ID: {request.user.id})"
         token = request.META.get("HTTP_AUTHORIZATION")
         if not token and hasattr(request, "auth") and request.auth:
             token = str(request.auth)
         if token:
-            user_info += f"\nToken: {token[:10]}...{token[-5:]}"
+            user_info += f"\n🔑 Token: {token[:10]}...{token[-5:]}"
+
+    if request:
+        page = request.headers.get("X-Current-Page", "N/A")
+        user_info += f"\n📄 Page: {page}"
+
+        ua_string = request.META.get("HTTP_USER_AGENT", "")
+        os_name = parse(ua_string).os.family if ua_string else "Unknown OS"
+        user_info += f"\n💻 OS: {os_name}"
+
+        try:
+            if request.method in ["POST", "PUT", "PATCH"]:
+                data = dict(request.data)
+                sensitive_keys = ["password", "token", "secret", "registration_id"]
+                for key in sensitive_keys:
+                    if key in data:
+                        data[key] = "[FILTERED]"
+                body_str = json.dumps(data, ensure_ascii=False)
+                if len(body_str) > 500:
+                    body_str = body_str[:500] + " ... (truncated)"
+                user_info += f"\n📦 Body: {body_str}"
+        except Exception as e:
+            user_info += f"\n📦 Body: [ERROR reading data: {e}]"
 
     url = url or os.getenv("SLACK_URL")
     channel = channel or os.getenv("SLACK_CHANNEL")
