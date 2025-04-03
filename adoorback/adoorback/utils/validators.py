@@ -60,24 +60,24 @@ def adoor_exception_handler(exc, context):
     except Exception:
         traceback.print_exc()
 
-    # 이메일 알림
-    try:
-        send_gmail_alert(
-            subject="🚨 Django 예외 발생",
-            body=f"""
-            View: {view.__class__.__name__ if view else 'Unknown'}
-            Method: {request.method if request else 'N/A'}
-            URL: {request.build_absolute_uri() if request else 'N/A'}
+    # # 이메일 알림
+    # try:
+    #     send_gmail_alert(
+    #         subject="🚨 Django 예외 발생",
+    #         body=f"""
+    #         View: {view.__class__.__name__ if view else 'Unknown'}
+    #         Method: {request.method if request else 'N/A'}
+    #         URL: {request.build_absolute_uri() if request else 'N/A'}
 
-            Exception:
-            {str(exc)}
+    #         Exception:
+    #         {str(exc)}
 
-            Traceback:
-            {tb}
-            """,
-        )
-    except Exception:
-        traceback.print_exc()
+    #         Traceback:
+    #         {tb}
+    #         """,
+    #     )
+    # except Exception:
+    #     traceback.print_exc()
 
     return exception_handler(exc, context)
 
