@@ -8,4 +8,8 @@ class SafeFormatter(logging.Formatter):
             record.token = 'N/A'
         if not hasattr(record, 'user_id'):
             record.user_id = ''
+        if not hasattr(record, 'page'):
+            record.referer = 'N/A'
+        if not hasattr(record, 'body'):
+            record.user_id = ''
         return super().format(record)
