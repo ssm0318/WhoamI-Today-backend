@@ -2,6 +2,8 @@ import contextvars
 import json
 from logging import Filter
 
+from user_agents import parse
+
 
 # 비동기 환경에서도 안전하게 동작함
 _current_request = contextvars.ContextVar('current_request', default=None)
@@ -41,12 +43,16 @@ class UserInfoFilter(Filter):
 
             record.page = request.headers.get('X-Current-Page', 'N/A')
 
+            user_agent_str = request.META.get('HTTP_USER_AGENT', '')
+            user_agent = parse(user_agent_str)
+            record.os = user_agent.os.family  # 예: "iOS", "Android", "Windows"
+
             # request body
             try:
                 if request.method in ['POST', 'PUT', 'PATCH']:
                     data = dict(request.data)  # QueryDict → dict (mutable copy)
                     # 민감 정보 필터링
-                    sensitive_keys = ['password', 'token', 'secret']
+                    sensitive_keys = ['password', 'token', 'secret', 'registration_id']
                     for key in sensitive_keys:
                         if key in data:
                             data[key] = '[FILTERED]'
@@ -63,5 +69,6 @@ class UserInfoFilter(Filter):
             record.referer = 'N/A'
             record.page = 'N/A'
             record.body = ''
+            record.os = 'N/A'
 
         return True

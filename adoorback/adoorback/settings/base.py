@@ -279,13 +279,13 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{asctime} {levelname} [{username} ({user_id})] {message} (Token: {token}, Page: {page}, Body: {body})',
+            'format': '{asctime} {levelname} [{username} ({user_id})] {message} (Token: {token}, Page: {page}, OS: {os}, Body: {body})',
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
             'class': 'adoorback.safe_formatter.SafeFormatter',
         },
         'detailed': {
-            'format': '\n' + '='*50 + '\n{asctime} [{levelname}] User: {username} ({user_id})\nPage: {page}\nBody:\n\t{body}\nLogger: {name}\nPath: {pathname}:{lineno}\nMessage: {message}\nToken: {token}\n' + '='*50 + '\n',
+            'format': '\n' + '='*50 + '\n{asctime} [{levelname}] User: {username} ({user_id}) ({os})\nPage: {page}\nBody:\n\t{body}\nLogger: {name}\nPath: {pathname}:{lineno}\nMessage: {message}\nToken: {token}\n' + '='*50 + '\n',
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
             'class': 'adoorback.safe_formatter.SafeFormatter',

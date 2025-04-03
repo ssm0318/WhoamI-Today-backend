@@ -9,7 +9,9 @@ class SafeFormatter(logging.Formatter):
         if not hasattr(record, 'user_id'):
             record.user_id = ''
         if not hasattr(record, 'page'):
-            record.referer = 'N/A'
+            record.page = 'N/A'
         if not hasattr(record, 'body'):
-            record.user_id = ''
+            record.body = ''
+        if not hasattr(record, 'os'):
+            record.os = 'N/A'
         return super().format(record)
