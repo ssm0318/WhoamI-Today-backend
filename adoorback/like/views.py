@@ -23,11 +23,25 @@ class LikeCreate(generics.CreateAPIView):
     def perform_create(self, serializer):
         content_type_id = get_generic_relation_type(self.request.data['target_type']).id
         try:
-            serializer.save(user=self.request.user,
-                            content_type_id=content_type_id,
-                            object_id=self.request.data['target_id'])
+            instance = serializer.save(
+                user=self.request.user,
+                content_type_id=content_type_id,
+                object_id=self.request.data['target_id']
+            )
+            # serializer.data 접근 시 에러 방지: instance 기준으로 새 serializer 만들어줌
+            self.instance = instance  # for use in get_success_headers
         except IntegrityError:
             raise ValidationError("You have already liked this.")
+    
+    # @transaction.atomic
+    # def perform_create(self, serializer):
+    #     content_type_id = get_generic_relation_type(self.request.data['target_type']).id
+    #     try:
+    #         serializer.save(user=self.request.user,
+    #                         content_type_id=content_type_id,
+    #                         object_id=self.request.data['target_id'])
+    #     except IntegrityError:
+    #         raise ValidationError("You have already liked this.")
 
 
 class LikeDestroy(generics.DestroyAPIView):
