@@ -24,7 +24,6 @@ from qna.models import Response, Question, ResponseRequest
 
 User = get_user_model()
 
-
 class ResponseCreate(generics.CreateAPIView):
     serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
@@ -230,7 +229,14 @@ class QuestionList(generics.ListCreateAPIView):
         serialized_data = []
         for group in page:
             date_str = group["date"]
-            localized_date = format_date_for_user(date_str, user.timezone)
+            
+            #directly attempt to format the date string
+            try:
+                from datetime import datetime
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                localized_date = date_obj.strftime('%B %d, %Y')
+            except Exception:
+                localized_date = date_str
             
             serialized_group = {
                 "date": localized_date,
