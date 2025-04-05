@@ -26,6 +26,10 @@ USER_INPUT_EXCEPTIONS = (
 )
 
 
+class NonReportingValidationError(ValidationError):
+    slack_level = None
+
+
 def validate_notification_message(message):
     if message not in ['sent friend request to',
                        'received friend request from',
@@ -47,18 +51,33 @@ def adoor_exception_handler(exc, context):
         if not str(exc).startswith("CSRF Failed"):
             return exception_handler(exc, context)
 
+    # 슬랙 알림
     # 인증 실패 + 사용자 입력 관련 예외는 무시
     if isinstance(exc, (NotAuthenticated, AuthenticationFailed)) or isinstance(exc, USER_INPUT_EXCEPTIONS):
         return exception_handler(exc, context)
 
-    # 슬랙 알림
-    try:
-        send_msg_to_slack(
-            text=f"*🚨 예외 발생 in {view.__class__.__name__ if view else 'Unknown'}*\n```{tb}```",
-            level="ERROR"
-        )
-    except Exception:
-        traceback.print_exc()
+    slack_level = getattr(exc, 'slack_level', 'ERROR')  # 기본값은 ERROR
+
+    # ValidationError에 대해 메시지 기반으로 무시
+    if isinstance(exc, ValidationError):
+        flat_messages = list(flatten_validation_errors(exc.detail))
+        skip_messages = {
+            "This field may not be blank.",
+            "이 필드는 필수 항목입니다.",
+            "This field is required.",
+            "Cannot send friend requests to users using different versions",
+        }
+        if all(msg in skip_messages for msg in flat_messages):
+            slack_level = None
+
+    if slack_level:
+        try:
+            send_msg_to_slack(
+                text=f"*🚨 예외 발생 in {view.__class__.__name__ if view else 'Unknown'}*\n```{tb}```",
+                level="ERROR"
+            )
+        except Exception:
+            traceback.print_exc()
 
     # # 이메일 알림
     # try:
@@ -82,6 +101,18 @@ def adoor_exception_handler(exc, context):
     return exception_handler(exc, context)
 
 
+# Helper to flatten nested dict/list validation errors
+def flatten_validation_errors(detail):
+    if isinstance(detail, list):
+        for item in detail:
+            yield from flatten_validation_errors(item)
+    elif isinstance(detail, dict):
+        for item in detail.values():
+            yield from flatten_validation_errors(item)
+    else:
+        yield str(detail)
+
+
 class AdoorUsernameValidator(validators.RegexValidator):
     regex = USERNAME_REGEX
     message = _(
@@ -90,11 +121,15 @@ class AdoorUsernameValidator(validators.RegexValidator):
     )
     flags = 0
 
+    def __call__(self, value):
+        if not self.regex.match(value):
+            raise NonReportingValidationError(self.message)
+
 
 class NumberValidator(object):
     def validate(self, password, user=None):
         if not re.findall('\d', password):
-            raise ValidationError(
+            raise NonReportingValidationError(
                 _("비밀번호는 숫자(0-9)를 한 개 이상 포함해야 합니다."),
                 code='password_no_number',
             )
@@ -108,7 +143,7 @@ class NumberValidator(object):
 class UppercaseValidator(object):
     def validate(self, password, user=None):
         if not re.findall('[A-Z]', password):
-            raise ValidationError(
+            raise NonReportingValidationError(
                 _("비밀번호는 알파벳 대문자(A-Z)를 한 개 이상 포함해야 합니다."),
                 code='password_no_upper',
             )
@@ -122,7 +157,7 @@ class UppercaseValidator(object):
 class LowercaseValidator(object):
     def validate(self, password, user=None):
         if not re.findall('[a-z]', password):
-            raise ValidationError(
+            raise NonReportingValidationError(
                 _("비밀번호는 알파벳 소문자(a-z)를 한 개 이상 포함해야 합니다."),
                 code='password_no_lower',
             )
@@ -136,7 +171,7 @@ class LowercaseValidator(object):
 class SymbolValidator(object):
     def validate(self, password, user=None):
         if not re.findall('[()[\]{}|\\`~!@#$%^&*_\-+=;:\'",<>./?]', password):
-            raise ValidationError(
+            raise NonReportingValidationError(
                 _("비밀번호는 특수문자를 한 개 이상 포함해야 합니다: " +
                   "()[]{}|\`~!@#$%^&*_-+=;:'\",<>./?"),
                 code='password_no_symbol',
