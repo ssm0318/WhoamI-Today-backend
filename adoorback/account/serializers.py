@@ -43,12 +43,6 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
             raise serializers.ValidationError("noti_period_days must be a list.")
         
         return value
-
-    def validate_persona(self, value):
-        if not isinstance(value, list):
-            raise serializers.ValidationError("persona must be a list.")
-        
-        return value
     
     def validate_persona(self, value):
         if isinstance(value, list) and len(value) == 1 and isinstance(value[0], str):
