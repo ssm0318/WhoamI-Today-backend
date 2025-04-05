@@ -210,7 +210,10 @@ class QuestionList(generics.ListCreateAPIView):
         for question in all_questions:
             if question.selected_dates:
                 last_date = question.selected_dates[-1]
-                grouped[last_date].append(question)
+                formatted_date = last_date.strftime('%Y-%m-%d')
+                
+                #try to group by the formatted date string, instead of the date object
+                grouped[formatted_date].append(question)
 
         grouped_ordered = OrderedDict(
             sorted(grouped.items(), key=lambda x: x[0], reverse=True)
@@ -226,8 +229,11 @@ class QuestionList(generics.ListCreateAPIView):
 
         serialized_data = []
         for group in page:
+            date_str = group["date"]
+            localized_date = format_date_for_user(date_str, user.timezone)
+            
             serialized_group = {
-                "date": group["date"],
+                "date": localized_date,
                 "questions": self.serializer_class(
                     group["questions"], many=True, context={"request": request}
                 ).data
