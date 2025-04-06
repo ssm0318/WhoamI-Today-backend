@@ -3,6 +3,8 @@ from collections import defaultdict
 import json
 import uuid
 from zoneinfo import ZoneInfo
+import csv
+import os
 
 from django.apps import apps
 from django.conf import settings
@@ -1091,9 +1093,26 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         sorted_friends = sorted(mutual_friends_count_dict.items(), key=lambda x: x[1], reverse=True)[:25]
         sorted_friend_ids = [friend_id for friend_id, _ in sorted_friends]
 
-        # Add 10 random users
+        # Add 10 random users who are experiment participants, not just random users
+        participant_emails = set()
+        csv_path = os.path.join(settings.BASE_DIR, 'adoorback', 'assets', 'user_list.csv')
+        
+        try:
+            with open(csv_path, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if 'email' in row:
+                        participant_emails.add(row['email'])
+        except (FileNotFoundError, IOError):
+            #if in some circumstance the file can't be read -> log error
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Could not read participant list from {csv_path}")
+        
+        #filter random users to only include experiment participants
         potential_random_users = User.objects.filter(user_group=user.user_group) \
             .filter(current_ver=user.current_ver) \
+            .filter(email__in=participant_emails) \
             .exclude(id=user_id) \
             .exclude(id__in=user_friend_ids) \
             .exclude(id__in=user_block_rec_ids) \
