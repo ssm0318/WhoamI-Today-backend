@@ -1095,7 +1095,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         # Add 10 random users who are experiment participants, not just random users
         participant_emails = set()
-        csv_path = os.path.join(settings.BASE_DIR, 'adoorback', 'assets', 'user_list.csv')
+        csv_path = os.path.join(settings.BASE_DIR, 'assets', 'user_list.csv')
         
         try:
             with open(csv_path, 'r') as f:
