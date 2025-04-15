@@ -1,4 +1,7 @@
+import csv
 import json
+import os
+import traceback
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -7,10 +10,11 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
     VERSION_CHOICES, PERSONA_CHOICES
+from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
@@ -51,7 +55,6 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     def validate_noti_period_days(self, value):
         if not isinstance(value, list):
             raise serializers.ValidationError("noti_period_days must be a list.")
-        
         return value
     
     def validate_persona(self, value):
@@ -70,30 +73,11 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
 
         return value
 
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'email', 'password',
-                  'profile_pic', 'question_history', 'url',
-                  'profile_image', 'gender', 'date_of_birth',
-                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
-                  'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
-                  'noti_time', 'noti_period_days',
-                  'timezone', 'current_ver', 'user_group', 'has_changed_pw']
-        extra_kwargs = {'password': {'write_only': True}}
-
-    @transaction.atomic
-    def create(self, validated_data):
-        password = validated_data.pop('password')
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
-        return user
-
     def validate(self, attrs):
         if self.partial:
-            return super(CurrentUserSerializer, self).validate(attrs)
+            return super().validate(attrs)
         user = User(**attrs)
-        errors = dict()
+        errors = {}
         try:
             validate_password(password=attrs.get('password'), user=user)
 
@@ -102,7 +86,82 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
 
         if errors:
             raise serializers.ValidationError(errors)
-        return super(CurrentUserSerializer, self).validate(attrs)
+        return super().validate(attrs)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'password',
+                  'profile_pic', 'question_history', 'url',
+                  'profile_image', 'gender', 'date_of_birth',
+                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
+                  'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
+                  'noti_time', 'noti_period_days',
+                  'timezone', 'current_ver', 'user_group', 'user_type',
+                  'has_changed_pw']
+        extra_kwargs = {'password': {'write_only': True}}
+
+
+class CurrentUserSignupSerializer(CurrentUserSerializer):
+    inviter_id = serializers.IntegerField(write_only=True, required=True)
+    user_group = serializers.CharField(write_only=True, required=True)
+    current_ver = serializers.CharField(write_only=True, required=True)
+
+    def validate(self, attrs):
+        try:
+            self._inviter_id = attrs.pop('inviter_id')
+        except KeyError:
+            raise serializers.ValidationError({
+                'inviter_id': 'This field is required.'
+            })
+
+        return super().validate(attrs)
+
+    @transaction.atomic
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        inviter_id = getattr(self, '_inviter_id', None)
+
+        validated_data['user_type'] = 'indirect'
+
+        try:
+            inviter = User.objects.get(id=inviter_id)
+            validated_data['invited_from'] = inviter
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError({
+                'inviter_id': 'Failed to find a user with the given inviter_id.'
+            })
+
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+
+        # ✅ 가입 성공 후 CSV에 기록
+        try:
+            if user.user_group in ['group_1', 'group_2']:
+                country = 'US'
+            elif user.user_group in ['group_3', 'group_4']:
+                country = 'Korea'
+            else:
+                country = 'Unknown'
+
+            row = [user.email, 'signed_up', country]
+
+            csv_path = os.path.join(settings.BASE_DIR, 'assets', 'created_users.csv')
+            with open(csv_path, mode='a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(row)
+
+        except Exception as e:
+            tb = traceback.format_exc()
+            send_msg_to_slack(
+                text=f"*⚠️ 가입 기록 CSV 저장 실패*\n```{tb}```",
+                level="WARNING"
+            )
+        return user
+
+    class Meta(CurrentUserSerializer.Meta):
+        fields = CurrentUserSerializer.Meta.fields + ['inviter_id']
+        extra_kwargs = {**CurrentUserSerializer.Meta.extra_kwargs}
 
 
 class UserMinimalSerializer(serializers.ModelSerializer):
@@ -145,6 +204,10 @@ class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username']
+
+
+class UserInviterEmailBirthDateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
 
 
 class UserProfileSerializer(UserMinimalSerializer):

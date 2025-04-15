@@ -34,10 +34,10 @@ from safedelete.models import SOFT_DELETE_CASCADE
 from .email import email_manager
 from .models import Subscription, Connection, AppSession
 from account.models import FriendRequest, BlockRec
-from account.serializers import (CurrentUserSerializer, \
+from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
-                                 UserEmailSerializer, UserUsernameSerializer, \
+                                 UserEmailSerializer, UserUsernameSerializer, UserInviterEmailBirthDateSerializer, \
                                  FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
@@ -190,8 +190,49 @@ class UserUsernameCheck(generics.CreateAPIView):
         return Response(serializer.data, status=201, headers=headers)
 
 
+class UserInviterBirthDateCheck(generics.CreateAPIView):
+    serializer_class = UserInviterEmailBirthDateSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        serializer = self.get_serializer(data=request.data)
+        # check if email format is invalid
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            if 'email' in e.detail:
+                if 'invalid' in e.get_codes()['email']:
+                    raise InvalidEmail()
+            raise e
+
+        # check if user with invited email exists
+        invited_email = request.data.get('email').strip().lower()        
+        try:
+            inviter = User.objects.get(email=invited_email)
+            user_group = inviter.user_group
+            current_ver = inviter.current_ver
+        except ObjectDoesNotExist:
+            raise InvalidInviterEmail()
+
+        response_data = {
+            'email': invited_email,
+            'inviter_id': inviter.id,
+            'user_group': user_group,
+            'current_ver': current_ver
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
 class UserSignup(generics.CreateAPIView):
-    serializer_class = CurrentUserSerializer
+    serializer_class = CurrentUserSignupSerializer
     parser_classes = (MultiPartParser, FormParser)
 
     def get_exception_handler(self):
@@ -1095,7 +1136,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         # Add 10 random users who are experiment participants, not just random users
         participant_emails = set()
-        csv_path = os.path.join(settings.BASE_DIR, 'assets', 'user_list.csv')
+        csv_path = os.path.join(settings.BASE_DIR, 'assets', 'created_users.csv')
         
         try:
             with open(csv_path, 'r') as f:
