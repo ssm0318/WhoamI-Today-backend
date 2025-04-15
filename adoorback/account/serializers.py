@@ -33,10 +33,20 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
 
     def get_unread_noti(self, obj):
-        return Notification.objects.filter(user=obj, is_read=False).exists()
+        notifications = Notification.objects.visible_only().filter(user=obj, is_read=False)
+
+        if obj.ver_changed_at:
+            notifications = notifications.filter(created_at__gte=obj.ver_changed_at)
+
+        return notifications.exists()
     
     def get_unread_noti_cnt(self, obj):
-        return Notification.objects.filter(user=obj, is_read=False).count()
+        notifications = Notification.objects.visible_only().filter(user=obj, is_read=False)
+
+        if obj.ver_changed_at:
+            notifications = notifications.filter(created_at__gte=obj.ver_changed_at)
+
+        return notifications.count()
 
     def validate_noti_period_days(self, value):
         if not isinstance(value, list):
