@@ -45,7 +45,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  AppSessionSerializer, FriendFriendListSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
-    NoUsername, WrongPassword, ExistingUsername
+    NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
 from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
