@@ -182,16 +182,15 @@ class UserPasswordSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         user = User(**attrs)
-        errors = dict()
+        password = attrs.get('password')
         try:
-            validate_password(password=attrs.get('password'), user=user)
-
+            validate_password(password=password, user=user)
         except ValidationError as e:
-            errors['password'] = [list(e.messages)[0]]
+            raise serializers.ValidationError({
+                'password_validation_error': e.messages
+            })
 
-        if errors:
-            raise serializers.ValidationError(errors)
-        return super(UserPasswordSerializer, self).validate(attrs)
+        return super().validate(attrs)
 
 
 class UserEmailSerializer(serializers.ModelSerializer):
