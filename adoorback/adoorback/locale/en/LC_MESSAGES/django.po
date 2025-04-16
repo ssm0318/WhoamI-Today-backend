@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-11-16 00:44-0800\n"
+"POT-Creation-Date: 2025-04-15 08:13-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,11 +18,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: account/email.py:13
+#: account/email.py:18
 msgid "비밀번호 변경 링크입니다."
 msgstr "Reset your Diivers password"
 
-#: account/email.py:16
+#: account/email.py:21
 msgid ""
 "님, 아래 링크를 클릭하면 비밀번호 변경이 가능합니다.\n"
 "\n"
@@ -32,74 +32,74 @@ msgstr ""
 "\n"
 "Link : "
 
-#: account/email.py:18
+#: account/email.py:23
 msgid "감사합니다."
 msgstr "Thank you."
 
-#: account/models.py:32
+#: account/models.py:35
 msgid "여성"
 msgstr "Female"
 
-#: account/models.py:33
+#: account/models.py:36
 msgid "남성"
 msgstr "Male"
 
-#: account/models.py:34
+#: account/models.py:37
 msgid "트랜스젠더 (transgender)"
 msgstr "Transgender"
 
-#: account/models.py:35
+#: account/models.py:38
 msgid "논바이너리 (non-binary/non-conforming)"
 msgstr "Non-binary/Non-conforming"
 
-#: account/models.py:36
+#: account/models.py:39
 msgid "응답하고 싶지 않음"
 msgstr "Do not want to reply"
 
-#: account/models.py:40
+#: account/models.py:43
 msgid "미국 원주민/알래스카 원주민 (American Indian/Alaska Native)"
 msgstr "American Indian/Alaska Native"
 
-#: account/models.py:41
+#: account/models.py:44
 msgid "아시아인 (Asian)"
 msgstr "Asian"
 
-#: account/models.py:42
+#: account/models.py:45
 msgid "흑인/아프리카계 미국인 (Black/African American)"
 msgstr "Black/African American"
 
-#: account/models.py:43
+#: account/models.py:46
 msgid "히스패닉/라틴계 미국인 (Hispanic/Latino)"
 msgstr "Hispanic/Latino"
 
-#: account/models.py:44
+#: account/models.py:47
 msgid ""
 "하와이 원주민/다른 태평양 섬 주민 (Native Hawaiian/Other Pacific Islander)"
 msgstr "Native Hawaiian/Other Pacific Islander"
 
-#: account/models.py:45
+#: account/models.py:48
 msgid "백인 (White)"
 msgstr "White"
 
-#: account/models.py:70
+#: account/models.py:148
 msgid "username"
 msgstr "닉네임"
 
-#: account/models.py:72
+#: account/models.py:150
 msgid ""
 "Required. 50 characters or fewer. Letters (alphabet & 한글), digits, -, _, "
 "and @ only."
 msgstr "필수 항목. 50자 이하. 알파벳/한글, 숫자, -, _, @만 허용됨."
 
-#: account/models.py:75
+#: account/models.py:153
 msgid "A user with that username already exists."
 msgstr "해당 닉네임은 이미 사용 중입니다."
 
-#: adoorback/settings/base.py:201
+#: adoorback/settings/base.py:208
 msgid "한국어"
 msgstr "Korean"
 
-#: adoorback/settings/base.py:202
+#: adoorback/settings/base.py:209
 msgid "영어"
 msgstr "English"
 
@@ -108,23 +108,23 @@ msgid ""
 "이미 가입되었으나 인증이 완료되지 않은 계정입니다. 인증 메일을 확인해주세요."
 msgstr "User is not active, please confirm your email."
 
-#: adoorback/utils/exceptions.py:15
+#: adoorback/utils/exceptions.py:16
 msgid "존재하지 않는 닉네임/이메일입니다."
 msgstr "Username/Email does not exist."
 
-#: adoorback/utils/exceptions.py:21
+#: adoorback/utils/exceptions.py:23
 msgid "비밀번호를 다시 확인해주세요."
 msgstr "Please check your password."
 
-#: adoorback/utils/exceptions.py:27
+#: adoorback/utils/exceptions.py:30
 msgid "이미 존재하는 닉네임입니다."
 msgstr "Username already exists."
 
-#: adoorback/utils/exceptions.py:33
+#: adoorback/utils/exceptions.py:37
 msgid "닉네임은 20글자 이하로 설정해주세요."
 msgstr "Username must be shorter than 21 letters."
 
-#: adoorback/utils/exceptions.py:39
+#: adoorback/utils/exceptions.py:44
 msgid ""
 "유효하지 않은 닉네임입니다. 닉네임은 영어, 한글, 숫자, 특수문자(_)만 포함할 "
 "수 있습니다."
@@ -132,39 +132,43 @@ msgstr ""
 "Username format is invalid. Usernames can only include letters (alphabet/"
 "Korean), numbers and underscores(_)."
 
-#: adoorback/utils/exceptions.py:44
+#: adoorback/utils/exceptions.py:51
 msgid "이미 가입된 이메일입니다."
 msgstr "An account with this email already exists."
 
-#: adoorback/utils/exceptions.py:50
+#: adoorback/utils/exceptions.py:58
 msgid "유효하지 않은 이메일 형식입니다."
 msgstr "Email format is invalid."
 
-#: adoorback/utils/exceptions.py:56
+#: adoorback/utils/exceptions.py:65
+msgid "해당 이메일을 가진 유저가 존재하지 않습니다."
+msgstr "No user found with that email address."
+
+#: adoorback/utils/exceptions.py:72
 msgid "이미 같은 게시물에 같은 이모지로 반응하였습니다."
 msgstr "You have already reacted to this post with a same emoji."
 
-#: adoorback/utils/exceptions.py:62
+#: adoorback/utils/exceptions.py:78
 msgid "존재하지 않는 게시물입니다."
 msgstr "Post does not exist."
 
-#: adoorback/utils/exceptions.py:68
+#: adoorback/utils/exceptions.py:84
 msgid "친구가 아닙니다."
 msgstr "You are not friends."
 
-#: adoorback/utils/exceptions.py:74
+#: adoorback/utils/exceptions.py:90
 msgid "이미 같은 유저에게 질문을 전송하였습니다."
 msgstr "You have already sent this question to the same friend."
 
-#: adoorback/utils/exceptions.py:80
+#: adoorback/utils/exceptions.py:96
 msgid "존재하지 않는 질문입니다."
 msgstr "Question does not exist."
 
-#: adoorback/utils/exceptions.py:85
+#: adoorback/utils/exceptions.py:102
 msgid "삭제된 질문입니다."
 msgstr "Question has been deleted."
 
-#: adoorback/utils/validators.py:37
+#: adoorback/utils/validators.py:119
 msgid ""
 "유효한 닉네임을 입력해주세요. 영문, 한글, 숫자, 일부 특수문자(_)만 허용합니"
 "다.공백, 한글 자음/모음만 있는 경우는 허용되지 않습니다."
@@ -173,19 +177,19 @@ msgstr ""
 "and some special characters (_) are allowed. Spaces and standalone Korean "
 "consonants or vowels are not permitted."
 
-#: adoorback/utils/validators.py:47 adoorback/utils/validators.py:53
+#: adoorback/utils/validators.py:133 adoorback/utils/validators.py:139
 msgid "비밀번호는 숫자(0-9)를 한 개 이상 포함해야 합니다."
 msgstr "Your password must contain at least 1 digit, 0-9."
 
-#: adoorback/utils/validators.py:61 adoorback/utils/validators.py:67
+#: adoorback/utils/validators.py:147 adoorback/utils/validators.py:153
 msgid "비밀번호는 알파벳 대문자(A-Z)를 한 개 이상 포함해야 합니다."
 msgstr "Your password must contain at least 1 uppercase letter, A-Z."
 
-#: adoorback/utils/validators.py:75 adoorback/utils/validators.py:81
+#: adoorback/utils/validators.py:161 adoorback/utils/validators.py:167
 msgid "비밀번호는 알파벳 소문자(a-z)를 한 개 이상 포함해야 합니다."
 msgstr "Your password must contain at least 1 lowercase letter, a-z."
 
-#: adoorback/utils/validators.py:89 adoorback/utils/validators.py:96
+#: adoorback/utils/validators.py:175 adoorback/utils/validators.py:182
 msgid ""
 "비밀번호는 특수문자를 한 개 이상 포함해야 합니다: ()[]{}|\\`~!@#$%^&*_-"
 "+=;:'\",<>./?"

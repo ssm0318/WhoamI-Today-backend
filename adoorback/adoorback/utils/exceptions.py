@@ -60,6 +60,13 @@ class InvalidEmail(APIException):
     slack_level = None
 
 
+class InvalidInviterEmail(APIException):
+    status_code = status.HTTP_406_NOT_ACCEPTABLE
+    default_detail = _("해당 이메일을 가진 유저가 존재하지 않습니다.")
+    default_code = 'inviter_email_invalid'
+    slack_level = None
+
+
 class ExistingReaction(APIException):
     status_code = status.HTTP_406_NOT_ACCEPTABLE
     default_detail = _("이미 같은 게시물에 같은 이모지로 반응하였습니다.")
