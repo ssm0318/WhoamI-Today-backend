@@ -1,4 +1,5 @@
 from django.db import transaction, IntegrityError
+from django.utils.translation import gettext_lazy as _
 from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -31,7 +32,10 @@ class LikeCreate(generics.CreateAPIView):
             # serializer.data 접근 시 에러 방지: instance 기준으로 새 serializer 만들어줌
             self.instance = instance  # for use in get_success_headers
         except IntegrityError:
-            raise ValidationError("You have already liked this.")
+            raise ValidationError({
+                "detail": _("이미 좋아요를 눌렀어요."),
+                "code": "duplicate_like"
+            })
     
     # @transaction.atomic
     # def perform_create(self, serializer):
