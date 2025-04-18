@@ -26,6 +26,7 @@ from safedelete import DELETED_INVISIBLE
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
 
+from .email import email_manager
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.validators import AdoorUsernameValidator
 from notification.models import NotificationActor
@@ -200,6 +201,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         blank=True,
         help_text="History of previously used usernames"
     )
+    email_verified = models.BooleanField(default=False)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
@@ -747,6 +749,7 @@ def user_created(created, instance, **kwargs):
     '''
     when User is created, 
     1) send notification
+    2) send verification email
     '''
     if instance.deleted:
         return
@@ -762,6 +765,9 @@ def user_created(created, instance, **kwargs):
                                            message_en=f"{instance.username}, add your friends for a better WIT experience!",
                                            redirect_url='/friends/explore')
         NotificationActor.objects.create(user=admin, notification=noti)
+
+    if created and instance.email:
+        email_manager.send_verification_email(instance)
 
 
 @transaction.atomic

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-04-16 22:09-0700\n"
+"POT-Creation-Date: 2025-04-18 05:50-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,23 +17,34 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: account/email.py:18
+#: account/email.py:28
+msgid "[WIT] 이메일 인증을 완료해주세요"
+msgstr "[WIT] 이메일 인증을 완료해주세요"
+
+#: account/email.py:30
+msgid ""
+"이메일 인증을 위해 아래 링크를 클릭해주세요.\n"
+"\n"
+"이메일 인증 링크: "
+msgstr "이메일 인증을 위해 아래 링크를 클릭해주세요.\n\n이메일 인증 링크: "
+
+#: account/email.py:32 account/email.py:54
+msgid "감사합니다."
+msgstr "감사합니다."
+
+#: account/email.py:49
 msgid "비밀번호 변경 링크입니다."
 msgstr "비밀번호 변경 링크입니다."
 
-#: account/email.py:21
+#: account/email.py:52
 msgid ""
 "님, 아래 링크를 클릭하면 비밀번호 변경이 가능합니다.\n"
 "\n"
-"비밀번호 변경 링크 : "
+"비밀번호 변경 링크: "
 msgstr ""
 "님, 아래 링크를 클릭하면 비밀번호 변경이 가능합니다.\n"
 "\n"
-"비밀번호 변경 링크 : "
-
-#: account/email.py:23
-msgid "감사합니다."
-msgstr "감사합니다."
+"비밀번호 변경 링크: "
 
 #: account/models.py:35
 msgid "여성"
