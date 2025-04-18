@@ -135,7 +135,7 @@ class CurrentUserSignupSerializer(CurrentUserSerializer):
         user.set_password(password)
         user.save()
 
-        # ✅ 가입 성공 후 CSV에 기록
+        # 가입 성공 후 CSV에 기록
         try:
             if user.user_group in ['group_1', 'group_2']:
                 country = 'US'
@@ -157,6 +157,11 @@ class CurrentUserSignupSerializer(CurrentUserSerializer):
                 text=f"*⚠️ 가입 기록 CSV 저장 실패*\n```{tb}```",
                 level="WARNING"
             )
+
+        # 비밀번호 변경 페이지로 redirect되지 않게 하기
+        user.has_changed_pw = True
+        user.save()
+        
         return user
 
     class Meta(CurrentUserSerializer.Meta):
