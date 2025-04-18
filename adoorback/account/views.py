@@ -253,7 +253,7 @@ class UserSignup(generics.CreateAPIView):
         headers = self.get_success_headers(serializer.data)
 
         response = Response(serializer.data, status=201, headers=headers)
-        user = User.objects.get(username=request.data.get('username'))
+        user = serializer.instance
         access_token = get_access_token_for_user(user)
         response.set_cookie(
             key=settings.SIMPLE_JWT['AUTH_COOKIE'],
