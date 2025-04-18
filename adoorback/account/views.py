@@ -20,6 +20,8 @@ from django.http import HttpResponse, HttpResponseNotAllowed, Http404
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -263,7 +265,42 @@ class UserSignup(generics.CreateAPIView):
             samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
         )
         csrf.get_token(request)
+
         return response
+    
+
+class UserVerifyEmail(generics.UpdateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserProfileSerializer
+
+    def get_exception_handler(self):
+        print(self.request.headers)
+        return adoor_exception_handler
+
+    def get_object(self):
+        uidb64 = self.kwargs.get('uidb64')
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+        return user
+
+    def update(self, request, *args, **kwargs):
+        token = self.kwargs.get('token')
+        user = self.get_object()
+        if not user:
+            return HttpResponse(status=404)
+        if email_manager.check_activate_token(user, token):
+            self.verify_email(user)
+            return HttpResponse(status=204)
+        else:
+            return HttpResponse(status=400)
+
+    @transaction.atomic
+    def verify_email(self, user):
+        user.email_verified = True
+        user.save()
 
 
 class SendResetPasswordEmail(generics.CreateAPIView):

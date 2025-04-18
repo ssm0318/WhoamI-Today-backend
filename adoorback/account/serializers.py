@@ -294,7 +294,7 @@ class UserProfileSerializer(UserMinimalSerializer):
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
                                                       'pronouns', 'bio', 'persona', 'unread_ping_count', 'connection_status',
-                                                      'friend_count']
+                                                      'friend_count', 'email_verified']
 
 
 class FriendListSerializer(UserMinimalSerializer):
