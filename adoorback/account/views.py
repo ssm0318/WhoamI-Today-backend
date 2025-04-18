@@ -1201,6 +1201,19 @@ class UserRecommendedFriendsList(generics.ListAPIView):
             .exclude(id__in=sorted_friend_ids)
 
         random_user_ids = list(potential_random_users.order_by("?").values_list('id', flat=True)[:10])
+
+        # Get invited_from user and check conditions
+        invited_from = user.invited_from
+        if invited_from and \
+            invited_from.id not in user_friend_ids and \
+            invited_from.id not in user_block_rec_ids and \
+            invited_from.id not in sent_friend_request_ids and \
+            invited_from.id not in received_friend_request_ids and \
+            not invited_from.is_superuser and \
+            invited_from.id not in sorted_friend_ids:
+
+            sorted_friend_ids = [invited_from.id] + sorted_friend_ids
+
         final_user_ids = sorted_friend_ids + random_user_ids
 
         recommended_friends = User.objects.filter(id__in=final_user_ids) \
