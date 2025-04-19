@@ -3,4 +3,3 @@
 */15 * * * * /app/cron/scripts/run_django_cron.sh --force account.cron.SendDailyWhoAmINotiCronJob
 * * * * * /app/cron/scripts/run_django_cron.sh --force account.cron.AutoCloseSessionsCronJob
 0 15 * * * /app/cron/scripts/run_django_cron.sh --force qna.cron.DailyQuestionCronJob
-0 * * * * /app/cron/scripts/run_django_cron.sh --force account.cron.SendDailySurveyNotiCronJob
