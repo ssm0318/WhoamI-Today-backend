@@ -147,7 +147,6 @@ class Response(AdoorModel, SafeDeleteModel):
             return False
 
         if self.author == user:
-            print('author?')
             return True
 
         connection = Connection.get_connection_between(self.author, user)
@@ -157,9 +156,6 @@ class Response(AdoorModel, SafeDeleteModel):
 
         if self.visibility == 'close_friends':
             is_close = user.is_close_friend(self.author)
-            print(f'{user}')
-            print(f'{self.author}')
-            print(f'{is_close=}')
             if not is_close:
                 return False
 
