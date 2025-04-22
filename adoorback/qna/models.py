@@ -255,7 +255,7 @@ def create_request_answered_noti(instance, created, **kwargs):
 
     for request in related_requests:
         user = request.requester
-        if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
+        if not Response.is_audience(instance, user):
             return
         message_ko = f'{actor.username}님이 회원님이 보낸 질문에 답했습니다: "{content_preview}"'
         message_en = f'{actor.username} has responded to your question: "{content_preview}"'
