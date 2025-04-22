@@ -147,6 +147,7 @@ class Response(AdoorModel, SafeDeleteModel):
             return False
 
         if self.author == user:
+            print('author?')
             return True
 
         connection = Connection.get_connection_between(self.author, user)
@@ -156,6 +157,9 @@ class Response(AdoorModel, SafeDeleteModel):
 
         if self.visibility == 'close_friends':
             is_close = user.is_close_friend(self.author)
+            print(f'{user}')
+            print(f'{self.author}')
+            print(f'{is_close=}')
             if not is_close:
                 return False
 
@@ -255,7 +259,7 @@ def create_request_answered_noti(instance, created, **kwargs):
 
     for request in related_requests:
         user = request.requester
-        if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
+        if not Response.is_audience(instance, user):
             return
         message_ko = f'{actor.username}님이 회원님이 보낸 질문에 답했습니다: "{content_preview}"'
         message_en = f'{actor.username} has responded to your question: "{content_preview}"'
