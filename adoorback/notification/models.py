@@ -220,7 +220,8 @@ def notify_firebase(instance):
 
 @receiver(post_save, sender=Notification)
 def send_firebase_notification(sender, instance, created, **kwargs):
-    if created or (not created and instance.is_visible and not instance.is_read):
+    is_any_actor_active = instance.actors.filter(deleted__isnull=True).exists()
+    if (created or (not created and instance.is_visible and not instance.is_read)) and is_any_actor_active:
         notify_firebase(instance)
 
 
