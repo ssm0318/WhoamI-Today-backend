@@ -522,10 +522,6 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
         if Connection.objects.filter(user1=self.user2, user2=self.user1).exists():
             raise ValueError("A reverse Connection already exists.")
 
-        # check if both users belong to the same user group
-        if self.user1.user_group != self.user2.user_group:
-            raise ValidationError("Both users must belong to the same user group.")
-
         # Ensure that user1 always has the smaller ID to enforce consistency
         if self.user1.id > self.user2.id:
             self.user1, self.user2 = self.user2, self.user1
