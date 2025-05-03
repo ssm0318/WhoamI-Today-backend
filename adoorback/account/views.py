@@ -1154,8 +1154,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
 
         mutual_friends_count_dict = {}
         for friend in user_friends:
-            potential_friends = friend.connected_users.filter(user_group=user.user_group) \
-                .filter(current_ver=user.current_ver) \
+            potential_friends = friend.connected_users.filter(current_ver=user.current_ver) \
                 .exclude(id__in=user_friend_ids) \
                 .exclude(id=user_id).exclude(id__in=user_block_rec_ids) \
                 .exclude(id__in=sent_friend_request_ids) \
@@ -1172,26 +1171,8 @@ class UserRecommendedFriendsList(generics.ListAPIView):
         sorted_friends = sorted(mutual_friends_count_dict.items(), key=lambda x: x[1], reverse=True)[:25]
         sorted_friend_ids = [friend_id for friend_id, _ in sorted_friends]
 
-        # Add 10 random users who are experiment participants, not just random users
-        participant_emails = set()
-        csv_path = os.path.join(settings.BASE_DIR, 'assets', 'created_users.csv')
-        
-        try:
-            with open(csv_path, 'r') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if 'email' in row:
-                        participant_emails.add(row['email'])
-        except (FileNotFoundError, IOError):
-            #if in some circumstance the file can't be read -> log error
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Could not read participant list from {csv_path}")
-        
-        #filter random users to only include experiment participants
-        potential_random_users = User.objects.filter(user_group=user.user_group) \
-            .filter(current_ver=user.current_ver) \
-            .filter(email__in=participant_emails) \
+        # Add 10 random users
+        potential_random_users = User.objects.filter(current_ver=user.current_ver) \
             .exclude(id=user_id) \
             .exclude(id__in=user_friend_ids) \
             .exclude(id__in=user_block_rec_ids) \
