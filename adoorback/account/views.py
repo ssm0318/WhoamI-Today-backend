@@ -658,7 +658,7 @@ class CurrentUserDelete(generics.DestroyAPIView):
         instance.date_of_birth = None
         instance.save()
         # user is soft-deleted, contents user created will be cascade-deleted
-        instance.delete(force_policy=SOFT_DELETE_CASCADE)
+        instance.safe_delete()
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

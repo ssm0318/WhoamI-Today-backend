@@ -109,6 +109,9 @@ def update_like_noti_after_delete(instance, **kwargs):
     if not instance.deleted:
         return
 
+    if not instance.target:
+        return
+
     user = instance.target.author
     actor = instance.user
     origin = instance.target

@@ -250,6 +250,13 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
         super().save(*args, **kwargs)
 
+    def safe_delete(self):
+        for actor in self.notificationactor_set.all():
+            actor.delete()
+        for noti in self.received_noti_set.all():
+            noti.delete()
+        self.delete()
+
     @classmethod
     def user_read(cls, user1, user2):
         # Check if user1 has read all of user2's responses
