@@ -35,7 +35,7 @@ msgstr "Thank you."
 
 #: account/email.py:49
 msgid "비밀번호 변경 링크입니다."
-msgstr "Reset your Diivers password"
+msgstr "Reset your password."
 
 #: account/email.py:52
 msgid ""
