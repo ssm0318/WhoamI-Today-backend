@@ -1,10 +1,9 @@
 from datetime import timedelta
-from collections import defaultdict
+from itertools import chain
 import json
+from operator import attrgetter
 import uuid
 from zoneinfo import ZoneInfo
-import csv
-import os
 
 from django.apps import apps
 from django.conf import settings
@@ -54,7 +53,7 @@ from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
-from qna.serializers import GroupedResponseRequestSerializer
+from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
 from tracking.utils import clean_session_key
 
 
@@ -1365,6 +1364,66 @@ class FriendFeed(generics.ListAPIView):
         unread_note_ids = queryset.exclude(readers=request.user).values_list("id", flat=True)
         if unread_note_ids:
             request.user.read_notes.add(*unread_note_ids)
+
+        return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
+
+
+class FullFriendFeed(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_combined_feed_items(self):
+        user = self.request.user
+        connected_user_ids = user.connected_user_ids
+        blocked_user_ids = user.user_report_blocked_ids
+
+        # 1. Notes
+        notes = Note.objects.filter(
+            author_id__in=connected_user_ids
+        ).exclude(author_id__in=blocked_user_ids).select_related('author')
+        notes = [n for n in notes if n.is_audience(user)]
+
+        # 2. Responses
+        responses = _Response.objects.filter(
+            author_id__in=connected_user_ids
+        ).exclude(author_id__in=blocked_user_ids).select_related('author', 'question')
+        responses = [r for r in responses if r.is_audience(user)]
+
+        combined = sorted(chain(notes, responses), key=lambda x: x.created_at, reverse=True)
+        return notes, responses, combined
+
+    def paginate_queryset(self, queryset):
+        page = super().paginate_queryset(queryset)
+        return page
+
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        notes, responses, combined_feed_items = self.get_combined_feed_items()
+
+        # freeze notes before marking them as read
+        frozen_items = list(combined_feed_items)
+
+        page = self.paginate_queryset(frozen_items)
+        objects_to_serialize = page if page is not None else frozen_items
+
+        serialized_data = []
+        for obj in objects_to_serialize:
+            if isinstance(obj, Note):
+                serialized = DefaultFriendNoteSerializer(obj, context=self.get_serializer_context()).data
+            elif isinstance(obj, _Response):
+                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+            serialized_data.append(serialized)
+
+        # mark all notes as read
+        unread_note_ids = [n.id for n in notes if user not in n.readers.all()]
+        if unread_note_ids:
+            user.read_notes.add(*unread_note_ids)
+
+        unread_response_ids = [r.id for r in responses if user not in r.readers.all()]
+        if unread_response_ids:
+            user.read_responses.add(*unread_response_ids)
 
         return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
 
