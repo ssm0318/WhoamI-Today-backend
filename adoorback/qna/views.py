@@ -24,7 +24,6 @@ from qna.models import Response, Question, ResponseRequest
 
 User = get_user_model()
 
-
 class ResponseCreate(generics.CreateAPIView):
     serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
@@ -210,7 +209,10 @@ class QuestionList(generics.ListCreateAPIView):
         for question in all_questions:
             if question.selected_dates:
                 last_date = question.selected_dates[-1]
-                grouped[last_date].append(question)
+                formatted_date = last_date.strftime('%Y-%m-%d')
+                
+                #try to group by the formatted date string, instead of the date object
+                grouped[formatted_date].append(question)
 
         grouped_ordered = OrderedDict(
             sorted(grouped.items(), key=lambda x: x[0], reverse=True)
@@ -226,8 +228,18 @@ class QuestionList(generics.ListCreateAPIView):
 
         serialized_data = []
         for group in page:
+            date_str = group["date"]
+            
+            #directly attempt to format the date string
+            try:
+                from datetime import datetime
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                localized_date = date_obj.strftime('%B %d, %Y')
+            except Exception:
+                localized_date = date_str
+            
             serialized_group = {
-                "date": group["date"],
+                "date": localized_date,
                 "questions": self.serializer_class(
                     group["questions"], many=True, context={"request": request}
                 ).data
