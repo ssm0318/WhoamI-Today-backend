@@ -1411,7 +1411,7 @@ class FullFriendFeed(generics.ListAPIView):
         serialized_data = []
         for obj in objects_to_serialize:
             if isinstance(obj, Note):
-                serialized = DefaultFriendNoteSerializer(obj, context=self.get_serializer_context()).data
+                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
             elif isinstance(obj, _Response):
                 serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
             serialized_data.append(serialized)
