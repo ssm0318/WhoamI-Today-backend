@@ -26,7 +26,6 @@ def select_daily_questions(set_date=None):
         question.selected_dates.append(set_date)
         question.selected = True
         question.save()
-    print(questions)
 
 
 def create_question_csv():
