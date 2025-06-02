@@ -102,61 +102,13 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
 
 
 class CurrentUserSignupSerializer(CurrentUserSerializer):
-    inviter_id = serializers.IntegerField(write_only=True, required=True)
-    user_group = serializers.CharField(write_only=True, required=True)
-    current_ver = serializers.CharField(write_only=True, required=True)
-
-    def validate(self, attrs):
-        try:
-            self._inviter_id = attrs.pop('inviter_id')
-        except KeyError:
-            raise serializers.ValidationError({
-                'inviter_id': 'This field is required.'
-            })
-
-        return super().validate(attrs)
-
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop('password')
-        inviter_id = getattr(self, '_inviter_id', None)
-
-        validated_data['user_type'] = 'indirect'
-
-        try:
-            inviter = User.objects.get(id=inviter_id)
-            validated_data['invited_from'] = inviter
-        except ObjectDoesNotExist:
-            raise serializers.ValidationError({
-                'inviter_id': 'Failed to find a user with the given inviter_id.'
-            })
 
         user = User(**validated_data)
         user.set_password(password)
         user.save()
-
-        # 가입 성공 후 CSV에 기록
-        try:
-            if user.user_group in ['group_1', 'group_2']:
-                country = 'US'
-            elif user.user_group in ['group_3', 'group_4']:
-                country = 'Korea'
-            else:
-                country = 'Unknown'
-
-            row = [user.email, 'signed_up', country]
-
-            csv_path = os.path.join(settings.BASE_DIR, 'assets', 'created_users.csv')
-            with open(csv_path, mode='a', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow(row)
-
-        except Exception as e:
-            tb = traceback.format_exc()
-            send_msg_to_slack(
-                text=f"*⚠️ 가입 기록 CSV 저장 실패*\n```{tb}```",
-                level="WARNING"
-            )
 
         # 비밀번호 변경 페이지로 redirect되지 않게 하기
         user.has_changed_pw = True
@@ -165,7 +117,7 @@ class CurrentUserSignupSerializer(CurrentUserSerializer):
         return user
 
     class Meta(CurrentUserSerializer.Meta):
-        fields = CurrentUserSerializer.Meta.fields + ['inviter_id']
+        fields = CurrentUserSerializer.Meta.fields
         extra_kwargs = {**CurrentUserSerializer.Meta.extra_kwargs}
 
 
@@ -208,6 +160,12 @@ class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username']
+
+
+class UserBirthDateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['date_of_birth']
 
 
 class UserInviterEmailBirthDateSerializer(serializers.Serializer):
