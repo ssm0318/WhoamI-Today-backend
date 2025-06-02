@@ -273,6 +273,7 @@ class ResponseRequestCreate(generics.CreateAPIView):
         requester = User.objects.get(id=self.request.data.get('requester_id'))
         requestee = User.objects.get(id=self.request.data.get('requestee_id'))
         question_id = self.request.data.get('question_id')
+
         if Question.all_objects.filter(id=question_id, deleted__isnull=False).exists():
             raise DeletedQuestion()
         if not Question.objects.filter(id=question_id).exists():
@@ -281,13 +282,16 @@ class ResponseRequestCreate(generics.CreateAPIView):
             raise PermissionDenied("requester가 본인이 아닙니다.")
         if not requestee.is_connected(current_user):
             raise PermissionDenied("친구에게만 response request를 보낼 수 있습니다.")
-        try:
+        
+        # 이미 있는 요청이 있으면 아무 일도 하지 않음
+        exists = ResponseRequest.objects.filter(
+            requester=requester,
+            requestee=requestee,
+            question_id=question_id,
+            deleted__isnull=True
+        ).exists()
+        if not exists:
             serializer.save()
-        except IntegrityError as e:
-            if 'unique constraint' in e.args[0]:
-                raise ExistingResponseRequest()
-            else:
-                raise e
 
 
 class DailyQuestionList(generics.ListAPIView):
