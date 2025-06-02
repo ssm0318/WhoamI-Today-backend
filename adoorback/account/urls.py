@@ -8,6 +8,7 @@ urlpatterns = [
     path('signup/email/', views.UserEmailCheck.as_view(), name='user-email-check'),
     path('signup/password/', views.UserPasswordCheck.as_view(), name='user-password-check'),
     path('signup/username/', views.UserUsernameCheck.as_view(), name='user-username-check'),
+    path('signup/birthdate/', views.UserBirthDateCheck.as_view(), name='user-birthdate-check'),
     path('signup/inviter-birthdate/', views.UserInviterBirthDateCheck.as_view(), name='user-inviter-birthdate-check'),
     path('signup/', views.UserSignup.as_view(), name='user-signup'),
     path('activate/<uidb64>/<str:token>/', views.UserVerifyEmail.as_view(), name='user-verify-email'),

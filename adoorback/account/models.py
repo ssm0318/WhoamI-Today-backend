@@ -188,9 +188,9 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
 
     ver_changed_at = models.DateTimeField(null=True)
-    current_ver = models.CharField(max_length=20, choices=VERSION_CHOICES, default='default')
+    current_ver = models.CharField(max_length=20, choices=VERSION_CHOICES, default='experiment')
     user_group = models.CharField(max_length=20, choices=USER_GROUP_CHOICES, default='group_1')
-    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='direct')
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='indirect')
     invited_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, 
                                      related_name="invited_users")
     

@@ -39,8 +39,8 @@ from account.models import FriendRequest, BlockRec
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
-                                 UserEmailSerializer, UserUsernameSerializer, UserInviterEmailBirthDateSerializer, \
-                                 FriendListSerializer, \
+                                 UserEmailSerializer, UserUsernameSerializer, UserBirthDateSerializer, \
+                                 UserInviterEmailBirthDateSerializer, FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
                                  AppSessionSerializer, FriendFriendListSerializer)
@@ -187,6 +187,25 @@ class UserUsernameCheck(generics.CreateAPIView):
                 if 'max_length' in e.get_codes()['username']:
                     raise LongUsername()
             raise e
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+
+
+class UserBirthDateCheck(generics.CreateAPIView):
+    serializer_class = UserBirthDateSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
