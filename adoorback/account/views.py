@@ -522,7 +522,14 @@ class UserNoteList(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        all_notes = Note.objects.filter(author__username=self.kwargs.get('username'))
+        author_username = self.kwargs.get('username')
+        author = User.objects.get(username=author_username)
+        
+        # don't show superuser's note list (Notice must be shown on its own tab)
+        if author.is_superuser:
+            return Note.objects.none()
+    
+        all_notes = Note.objects.filter(author=author)
         note_ids = [note.id for note in all_notes if note.is_audience(user)]
         return Note.objects.filter(id__in=note_ids).order_by('-created_at')
 
@@ -1263,7 +1270,7 @@ class UserMarkAllNotesAsRead(APIView):
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        notes = Note.objects.filter(author=target_user).exclude(readers=request.user)
+        notes = Note.objects.filter(author=target_user).exclude(readers=request.user).exclude(author__is_superuser=True)
         for note in notes:
             note.readers.add(request.user)
 
@@ -1357,7 +1364,7 @@ class FriendFeed(generics.ListAPIView):
 
         notes = Note.objects.filter(
             author_id__in=connected_user_ids
-        ).exclude(author_id__in=blocked_user_ids).select_related('author')
+        ).exclude(author_id__in=blocked_user_ids).exclude(author__is_superuser=True).select_related('author')
         note_list = list(filter(lambda note: note.is_audience(user), notes))
 
         return Note.objects.filter(id__in=[note.id for note in note_list]).order_by('-created_at')
@@ -1401,7 +1408,7 @@ class FullFriendFeed(generics.ListAPIView):
         # 1. Notes
         notes = Note.objects.filter(
             author_id__in=connected_user_ids
-        ).exclude(author_id__in=blocked_user_ids).select_related('author')
+        ).exclude(author_id__in=blocked_user_ids).exclude(author__is_superuser=True).select_related('author')
         notes = [n for n in notes if n.is_audience(user)]
 
         # 2. Responses

@@ -9,6 +9,7 @@ from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
@@ -108,25 +109,6 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Note.objects.all()
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-
-        new_images = request.FILES.getlist('images', [])
-        instance.images.all().delete()  # hard delete images
-
-        for image in new_images:
-            n = NoteImage.objects.create(note=instance, image=image)
-        
-        self.perform_update(serializer)
-        return Response(serializer.data)
-
-    def patch(self, request, *args, **kwargs):
-        if 'visibility' in request.data:
-            return self.partial_update(request, *args, **kwargs)
-        return super().patch(request, *args, **kwargs)
 
 
 class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -250,3 +232,128 @@ class NoteRead(generics.UpdateAPIView):
         serializer = self.get_serializer(queryset, many=True, partial=True)
 
         return Response(serializer.data)
+
+
+class NoticeList(generics.ListAPIView):
+    serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return Note.objects.filter(author__is_superuser=True).order_by('-created_at')
+
+
+class NoticeDetail(generics.RetrieveAPIView):
+    serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        pk = self.kwargs.get('pk')
+        obj = queryset.filter(pk=pk).first()
+
+        if obj is None:
+            raise Http404('No Note matches the given query.')
+
+        self.check_object_permissions(self.request, obj)
+
+        return obj
+
+    def get_queryset(self):
+        return Note.objects.filter(author__is_superuser=True)
+
+
+class NoticeComments(generics.ListAPIView):
+    serializer_class = cs.CommentFriendSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        from comment.models import Comment
+        from content_report.models import ContentReport
+
+        current_user = self.request.user
+
+        note = get_object_or_404(Note, id=self.kwargs.get('pk'))
+
+        blocked_content_ids = ContentReport.objects.filter(
+            user=current_user,
+            content_type=ContentType.objects.get_for_model(Comment)
+        ).values_list('object_id', flat=True)
+
+        return note.note_comments.exclude(
+            Q(id__in=blocked_content_ids) | Q(author_id__in=current_user.user_report_blocked_ids)
+        ).order_by('created_at')
+
+    def list(self, request, *args, **kwargs):
+        current_user = self.request.user
+        comments = self.get_queryset()
+
+        all_comments_and_replies = comments
+        for comment in comments:
+            replies = comment.replies.exclude(author_id__in=current_user.user_report_blocked_ids)
+            all_comments_and_replies = all_comments_and_replies.union(replies)
+
+        page = self.paginate_queryset(comments)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            extra_field = {'count_including_replies': all_comments_and_replies.count()}
+            paginated_response = self.get_paginated_response(serializer.data)
+            paginated_response.data.update(extra_field)
+            return paginated_response
+
+        serializer = self.get_serializer(comments, many=True)
+        extra_field = {'count_including_replies': all_comments_and_replies.count()}
+        return Response({'results': serializer.data, **extra_field})
+
+
+class NoticeInteractions(generics.ListAPIView):
+    serializer_class = InteractionSerializer
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        from like.models import Like
+        from reaction.models import Reaction
+
+        note_id = self.kwargs['pk']
+
+        likes = Like.objects.filter(content_type__model='note', object_id=note_id).annotate(
+            reaction=Value(None, output_field=CharField())
+        )
+
+        reactions = Reaction.objects.filter(content_type__model='note', object_id=note_id).annotate(
+            reaction=F('emoji')
+        )
+
+        combined_interactions = sorted(
+            chain(likes, reactions),
+            key=lambda x: x.created_at,
+            reverse=True
+        )
+
+        return combined_interactions
+
+
+class UserMarkAllNoticesAsRead(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request):
+        notes = Note.objects.filter(author__is_superuser=True).exclude(readers=request.user)
+        for note in notes:
+            note.readers.add(request.user)
+
+        return Response({'success': 'All content marked as read successfully'}, status=status.HTTP_200_OK)

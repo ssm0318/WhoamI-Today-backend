@@ -45,9 +45,6 @@ class ReactionList(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         target, content_type_id, object_id = self.validate_target()
 
-        if target.author != self.request.user and not target.author.is_connected(self.request.user):
-            raise NotFriend()
-
         try:
             serializer.save(user=self.request.user,
                             content_type_id=content_type_id,
