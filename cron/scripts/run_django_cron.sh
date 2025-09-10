@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# === 환경 변수 로드 ===
+# === Load environment variables ===
 ENV_FILE="/app/.env"
 DEV_ENV_FILE="/app/.env.development"
 
@@ -19,11 +19,11 @@ else
     exit 1
 fi
 
-# === 로그 설정 ===
+# === Log setup ===
 LOG_DIR="/app/cron/log"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/$(date +\%Y-\%m-\%d).log"
 
-# === runcrons 실행 ===
+# === Execute runcrons ===
 echo "[INFO] Running: python manage.py runcrons $*" >> "$LOG_FILE"
 /usr/local/bin/python /app/adoorback/manage.py runcrons "$@" >> "$LOG_FILE" 2>&1

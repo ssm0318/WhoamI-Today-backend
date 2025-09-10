@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# 기본 환경 변수 파일 설정
+# Set default environment variable file
 ENV_FILE="/app/.env"
 DEV_ENV_FILE="/app/.env.development"
 
-# .env 파일이 존재하면 로드하고, 없으면 .env.development를 로드
+# Load .env file if it exists, otherwise load .env.development
 if [ -f "$ENV_FILE" ]; then
     set -a
     source "$ENV_FILE"
@@ -28,7 +28,7 @@ LOG_FILE="${LOG_DIR}/backup_$(date +\%Y-\%m-\%d).log"
 # Ensure directories exist
 mkdir -p "$DATA_D" "$LOG_DIR"
 
-# 로그 파일 생성 및 실행 시간 기록
+# Create log file and record execution time
 {
     echo "========================================="
     echo "DB Backup Script Started: $(date)"
@@ -37,7 +37,7 @@ mkdir -p "$DATA_D" "$LOG_DIR"
     BACKUP_FILE="$DATA_D/whoamitoday_$(date +%Y-%m-%d_%H).backup.gz"
     echo "Backing up database to: $BACKUP_FILE"
 
-    # pipefail 활성화
+    # Enable pipefail
     set -o pipefail
 
     if PGPASSWORD=$DB_PASSWORD pg_dump -h "$DB_HOST" -U "$DB_USER" -Fc -w whoamitoday | gzip > "$BACKUP_FILE" 2>> "$LOG_FILE"; then
@@ -47,7 +47,7 @@ mkdir -p "$DATA_D" "$LOG_DIR"
         exit 1
     fi
 
-    # pipefail 비활성화 (다른 명령어에 영향 안 주도록)
+    # Disable pipefail (to not affect other commands)
     set +o pipefail
 
     # Remove backup data older than 72 hours
