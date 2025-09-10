@@ -33,7 +33,7 @@ SECRET_KEY = os.environ['SECRET_KEY']
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-DEFAULT_AUTO_FIELD = 'django.db.models.AutoField' # django 버전업하면서 추가
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField' # Added due to Django version upgrade
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',

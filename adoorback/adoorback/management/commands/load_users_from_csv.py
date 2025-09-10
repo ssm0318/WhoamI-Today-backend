@@ -18,7 +18,7 @@ class Command(BaseCommand):
             header = rows[0]
             data_rows = rows[1:]
 
-            # ✅ 칼럼별 strip + lower 처리
+            # ✅ Strip and lowercase processing for each column
             all_rows = [
                 {
                     k: (
@@ -57,7 +57,7 @@ class Command(BaseCommand):
                 print(f"⛔ {email}: {reason}")
                 return None
 
-            created_users[email] = None  # 생성 중 표시
+            created_users[email] = None  # Indicate user creation in progress
 
             username = row.get('username', '').strip()
             if not username:
@@ -70,7 +70,7 @@ class Command(BaseCommand):
             user_country = row['country']
             current_ver = 'default' if user_group in ['group_1', 'group_3'] else 'experiment'
 
-            # ✅ country에 따라 language, timezone 설정
+            # ✅ Set language and timezone based on country
             if user_country == 'Korea':
                 language = 'ko'
                 timezone = 'Asia/Seoul'
@@ -83,7 +83,7 @@ class Command(BaseCommand):
 
             friend_email = row.get('friend-email', '')
 
-            # 친구 먼저 생성 (자기 자신이 아닌 경우에만)
+            # Create friend first (only if not self)
             if (
                 friend_email and
                 friend_email != email and
@@ -92,7 +92,7 @@ class Command(BaseCommand):
             ):
                 create_user_by_email(friend_email, skipped_details)
 
-            # friend_email 유효성 확인
+            # Validate friend_email
             if friend_email == email:
                 invited_from = None
                 user_type = 'direct'
@@ -127,7 +127,7 @@ class Command(BaseCommand):
             new_users.append({'email': email, 'user_group': user_group, 'country': user_country})
             return user
 
-        # 전체 유저 생성 시도
+        # Attempt to create all users
         for row in all_rows:
             email = row.get('email', '')
             if not email:
@@ -137,7 +137,7 @@ class Command(BaseCommand):
             if email not in created_users and not User.objects.filter(email=email).exists():
                 create_user_by_email(email, skipped_details)
 
-        # CSV에 생성된 유저 정보 기록
+        # Record created user information in CSV
         file_exists = os.path.exists(output_file_path)
         with open(output_file_path, 'a', newline='', encoding='utf-8') as outfile:
             writer = csv.writer(outfile)
@@ -148,7 +148,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f'{len(new_users)} new users created. Info saved to {output_file_path}.'))
 
-        # ✅ 최종적으로 생성되지 않은 유저만 출력
+        # ✅ Finally output only users that were not created
         permanently_skipped = [
             (email, reason)
             for (email, reason) in skipped_details

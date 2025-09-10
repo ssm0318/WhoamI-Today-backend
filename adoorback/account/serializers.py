@@ -110,7 +110,7 @@ class CurrentUserSignupSerializer(CurrentUserSerializer):
         user.set_password(password)
         user.save()
 
-        # 비밀번호 변경 페이지로 redirect되지 않게 하기
+        # Prevent redirect to password change page
         user.has_changed_pw = True
         user.save()
         

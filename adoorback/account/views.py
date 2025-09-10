@@ -102,7 +102,7 @@ class UserLogin(APIView):
                 value=access_token,
                 max_age=settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
                 secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                # FIXME: 원활한 테스트를 위해 일단 XSS 보안 이슈는 스킵
+                # FIXME: Skip XSS security issues for smooth testing
                 # httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
@@ -278,7 +278,7 @@ class UserSignup(generics.CreateAPIView):
             value=access_token,
             max_age=settings.SIMPLE_JWT['AUTH_COOKIE_MAX_AGE'],
             secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            # FIXME: 원활한 테스트를 위해 일단 보안 이슈는 스킵
+            # FIXME: Skip security issues for smooth testing
             # httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
             samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
         )
@@ -789,7 +789,7 @@ class ReceivedResponseRequestList(generics.GenericAPIView):
                     "id": rr.id,
                 }
             else:
-                # 가장 최근 created_at 유지
+                # Keep the most recent created_at
                 if rr.created_at > grouped_dict[qid]["created_at"]:
                     grouped_dict[qid]["created_at"] = rr.created_at
             grouped_dict[qid]["requester_username_list"].append(rr.requester.username)
@@ -1113,7 +1113,7 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
             })
 
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)  # `accepted` 필드 검사
+        serializer.is_valid(raise_exception=True)  # Check `accepted` field
         self.perform_update(serializer)
         return Response(serializer.data)
 

@@ -130,7 +130,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
                              on_delete=models.CASCADE, null=True)
     actors = models.ManyToManyField('account.User', through='NotificationActor', related_name='sent_notification_set')
 
-    # target: notification을 발생시킨 직접적인 원인(?)
+    # target: direct cause that triggered the notification
     target_type = models.ForeignKey(ContentType,
                                     on_delete=models.PROTECT,
                                     null=True,
@@ -138,7 +138,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
     target_id = models.IntegerField(null=True)
     target = GenericForeignKey('target_type', 'target_id')
 
-    # origin: target의 target (target의 target이 없을 경우 target의 직접적인 발생지)
+    # origin: target's target (if target's target doesn't exist, the direct source of target)
     origin_type = models.ForeignKey(ContentType,
                                     on_delete=models.SET_NULL,
                                     null=True,
@@ -146,7 +146,7 @@ class Notification(AdoorTimestampedModel, SafeDeleteModel):
     origin_id = models.IntegerField(null=True)
     origin = GenericForeignKey('origin_type', 'origin_id')
 
-    # redirect: target의 근원지(?), origin != redirect_url의 모델일 경우가 있음 (e.g. reply)
+    # redirect: target's origin source, there are cases where origin != redirect_url's model (e.g. reply)
     redirect_url = models.CharField(max_length=150)
     message = models.CharField(max_length=300)
 

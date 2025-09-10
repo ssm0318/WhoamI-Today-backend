@@ -187,7 +187,7 @@ class QuestionList(generics.ListCreateAPIView):
         except Exception:
             tz = ZoneInfo("America/Los_Angeles")
         today = timezone.now().astimezone(tz).date()
-        daily_questions = list(Question.objects.daily_questions(request.user))  # DailyQuestionList와 순서 일치를 위해
+        daily_questions = list(Question.objects.daily_questions(request.user))  # To match order with DailyQuestionList
         excluded_ids = tuple(q.id for q in daily_questions)
         excluded_clause = "AND id NOT IN %s" if excluded_ids else ""
         sql = f"""
@@ -283,7 +283,7 @@ class ResponseRequestCreate(generics.CreateAPIView):
         if not requestee.is_connected(current_user):
             raise PermissionDenied("친구에게만 response request를 보낼 수 있습니다.")
         
-        # 이미 있는 요청이 있으면 아무 일도 하지 않음
+        # Do nothing if request already exists
         exists = ResponseRequest.objects.filter(
             requester=requester,
             requestee=requestee,

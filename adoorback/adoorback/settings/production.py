@@ -57,7 +57,7 @@ ALLOWED_HOSTS = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "https://ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com",  # Public DNS 이름
+    "https://ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com",  # Public DNS name
     "https://43.203.123.225",
 ]
 

@@ -46,19 +46,19 @@ def adoor_exception_handler(exc, context):
     request = context.get('request', None)
     tb = traceback.format_exc()
 
-    # PermissionDenied 중 CSRF 실패 메시지가 아니면 무시
+    # Ignore PermissionDenied unless it's a CSRF failure message
     if isinstance(exc, PermissionDenied):
         if not str(exc).startswith("CSRF Failed"):
             return exception_handler(exc, context)
 
-    # 슬랙 알림
-    # 인증 실패 + 사용자 입력 관련 예외는 무시
+    # Slack notification
+    # Ignore authentication failures and user input related exceptions
     if isinstance(exc, (NotAuthenticated, AuthenticationFailed)) or isinstance(exc, USER_INPUT_EXCEPTIONS):
         return exception_handler(exc, context)
 
-    slack_level = getattr(exc, 'slack_level', 'ERROR')  # 기본값은 ERROR
+    slack_level = getattr(exc, 'slack_level', 'ERROR')  # Default is ERROR
 
-    # ValidationError에 대해 메시지 기반으로 무시
+    # Ignore ValidationError based on message
     if isinstance(exc, ValidationError):
         flat_messages = list(flatten_validation_errors(exc.detail))
         skip_messages = {
@@ -79,10 +79,10 @@ def adoor_exception_handler(exc, context):
         except Exception:
             traceback.print_exc()
 
-    # # 이메일 알림
+    # # Email notification
     # try:
     #     send_gmail_alert(
-    #         subject="🚨 Django 예외 발생",
+    #         subject="🚨 Django Exception Occurred",
     #         body=f"""
     #         View: {view.__class__.__name__ if view else 'Unknown'}
     #         Method: {request.method if request else 'N/A'}

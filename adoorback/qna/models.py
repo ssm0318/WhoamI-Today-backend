@@ -239,7 +239,7 @@ def create_request_answered_noti(instance, created, **kwargs):
     if instance.deleted:
         return
 
-    if not created:  # response edit만 해줬거나 익명으로만 공개한 경우
+    if not created:  # Only edited response or published anonymously
         return
 
     author_id = instance.author.id

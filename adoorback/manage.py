@@ -15,11 +15,11 @@ from adoorback.utils.alerts import send_msg_to_slack
 def main():
     """Run administrative tasks."""
 
-    # 현재 환경이 Docker 환경인지 확인
+    # Check if current environment is Docker environment
     is_runserver_docker = os.path.exists('/.dockerenv')
     print('is_runserver_docker', is_runserver_docker)
 
-    # 현재 환경이 production인지 확인
+    # Check if current environment is production
     is_production = os.getenv('DJANGO_ENV', 'development') == 'production'
 
     # local

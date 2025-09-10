@@ -23,7 +23,7 @@ class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
     def __get_language_from_request(self, request):
         accept_language = request.META.get('HTTP_ACCEPT_LANGUAGE', '')
         lang = accept_language.split(',')[0].split('-')[0].strip().lower() if accept_language else 'en'
-        if lang not in dict(LANGUAGES):  # 예: 'fr' 같은 미지원 언어 필터링
+        if lang not in dict(LANGUAGES):  # Filter unsupported languages like 'fr'
             lang = LANGUAGE_CODE
         return lang
 

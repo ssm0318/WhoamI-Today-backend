@@ -15,7 +15,7 @@ from adoorback.utils.alerts import send_msg_to_slack
 
 
 class ActivateTokenGenerator(PasswordResetTokenGenerator):
-    EMAIL_VERIFICATION_TIMEOUT_SECONDS = 60 * 60 * 24 * 365  # 1년
+    EMAIL_VERIFICATION_TIMEOUT_SECONDS = 60 * 60 * 24 * 365  # 1 year
 
     def _make_hash_value(self, user, timestamp):
         return (six.text_type(user.pk) + six.text_type(timestamp)) + six.text_type(user.email_verified)

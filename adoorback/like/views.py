@@ -29,7 +29,7 @@ class LikeCreate(generics.CreateAPIView):
                 content_type_id=content_type_id,
                 object_id=self.request.data['target_id']
             )
-            # serializer.data 접근 시 에러 방지: instance 기준으로 새 serializer 만들어줌
+            # Prevent error when accessing serializer.data: create new serializer based on instance
             self.instance = instance  # for use in get_success_headers
         except IntegrityError:
             raise ValidationError({

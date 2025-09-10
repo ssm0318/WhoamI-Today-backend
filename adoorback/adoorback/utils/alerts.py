@@ -18,11 +18,11 @@ def send_msg_to_slack(
     channel: Optional[str] = None,
     icon_emoji: Optional[str] = None,
     username: Optional[str] = None,
-    level: str = "INFO",  # 👈 기본 레벨은 INFO
+    level: str = "INFO",  # 👈 Default level is INFO
 ):
     allowed_levels = {"WARNING", "ERROR", "CRITICAL"}
     if level.upper() not in allowed_levels:
-        return  # 중요하지 않은 레벨은 보내지 않음
+        return  # Don't send unimportant levels
 
     request = get_current_request()
     user_info = ""
@@ -103,7 +103,7 @@ def send_gmail_alert(
     app_password = app_password or os.getenv("GMAIL_APP_PASSWORD")
 
     if not (to_email and from_email and app_password):
-        return  # 필수 정보가 없으면 전송 안 함
+        return  # Don't send if required information is missing
 
     msg = MIMEMultipart()
     msg['From'] = from_email

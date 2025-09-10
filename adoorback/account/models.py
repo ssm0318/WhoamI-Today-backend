@@ -212,11 +212,11 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
-    # Django 기본 설정에서는 username이 고유해야 하지만 (USERNAME_FIELD)를 우리는 고유하지 않은 username을 허용하고 싶음.
-    # USERNAME_FIELD를 email로 설정하여 이메일을 인증에 사용하고, username은 고유하지 않아도 되도록 함.
+    # Django default setting requires username to be unique (USERNAME_FIELD), but we want to allow non-unique usernames.
+    # Set USERNAME_FIELD to email to use email for authentication, allowing username to be non-unique.
     USERNAME_FIELD = 'email'  
     
-    # USERNAME_FIELD를 email로 바꾼대신, 반드시 username을 입력하도록 요구.
+    # Since we changed USERNAME_FIELD to email, require username to be mandatory.
     REQUIRED_FIELDS = ['username'] 
 
     objects = UserCustomManager()
@@ -782,7 +782,7 @@ def delete_old_profile_image(sender, instance, **kwargs):
             current_image_name = os.path.basename(instance.profile_image.name)
             current_hash = current_image_name.split('_')[-1].split('.')[0]
 
-            # username_{hash}.png 형태의 모든 파일을 찾습니다.
+            # Find all files in the format username_{hash}.png
             pattern = os.path.join(profile_images_dir, f'{instance.username}_*.png')
             existing_images = glob.glob(pattern)
             print(len(existing_images))
@@ -791,4 +791,4 @@ def delete_old_profile_image(sender, instance, **kwargs):
                 image_name = os.path.basename(image_path)
                 image_hash = image_name.split('_')[-1].split('.')[0]
                 if image_hash != current_hash:
-                    os.remove(image_path)  # 해시 값이 다른 파일을 삭제합니다.
+                    os.remove(image_path)  # Delete files with different hash values

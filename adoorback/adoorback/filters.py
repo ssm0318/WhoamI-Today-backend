@@ -5,7 +5,7 @@ from logging import Filter
 from user_agents import parse
 
 
-# 비동기 환경에서도 안전하게 동작함
+# Works safely in asynchronous environment
 _current_request = contextvars.ContextVar('current_request', default=None)
 
 
@@ -31,7 +31,7 @@ class UserInfoFilter(Filter):
                 record.username = 'Anonymous'
                 record.user_id = 'N/A'
 
-            # 인증 토큰 가져오기 (JWT, DRF Token 등 상황 고려)
+            # Get authentication token (considering JWT, DRF Token, etc.)
             token = request.META.get('HTTP_AUTHORIZATION')
             if not token and hasattr(request, 'auth') and request.auth:
                 token = str(request.auth)
@@ -45,13 +45,13 @@ class UserInfoFilter(Filter):
 
             user_agent_str = request.META.get('HTTP_USER_AGENT', '')
             user_agent = parse(user_agent_str)
-            record.os = user_agent.os.family  # 예: "iOS", "Android", "Windows"
+            record.os = user_agent.os.family  # e.g., "iOS", "Android", "Windows"
 
             # request body
             try:
                 if request.method in ['POST', 'PUT', 'PATCH']:
                     data = dict(request.data)  # QueryDict → dict (mutable copy)
-                    # 민감 정보 필터링
+                    # Filter sensitive information
                     sensitive_keys = ['password', 'token', 'secret', 'registration_id']
                     for key in sensitive_keys:
                         if key in data:

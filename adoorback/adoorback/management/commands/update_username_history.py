@@ -30,18 +30,18 @@ class Command(BaseCommand):
                 skipped.append((email, "User not found in DB"))
                 continue
 
-            # username_history가 None이면 빈 리스트로 초기화
+            # Initialize with empty list if username_history is None
             if user.username_history is None:
                 user.username_history = []
 
             changed = False
 
-            # 1. CSV에서 온 username 기록
+            # 1. Record username from CSV
             if username_from_csv not in user.username_history:
                 user.username_history.append(username_from_csv)
                 changed = True
 
-            # 2. 현재 DB username이 다르면 그것도 기록
+            # 2. Also record if current DB username is different
             if user.username != username_from_csv and user.username not in user.username_history:
                 user.username_history.append(user.username)
                 changed = True
