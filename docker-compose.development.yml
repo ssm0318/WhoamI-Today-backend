@@ -12,7 +12,7 @@ services:
       - .:/app
     depends_on:
       db:
-        condition: service_healthy # ✅ DB가 정상 실행될 때까지 대기
+        condition: service_healthy # ✅ Wait until DB is running normally
     command: /app/start.sh
     networks:
       - whoamitoday-network
@@ -29,7 +29,7 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck: # ✅ PostgreSQL 상태 확인
+    healthcheck: # ✅ Check PostgreSQL status
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       retries: 5

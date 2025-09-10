@@ -23,5 +23,5 @@ COPY ./cron/crontab_jobs /etc/cron.d/crontab_jobs
 RUN chmod 0644 /etc/cron.d/crontab_jobs
 RUN crontab /etc/cron.d/crontab_jobs
 
-# 6) 컨테이너 실행 시 cron을 포그라운드로 실행
+# 6) Run cron in foreground when container starts
 CMD ["cron", "-f"]
