@@ -107,6 +107,10 @@ class UserLogin(APIView):
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
             csrf.get_token(request)
+
+            if user.username in ['user_me', 'user_friend_A', 'user_friend_B'] and user.current_ver == 'experiment':
+                user.current_ver = 'default'
+                user.save()
             return response
         else:
             raise WrongPassword()
