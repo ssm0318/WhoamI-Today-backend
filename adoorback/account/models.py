@@ -386,6 +386,19 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
         return id_list
 
+    def is_following(self, user): 
+        return Follow.objects.filter(follower=self, followed=user).exists()
+
+    @property
+    def following(self):
+        ids = self.following_rel.values_list('followed', flat=True)
+        return User.objects.filter(id__in=ids)
+    
+    @property
+    def followers(self):
+        ids = self.followers_rel.values_list('follower', flat=True)
+        return User.objects.filter(id__in=ids)
+
     @property
     def reported_user_ids(self):
         from user_report.models import UserReport
@@ -582,6 +595,56 @@ class Connection(AdoorTimestampedModel, SafeDeleteModel):
         self.save()
 
 
+class FollowRequest(AdoorTimestampedModel, SafeDeleteModel):
+    requester = models.ForeignKey(
+        get_user_model(), related_name='sent_follow_requests', on_delete=models.CASCADE)
+    requestee = models.ForeignKey(
+        get_user_model(), related_name='received_follow_requests', on_delete=models.CASCADE)
+    accepted = models.BooleanField(null=True)  # None = pending, True/False = accepted/rejected
+
+    follow_request_targetted_notis = GenericRelation("notification.Notification",
+                                                           content_type_field='target_type',
+                                                           object_id_field='target_id')
+    follow_request_originated_notis = GenericRelation("notification.Notification",
+                                                            content_type_field='origin_type',
+                                                            object_id_field='origin_id')
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['requester', 'requestee'], condition=Q(deleted__isnull=True),
+                                    name='unique_follow_request'),
+            models.CheckConstraint(check=~models.Q(requester=models.F('requestee')), name='no_self_follow_request'),
+        ]
+        indexes = [models.Index(fields=['-updated_at'])]
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'Follow request: {self.requester.username} -> {self.requestee.username} (accepted: {self.accepted})'
+
+
+class Follow(AdoorTimestampedModel, SafeDeleteModel):
+    follower = models.ForeignKey(get_user_model(), related_name='following_rel', on_delete=models.CASCADE)
+    followed = models.ForeignKey(get_user_model(), related_name='followers_rel', on_delete=models.CASCADE)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['follower', 'followed'], condition=Q(deleted__isnull=True),
+                                    name='unique_follow'),
+            models.CheckConstraint(check=~models.Q(follower=models.F('followed')), name='no_self_follow'),
+        ]
+        indexes = [
+            models.Index(fields=['follower']),
+            models.Index(fields=['followed']),
+        ]
+
+    def __str__(self):
+        return f'{self.follower.username} follows {self.followed.username}'
+
+
 class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(
         get_user_model(), related_name='block_recs', on_delete=models.CASCADE)
@@ -745,6 +808,56 @@ def create_connection_noti(created, instance, **kwargs):
                                                    actors__id=requester.id).update(is_read=True,
                                                                                    is_visible=False)
 
+
+@transaction.atomic
+@receiver(post_save, sender=FollowRequest)
+def create_follow_request_noti(created, instance, **kwargs):
+    if instance.deleted:
+        return
+
+    Notification = apps.get_model('notification', 'Notification')
+    requester = instance.requester
+    requestee = instance.requestee
+
+    # do not create notification from/for blocked user
+    if requester.id in requestee.user_report_blocked_ids:
+        return
+
+    if created:
+        noti = Notification.objects.create(
+            user=requestee,
+            origin=requester,
+            target=instance,
+            message_ko=f'{requester.username}님이 팔로우 요청을 보냈습니다.',
+            message_en=f'{requester.username} has sent a follow request.',
+            redirect_url=f'/users/{requester.username}'
+        )
+        NotificationActor.objects.create(user=requester, notification=noti)
+        return
+
+    # accepted -> create directional follow (follower -> followed)
+    if instance.accepted:
+        # avoid duplicate on undelete
+        if Follow.objects.filter(follower=requester, followed=requestee).exists():
+            return
+
+        Follow.objects.create(follower=requester, followed=requestee)
+
+        noti = Notification.objects.create(
+            user=requester,
+            origin=requestee,
+            target=instance,
+            message_ko=f'{requestee.username}님이 당신의 팔로우 요청을 수락했습니다.',
+            message_en=f'{requestee.username} accepted your follow request.',
+            redirect_url=f'/users/{requestee.username}'
+        )
+        NotificationActor.objects.create(user=requestee, notification=noti)
+
+    # make request notification invisible/read once requestee has responded
+    instance.follow_request_targetted_notis.filter(user=requestee,
+                                                         actors__id=requester.id).update(is_read=True,
+                                                                                         is_visible=False)
+                         
 
 @transaction.atomic
 @receiver(post_save, sender=User)
