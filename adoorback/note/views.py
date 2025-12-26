@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -23,6 +24,7 @@ class NoteCreate(generics.CreateAPIView):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -31,7 +33,6 @@ class NoteCreate(generics.CreateAPIView):
     def perform_create(self, serializer):
         images = self.request.FILES.getlist('images')
         note_instance = serializer.save(author=self.request.user)
-        serializer.save(author=self.request.user)
         for image in images:
             NoteImage.objects.create(note=note_instance, image=image)
 
@@ -87,6 +88,7 @@ class NoteComments(generics.ListAPIView):
 class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -114,6 +116,7 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = DefaultFriendNoteSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_exception_handler(self):
         return adoor_exception_handler
