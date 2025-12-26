@@ -295,6 +295,7 @@ class FriendListSerializer(UserMinimalSerializer):
     track_id = serializers.SerializerMethodField(read_only=True)
     description = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
+    social_battery = serializers.SerializerMethodField(read_only=True)
     recent_post = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
@@ -366,6 +367,13 @@ class FriendListSerializer(UserMinimalSerializer):
         check_in = self.check_in(obj)
         if check_in:
             return check_in.description
+        else:
+            return None
+            
+    def get_social_battery(self, obj):
+        check_in = self.check_in(obj)
+        if check_in:
+            return check_in.social_battery
         else:
             return None
 
@@ -453,7 +461,7 @@ class FriendListSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
                                                       'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count',
-                                                      'recent_post']
+                                                      'recent_post', 'social_battery']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
