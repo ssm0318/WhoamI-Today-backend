@@ -4,6 +4,7 @@ import uuid
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.fields import ArrayField
 from django.core.files.storage import FileSystemStorage
 from django.db import models, transaction
 from django.db.models.signals import post_save, post_delete
@@ -41,10 +42,10 @@ def note_image_path(instance, filename):
 
 class Note(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='note_set', on_delete=models.CASCADE)
-    visibility = models.CharField(
-        max_length=20,
-        choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
-        default='friends'
+    visibility = ArrayField(
+        models.CharField(max_length=20),
+        default=list,
+        blank=True
     )
 
     note_comments = GenericRelation(Comment)
@@ -104,16 +105,12 @@ class Note(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
 
+        is_close_friend = user.is_close_friend(self.author)
         connection = Connection.get_connection_between(self.author, user)
+        is_friend = connection is not None
 
-        if not connection:
-            return False
-
-        if self.visibility == 'close_friends':
-            is_close = user.is_close_friend(self.author)
-            if not is_close:
-                return False
-
+        # Check Close Friend
+        if is_close_friend:
             if self.author == connection.user1:
                 update_past_posts = connection.user1_update_past_posts
                 upgrade_time = connection.user1_upgrade_time
@@ -121,13 +118,23 @@ class Note(AdoorModel, SafeDeleteModel):
                 update_past_posts = connection.user2_update_past_posts
                 upgrade_time = connection.user2_upgrade_time
 
+            can_see_as_cf = False
             if update_past_posts:
+                can_see_as_cf = True
+            elif upgrade_time is None:  # users were close friends from the beginning
+                can_see_as_cf = True
+            elif self.created_at > upgrade_time:
+                can_see_as_cf = True
+            
+            if can_see_as_cf and 'close_friends' in self.visibility:
                 return True
-            if upgrade_time is None:  # users were close friends from the beginning
-                return True
-            return self.created_at > upgrade_time
         
-        return True
+        # Check Friend (Mutually Exclusive: Not Close Friend)
+        if is_friend and not is_close_friend:
+            if 'friends' in self.visibility:
+                return True
+        
+        return False
 
     class Meta:
         indexes = [
