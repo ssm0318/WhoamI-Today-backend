@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.9
 
 WORKDIR /app
 
@@ -9,10 +9,16 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     postgresql-server-dev-all \
     libpq-dev \
+    libev-dev \
+    libevent-dev \
+    default-jdk \
+    libxml2-dev \
+    libxslt-dev \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip setuptools wheel
 
 # Start script
 COPY start.sh .
@@ -21,10 +27,10 @@ RUN ls -la /app/start.sh    # For permission verification
 
 # Copy project files - prevent nested directory structure
 COPY adoorback /app/adoorback
-COPY docker-compose.* .
-COPY .env* .
-COPY .dockerignore .
-COPY .gitignore .
+COPY docker-compose.* ./
+COPY .env* ./
+COPY .dockerignore ./
+COPY .gitignore ./
 
 # Install Python packages
 WORKDIR /app/adoorback

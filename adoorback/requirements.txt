@@ -53,10 +53,10 @@ fcm-django==2.2.1
 firebase-admin==6.2
 Flask>=1.1.2
 Flask-BasicAuth>=0.2.0
-gevent>=20.9.0
+gevent>=23.9.1
 geventhttpclient>=1.4.4
 google-cloud-translate==2.0.1
-greenlet>=0.4.17
+greenlet>=3.0.0
 idna>=2.10
 importlib-metadata>=2.0.0
 isort>=5.6.4

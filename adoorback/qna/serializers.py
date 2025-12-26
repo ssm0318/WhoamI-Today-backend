@@ -49,7 +49,7 @@ class ResponseSerializer(AdoorBaseSerializer):
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
     visibility = serializers.ChoiceField(
-        choices=['friends', 'close_friends'],
+        choices=['public', 'follower', 'friends', 'close_friends'],
         required=True
     )
 

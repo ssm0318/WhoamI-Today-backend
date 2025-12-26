@@ -70,6 +70,16 @@ urlpatterns = [
     path('friend-requests/<int:pk>/respond/default/', views.UserFriendRequestUpdateDefault.as_view(), 
          name='user-friend-request-update-default'),
 
+    # FollowRequest related
+    path('follow-requests/', views.UserFollowRequestListCreate.as_view(), name='user-follow-request-list-create'),
+    path('follow-requests/sent/', views.UserSentFollowRequestList.as_view(), name='user-sent-follow-request-list'),
+    path('follow-requests/<int:pk>/', views.UserFollowRequestDestroy.as_view(), name='user-follow-request-destroy'),
+    path('follow-requests/<int:pk>/respond/', views.UserFollowRequestUpdate.as_view(), name='user-follow-request-update'),
+
+    # Follower related
+    path('followers/', views.UserFollowerList.as_view(), name='user-followers-list'),
+    path('following/', views.UserFollowingList.as_view(), name='user-following-list'),
+    
     # Friend Recommend related
     path('recommended-friends/', views.UserRecommendedFriendsList.as_view(), name='user-recommended-friends-list'),
     path('block-recommendation/', views.BlockRecCreate.as_view(), name='block-rec-create'),

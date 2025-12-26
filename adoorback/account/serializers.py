@@ -13,7 +13,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES, PERSONA_CHOICES
+    VERSION_CHOICES, PERSONA_CHOICES, FollowRequest, Follow
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -182,6 +182,10 @@ class UserProfileSerializer(UserMinimalSerializer):
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     friend_count = serializers.SerializerMethodField(read_only=True)
+    is_following = serializers.SerializerMethodField(read_only=True)
+    is_followed_by = serializers.SerializerMethodField(read_only=True)
+    sent_follow_request_to = serializers.SerializerMethodField(read_only=True)
+    received_follow_request_from = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -247,12 +251,38 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_friend_count(self, obj):
         return Connection.objects.filter(Q(user1=obj) | Q(user2=obj)).count()
 
+    def get_is_following(self, obj):
+        user = self.context.get('request').user
+        if user.is_anonymous:
+            return False
+        return Follow.objects.filter(follower=user, followed=obj).exists()
+
+    def get_is_followed_by(self, obj):
+        user = self.context.get('request').user
+        if user.is_anonymous:
+            return False
+        return Follow.objects.filter(follower=obj, followed=user).exists()
+
+    def get_sent_follow_request_to(self, obj):
+        user = self.context.get('request').user
+        if user.is_anonymous:
+            return False
+        return FollowRequest.objects.filter(requester=user, requestee=obj, accepted__isnull=True).exists()
+
+    def get_received_follow_request_from(self, obj):
+        user = self.context.get('request').user
+        if user.is_anonymous:
+            return False
+        return FollowRequest.objects.filter(requester=obj, requestee=user, accepted__isnull=True).exists()
+
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
                                                       'pronouns', 'bio', 'persona', 'unread_ping_count', 'connection_status',
-                                                      'friend_count', 'email_verified']
+                                                      'friend_count', 'email_verified',
+                                                      'is_following', 'is_followed_by',
+                                                      'sent_follow_request_to', 'received_follow_request_from']
 
 
 class FriendListSerializer(UserMinimalSerializer):
@@ -265,6 +295,7 @@ class FriendListSerializer(UserMinimalSerializer):
     track_id = serializers.SerializerMethodField(read_only=True)
     description = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
+    recent_post = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -362,10 +393,64 @@ class FriendListSerializer(UserMinimalSerializer):
             return ping_room.pings.filter(receiver=user, is_read=False).count()
         return 0
 
+    def get_recent_post(self, obj):
+        responses = self.responses(obj)
+        notes = self.notes(obj)
+        
+        # Combine and sort by created_at descending
+        all_posts = []
+        for r in responses:
+            all_posts.append({
+                'type': 'Response',
+                'id': r['id'],
+                'content': r['content'],
+                'created_at': r['created_at'],
+                'question': r.get('question'), # Include full question object
+                'current_user_like_id': r.get('current_user_like_id'),
+                'current_user_reaction_id_list': r.get('current_user_reaction_id_list'),
+                'like_reaction_user_sample': r.get('like_reaction_user_sample'),
+            })
+        for n in notes:
+            all_posts.append({
+                'type': 'Note',
+                'id': n['id'],
+                'content': n['content'],
+                'created_at': n['created_at'],
+                'current_user_like_id': n.get('current_user_like_id'),
+                'current_user_reaction_id_list': n.get('current_user_reaction_id_list'),
+                'like_reaction_user_sample': n.get('like_reaction_user_sample'),
+            })
+        
+        if not all_posts:
+            return None
+            
+        # Sort by created_at desc (assuming ISO string format sorts correctly)
+        all_posts.sort(key=lambda x: x['created_at'], reverse=True)
+        recent = all_posts[0]
+        
+        # Format output
+        preview = recent['content'][:50]
+        
+        data = {
+            'type': recent['type'],
+            'id': recent['id'],
+            'preview_content': preview,
+            'created_at': recent['created_at'],
+            'current_user_like_id': recent.get('current_user_like_id'),
+            'current_user_reaction_id_list': recent.get('current_user_reaction_id_list'),
+            'like_reaction_user_sample': recent.get('like_reaction_user_sample'),
+        }
+        
+        if recent['type'] == 'Response':
+             data['question'] = recent.get('question')
+             
+        return data
+
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count']
+                                                      'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count',
+                                                      'recent_post']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
@@ -537,6 +622,70 @@ class UserFriendRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FriendRequest
+        fields = ['requester_id', 'requestee_id', 'requestee_detail']
+
+
+class UserFollowRequestCreateSerializer(serializers.ModelSerializer):
+    requester_id = serializers.IntegerField()
+    requestee_id = serializers.IntegerField()
+    accepted = serializers.BooleanField(allow_null=True, required=False)
+    requester_detail = serializers.SerializerMethodField(read_only=True)
+
+    def get_requester_detail(self, obj):
+        return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
+
+    def validate(self, data):
+        data = super().validate(data)
+        
+        try:
+            requester = User.objects.get(id=data['requester_id'])
+            requestee = User.objects.get(id=data['requestee_id'])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found")
+
+        if data.get('requester_id') == data.get('requestee_id'):
+            raise serializers.ValidationError('You cannot follow yourself.')
+
+        if Follow.objects.filter(follower=requester, followed=requestee).exists():
+             raise serializers.ValidationError('You are already following this user.')
+
+        if FollowRequest.objects.filter(requester=requester, requestee=requestee, accepted__isnull=True).exists():
+            raise serializers.ValidationError('You have already sent a follow request to this user.')
+
+        return data
+
+    class Meta:
+        model = FollowRequest
+        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail']
+
+
+class UserFollowRequestUpdateSerializer(serializers.ModelSerializer):
+    requester_id = serializers.IntegerField(required=False)
+    requestee_id = serializers.IntegerField(required=False)
+    accepted = serializers.BooleanField(required=True)
+
+    def validate(self, data):
+        unknown = set(self.initial_data) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError("Unknown field: {}".format(", ".join(unknown)))
+        if self.instance.accepted is not None:
+            raise serializers.ValidationError("You have already responded to this follow request.")
+        
+        return data
+
+    class Meta:
+        model = FollowRequest
+        fields = ['requester_id', 'requestee_id', 'accepted']
+
+
+class UserFollowRequestSerializer(serializers.ModelSerializer):
+    requestee_detail = serializers.SerializerMethodField(read_only=True)
+
+    def get_requestee_detail(self, obj):
+        return UserMinimalSerializer(User.objects.get(id=obj.requestee_id)).data
+
+    class Meta:
+        model = FollowRequest
         fields = ['requester_id', 'requestee_id', 'requestee_detail']
 
 
