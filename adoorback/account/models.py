@@ -112,6 +112,17 @@ PERSONA_CHOICES = [
     ('active_listener', 'Active Listener'),
     ('thoughtful_responder', 'Thoughtful Responder'),
 ]
+INTEREST_CHOICES_BASE = [
+    'Gaming', 'Minecraft', 'Roblox', 'Fortnite', 'Valorant', 'Anime', 'Kpop', 'HipHop', 
+    'PopMusic', 'MusicProduction', 'Podcast', 'YouTube', 'Streaming', 'Movies', 'TVShows', 
+    'Tech&Gadgets', 'Coding', 'AppDesign', 'UXDesign', 'AI', 'DigitalArt', 'GraphicDesign', 
+    'VideoEditing', 'Photography', 'SocialMedia', 'Basketball', 'Soccer', 'Volleyball', 
+    'Tennis', 'Gym&Lifting', 'Running', 'Cycling', 'Climbing', 'Skateboarding', 'Surfing', 
+    'Snowboarding', 'Drawing', 'Painting', 'Fashion', 'Thrifting', 'Makeup', 'NailArt', 
+    'DIY', 'Journaling', 'Aesthetic', 'Reading', 'ClosedBook', 'Studying', 'SelfCare', 
+    'MentalHealth', 'Motivation', 'Productivity', 'NightOwl', 'EarlyBird', 'Dogs', 'Cats', 
+    'Pets', 'Nature', 'Hiking', 'Traveling', 'Foodie', 'Baking', 'Cooking'
+]
 
 
 class OverwriteStorage(FileSystemStorage):
@@ -682,6 +693,36 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return f'{self.subscriber} subscribed to {self.content_type} of {self.subscribed_to}'
+
+
+class Interest(AdoorTimestampedModel, SafeDeleteModel):
+    content = models.CharField(max_length=100, unique=True)
+    users = models.ManyToManyField(get_user_model(), related_name='user_interests', blank=True)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['content']),
+        ]
+
+    def __str__(self):
+        return self.content
+
+
+class Persona(AdoorTimestampedModel, SafeDeleteModel):
+    content = models.CharField(max_length=100, unique=True)
+    users = models.ManyToManyField(get_user_model(), related_name='user_personas', blank=True)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['content']),
+        ]
+
+    def __str__(self):
+        return self.content
 
 
 class AppSession(SafeDeleteModel):
