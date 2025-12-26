@@ -53,6 +53,9 @@ class ResponseSerializer(AdoorBaseSerializer):
         required=True
     )
 
+    def validate_visibility(self, value):
+        return list(value)
+
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
         return current_user_id in obj.reader_ids
