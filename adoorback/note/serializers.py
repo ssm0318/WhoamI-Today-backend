@@ -36,7 +36,10 @@ class BaseNoteSerializer(AdoorBaseSerializer):
 class NoteSerializer(BaseNoteSerializer):
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
-    visibility = serializers.ChoiceField(choices=['friends', 'close_friends'], required=True)
+    visibility = serializers.MultipleChoiceField(choices=['friends', 'close_friends'], required=True)
+
+    def validate_visibility(self, value):
+        return list(value)
 
     def get_current_user_reaction_id_list(self, obj):
         current_user_id = self.context['request'].user.id
@@ -81,7 +84,10 @@ class DefaultFriendNoteSerializer(BaseNoteSerializer):
     '''
     like_count = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
-    visibility = serializers.ChoiceField(choices=['friends', 'close_friends'], required=True)
+    visibility = serializers.MultipleChoiceField(choices=['friends', 'close_friends'], required=True)
+
+    def validate_visibility(self, value):
+        return list(value)
 
     def get_like_count(self, obj):
         return obj.liked_user_ids.count()
