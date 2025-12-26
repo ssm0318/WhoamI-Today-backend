@@ -82,7 +82,7 @@ class Response(AdoorModel, SafeDeleteModel):
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
     visibility = models.CharField(
         max_length=20,
-        choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
+        choices=[('public', 'Public'), ('follower', 'Follower'), ('friends', 'Friends'), ('close_friends', 'Close Friends')],
         default='close_friends'
     )
 
@@ -149,10 +149,19 @@ class Response(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
 
+        if self.visibility == 'public':
+            return True
+
+        if self.visibility == 'follower':
+            return user.is_following(self.author)
+
         connection = Connection.get_connection_between(self.author, user)
 
         if not connection:
             return False
+            
+        if self.visibility == 'friends':
+             return True
 
         if self.visibility == 'close_friends':
             is_close = user.is_close_friend(self.author)
@@ -172,7 +181,7 @@ class Response(AdoorModel, SafeDeleteModel):
                 return True
             return self.created_at > upgrade_time
 
-        return True
+        return False
 
 
 class ResponseRequest(AdoorTimestampedModel, SafeDeleteModel):

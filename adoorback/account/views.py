@@ -43,7 +43,9 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserInviterEmailBirthDateSerializer, FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
-                                 AppSessionSerializer, FriendFriendListSerializer)
+                                 AppSessionSerializer, FriendFriendListSerializer, \
+                                 UserFollowRequestCreateSerializer, UserFollowRequestSerializer, \
+                                 UserFollowRequestUpdateSerializer, UserMinimalSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -54,6 +56,7 @@ from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Response as _Response
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
+from account.models import FollowRequest, Follow
 from tracking.utils import clean_session_key
 
 
@@ -969,6 +972,12 @@ class ConnectionChoiceUpdate(generics.UpdateAPIView):
         
         if new_choice not in ['friend', 'close_friend']:
             return Response({'error': 'Invalid choice'}, status=400)
+        
+        # Check limits
+        user = request.user
+        if new_choice == 'close_friend':
+            if user.close_friends.count() >= 15:
+                return Response({'error': 'You can only have up to 15 close friends.'}, status=400)
             
         connection.update_friendship_level(request.user, new_choice, update_past_posts)
         return Response({'status': 'Friendship level updated'})
@@ -1118,6 +1127,23 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
 
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)  # Check `accepted` field
+        
+        # Check limits before performing update
+        if serializer.validated_data.get('accepted'):
+            requestee = self.get_object().requestee
+            # checking friend limit
+            if requestee.friends.count() >= 35:
+                 raise ValidationError({'error': 'You can only have up to 35 friends.'})
+            
+            # checking close friend limit
+            if self.default_api: # default api accepts as friend
+                 pass
+            else:
+                choice = request.data.get('requestee_choice')
+                if choice == 'close_friend':
+                    if requestee.close_friends.count() >= 15:
+                        raise ValidationError({'error': 'You can only have up to 15 close friends.'})
+
         self.perform_update(serializer)
         return Response(serializer.data)
 
@@ -1162,6 +1188,83 @@ class UserFriendRequestUpdate(BaseUserFriendRequestUpdate):
 
 class UserFriendRequestUpdateDefault(BaseUserFriendRequestUpdate):
     default_api = True
+
+
+class UserFollowRequestListCreate(generics.ListCreateAPIView):
+    queryset = FollowRequest.objects.all()
+    serializer_class = UserFollowRequestCreateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        # List pending received follow requests
+        return FollowRequest.objects.filter(requestee=self.request.user).filter(accepted__isnull=True)
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        if int(self.request.data.get('requester_id')) != int(self.request.user.id):
+            raise PermissionDenied("The requester must be yourself.")
+        serializer.save(accepted=None)
+
+
+class UserSentFollowRequestList(generics.ListAPIView):
+    queryset = FollowRequest.objects.all()
+    serializer_class = UserFollowRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        # List pending sent follow requests (not accepted, not declined)
+        return FollowRequest.objects.filter(requester=self.request.user).filter(accepted__isnull=True)
+
+
+class UserFollowRequestDestroy(generics.DestroyAPIView):
+    serializer_class = UserFollowRequestCreateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        return FollowRequest.objects.get(requester_id=self.request.user.id,
+                                         requestee_id=self.kwargs.get('pk'))
+
+    @transaction.atomic
+    def perform_destroy(self, obj):
+        obj.delete(force_policy=SOFT_DELETE_CASCADE)
+
+
+class UserFollowRequestUpdate(generics.UpdateAPIView):
+    serializer_class = UserFollowRequestUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        return FollowRequest.objects.get(requester_id=self.kwargs.get('pk'),
+                                         requestee_id=self.request.user.id)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
+        if serializer.validated_data.get('accepted'):
+             # Check follower limit
+             if request.user.followers.count() >= 100:
+                 raise ValidationError({'error': 'You can only have up to 100 followers.'})
+
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        serializer.save()
 
 
 class UserRecommendedFriendsList(generics.ListAPIView):
@@ -1539,3 +1642,24 @@ class TouchSession(generics.UpdateAPIView):
         session_id = clean_session_key(session_id)
         
         return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)
+
+class UserFollowerList(generics.ListAPIView):
+    serializer_class = UserMinimalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return self.request.user.followers
+
+
+class UserFollowingList(generics.ListAPIView):
+    serializer_class = UserMinimalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return self.request.user.following

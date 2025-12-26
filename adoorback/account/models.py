@@ -813,6 +813,7 @@ def create_connection_noti(created, instance, **kwargs):
 @receiver(post_save, sender=FollowRequest)
 def create_follow_request_noti(created, instance, **kwargs):
     if instance.deleted:
+        instance.follow_request_targetted_notis.update(is_read=True, is_visible=False)
         return
 
     Notification = apps.get_model('notification', 'Notification')

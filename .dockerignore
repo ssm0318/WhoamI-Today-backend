@@ -1,5 +1,5 @@
 .git
-.env*
+# .env* (commented out to allow copying)
 *.pyc
 __pycache__
 *.pyo

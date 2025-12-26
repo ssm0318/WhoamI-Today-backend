@@ -12,6 +12,3 @@ fi
 
 # Run as development server (for testing)
 python manage.py runserver 0.0.0.0:8000
-
-# Run uwsgi
-uwsgi --ini adoorback/.config/uwsgi/uwsgi.ini
