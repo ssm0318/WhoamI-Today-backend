@@ -418,6 +418,7 @@ class FriendListSerializer(UserMinimalSerializer):
                 'current_user_reaction_id_list': r.get('current_user_reaction_id_list'),
                 'like_reaction_user_sample': r.get('like_reaction_user_sample'),
                 'is_read': r.get('current_user_read'),
+                'comment_count': r.get('comment_count'),
             })
         for n in notes:
             all_posts.append({
@@ -430,6 +431,7 @@ class FriendListSerializer(UserMinimalSerializer):
                 'like_reaction_user_sample': n.get('like_reaction_user_sample'),
                 'is_read': n.get('current_user_read'),
                 'images': n.get('images'),
+                'comment_count': n.get('comment_count'),
             })
         
         if not all_posts:
@@ -452,6 +454,7 @@ class FriendListSerializer(UserMinimalSerializer):
             'like_reaction_user_sample': recent.get('like_reaction_user_sample'),
             'is_read': recent.get('is_read'),
             'images': recent.get('images', []),
+            'comment_count': recent.get('comment_count'),
         }
         
         if recent['type'] == 'Response':
