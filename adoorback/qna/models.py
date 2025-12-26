@@ -80,10 +80,10 @@ class Question(AdoorModel, SafeDeleteModel):
 class Response(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='response_set', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
-    visibility = models.CharField(
-        max_length=20,
-        choices=[('public', 'Public'), ('follower', 'Follower'), ('friends', 'Friends'), ('close_friends', 'Close Friends')],
-        default='close_friends'
+    visibility = ArrayField(
+        models.CharField(max_length=20),
+        blank=True,
+        default=list
     )
 
     response_comments = GenericRelation(Comment)
@@ -148,38 +148,51 @@ class Response(AdoorModel, SafeDeleteModel):
 
         if self.author == user:
             return True
-
-        if self.visibility == 'public':
-            return True
-
-        if self.visibility == 'follower':
-            return user.is_following(self.author)
-
-        connection = Connection.get_connection_between(self.author, user)
-
-        if not connection:
-            return False
             
-        if self.visibility == 'friends':
-             return True
+        is_close_friend = user.is_close_friend(self.author)
+        is_friend = Connection.objects.filter(
+            (models.Q(user1=self.author) & models.Q(user2=user)) | 
+            (models.Q(user1=user) & models.Q(user2=self.author))
+        ).exists()
+        is_following = user.is_following(self.author)
 
-        if self.visibility == 'close_friends':
-            is_close = user.is_close_friend(self.author)
-            if not is_close:
-                return False
+        # Check Close Friend
+        if is_close_friend:
+            # Upgrade logic for close friends
+            connection = Connection.get_connection_between(self.author, user)
+            if connection:  # Should exist if close friend
+                if self.author == connection.user1:
+                    update_past_posts = connection.user1_update_past_posts
+                    upgrade_time = connection.user1_upgrade_time
+                else:
+                    update_past_posts = connection.user2_update_past_posts
+                    upgrade_time = connection.user2_upgrade_time
 
-            if self.author == connection.user1:
-                update_past_posts = connection.user1_update_past_posts
-                upgrade_time = connection.user1_upgrade_time
-            else:
-                update_past_posts = connection.user2_update_past_posts
-                upgrade_time = connection.user2_upgrade_time
+                can_see_as_cf = False
+                if update_past_posts:
+                    can_see_as_cf = True
+                elif upgrade_time is None:
+                    can_see_as_cf = True
+                elif self.created_at > upgrade_time:
+                    can_see_as_cf = True
+                
+                if can_see_as_cf and 'close_friends' in self.visibility:
+                    return True
 
-            if update_past_posts:
+        # Check Friend (Mutually Exclusive: Not Close Friend)
+        if is_friend and not is_close_friend:
+            if 'friends' in self.visibility:
                 return True
-            if upgrade_time is None:  # users were close friends from the beginning
+
+        # Check Follower (Mutually Exclusive: Not Connected)
+        if is_following and not is_friend:
+             if 'follower' in self.visibility:
                 return True
-            return self.created_at > upgrade_time
+
+        # Check Public (Mutually Exclusive: Not Connected, Not Following)
+        if not is_friend and not is_following:
+            if 'public' in self.visibility:
+                return True
 
         return False
 
