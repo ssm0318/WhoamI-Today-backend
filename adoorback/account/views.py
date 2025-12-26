@@ -828,6 +828,20 @@ class FriendList(generics.ListAPIView):
 
         if query_type == 'all':
             return friends.order_by('username')
+        elif query_type == 'close_friends':
+            close_friends_ids = Connection.objects.filter(
+                Q(user1=user, user1_choice='close_friend') | 
+                Q(user2=user, user2_choice='close_friend')
+            ).values_list('user1_id', 'user2_id')
+            
+            target_ids = set()
+            for u1_id, u2_id in close_friends_ids:
+                if u1_id == user.id:
+                    target_ids.add(u2_id)
+                else:
+                    target_ids.add(u1_id)
+            
+            return friends.filter(id__in=target_ids).order_by('username')
         elif query_type == 'has_updates':
             friends = friends.exclude(hidden=True)
             friends_with_updates = [
