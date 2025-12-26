@@ -1,4 +1,5 @@
 from itertools import chain
+import json
 
 from django.contrib.auth import get_user_model
 from django.db.models import F, Value, CharField, BooleanField
@@ -33,13 +34,38 @@ class BaseNoteSerializer(AdoorBaseSerializer):
         fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_read', 'is_edited']
 
 
+class VisibilityField(serializers.MultipleChoiceField):
+    def to_internal_value(self, data):
+        # Case: single item list from form-data (e.g., ['["friends"]'])
+        if isinstance(data, list) and len(data) == 1 and isinstance(data[0], str):
+            if data[0].strip().startswith('['):
+                data = data[0]
+
+        if isinstance(data, str):
+            data = data.strip()
+            if data.startswith('[') and data.endswith(']'):
+                try:
+                    data = json.loads(data)
+                except (json.JSONDecodeError, TypeError):
+                    content = data[1:-1].strip()
+                    if not content:
+                        data = []
+                    else:
+                        data = [v.strip().strip('"').strip("'") for v in content.split(',') if v.strip()]
+            elif ',' in data:
+                data = [v.strip() for v in data.split(',') if v.strip()]
+            
+            if isinstance(data, str):
+                data = [data]
+
+        # MultipleChoiceField returns a set, but we need a list for ArrayField
+        return list(super().to_internal_value(data))
+
+
 class NoteSerializer(BaseNoteSerializer):
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
-    visibility = serializers.MultipleChoiceField(choices=['friends', 'close_friends'], required=True)
-
-    def validate_visibility(self, value):
-        return list(value)
+    visibility = VisibilityField(choices=['friends', 'close_friends'], required=True)
 
     def get_current_user_reaction_id_list(self, obj):
         current_user_id = self.context['request'].user.id
@@ -84,10 +110,7 @@ class DefaultFriendNoteSerializer(BaseNoteSerializer):
     '''
     like_count = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
-    visibility = serializers.MultipleChoiceField(choices=['friends', 'close_friends'], required=True)
-
-    def validate_visibility(self, value):
-        return list(value)
+    visibility = VisibilityField(choices=['friends', 'close_friends'], required=True)
 
     def get_like_count(self, obj):
         return obj.liked_user_ids.count()
