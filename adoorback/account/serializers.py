@@ -429,6 +429,7 @@ class FriendListSerializer(UserMinimalSerializer):
                 'current_user_reaction_id_list': n.get('current_user_reaction_id_list'),
                 'like_reaction_user_sample': n.get('like_reaction_user_sample'),
                 'is_read': n.get('current_user_read'),
+                'images': n.get('images'),
             })
         
         if not all_posts:
@@ -450,6 +451,7 @@ class FriendListSerializer(UserMinimalSerializer):
             'current_user_reaction_id_list': recent.get('current_user_reaction_id_list'),
             'like_reaction_user_sample': recent.get('like_reaction_user_sample'),
             'is_read': recent.get('is_read'),
+            'images': recent.get('images', []),
         }
         
         if recent['type'] == 'Response':
