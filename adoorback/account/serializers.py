@@ -32,6 +32,8 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     unread_noti = serializers.SerializerMethodField(read_only=True)
     unread_noti_cnt = serializers.SerializerMethodField(read_only=True)
     current_ver = serializers.ChoiceField(choices=VERSION_CHOICES, read_only=True)
+    user_interests = serializers.StringRelatedField(many=True, read_only=True)
+    user_personas = serializers.StringRelatedField(many=True, read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -94,6 +96,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
+                  'user_interests', 'user_personas',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',

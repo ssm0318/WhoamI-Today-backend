@@ -600,26 +600,62 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
                     raise ExistingUsername()
 
-            persona = self.request.data.get('persona')
-            if persona:
-                if isinstance(persona, str):
-                    try:
-                        persona = json.loads(persona)
-                    except json.JSONDecodeError:
-                        raise serializers.ValidationError({
-                            "persona": ["persona must be a valid JSON list."]
-                        })
-                if not isinstance(persona, list):
-                    raise serializers.ValidationError({
-                        "persona": ["persona must be a list."]
-                    })
-                from .models import PERSONA_CHOICES
-                invalid_choices = [p for p in persona if p not in dict(PERSONA_CHOICES)]
-                if invalid_choices:
-                    raise serializers.ValidationError({
-                        "persona": [f"Invalid choices: {invalid_choices}"]
-                    })
-                serializer.validated_data['persona'] = persona
+            persona_str = self.request.data.get('persona')
+            interest_str = self.request.data.get('interest')
+
+            import re
+            from .models import Persona, Interest
+
+            def normalize(t):
+                return t.lower().replace('-', '').replace('_', '').replace(' ', '')
+
+            def parse_hashtags(text):
+                if not text:
+                    return []
+                return re.findall(r'#([^\s#]+)', text)
+
+            def get_or_create_normalized(model, raw_tag):
+                normalized_input = normalize(raw_tag)
+                # Fetch all in-memory for matching (optimized for small-medium scale)
+                all_instances = list(model.objects.all_with_deleted())
+                for instance in all_instances:
+                    if normalize(instance.content) == normalized_input:
+                        if instance.deleted:
+                            instance.undelete()
+                        return instance
+                # Not found, create new PascalCase version
+                pascal_content = ''.join(word.capitalize() for word in re.split(r'[-_]', raw_tag))
+                return model.objects.create(content=pascal_content)
+
+            if persona_str is not None:
+                old_personas = list(self.get_object().user_personas.all())
+                persona_tags = parse_hashtags(persona_str)
+                persona_instances = [get_or_create_normalized(Persona, tag) for tag in persona_tags]
+                self.get_object().user_personas.set(persona_instances)
+                
+                # Orphan cleanup for Persona
+                from account.models import PERSONA_CHOICES
+                predefined_personas = {normalize(val) for _, val in PERSONA_CHOICES}
+                for p in old_personas:
+                    if p not in persona_instances:
+                        if normalize(p.content) not in predefined_personas:
+                            if p.users.count() == 0:
+                                p.delete()
+
+            if interest_str is not None:
+                old_interests = list(self.get_object().user_interests.all())
+                interest_tags = parse_hashtags(interest_str)
+                interest_instances = [get_or_create_normalized(Interest, tag) for tag in interest_tags]
+                self.get_object().user_interests.set(interest_instances)
+
+                # Orphan cleanup for Interest
+                from account.models import INTEREST_CHOICES_BASE
+                predefined_interests = {normalize(val) for val in INTEREST_CHOICES_BASE}
+                for i in old_interests:
+                    if i not in interest_instances:
+                        if normalize(i.content) not in predefined_interests:
+                            if i.users.count() == 0:
+                                i.delete()
 
             noti_period_days = self.request.data.get('noti_period_days')
             if noti_period_days:
