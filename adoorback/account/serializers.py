@@ -295,6 +295,7 @@ class FriendListSerializer(UserMinimalSerializer):
     track_id = serializers.SerializerMethodField(read_only=True)
     description = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
+    recent_post = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -392,10 +393,64 @@ class FriendListSerializer(UserMinimalSerializer):
             return ping_room.pings.filter(receiver=user, is_read=False).count()
         return 0
 
+    def get_recent_post(self, obj):
+        responses = self.responses(obj)
+        notes = self.notes(obj)
+        
+        # Combine and sort by created_at descending
+        all_posts = []
+        for r in responses:
+            all_posts.append({
+                'type': 'Response',
+                'id': r['id'],
+                'content': r['content'],
+                'created_at': r['created_at'],
+                'question': r.get('question'), # Include full question object
+                'current_user_like_id': r.get('current_user_like_id'),
+                'current_user_reaction_id_list': r.get('current_user_reaction_id_list'),
+                'like_reaction_user_sample': r.get('like_reaction_user_sample'),
+            })
+        for n in notes:
+            all_posts.append({
+                'type': 'Note',
+                'id': n['id'],
+                'content': n['content'],
+                'created_at': n['created_at'],
+                'current_user_like_id': n.get('current_user_like_id'),
+                'current_user_reaction_id_list': n.get('current_user_reaction_id_list'),
+                'like_reaction_user_sample': n.get('like_reaction_user_sample'),
+            })
+        
+        if not all_posts:
+            return None
+            
+        # Sort by created_at desc (assuming ISO string format sorts correctly)
+        all_posts.sort(key=lambda x: x['created_at'], reverse=True)
+        recent = all_posts[0]
+        
+        # Format output
+        preview = recent['content'][:50]
+        
+        data = {
+            'type': recent['type'],
+            'id': recent['id'],
+            'preview_content': preview,
+            'created_at': recent['created_at'],
+            'current_user_like_id': recent.get('current_user_like_id'),
+            'current_user_reaction_id_list': recent.get('current_user_reaction_id_list'),
+            'like_reaction_user_sample': recent.get('like_reaction_user_sample'),
+        }
+        
+        if recent['type'] == 'Response':
+             data['question'] = recent.get('question')
+             
+        return data
+
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count']
+                                                      'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count',
+                                                      'recent_post']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
