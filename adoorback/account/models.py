@@ -725,6 +725,34 @@ class Persona(AdoorTimestampedModel, SafeDeleteModel):
         return self.content
 
 
+class DiscoverFeed(AdoorTimestampedModel):
+    user = models.ForeignKey(get_user_model(), related_name='discover_feeds', on_delete=models.CASCADE)
+    response = models.ForeignKey('qna.Response', related_name='discover_feed_items', on_delete=models.CASCADE)
+    
+    # Override created_at to allow consistent batch timestamps
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    
+    # Category to explain why this was recommended
+    CATEGORY_CHOICES = (
+        ('following', 'Following'),
+        ('mutual_friends', 'Mutual Friends'),
+        ('mutual_traits', 'Mutual Traits'),
+        ('anonymous', 'Anonymous'),
+        ('random', 'Random'),
+    )
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-created_at', 'sort_order']
+        indexes = [
+            models.Index(fields=['user', '-created_at', 'sort_order']),
+        ]
+
+    def __str__(self):
+        return f"DiscoverFeed for {self.user.username}: {self.response.id} ({self.category})"
+
+
 class AppSession(SafeDeleteModel):
     user = models.ForeignKey(
         "User",
@@ -916,13 +944,14 @@ def user_created(created, instance, **kwargs):
         # send notification
         from notification.models import Notification
         admin = User.objects.filter(is_superuser=True).first()
-        noti = Notification.objects.create(user=instance,
-                                           target=admin,
-                                           origin=admin,
-                                           message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
-                                           message_en=f"{instance.username}, add your friends for a better WIT experience!",
-                                           redirect_url='/friends/explore')
-        NotificationActor.objects.create(user=admin, notification=noti)
+        if admin:
+            noti = Notification.objects.create(user=instance,
+                                               target=admin,
+                                               origin=admin,
+                                               message_ko=f"{instance.username}님, 보다 재밌는 후엠아이 이용을 위해 친구를 추가해보세요!",
+                                               message_en=f"{instance.username}, add your friends for a better WIT experience!",
+                                               redirect_url='/friends/explore')
+            NotificationActor.objects.create(user=admin, notification=noti)
 
     if created and instance.email:
         email_manager.send_verification_email(instance)

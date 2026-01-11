@@ -34,7 +34,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
-from .models import Subscription, Connection, AppSession
+from .models import Subscription, Connection, AppSession, DiscoverFeed
 from account.models import FriendRequest, BlockRec
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -54,7 +54,8 @@ from note.models import Note
 from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
-from qna.models import Response as _Response
+from qna.models import Question, Response as _Response
+from qna.serializers import ResponseSerializer
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
 from account.models import FollowRequest, Follow
 from tracking.utils import clean_session_key
@@ -1548,9 +1549,6 @@ class FriendFeed(generics.ListAPIView):
         if unread_note_ids:
             request.user.read_notes.add(*unread_note_ids)
 
-        return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
-
-
 class FullFriendFeed(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
@@ -1609,6 +1607,208 @@ class FullFriendFeed(generics.ListAPIView):
             user.read_responses.add(*unread_response_ids)
 
         return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
+
+
+class DiscoverFeedView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        type_param = self.request.query_params.get('type', 'all')
+
+        now = timezone.now()
+        last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
+
+        # Check if date has changed in user's timezone
+        user_timezone = getattr(user, 'timezone', 'UTC')
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(user_timezone)
+        except:
+            tz = timezone.get_current_timezone()
+
+        now_local = now.astimezone(tz)
+        
+        needs_new_feed = False
+        if not last_feed:
+            needs_new_feed = True
+        else:
+            last_feed_local = last_feed.created_at.astimezone(tz)
+            if now_local.date() > last_feed_local.date():
+                needs_new_feed = True
+
+        if needs_new_feed:
+            self.generate_new_feed(user)
+            last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
+
+        if not last_feed:
+            return DiscoverFeed.objects.none()
+
+        # Get only the latest batch (items with the same created_at as the latest one)
+        latest_timestamp = last_feed.created_at
+        queryset = DiscoverFeed.objects.filter(
+            user=user, 
+            created_at=latest_timestamp
+        ).select_related('response', 'response__author', 'response__question')
+
+        # Filter by type if not 'all'
+        type_param = type_param.lower().rstrip('/')
+        if type_param == 'following':
+            queryset = queryset.filter(category='following')
+        elif type_param == 'mutual_friends':
+            queryset = queryset.filter(category='mutual_friends')
+        elif type_param == 'mutual_traits':
+            queryset = queryset.filter(category='mutual_traits')
+        elif type_param == 'anonymous':
+            queryset = queryset.filter(category='anonymous')
+        elif type_param == 'random':
+            queryset = queryset.filter(category='random')
+
+        # If 'all', we might want a specific mixed ordering
+        if type_param == 'all':
+            # We can use the order they were added or a custom sort_order field if we add one.
+            # For now, let's just make sure it's consistent.
+            queryset = queryset.order_by('id') # Or some other stable order
+        else:
+            queryset = queryset.order_by('-id')
+
+        return queryset
+
+    @transaction.atomic
+    def generate_new_feed(self, user):        
+        batch_time = timezone.now()
+
+        friend_ids = set(user.friend_ids + user.close_friend_ids)
+        blocked_ids = set(user.user_report_blocked_ids)
+        exclude_ids = friend_ids | blocked_ids | {user.id}
+
+        feed_items = []  # List of (response, category)
+
+        # 1. Posts from people I follow (who are not friends) - Include ALL
+        following_ids = set(user.following.values_list('id', flat=True))
+        follow_but_not_friend_ids = following_ids - friend_ids - blocked_ids - {user.id}
+        
+        following_responses = _Response.objects.filter(
+            author_id__in=follow_but_not_friend_ids
+        ).exclude(readers=user).order_by('-created_at')
+        
+        for r in following_responses:
+            if r.is_audience(user):
+                feed_items.append((r, 'following'))
+
+        # 2, 3, 4. Collect candidates for Mutual Friends, Mutual Traits, and Strangers
+        
+        # Mutual Friends Candidates
+        user_friends = user.connected_users
+        user_friend_ids = set(user_friends.values_list('id', flat=True))
+        mutual_friend_potential_ids = set()
+        for friend in user_friends:
+            friend_of_friend_ids = set(friend.connected_users.values_list('id', flat=True))
+            mutual_friend_potential_ids.update(friend_of_friend_ids)
+        mf_ids = mutual_friend_potential_ids - user_friend_ids - following_ids - exclude_ids
+        mf_candidates = list(_Response.objects.filter(author_id__in=mf_ids).exclude(readers=user).order_by('-created_at')[:20])
+
+        # Mutual Traits Candidates
+        user_interests = set(user.user_interests.values_list('id', flat=True))
+        user_personas = set(user.user_personas.values_list('id', flat=True))
+        trait_ids = set(User.objects.filter(
+            Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas)
+        ).exclude(id__in=exclude_ids | following_ids).values_list('id', flat=True))
+        trait_candidates = list(_Response.objects.filter(author_id__in=trait_ids).exclude(readers=user).order_by('-created_at')[:20])
+
+        # Strangers (No Mutual) Candidates
+        stranger_ids = set(User.objects.exclude(
+            id__in=exclude_ids | following_ids | mutual_friend_potential_ids | trait_ids
+        ).exclude(is_superuser=True).values_list('id', flat=True))
+        stranger_candidates = list(_Response.objects.filter(author_id__in=stranger_ids).exclude(readers=user).order_by('-created_at')[:20])
+
+        category_candidates = [
+            (mf_candidates, 'mutual_friends'),
+            (trait_candidates, 'mutual_traits'),
+            (stranger_candidates, 'anonymous')
+        ]
+        
+        existing_response_ids = {item[0].id for item in feed_items}
+        
+        # Step 1: Ensure at least 1 from each category (if exists)
+        for candidates, category_name in category_candidates:
+            while candidates:
+                cand = candidates.pop(0)
+                if cand.id not in existing_response_ids and cand.is_audience(user):
+                    feed_items.append((cand, category_name))
+                    existing_response_ids.add(cand.id)
+                    break
+
+        # Step 2: If still less than 10, fill more in round-robin fashion
+        while len(feed_items) < 10:
+            added_in_round = False
+            for candidates, category_name in category_candidates:
+                if len(feed_items) >= 10:
+                    break
+                
+                while candidates:
+                    cand = candidates.pop(0)
+                    if cand.id not in existing_response_ids and cand.is_audience(user):
+                        feed_items.append((cand, category_name))
+                        existing_response_ids.add(cand.id)
+                        added_in_round = True
+                        break
+            
+            if not added_in_round:
+                break
+
+        # 5. Fallback: Fill up to 10 random posts (from any non-friends) if still not enough
+        if len(feed_items) < 10:
+            existing_response_ids = [item[0].id for item in feed_items]
+            # Exclude friends and blocked, and already added
+            random_potentials = _Response.objects.exclude(
+                author_id__in=exclude_ids
+            ).exclude(id__in=existing_response_ids).exclude(readers=user).order_by('-created_at')[:50]
+            
+            import random
+            random_responses = list(random_potentials)
+            random.shuffle(random_responses)
+            
+            for r in random_responses:
+                if len(feed_items) >= 10:
+                    break
+                if r.is_audience(user):
+                    feed_items.append((r, 'random'))
+
+        # Mix feed items to ensure variety in 'all' view
+        import random
+        random.shuffle(feed_items)
+
+        # Save to DiscoverFeed
+        for i, (response, category) in enumerate(feed_items):
+            DiscoverFeed.objects.create(
+                user=user, 
+                response=response, 
+                category=category, 
+                created_at=batch_time,
+                sort_order=i
+            )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        
+        # Mark as read
+        if page is not None:
+            responses = [item.response for item in page]
+            request.user.read_responses.add(*responses)
+            serializer = ResponseSerializer(responses, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
+        # If not paginated
+        responses = [item.response for item in queryset]
+        request.user.read_responses.add(*responses)
+        serializer = ResponseSerializer(responses, many=True, context={'request': request})
+        return Response(serializer.data)
+
 
 
 class StartSession(generics.CreateAPIView):
