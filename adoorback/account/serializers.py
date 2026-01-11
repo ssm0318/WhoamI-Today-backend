@@ -278,11 +278,15 @@ class UserProfileSerializer(UserMinimalSerializer):
             return False
         return FollowRequest.objects.filter(requester=obj, requestee=user, accepted__isnull=True).exists()
 
+    user_interests = serializers.StringRelatedField(many=True, read_only=True)
+    user_personas = serializers.StringRelatedField(many=True, read_only=True)
+
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'pronouns', 'bio', 'persona', 'unread_ping_count', 'connection_status',
+                                                      'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
+                                                      'unread_ping_count', 'connection_status',
                                                       'friend_count', 'email_verified',
                                                       'is_following', 'is_followed_by',
                                                       'sent_follow_request_to', 'received_follow_request_from']
