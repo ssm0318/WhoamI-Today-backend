@@ -52,6 +52,7 @@ urlpatterns = [
     # Feed related
     path('feed/', views.FriendFeed.as_view(), name='friend-feed'),
     path('feed/full/', views.FullFriendFeed.as_view(), name='full-friend-feed'),
+    path('discover/', views.DiscoverFeedView.as_view(), name='discover-feed'),
 
     # Friendship related
     path('friends/<int:pk>/', views.UserFriendDestroy.as_view(), name='user-friend-destroy'),
