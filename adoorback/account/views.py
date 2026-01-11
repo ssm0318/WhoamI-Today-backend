@@ -574,6 +574,54 @@ class UserResponseList(generics.ListAPIView):
         return _Response.objects.filter(id__in=response_ids)
 
 
+class UserAllPostList(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_combined_items(self):
+        user = self.request.user
+        author_username = self.kwargs.get('username')
+        author = get_object_or_404(User, username=author_username)
+        
+        # don't show superuser's note list (Notice must be shown on its own tab)
+        if author.is_superuser:
+            notes = []
+        else:
+            all_notes = Note.objects.filter(author=author)
+            note_ids = [note.id for note in all_notes if note.is_audience(user)]
+            notes = list(Note.objects.filter(id__in=note_ids).order_by('-created_at'))
+
+        all_responses = _Response.objects.filter(author=author).order_by('-created_at')
+        response_ids = [response.id for response in all_responses if response.is_audience(user)]
+        responses = list(_Response.objects.filter(id__in=response_ids))
+
+        combined = sorted(chain(notes, responses), key=lambda x: x.created_at, reverse=True)
+        return combined
+
+    def paginate_queryset(self, queryset):
+        page = super().paginate_queryset(queryset)
+        return page
+
+    def list(self, request, *args, **kwargs):
+        combined_items = self.get_combined_items()
+        
+        page = self.paginate_queryset(combined_items)
+        objects_to_serialize = page if page is not None else combined_items
+        
+        serialized_data = []
+        for obj in objects_to_serialize:
+            if isinstance(obj, Note):
+                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
+                serialized['type'] = 'Note' # Optional: helps client distinguish
+            elif isinstance(obj, _Response):
+                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+                serialized['type'] = 'Response' # Optional
+            serialized_data.append(serialized)
+            
+        return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
+
 class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [IsAuthenticated]
