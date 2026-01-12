@@ -1158,6 +1158,24 @@ class FriendListUpdate(generics.UpdateAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class FriendUpdateList(generics.ListAPIView):
+    serializer_class = UserMinimalSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        friends = user.connected_users.exclude(hidden=True)
+        
+        friends_with_updates = [
+            friend for friend in friends if not User.user_read(user, friend)
+        ]
+        
+        return sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
+
+
 class UserFavoriteAdd(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 

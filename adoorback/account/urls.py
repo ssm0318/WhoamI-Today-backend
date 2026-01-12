@@ -51,6 +51,7 @@ urlpatterns = [
 
     # Friend List related
     path('friends/', views.FriendList.as_view(), name='friend-list'),
+    path('friends/updates/', views.FriendUpdateList.as_view(), name='friend-update-list'),
     path('friends/update/', views.FriendListUpdate.as_view(), name='current-user-friends-update'),
 
     path('friends/favorites/', views.UserFavoriteAdd.as_view(), name='user-favorite-add'),
