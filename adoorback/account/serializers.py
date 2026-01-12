@@ -189,12 +189,16 @@ class UserProfileSerializer(UserMinimalSerializer):
     is_followed_by = serializers.SerializerMethodField(read_only=True)
     sent_follow_request_to = serializers.SerializerMethodField(read_only=True)
     received_follow_request_from = serializers.SerializerMethodField(read_only=True)
+    pinned_cnt = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj in request.user.favorites.all()
         return False
+    
+    def get_pinned_cnt(self, obj):
+        return obj.pin_set.count()
 
     def get_check_in(self, obj):
         from check_in.serializers import CheckInBaseSerializer
@@ -289,7 +293,8 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'unread_ping_count', 'connection_status',
                                                       'friend_count', 'email_verified',
                                                       'is_following', 'is_followed_by',
-                                                      'sent_follow_request_to', 'received_follow_request_from']
+                                                      'sent_follow_request_to', 'received_follow_request_from',
+                                                      'pinned_cnt']
 
 
 class FriendListSerializer(UserMinimalSerializer):
