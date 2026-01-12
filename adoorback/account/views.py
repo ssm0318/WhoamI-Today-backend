@@ -842,6 +842,48 @@ class CurrentUserResponseList(generics.ListAPIView):
         return _Response.objects.filter(author=user).order_by('-created_at')
 
 
+
+class CurrentUserAllPostList(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_combined_items(self):
+        user = self.request.user
+        
+        all_notes = Note.objects.filter(author=user).order_by('-created_at')
+        notes = list(all_notes)
+
+        all_responses = _Response.objects.filter(author=user).order_by('-created_at')
+        responses = list(all_responses)
+
+        combined = sorted(chain(notes, responses), key=lambda x: x.created_at, reverse=True)
+        return combined
+
+    def paginate_queryset(self, queryset):
+        page = super().paginate_queryset(queryset)
+        return page
+
+    def list(self, request, *args, **kwargs):
+        combined_items = self.get_combined_items()
+        
+        page = self.paginate_queryset(combined_items)
+        objects_to_serialize = page if page is not None else combined_items
+        
+        serialized_data = []
+        for obj in objects_to_serialize:
+            if isinstance(obj, Note):
+                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
+                serialized['type'] = 'Note'
+            elif isinstance(obj, _Response):
+                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+                serialized['type'] = 'Response'
+            serialized_data.append(serialized)
+            
+        return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
+
+
 class ReceivedResponseRequestPagination(PageNumberPagination):
     page_size = 10
 
