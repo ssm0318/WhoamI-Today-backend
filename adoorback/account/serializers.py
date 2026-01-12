@@ -190,6 +190,8 @@ class UserProfileSerializer(UserMinimalSerializer):
     sent_follow_request_to = serializers.SerializerMethodField(read_only=True)
     received_follow_request_from = serializers.SerializerMethodField(read_only=True)
     pinned_cnt = serializers.SerializerMethodField(read_only=True)
+    mutual_personas = serializers.SerializerMethodField(read_only=True)
+    mutual_interests = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -218,6 +220,24 @@ class UserProfileSerializer(UserMinimalSerializer):
             mutual_users = User.objects.filter(id__in=mutual_connections)
             return UserMinimalSerializer(mutual_users, many=True).data
         return {}
+
+    def get_mutual_personas(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            current_user_personas = set(request.user.user_personas.all())
+            obj_personas = set(obj.user_personas.all())
+            mutual_personas = current_user_personas & obj_personas
+            return PersonaSerializer(mutual_personas, many=True).data
+        return []
+
+    def get_mutual_interests(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            current_user_interests = set(request.user.user_interests.all())
+            obj_interests = set(obj.user_interests.all())
+            mutual_interests = current_user_interests & obj_interests
+            return InterestSerializer(mutual_interests, many=True).data
+        return []
 
     def get_are_friends(self, obj):  # does not mean 'friend' in friend & close friend, it means connection
         user = self.context.get('request', None).user
@@ -294,7 +314,7 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'friend_count', 'email_verified',
                                                       'is_following', 'is_followed_by',
                                                       'sent_follow_request_to', 'received_follow_request_from',
-                                                      'pinned_cnt']
+                                                      'pinned_cnt', 'mutual_personas', 'mutual_interests']
 
 
 class FriendListSerializer(UserMinimalSerializer):
