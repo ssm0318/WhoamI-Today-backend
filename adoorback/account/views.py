@@ -3,6 +3,7 @@ from itertools import chain
 import json
 from operator import attrgetter
 import uuid
+import re
 from zoneinfo import ZoneInfo
 
 from django.apps import apps
@@ -13,7 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
-from django.db.models import Q, Case, When, Value, IntegerField
+from django.db.models import Q, Case, When, Value, IntegerField, Count
 from django.db.models.functions import Lower
 from django.http import HttpResponse, HttpResponseNotAllowed, Http404
 from django.middleware import csrf
@@ -34,7 +35,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
-from .models import Subscription, Connection, AppSession, DiscoverFeed
+from .models import Subscription, Connection, AppSession, DiscoverFeed, Persona, Interest
 from account.models import FriendRequest, BlockRec
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -45,7 +46,9 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
                                  AppSessionSerializer, FriendFriendListSerializer, \
                                  UserFollowRequestCreateSerializer, UserFollowRequestSerializer, \
-                                 UserFollowRequestUpdateSerializer, UserMinimalSerializer)
+                                 UserFollowRequestUpdateSerializer, UserMinimalSerializer, \
+                                 UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
+                                 InterestSerializer, PersonaSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -62,6 +65,102 @@ from tracking.utils import clean_session_key
 import random
 
 User = get_user_model()
+
+
+def normalize_tag(t):
+    return t.lower().replace('-', '').replace('_', '').replace(' ', '')
+
+def parse_hashtags_or_list(data):
+    if not data:
+        return []
+    if isinstance(data, list):
+        return data
+    return re.findall(r'#([^\s#]+)', data)
+
+def get_or_create_normalized_tag(model, raw_tag):
+    normalized_input = normalize_tag(raw_tag)
+    # Fetch all in-memory for matching (optimized for small-medium scale)
+    all_instances = list(model.objects.all_with_deleted())
+    for instance in all_instances:
+        if normalize_tag(instance.content) == normalized_input:
+            if instance.deleted:
+                instance.undelete()
+            return instance
+    # Not found, create new PascalCase version
+    pascal_content = ''.join(word.capitalize() for word in re.split(r'[-_]', raw_tag))
+    return model.objects.create(content=pascal_content)
+
+def update_user_personas_logic(user, persona_keys):
+    # This function now expects a list of KEYS from PERSONA_CHOICES
+    
+    from account.models import PERSONA_CHOICES
+    
+    # 1. Update ArrayField (stores keys)
+    user.persona = persona_keys
+    user.save()
+
+    # 2. Update ManyToMany Field (stores Label objects)
+    # Map keys to labels
+    key_to_label = dict(PERSONA_CHOICES)
+    new_labels = {key_to_label[key] for key in persona_keys if key in key_to_label}
+    
+    # Get all current personas
+    current_personas = list(user.user_personas.all())
+    
+    # Identify "Choice Personas" (those in the predefined list) vs "Custom Personas" (hashtags)
+    # Predefined labels set for quick lookup
+    all_choice_labels_normalized = {normalize_tag(label) for _, label in PERSONA_CHOICES}
+    
+    custom_personas = []
+    for p in current_personas:
+        if normalize_tag(p.content) not in all_choice_labels_normalized:
+            custom_personas.append(p)
+            
+    # Get or create new Persona instances for the new selection
+    new_choice_personas = [get_or_create_normalized_tag(Persona, label) for label in new_labels]
+    
+    # Final set = Custom Personas (preserved) + New Choice Personas
+    final_persona_set = custom_personas + new_choice_personas
+    user.user_personas.set(final_persona_set)
+    
+    # Orphan cleanup for removed choice personas
+    # We only check personas that were removed from the user's set
+    removed_personas = [p for p in current_personas if p not in final_persona_set]
+    for p in removed_personas:
+        if normalize_tag(p.content) in all_choice_labels_normalized: # Only cleanup choice personas here?
+             # Actually orphan cleanup applies to any tag that has no users.
+             if p.users.count() == 0:
+                 p.delete()
+
+def update_user_interests_logic(user, interest_labels):
+    # This function expects a list of LABELS from INTEREST_CHOICES_BASE
+    
+    from account.models import INTEREST_CHOICES_BASE
+    
+    # Predefined interests set for quick lookup
+    all_choice_interests_normalized = {normalize_tag(label) for label in INTEREST_CHOICES_BASE}
+    
+    # Get all current interests
+    current_interests = list(user.user_interests.all())
+    
+    # Separate Custom vs Base
+    custom_interests = []
+    for i in current_interests:
+        if normalize_tag(i.content) not in all_choice_interests_normalized:
+            custom_interests.append(i)
+            
+    # Get or create new Interest instances for the new selection
+    new_choice_interests = [get_or_create_normalized_tag(Interest, label) for label in interest_labels]
+    
+    # Final set = Custom Interests (preserved) + New Choice Interests
+    final_interest_set = custom_interests + new_choice_interests
+    user.user_interests.set(final_interest_set)
+
+    # Orphan cleanup
+    removed_interests = [i for i in current_interests if i not in final_interest_set]
+    for i in removed_interests:
+        if i.users.count() == 0:
+            i.delete()
 
 
 @transaction.atomic
@@ -634,6 +733,24 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
+        # NOTE: We need to use 'updated_user' which might be modified by serializer.save(),
+        # however, this method is called *around* serializer.save().
+        # Actually standard perform_update calls serializer.save().
+        # But here we are overriding it.
+        # Let's keep the logic consistent: validate first, then operate.
+        # But wait, original code did `serializer.save()` then `updated_user = self.get_object()`.
+        # And it used `self.get_object()` before that for old_personas.
+        # The refactoring above uses `updated_user` inside `update_user_...`.
+        # So I need to define `updated_user` correctly.
+        # In the original code, `updated_user` was defined AFTER `serializer.save()`.
+        # But `old_personas` were fetched from `self.get_object()` BEFORE updates?
+        # Actually in original code:
+        # `old_personas = list(self.get_object().user_personas.all())` happens inside the `if persona_str` block,
+        # which is BEFORE `serializer.save()`.
+        # So `self.get_object()` refers to the user instance.
+        
+        updated_user = self.get_object() # This is the user instance
+        
         if serializer.is_valid(raise_exception=True):
             if 'username' in self.request.data:
                 new_username = serializer.validated_data.get('username')
@@ -651,57 +768,56 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
             persona_str = self.request.data.get('persona') or self.request.data.get('user_personas')
             interest_str = self.request.data.get('interest') or self.request.data.get('user_interests') or self.request.data.get('user_interest')
 
-            import re
-            from .models import Persona, Interest
-
-            def normalize(t):
-                return t.lower().replace('-', '').replace('_', '').replace(' ', '')
-
-            def parse_hashtags(text):
-                if not text:
-                    return []
-                return re.findall(r'#([^\s#]+)', text)
-
-            def get_or_create_normalized(model, raw_tag):
-                normalized_input = normalize(raw_tag)
-                # Fetch all in-memory for matching (optimized for small-medium scale)
-                all_instances = list(model.objects.all_with_deleted())
-                for instance in all_instances:
-                    if normalize(instance.content) == normalized_input:
-                        if instance.deleted:
-                            instance.undelete()
-                        return instance
-                # Not found, create new PascalCase version
-                pascal_content = ''.join(word.capitalize() for word in re.split(r'[-_]', raw_tag))
-                return model.objects.create(content=pascal_content)
-
             if persona_str is not None:
-                old_personas = list(self.get_object().user_personas.all())
-                persona_tags = parse_hashtags(persona_str)
-                persona_instances = [get_or_create_normalized(Persona, tag) for tag in persona_tags]
-                self.get_object().user_personas.set(persona_instances)
+                # Legacy behavior: parse hashtags and replace ALL
+                # This logic is for the 'user/me' endpoint which might send mixed content or just hashtags
+                # Ideally we should keep the same behavior as before:
+                # "parse_hashtags" -> set(personas)
                 
-                # Orphan cleanup for Persona
+                # Note: `update_user_personas_logic` has been changed to support the NEW API behavior (subset replacement).
+                # The OLD `CurrentUserDetail` logic did: parse -> set.
+                # If we want to preserve OLD behavior here, we should NOT use the new `update_user_personas_logic` directly 
+                # if it does subset replacement.
+                
+                # Let's revert `CurrentUserDetail` to use the original full-replacement logic using the helpers.
+                # Or create a `update_user_personas_full_replacement` helper.
+                pass # See below
+                
+            # Wait, I need to provide the implementation in this block.
+            # I will inline the old logic here to avoid confusion, using the helpers.
+            
+            if persona_str is not None:
+                old_personas = list(updated_user.user_personas.all())
+                persona_tags = parse_hashtags_or_list(persona_str)
+                persona_instances = [get_or_create_normalized_tag(Persona, tag) for tag in persona_tags]
+                updated_user.user_personas.set(persona_instances)
+                
+                # Update ArrayField if needed? 
+                # Original code: `self.get_object().user_personas.set(persona_instances)`
+                # It did NOT update `user.persona` (ArrayField) based on hashtags.
+                # So we just do M2M update.
+                
+                # Orphan cleanup
                 from account.models import PERSONA_CHOICES
-                predefined_personas = {normalize(val) for _, val in PERSONA_CHOICES}
+                predefined_personas = {normalize_tag(val) for _, val in PERSONA_CHOICES}
                 for p in old_personas:
                     if p not in persona_instances:
-                        if normalize(p.content) not in predefined_personas:
+                        if normalize_tag(p.content) not in predefined_personas:
                             if p.users.count() == 0:
                                 p.delete()
 
             if interest_str is not None:
-                old_interests = list(self.get_object().user_interests.all())
-                interest_tags = parse_hashtags(interest_str)
-                interest_instances = [get_or_create_normalized(Interest, tag) for tag in interest_tags]
-                self.get_object().user_interests.set(interest_instances)
+                old_interests = list(updated_user.user_interests.all())
+                interest_tags = parse_hashtags_or_list(interest_str)
+                interest_instances = [get_or_create_normalized_tag(Interest, tag) for tag in interest_tags]
+                updated_user.user_interests.set(interest_instances)
 
-                # Orphan cleanup for Interest
+                # Orphan cleanup
                 from account.models import INTEREST_CHOICES_BASE
-                predefined_interests = {normalize(val) for val in INTEREST_CHOICES_BASE}
+                predefined_interests = {normalize_tag(val) for val in INTEREST_CHOICES_BASE}
                 for i in old_interests:
                     if i not in interest_instances:
-                        if normalize(i.content) not in predefined_interests:
+                        if normalize_tag(i.content) not in predefined_interests:
                             if i.users.count() == 0:
                                 i.delete()
 
@@ -750,10 +866,53 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 
                 # "became friends" notification
                 Notification = apps.get_model('notification', 'Notification')
-                notis_to_change = Notification.objects.filter(redirect_url=f'/users/{old_username}')
                 notis_to_change.update(
                     redirect_url=f"/users/{new_username}"
                 )
+
+
+class CurrentUserInterestUpdate(generics.UpdateAPIView):
+    serializer_class = UserInterestUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        return self.request.user
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        user_interests = serializer.validated_data.get('user_interests')
+        if user_interests is not None:
+             update_user_interests_logic(self.get_object(), user_interests)
+
+        return Response(status=status.HTTP_200_OK, data={"message": "Interests updated successfully"})
+
+
+class CurrentUserPersonaUpdate(generics.UpdateAPIView):
+    serializer_class = UserPersonaUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        return self.request.user
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        user_personas = serializer.validated_data.get('user_personas')
+        if user_personas is not None:
+             update_user_personas_logic(self.get_object(), user_personas)
+
+        return Response(status=status.HTTP_200_OK, data={"message": "Personas updated successfully"})
 
 
 class CurrentUserDelete(generics.DestroyAPIView):
@@ -2086,3 +2245,112 @@ class UserFollowingList(generics.ListAPIView):
 
     def get_queryset(self):
         return self.request.user.following
+
+class InterestSearch(generics.ListAPIView):
+    serializer_class = InterestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        query = self.request.GET.get('q') or self.request.GET.get('query', '')
+        if not query:
+            return Interest.objects.none()
+
+        if query.startswith('#'):
+            query = query[1:]
+        
+        # 1. Startswith matches
+        startswith_qs = Interest.objects.filter(content__istartswith=query)
+        startswith_count = startswith_qs.count()
+        
+        if startswith_count >= 10:
+            return startswith_qs[:10]
+        
+        # 2. Contains matches (fill up to 10)
+        needed = 10 - startswith_count
+        # Exclude IDs from startswith to avoid duplicates
+        sw_ids = list(startswith_qs[:10].values_list('id', flat=True))  # Evaluate startswith_qs
+        
+        contains_qs = Interest.objects.filter(content__icontains=query).exclude(id__in=sw_ids)
+        ct_ids = list(contains_qs[:needed].values_list('id', flat=True))
+        
+        all_ids = sw_ids + ct_ids
+        
+        if not all_ids:
+            return Interest.objects.none()
+            
+        cases = [When(id=pk, then=Value(i)) for i, pk in enumerate(all_ids)]
+        qs = Interest.objects.filter(id__in=all_ids).annotate(
+            search_rank=Case(*cases, output_field=IntegerField())
+        ).order_by('search_rank')
+        
+        return qs
+
+
+class PersonaSearch(generics.ListAPIView):
+    serializer_class = PersonaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        query = self.request.GET.get('q') or self.request.GET.get('query', '')
+        if not query:
+            return Persona.objects.none()
+
+        if query.startswith('#'):
+            query = query[1:]
+        
+        # 1. Startswith matches
+        startswith_qs = Persona.objects.filter(content__istartswith=query)
+        startswith_count = startswith_qs.count()
+        
+        if startswith_count >= 10:
+            return startswith_qs[:10]
+        
+        # 2. Contains matches (fill up to 10)
+        needed = 10 - startswith_count
+        sw_ids = list(startswith_qs[:10].values_list('id', flat=True))
+        
+        contains_qs = Persona.objects.filter(content__icontains=query).exclude(id__in=sw_ids)
+        ct_ids = list(contains_qs[:needed].values_list('id', flat=True))
+        
+        all_ids = sw_ids + ct_ids
+        
+        if not all_ids:
+            return Persona.objects.none()
+            
+        cases = [When(id=pk, then=Value(i)) for i, pk in enumerate(all_ids)]
+        qs = Persona.objects.filter(id__in=all_ids).annotate(
+            search_rank=Case(*cases, output_field=IntegerField())
+        ).order_by('search_rank')
+        
+        return qs
+        return qs
+
+
+class InterestRecommendation(generics.ListAPIView):
+    serializer_class = InterestSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return Interest.objects.annotate(user_count=Count('users')).order_by('-user_count')[:15]
+
+
+class PersonaRecommendation(generics.ListAPIView):
+    serializer_class = PersonaSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return Persona.objects.annotate(user_count=Count('users')).order_by('-user_count')[:15]

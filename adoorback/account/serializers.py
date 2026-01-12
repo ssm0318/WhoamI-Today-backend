@@ -13,7 +13,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES, PERSONA_CHOICES, FollowRequest, Follow
+    VERSION_CHOICES, PERSONA_CHOICES, FollowRequest, Follow, Interest, Persona
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -648,6 +648,60 @@ class UserFriendRequestSerializer(serializers.ModelSerializer):
         fields = ['requester_id', 'requestee_id', 'requestee_detail']
 
 
+class UserInterestUpdateSerializer(serializers.Serializer):
+    user_interests = serializers.ListField(child=serializers.CharField(), required=False)
+
+    def validate_user_interests(self, value):
+        # Handle stringified list from form-data
+        if isinstance(value, list) and len(value) == 1 and isinstance(value[0], str):
+            try:
+                import json
+                value = json.loads(value[0])
+            except json.JSONDecodeError:
+                raise serializers.ValidationError("user_interests must be a valid JSON list.")
+
+        from account.models import INTEREST_CHOICES_BASE
+        if not isinstance(value, list):
+            raise serializers.ValidationError("user_interests must be a list of strings.")
+        
+        # Validating that all provided interests are within the base choices
+        # We assume the frontend sends the string content directly.
+        # Actually, let's allow case-insensitive check or strict?
+        # User said "receiving what user selected from the set", likely exact strings.
+        # But let's be safe and check if it's in the list.
+        
+        invalid = [i for i in value if i not in INTEREST_CHOICES_BASE]
+        if invalid:
+             raise serializers.ValidationError(f"Invalid choices: {invalid}")
+
+        return value
+
+
+class UserPersonaUpdateSerializer(serializers.Serializer):
+    user_personas = serializers.ListField(child=serializers.CharField(), required=False)
+
+    def validate_user_personas(self, value):
+        # Handle stringified list from form-data
+        if isinstance(value, list) and len(value) == 1 and isinstance(value[0], str):
+            try:
+                import json
+                value = json.loads(value[0])
+            except json.JSONDecodeError:
+                raise serializers.ValidationError("user_personas must be a valid JSON list.")
+
+        from account.models import PERSONA_CHOICES
+        if not isinstance(value, list):
+            raise serializers.ValidationError("user_personas must be a list of strings.")
+            
+        # Value contains keys (e.g. 'lurker')
+        valid_keys = {choice[0] for choice in PERSONA_CHOICES}
+        invalid = [p for p in value if p not in valid_keys]
+        if invalid:
+            raise serializers.ValidationError(f"Invalid choices: {invalid}")
+            
+        return value
+
+
 class UserFollowRequestCreateSerializer(serializers.ModelSerializer):
     requester_id = serializers.IntegerField()
     requestee_id = serializers.IntegerField()
@@ -735,3 +789,15 @@ class AppSessionSerializer(serializers.ModelSerializer):
         model = AppSession
         fields = ["session_id", "user", "start_time", "end_time"]
         read_only_fields = ["start_time", "end_time"]
+
+
+class InterestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Interest
+        fields = ['id', 'content']
+
+
+class PersonaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Persona
+        fields = ['id', 'content']
