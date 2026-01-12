@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/reactions/', include('reaction.urls')),
     path('api/check_in/', include('check_in.urls')),
     path('api/notes/', include('note.urls')),
+    path('api/playlist/', include('playlist.urls')),
     
     path('api/secret/', admin.site.urls),
     path('api/', include('custom_fcm.urls')), 
