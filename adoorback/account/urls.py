@@ -27,6 +27,8 @@ urlpatterns = [
     path('me/response-requests/', views.ReceivedResponseRequestList.as_view(), name='received-response-request-list'),
     path('me/search/', views.CurrentUserFriendSearch.as_view(), name='current-user-friend-search'),
     path('me/all-posts/', views.CurrentUserAllPostList.as_view(), name='current-user-all-post-list'),
+    path('me/interests/', views.CurrentUserInterestUpdate.as_view(), name='current-user-interest-update'),
+    path('me/personas/', views.CurrentUserPersonaUpdate.as_view(), name='current-user-persona-update'),
 
     # User Profile related
     path(r'search/', views.UserSearch.as_view(), name='user-search'),
