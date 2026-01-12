@@ -14,7 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
-from django.db.models import Q, Case, When, Value, IntegerField
+from django.db.models import Q, Case, When, Value, IntegerField, Count
 from django.db.models.functions import Lower
 from django.http import HttpResponse, HttpResponseNotAllowed, Http404
 from django.middleware import csrf
@@ -47,7 +47,8 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  AppSessionSerializer, FriendFriendListSerializer, \
                                  UserFollowRequestCreateSerializer, UserFollowRequestSerializer, \
                                  UserFollowRequestUpdateSerializer, UserMinimalSerializer, \
-                                 UserInterestUpdateSerializer, UserPersonaUpdateSerializer)
+                                 UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
+                                 InterestSerializer, PersonaSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -2244,3 +2245,112 @@ class UserFollowingList(generics.ListAPIView):
 
     def get_queryset(self):
         return self.request.user.following
+
+class InterestSearch(generics.ListAPIView):
+    serializer_class = InterestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        query = self.request.GET.get('q') or self.request.GET.get('query', '')
+        if not query:
+            return Interest.objects.none()
+
+        if query.startswith('#'):
+            query = query[1:]
+        
+        # 1. Startswith matches
+        startswith_qs = Interest.objects.filter(content__istartswith=query)
+        startswith_count = startswith_qs.count()
+        
+        if startswith_count >= 10:
+            return startswith_qs[:10]
+        
+        # 2. Contains matches (fill up to 10)
+        needed = 10 - startswith_count
+        # Exclude IDs from startswith to avoid duplicates
+        sw_ids = list(startswith_qs[:10].values_list('id', flat=True))  # Evaluate startswith_qs
+        
+        contains_qs = Interest.objects.filter(content__icontains=query).exclude(id__in=sw_ids)
+        ct_ids = list(contains_qs[:needed].values_list('id', flat=True))
+        
+        all_ids = sw_ids + ct_ids
+        
+        if not all_ids:
+            return Interest.objects.none()
+            
+        cases = [When(id=pk, then=Value(i)) for i, pk in enumerate(all_ids)]
+        qs = Interest.objects.filter(id__in=all_ids).annotate(
+            search_rank=Case(*cases, output_field=IntegerField())
+        ).order_by('search_rank')
+        
+        return qs
+
+
+class PersonaSearch(generics.ListAPIView):
+    serializer_class = PersonaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        query = self.request.GET.get('q') or self.request.GET.get('query', '')
+        if not query:
+            return Persona.objects.none()
+
+        if query.startswith('#'):
+            query = query[1:]
+        
+        # 1. Startswith matches
+        startswith_qs = Persona.objects.filter(content__istartswith=query)
+        startswith_count = startswith_qs.count()
+        
+        if startswith_count >= 10:
+            return startswith_qs[:10]
+        
+        # 2. Contains matches (fill up to 10)
+        needed = 10 - startswith_count
+        sw_ids = list(startswith_qs[:10].values_list('id', flat=True))
+        
+        contains_qs = Persona.objects.filter(content__icontains=query).exclude(id__in=sw_ids)
+        ct_ids = list(contains_qs[:needed].values_list('id', flat=True))
+        
+        all_ids = sw_ids + ct_ids
+        
+        if not all_ids:
+            return Persona.objects.none()
+            
+        cases = [When(id=pk, then=Value(i)) for i, pk in enumerate(all_ids)]
+        qs = Persona.objects.filter(id__in=all_ids).annotate(
+            search_rank=Case(*cases, output_field=IntegerField())
+        ).order_by('search_rank')
+        
+        return qs
+        return qs
+
+
+class InterestRecommendation(generics.ListAPIView):
+    serializer_class = InterestSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return Interest.objects.annotate(user_count=Count('users')).order_by('-user_count')[:15]
+
+
+class PersonaRecommendation(generics.ListAPIView):
+    serializer_class = PersonaSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return Persona.objects.annotate(user_count=Count('users')).order_by('-user_count')[:15]

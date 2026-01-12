@@ -30,6 +30,14 @@ urlpatterns = [
     path('me/interests/', views.CurrentUserInterestUpdate.as_view(), name='current-user-interest-update'),
     path('me/personas/', views.CurrentUserPersonaUpdate.as_view(), name='current-user-persona-update'),
 
+    # Interest/Persona Search
+    path('interests/search/', views.InterestSearch.as_view(), name='interest-search'),
+    path('personas/search/', views.PersonaSearch.as_view(), name='persona-search'),
+
+    # Interest/Persona Recommendation
+    path('recommendations/interests/', views.InterestRecommendation.as_view(), name='interest-recommendation'),
+    path('recommendations/personas/', views.PersonaRecommendation.as_view(), name='persona-recommendation'),
+
     # User Profile related
     path(r'search/', views.UserSearch.as_view(), name='user-search'),
     path('<str:username>/profile/', views.UserProfile.as_view(), name='user-detail'),

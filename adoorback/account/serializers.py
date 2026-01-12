@@ -13,7 +13,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES, PERSONA_CHOICES, FollowRequest, Follow
+    VERSION_CHOICES, PERSONA_CHOICES, FollowRequest, Follow, Interest, Persona
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -789,3 +789,15 @@ class AppSessionSerializer(serializers.ModelSerializer):
         model = AppSession
         fields = ["session_id", "user", "start_time", "end_time"]
         read_only_fields = ["start_time", "end_time"]
+
+
+class InterestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Interest
+        fields = ['id', 'content']
+
+
+class PersonaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Persona
+        fields = ['id', 'content']
