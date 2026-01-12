@@ -55,11 +55,11 @@ from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Question, Response as _Response
-from qna.serializers import ResponseSerializer
+from qna.serializers import ResponseSerializer, DailyQuestionSerializer
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
-from account.models import FollowRequest, Follow
+from account.models import FollowRequest, Follow, PERSONA_CHOICES, INTEREST_CHOICES_BASE
 from tracking.utils import clean_session_key
-
+import random
 
 User = get_user_model()
 
@@ -300,7 +300,6 @@ class UserVerifyEmail(generics.UpdateAPIView):
     serializer_class = UserProfileSerializer
 
     def get_exception_handler(self):
-        print(self.request.headers)
         return adoor_exception_handler
 
     def get_object(self):
@@ -1844,18 +1843,102 @@ class DiscoverFeedView(generics.ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         
-        # Mark as read
+        # Serialize data
         if page is not None:
             responses = [item.response for item in page]
             request.user.read_responses.add(*responses)
             serializer = ResponseSerializer(responses, many=True, context={'request': request})
-            return self.get_paginated_response(serializer.data)
+            serialized_data = serializer.data
+        else:
+            responses = [item.response for item in queryset]
+            request.user.read_responses.add(*responses)
+            serializer = ResponseSerializer(responses, many=True, context={'request': request})
+            serialized_data = serializer.data
 
-        # If not paginated
-        responses = [item.response for item in queryset]
-        request.user.read_responses.add(*responses)
-        serializer = ResponseSerializer(responses, many=True, context={'request': request})
-        return Response(serializer.data)
+        # --- Injection Logic ---
+        results = []
+        for item in serialized_data:
+            results.append({
+                "type": "Response",
+                "body": item
+            })
+
+        # Inject Daily Question
+        from qna.models import Question
+        
+        daily_questions_qs = Question.objects.daily_questions(request.user)
+        daily_question = daily_questions_qs.order_by('?').first()
+
+        if daily_question:
+            q_data = DailyQuestionSerializer(daily_question).data
+            q_card = {
+                "type": "Question",
+                "body": q_data
+            }
+            # Insert at 2nd (idx 1) or 3rd (idx 2)
+            # If empty, just append.
+            if not results:
+                results.append(q_card)
+            else:
+                q_idx = random.choice([1, 2])
+                results.insert(min(len(results), q_idx), q_card)
+        
+        original_count = len(serialized_data)
+
+        # Inject Interest
+        if original_count >= 5:
+            # Insert at 6th (idx 5) or 7th (idx 6)
+            i_idx = random.choice([5, 6])
+            
+            # Fetch user's selected interests
+            user_interest_contents = set(request.user.user_interests.values_list('content', flat=True))
+            
+            interest_list = []
+            for interest in INTEREST_CHOICES_BASE:
+                interest_list.append({
+                    "content": interest,
+                    "is_selected": interest in user_interest_contents
+                })
+
+            interest_card = {
+                "type": "Interest",
+                "body": {
+                    "list": interest_list
+                }
+            }
+            results.insert(min(len(results), i_idx), interest_card)
+
+        # Inject Persona
+        if original_count >= 9:
+            # Insert at 12th (idx 11) or 13th (idx 12)
+            p_idx = random.choice([11, 12])
+            
+            # Fetch user's selected personas
+            user_persona_contents = set(request.user.user_personas.values_list('content', flat=True))
+
+            persona_list = []
+            for key, label in PERSONA_CHOICES:
+                # Format label to match DB content (remove spaces and #)
+                formatted_content = label.replace(' ', '').replace('#', '')
+                persona_list.append({
+                    "key": key, 
+                    "label": label,
+                    "is_selected": formatted_content in user_persona_contents
+                })
+
+            persona_card = {
+                "type": "Persona",
+                "body": {
+                    "list": persona_list
+                }
+            }
+            results.insert(min(len(results), p_idx), persona_card)
+
+        if page is not None:
+             return self.get_paginated_response(results)
+        
+        # If not paginated, return wrapped structure
+        return Response({"results": results})
 
 
 
