@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     'import_export',
     'trackstats',
     'safedelete',
+    'pin',
     'tracking',
     'playlist',
 ]
