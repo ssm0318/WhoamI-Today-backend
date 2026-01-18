@@ -806,6 +806,7 @@ def connection_removed(instance, **kwargs):
     except IntegrityError:
         pass
 
+
     # 3. Inactivate chat rooms
     from chat.models import ChatRoom
     chat_rooms = ChatRoom.objects.filter(users__in=[user1, user2])
@@ -813,6 +814,18 @@ def connection_removed(instance, **kwargs):
         if chat_room.users.count() == 2:
             chat_room.active = False
             chat_room.save()
+
+
+@transaction.atomic
+@receiver(post_save, sender=Connection)
+def stop_following_on_friend_connection(instance, **kwargs):
+    if not instance.deleted:
+        user1 = instance.user1
+        user2 = instance.user2
+
+        # Delete any existing Follow objects between the two users
+        Follow.objects.filter(follower=user1, followed=user2).delete(force_policy=HARD_DELETE)
+        Follow.objects.filter(follower=user2, followed=user1).delete(force_policy=HARD_DELETE)
 
 
 @transaction.atomic
