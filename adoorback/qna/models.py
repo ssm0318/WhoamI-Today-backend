@@ -179,8 +179,8 @@ class Response(AdoorModel, SafeDeleteModel):
                 if can_see_as_cf and 'close_friends' in self.visibility:
                     return True
 
-        # Check Friend (Mutually Exclusive: Not Close Friend)
-        if is_friend and not is_close_friend:
+        # Check Friend
+        if is_friend:
             if 'friends' in self.visibility:
                 return True
 
