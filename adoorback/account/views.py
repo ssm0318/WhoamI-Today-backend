@@ -12,6 +12,7 @@ from django.contrib.auth import authenticate, logout
 from django.core import exceptions
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
 from django.db.models import Q, Case, When, Value, IntegerField, Count
@@ -874,6 +875,10 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 
                 # "became friends" notification
                 Notification = apps.get_model('notification', 'Notification')
+                user_ct = ContentType.objects.get_for_model(User)
+                notis_to_change = self.request.user.friendship_originated_notis.filter(
+                    target_type=user_ct
+                )
                 notis_to_change.update(
                     redirect_url=f"/users/{new_username}"
                 )
