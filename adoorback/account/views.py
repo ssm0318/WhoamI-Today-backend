@@ -234,6 +234,7 @@ class UserLogout(APIView):
 class UserEmailCheck(generics.CreateAPIView):
     serializer_class = UserEmailSerializer
     parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -258,6 +259,7 @@ class UserEmailCheck(generics.CreateAPIView):
 class UserPasswordCheck(generics.CreateAPIView):
     serializer_class = UserPasswordSerializer
     parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -276,6 +278,7 @@ class UserPasswordCheck(generics.CreateAPIView):
 class UserUsernameCheck(generics.CreateAPIView):
     serializer_class = UserUsernameSerializer
     parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -302,6 +305,7 @@ class UserUsernameCheck(generics.CreateAPIView):
 class UserBirthDateCheck(generics.CreateAPIView):
     serializer_class = UserBirthDateSerializer
     parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -321,6 +325,7 @@ class UserBirthDateCheck(generics.CreateAPIView):
 class UserInviterBirthDateCheck(generics.CreateAPIView):
     serializer_class = UserInviterEmailBirthDateSerializer
     parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -362,6 +367,7 @@ class UserInviterBirthDateCheck(generics.CreateAPIView):
 class UserSignup(generics.CreateAPIView):
     serializer_class = CurrentUserSignupSerializer
     parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -429,6 +435,7 @@ class UserVerifyEmail(generics.UpdateAPIView):
 
 class SendResetPasswordEmail(generics.CreateAPIView):
     serializer_class = CurrentUserSerializer
+    authentication_classes = []
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -453,6 +460,7 @@ class ResetPassword(generics.UpdateAPIView):
     (= Users who have forgotten their password.)
     '''
     serializer_class = CurrentUserSerializer
+    authentication_classes = []
     queryset = User.objects.all()
 
     def get_exception_handler(self):
