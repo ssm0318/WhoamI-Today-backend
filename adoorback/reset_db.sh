@@ -59,8 +59,15 @@ echo "Waiting for web container to initialize (10s)..."
 sleep 10
 
 # 3. Migrate
-echo "[3/6] Running migrations..."
-docker exec -it $WEB_CONTAINER python3 manage.py migrate
+echo "[3/6] Waiting for container auto-migration..."
+# The manage.py script automatically runs migrations on startup!
+# We just need to wait for it to finish and the DB to be ready.
+# We can check this by trying to list migrations or just waiting.
+sleep 20
+
+# Verify migrations are done (optional, but good for sanity)
+echo "Verifying migrations..."
+docker exec -it $WEB_CONTAINER python3 manage.py showmigrations
 
 # 4. Create Superuser
 echo "[4/6] Creating Superuser..."
