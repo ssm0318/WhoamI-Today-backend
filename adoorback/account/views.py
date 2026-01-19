@@ -1105,13 +1105,20 @@ class FriendList(generics.ListAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        query_type = self.request.query_params.get('type')
+        if query_type == 'following':
+            context['hide_check_in'] = True
+        return context
+
     def get_queryset(self):
         user = self.request.user
         friends = user.connected_users
 
         query_type = self.request.query_params.get('type')
 
-        if query_type == 'all':
+        if query_type == 'all' or query_type == 'friends':
             return friends.order_by('username')
         elif query_type == 'close_friends':
             close_friends_ids = Connection.objects.filter(
@@ -1127,6 +1134,8 @@ class FriendList(generics.ListAPIView):
                     target_ids.add(u1_id)
             
             return friends.filter(id__in=target_ids).order_by('username')
+        elif query_type == 'following':
+            return user.following.order_by('username')
         elif query_type == 'has_updates':
             friends = friends.exclude(hidden=True)
             friends_with_updates = [

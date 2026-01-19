@@ -391,6 +391,8 @@ class FriendListSerializer(UserMinimalSerializer):
         return 0
 
     def check_in(self, obj):
+        if self.context.get('hide_check_in'):
+            return None
         user = self.context.get('request', None).user
         check_in = obj.check_in_set.filter(is_active=True).first()
         if check_in and CheckIn.is_audience(check_in, user):
