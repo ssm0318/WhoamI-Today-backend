@@ -76,7 +76,7 @@ class VisibilityField(serializers.MultipleChoiceField):
 class NoteSerializer(BaseNoteSerializer):
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
-    visibility = VisibilityField(choices=['friends', 'close_friends'], required=True)
+    visibility = VisibilityField(choices=['friends', 'close_friends', 'public', 'followers'], required=True)
 
     def get_current_user_reaction_id_list(self, obj):
         current_user_id = self.context['request'].user.id
@@ -121,7 +121,7 @@ class DefaultFriendNoteSerializer(BaseNoteSerializer):
     '''
     like_count = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
-    visibility = VisibilityField(choices=['friends', 'close_friends'], required=True)
+    visibility = VisibilityField(choices=['friends', 'close_friends', 'public', 'followers'], required=True)
 
     def get_like_count(self, obj):
         return obj.liked_user_ids.count()

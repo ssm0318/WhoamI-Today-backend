@@ -134,6 +134,17 @@ class Note(AdoorModel, SafeDeleteModel):
             if 'friends' in self.visibility:
                 return True
         
+        # Check Follower (Mutually Exclusive: Not Connected)
+        is_following = user.is_following(self.author)
+        if is_following and not is_friend:
+             if 'followers' in self.visibility:
+                return True
+
+        # Check Public (Mutually Exclusive: Not Connected, Not Following)
+        if not is_friend and not is_following:
+            if 'public' in self.visibility:
+                return True
+
         return False
 
     class Meta:
