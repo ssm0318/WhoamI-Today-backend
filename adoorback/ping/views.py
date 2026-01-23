@@ -1,13 +1,46 @@
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import OuterRef, Subquery, Max, Count, Q, F
 from rest_framework import generics, exceptions
 from rest_framework.permissions import IsAuthenticated
 
 from adoorback.utils.validators import adoor_exception_handler
-from .models import Ping, get_or_create_ping_room
-from .serializers import PingSerializer
+from .models import Ping, PingRoom, get_or_create_ping_room
+from .serializers import PingSerializer, PingRoomSerializer
 
 User = get_user_model()
+
+
+class PingRoomList(generics.ListAPIView):
+    serializer_class = PingRoomSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Subquery to get the latest ping for each room
+        latest_ping_subquery = Ping.objects.filter(
+            ping_room=OuterRef('pk')
+        ).order_by('-created_at')
+
+        return PingRoom.objects.filter(
+            Q(user1=user) | Q(user2=user)
+        ).annotate(
+            last_ping_time=Subquery(latest_ping_subquery.values('created_at')[:1]),
+            last_ping_content=Subquery(latest_ping_subquery.values('content')[:1]),
+            last_ping_emoji=Subquery(latest_ping_subquery.values('emoji')[:1]),
+            unread_cnt=Count(
+                'pings',
+                filter=Q(pings__receiver=user, pings__is_read=False)
+            )
+        ).filter(
+            last_ping_time__isnull=False  # Only show rooms with messages
+        ).order_by('-last_ping_time')
+
 
 
 class PingList(generics.ListCreateAPIView):
