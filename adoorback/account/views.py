@@ -729,6 +729,35 @@ class UserAllPostList(generics.ListAPIView):
             
         return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
 
+
+class CurrentUserLatestVisibility(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get(self, request):
+        user = request.user
+        
+        latest_note = Note.objects.filter(author=user).order_by('-created_at').first()
+        latest_response = _Response.objects.filter(author=user).order_by('-created_at').first()
+        
+        if not latest_note and not latest_response:
+            return Response({'visibility': ['close_friends']}, status=200)
+            
+        if latest_note and not latest_response:
+            return Response({'visibility': latest_note.visibility}, status=200)
+            
+        if not latest_note and latest_response:
+            return Response({'visibility': latest_response.visibility}, status=200)
+            
+        # Both exist
+        if latest_note.created_at > latest_response.created_at:
+             return Response({'visibility': latest_note.visibility}, status=200)
+        else:
+             return Response({'visibility': latest_response.visibility}, status=200)
+
+
 class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [IsAuthenticated]
