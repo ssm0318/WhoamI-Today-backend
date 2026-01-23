@@ -21,14 +21,20 @@ class SongList(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         cutoff_date = timezone.now() - timedelta(days=7)
+        filter_type = self.request.query_params.get('type', 'friends')
 
-        # Get connected users (friends + close friends)
-        connected_user_ids = user.connected_user_ids
-        # Include self
-        visible_user_ids = connected_user_ids + [user.id]
+        if filter_type == 'close_friends':
+            target_ids = user.close_friend_ids + [user.id]
+        elif filter_type == 'following':
+            target_ids = list(user.following.values_list('id', flat=True)) + [user.id]
+        else:  # default 'all'
+            # Get connected users (friends + close friends)
+            connected_user_ids = user.connected_user_ids
+            # Include self
+            target_ids = connected_user_ids + [user.id]
 
         return Song.objects.filter(
-            user_id__in=visible_user_ids,
+            user_id__in=target_ids,
             created_at__gte=cutoff_date
         )
 
