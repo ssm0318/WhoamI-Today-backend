@@ -102,3 +102,19 @@ class CheckInRead(generics.UpdateAPIView):
         instance.readers.add(current_user)
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CurrentUserLatestCheckInVisibility(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get(self, request):
+        user = request.user
+        latest_check_in = CheckIn.objects.filter(user=user).order_by('-created_at').first()
+        
+        if latest_check_in:
+            return Response({'visibility': latest_check_in.visibility}, status=status.HTTP_200_OK)
+        else:
+            return Response({'visibility': ['public', 'followers', 'friends']}, status=status.HTTP_200_OK)
