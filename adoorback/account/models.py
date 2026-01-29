@@ -727,7 +727,8 @@ class Persona(AdoorTimestampedModel, SafeDeleteModel):
 
 class DiscoverFeed(AdoorTimestampedModel):
     user = models.ForeignKey(get_user_model(), related_name='discover_feeds', on_delete=models.CASCADE)
-    response = models.ForeignKey('qna.Response', related_name='discover_feed_items', on_delete=models.CASCADE)
+    response = models.ForeignKey('qna.Response', related_name='discover_feed_items', on_delete=models.CASCADE, null=True, blank=True)
+    note = models.ForeignKey('note.Note', related_name='discover_feed_items', on_delete=models.CASCADE, null=True, blank=True)
     
     # Override created_at to allow consistent batch timestamps
     created_at = models.DateTimeField(default=timezone.now, editable=False)
