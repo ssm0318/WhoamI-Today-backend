@@ -14,13 +14,21 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = CheckIn
         fields = ['id', 'created_at', 'is_active', 'mood', 'track_id',
-                  'social_battery', 'description', 'current_user_read']
+                  'social_battery', 'description', 'current_user_read', 'visibility']
 
 
 class MyCheckInSerializer(CheckInBaseSerializer):
     class Meta:
         model = CheckIn
         fields = CheckInBaseSerializer.Meta.fields
+        extra_kwargs = {
+            'visibility': {'required': True}
+        }
+
+    def validate_visibility(self, value):
+        if len(value) == 0:
+            raise serializers.ValidationError("visibility field is required.")
+        return value
 
 
 class TrackSerializer(serializers.Serializer):
