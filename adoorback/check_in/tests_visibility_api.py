@@ -47,11 +47,5 @@ class CheckInLatestVisibilityAPITests(APITestCase):
         # Delete the check-in
         check_in.delete()
         
-        # After deletion, it should revert to default because it's soft-deleted? 
-        # Wait, the view uses CheckIn.objects.filter(user=user).order_by('-created_at').first()
-        # Default objects manager excludes soft-deleted items usually?
-        # Let's check model definition. CheckIn inherits SafeDeleteModel.
-        # SafeDeleteModel usually hides deleted items from default manager.
-        
         response = self.client.get(self.url)
         self.assertEqual(response.data['visibility'], ['public', 'followers', 'friends'])
