@@ -1969,7 +1969,7 @@ class DiscoverFeedView(generics.ListAPIView):
         queryset = DiscoverFeed.objects.filter(
             user=user, 
             created_at=latest_timestamp
-        ).select_related('response', 'response__author', 'response__question')
+        ).select_related('response', 'response__author', 'response__question', 'note', 'note__author')
 
         # Filter by type if not 'all'
         type_param = type_param.lower().rstrip('/')
@@ -2002,19 +2002,42 @@ class DiscoverFeedView(generics.ListAPIView):
         blocked_ids = set(user.user_report_blocked_ids)
         exclude_ids = friend_ids | blocked_ids | {user.id}
 
-        feed_items = []  # List of (response, category)
+        feed_items = []  # List of (object, category)
+
+        # Helper to get candidates
+        def get_candidates(author_ids, limit=None):
+            # Responses
+            responses = _Response.objects.filter(author_id__in=author_ids).exclude(readers=user).order_by('-created_at')
+            if limit:
+                responses = responses[:limit]
+            
+            # Notes
+            notes = Note.objects.filter(author_id__in=author_ids).exclude(readers=user).order_by('-created_at')
+            if limit:
+                notes = notes[:limit]
+
+            # Combine and sort
+            combined = sorted(chain(responses, notes), key=attrgetter('created_at'), reverse=True)
+            
+            # Filter by permission (is_audience)
+            valid_candidates = []
+            count = 0 
+            for obj in combined:
+                if obj.is_audience(user):
+                    valid_candidates.append(obj)
+                    count += 1
+                if limit and count >= limit:
+                    break
+            return valid_candidates
 
         # 1. Posts from people I follow (who are not friends) - Include ALL
         following_ids = set(user.following.values_list('id', flat=True))
         follow_but_not_friend_ids = following_ids - friend_ids - blocked_ids - {user.id}
         
-        following_responses = _Response.objects.filter(
-            author_id__in=follow_but_not_friend_ids
-        ).exclude(readers=user).order_by('-created_at')
+        following_candidates = get_candidates(follow_but_not_friend_ids, limit=None)
         
-        for r in following_responses:
-            if r.is_audience(user):
-                feed_items.append((r, 'following'))
+        for obj in following_candidates:
+            feed_items.append((obj, 'following'))
 
         # 2, 3, 4. Collect candidates for Mutual Friends, Mutual Traits, and Strangers
         
@@ -2026,7 +2049,8 @@ class DiscoverFeedView(generics.ListAPIView):
             friend_of_friend_ids = set(friend.connected_users.values_list('id', flat=True))
             mutual_friend_potential_ids.update(friend_of_friend_ids)
         mf_ids = mutual_friend_potential_ids - user_friend_ids - following_ids - exclude_ids
-        mf_candidates = list(_Response.objects.filter(author_id__in=mf_ids).exclude(readers=user).order_by('-created_at')[:20])
+        
+        mf_candidates = get_candidates(mf_ids, limit=20)
 
         # Mutual Traits Candidates
         user_interests = set(user.user_interests.values_list('id', flat=True))
@@ -2034,13 +2058,15 @@ class DiscoverFeedView(generics.ListAPIView):
         trait_ids = set(User.objects.filter(
             Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas)
         ).exclude(id__in=exclude_ids | following_ids).values_list('id', flat=True))
-        trait_candidates = list(_Response.objects.filter(author_id__in=trait_ids).exclude(readers=user).order_by('-created_at')[:20])
+        
+        trait_candidates = get_candidates(trait_ids, limit=20)
 
         # Strangers (No Mutual) Candidates
         stranger_ids = set(User.objects.exclude(
             id__in=exclude_ids | following_ids | mutual_friend_potential_ids | trait_ids
         ).exclude(is_superuser=True).values_list('id', flat=True))
-        stranger_candidates = list(_Response.objects.filter(author_id__in=stranger_ids).exclude(readers=user).order_by('-created_at')[:20])
+        
+        stranger_candidates = get_candidates(stranger_ids, limit=20)
 
         category_candidates = [
             (mf_candidates, 'mutual_friends'),
@@ -2048,15 +2074,15 @@ class DiscoverFeedView(generics.ListAPIView):
             (stranger_candidates, 'anonymous')
         ]
         
-        existing_response_ids = {item[0].id for item in feed_items}
+        existing_obj_ids = {(type(item[0]), item[0].id) for item in feed_items}
         
         # Step 1: Ensure at least 1 from each category (if exists)
         for candidates, category_name in category_candidates:
             while candidates:
                 cand = candidates.pop(0)
-                if cand.id not in existing_response_ids and cand.is_audience(user):
+                if (type(cand), cand.id) not in existing_obj_ids:
                     feed_items.append((cand, category_name))
-                    existing_response_ids.add(cand.id)
+                    existing_obj_ids.add((type(cand), cand.id))
                     break
 
         # Step 2: If still less than 10, fill more in round-robin fashion
@@ -2068,9 +2094,9 @@ class DiscoverFeedView(generics.ListAPIView):
                 
                 while candidates:
                     cand = candidates.pop(0)
-                    if cand.id not in existing_response_ids and cand.is_audience(user):
+                    if (type(cand), cand.id) not in existing_obj_ids:
                         feed_items.append((cand, category_name))
-                        existing_response_ids.add(cand.id)
+                        existing_obj_ids.add((type(cand), cand.id))
                         added_in_round = True
                         break
             
@@ -2079,31 +2105,38 @@ class DiscoverFeedView(generics.ListAPIView):
 
         # 5. Fallback: Fill up to 10 random posts (from any non-friends) if still not enough
         if len(feed_items) < 10:
-            existing_response_ids = [item[0].id for item in feed_items]
-            # Exclude friends and blocked, and already added
-            random_potentials = _Response.objects.exclude(
+            # Random Response
+            random_responses = list(_Response.objects.exclude(
                 author_id__in=exclude_ids
-            ).exclude(id__in=existing_response_ids).exclude(readers=user).order_by('-created_at')[:50]
+            ).exclude(readers=user).order_by('-created_at')[:50])
             
-            import random
-            random_responses = list(random_potentials)
-            random.shuffle(random_responses)
+            # Random Note
+            random_notes = list(Note.objects.exclude(
+                author_id__in=exclude_ids
+            ).exclude(readers=user).order_by('-created_at')[:50])
+
+            random_potentials = random_responses + random_notes
+            random.shuffle(random_potentials) # Shuffle candidates for random selection
             
-            for r in random_responses:
+            for obj in random_potentials:
                 if len(feed_items) >= 10:
                     break
-                if r.is_audience(user):
-                    feed_items.append((r, 'random'))
+                if (type(obj), obj.id) not in existing_obj_ids and obj.is_audience(user):
+                    feed_items.append((obj, 'random'))
+                    existing_obj_ids.add((type(obj), obj.id))
 
-        # Mix feed items to ensure variety in 'all' view
-        import random
-        random.shuffle(feed_items)
+        # Sort by created_at descending (Newest first)
+        feed_items.sort(key=lambda x: x[0].created_at, reverse=True)
 
         # Save to DiscoverFeed
-        for i, (response, category) in enumerate(feed_items):
+        for i, (obj, category) in enumerate(feed_items):
+            response = obj if isinstance(obj, _Response) else None
+            note = obj if isinstance(obj, Note) else None
+            
             DiscoverFeed.objects.create(
                 user=user, 
-                response=response, 
+                response=response,
+                note=note,
                 category=category, 
                 created_at=batch_time,
                 sort_order=i
@@ -2113,25 +2146,50 @@ class DiscoverFeedView(generics.ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         
-        # Serialize data
-        if page is not None:
-            responses = [item.response for item in page]
+        feed_objects = page if page is not None else queryset
+        
+        responses = []
+        notes = []
+        for item in feed_objects:
+            if item.response:
+                responses.append(item.response)
+            elif item.note:
+                notes.append(item.note)
+
+        # Mark as read
+        if responses:
             request.user.read_responses.add(*responses)
+        if notes:
+            request.user.read_notes.add(*notes)
+
+        # Serialize
+        resp_data_map = {}
+        if responses:
             serializer = ResponseSerializer(responses, many=True, context={'request': request})
-            serialized_data = serializer.data
-        else:
-            responses = [item.response for item in queryset]
-            request.user.read_responses.add(*responses)
-            serializer = ResponseSerializer(responses, many=True, context={'request': request})
-            serialized_data = serializer.data
+            resp_data_map = {d['id']: d for d in serializer.data}
+            
+        note_data_map = {}
+        if notes:
+            serializer = NoteSerializer(notes, many=True, context={'request': request})
+            note_data_map = {d['id']: d for d in serializer.data}
 
         # --- Injection Logic ---
         results = []
-        for item in serialized_data:
-            results.append({
-                "type": "Response",
-                "body": item
-            })
+        for item in feed_objects:
+            if item.response:
+                data = resp_data_map.get(item.response.id)
+                if data:
+                    results.append({
+                        "type": "Response",
+                        "body": data
+                    })
+            elif item.note:
+                data = note_data_map.get(item.note.id)
+                if data:
+                    results.append({
+                        "type": "Note",
+                        "body": data
+                    })
 
         # Inject Daily Question
         from qna.models import Question
@@ -2153,7 +2211,7 @@ class DiscoverFeedView(generics.ListAPIView):
                 q_idx = random.choice([1, 2])
                 results.insert(min(len(results), q_idx), q_card)
         
-        original_count = len(serialized_data)
+        original_count = len(results)
 
         # Inject Interest
         if original_count >= 5:
