@@ -1,4 +1,5 @@
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -30,6 +31,11 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     social_battery = models.CharField(blank=True, null=True, max_length=30, choices=SOCIAL_BATTERY_CHOICES)
     description = models.CharField(blank=True, null=True, max_length=88)
     track_id = models.CharField(blank=True, null=True, max_length=50)
+    visibility = ArrayField(
+        models.CharField(max_length=20),
+        blank=True,
+        default=list
+    )
 
     readers = models.ManyToManyField(User, related_name='read_check_ins')
 
@@ -43,6 +49,8 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         return self.readers.values_list('id', flat=True)
     
     def is_audience(self, user):
+        from account.models import Connection
+
         content_type = ContentType.objects.get_for_model(self)
         if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():
             return False
@@ -53,8 +61,45 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         if self.user == user:
             return True
 
-        if self.user.is_connected(user):
-            return True
+        is_close_friend = user.is_close_friend(self.user)
+        connection = Connection.get_connection_between(self.user, user)
+        is_friend = connection is not None
+
+        # Check Close Friend
+        if is_close_friend:
+            if self.user == connection.user1:
+                update_past_posts = connection.user1_update_past_posts
+                upgrade_time = connection.user1_upgrade_time
+            else:
+                update_past_posts = connection.user2_update_past_posts
+                upgrade_time = connection.user2_upgrade_time
+
+            can_see_as_cf = False
+            if update_past_posts:
+                can_see_as_cf = True
+            elif upgrade_time is None:  # users were close friends from the beginning
+                can_see_as_cf = True
+            elif self.created_at > upgrade_time:
+                can_see_as_cf = True
+            
+            if can_see_as_cf and 'close_friends' in self.visibility:
+                return True
+        
+        # Check Friend
+        if is_friend:
+            if 'friends' in self.visibility:
+                return True
+        
+        # Check Follower (Mutually Exclusive: Not Connected)
+        is_following = user.is_following(self.user)
+        if is_following and not is_friend:
+             if 'followers' in self.visibility:
+                return True
+
+        # Check Public (Mutually Exclusive: Not Connected, Not Following)
+        if not is_friend and not is_following:
+            if 'public' in self.visibility:
+                return True
 
         return False
 
