@@ -9,6 +9,8 @@ from account.models import Connection, Follow
 
 User = get_user_model()
 
+from playlist.models import PlaylistFeed, Song
+
 class SongListTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='current_user', email='current@test.com', password='password')
@@ -48,6 +50,9 @@ class SongListTestCase(APITestCase):
         self.old_song = CheckIn.objects.create(user=self.user, track_id='old_song', is_active=True, visibility=['public'])
         CheckIn.objects.filter(pk=self.old_song.pk).update(created_at=old_time) # Force update created_at
 
+        # Ensure no existing feed
+        PlaylistFeed.objects.all().delete()
+
     def test_list_songs_friends(self):
         """Test type='friends' (Connected users + Self)"""
         response = self.client.get('/api/playlist/feed/?type=friends')
@@ -66,28 +71,31 @@ class SongListTestCase(APITestCase):
         self.assertNotIn('old_song', track_ids)
 
     def test_list_songs_default_mix(self):
-        """Test default behavior (Daily Digest: Mutuals, Strangers, etc. - limit 10)"""
-        # Create more dummy check-ins to test limit if needed, 
-        # but here we have < 10, so it should return all suitable discovery items.
-        response = self.client.get('/api/playlist/feed/') # No type param
+        """Test default behavior (Daily Digest with Persistence)"""
+        # First request: Creates new feed
+        response = self.client.get('/api/playlist/feed/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.data['results'] if 'results' in response.data else response.data
-        track_ids = [s['track_id'] for s in data]
+        track_ids_1 = [s['track_id'] for s in data]
 
-        # Should NOT contain direct friends
-        self.assertNotIn('user_song', track_ids)
-        self.assertNotIn('friend_song', track_ids)
-        self.assertNotIn('close_friend_song', track_ids)
+        # Verify Content
+        self.assertIn('mutual_song', track_ids_1)
+        self.assertIn('stranger_song', track_ids_1)
+        self.assertIn('followed_song', track_ids_1)
+        self.assertEqual(len(track_ids_1), 3)
         
-        # Should contain discovery items
-        self.assertIn('mutual_song', track_ids)   
-        self.assertIn('stranger_song', track_ids)
-        # Followed users (who are not friends) are also valid candidates for discovery/digest
-        # (matching DiscoverFeed logic which includes 'Following' category)
-        self.assertIn('followed_song', track_ids)
+        # Verify Persistence: Calling again should return SAME feed
+        # Even if we add a new candidate, the feed should be fixed for the day.
         
-        # Max limit check (2 discovery + 1 followed = 3)
-        self.assertEqual(len(track_ids), 3)
+        new_stranger = User.objects.create_user(username='new_stranger', email='new@test.com', password='password')
+        CheckIn.objects.create(user=new_stranger, track_id='new_song', is_active=True, visibility=['public'])
+        
+        response_2 = self.client.get('/api/playlist/feed/')
+        data_2 = response_2.data['results'] if 'results' in response_2.data else response_2.data
+        track_ids_2 = [s['track_id'] for s in data_2]
+        
+        self.assertEqual(track_ids_1, track_ids_2)
+        self.assertNotIn('new_song', track_ids_2) # New candidate ignored due to persistence
         
     def test_list_songs_mutual_friends(self):
         """Test type='mutual_friends'"""

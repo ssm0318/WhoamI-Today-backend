@@ -42,7 +42,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     _safedelete_policy = SOFT_DELETE_CASCADE
 
     def __str__(self):
-        return self.description
+        return self.description or ""
     
     @property
     def reader_ids(self):
