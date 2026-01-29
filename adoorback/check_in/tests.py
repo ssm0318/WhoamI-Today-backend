@@ -49,44 +49,9 @@ class CheckInVisibilityTests(TestCase):
     def test_followers_visibility(self):
         check_in = self.create_check_in(['followers'])
         self.assertFalse(check_in.is_audience(self.stranger))
+        self.assertTrue(check_in.is_audience(self.follower))        
         self.assertTrue(check_in.is_audience(self.follower))
-        # Friends are implicitly connected, but loop logic handles it?
-        # Note logic: is_following checks Follow model. 
-        # Friend is NOT necessarily following in Follow model unless mutually exclusive logic is handled or explicit follow exists.
-        # Wait, Note logic:
-        # if is_friend: check 'friends'
-        # if is_following and not is_friend: check 'followers'
-        # if not is_friend and not is_following: check 'public'
-        
-        # So if visibility is ONLY 'followers', a friend (who is not in 'followers' visibility logic for Friend check) might NOT see it if they are not also following?
-        # Actually `is_following` implementation: `Follow.objects.filter(follower=user, followed=self.author).exists()`
-        
-        # If I am a friend, I am NOT necessarily a follower in `Follow` model (depends on implementation, usually separate).
-        # But usually friends should see 'followers' posts? 
-        # The logic in `is_audience`:
-        # if is_friend: returns True IF 'friends' in visibility.
-        # It does NOT return True if 'followers' in visibility.
-        
-        # So if visibility=['followers'], a Friend (who is not following) will NOT see it.
-        # Is this intended? The Prompt said "Like Response, Note". 
-        # In Note model:
-        # Loop Check Friend: if is_friend: if 'friends' in visibility: return True.
-        # Loop Check Follower: if is_following and not is_friend: if 'followers' in visibility: return True.
-        
-        # So if I mark "Followers only", Friends do NOT see it unless they are also Followers (and `is_friend` check fails? No `is_friend` is usually true).
-        # Actually `is_following and not is_friend`. So if is_friend is True, it SKIPS the follower block.
-        # So Friends CANNOT see "Followers only" posts based on current Note logic.
-        # This implies "Followers" option is strictly for non-connected followers?
-        # OR the user selects multiple? Usually "Followers" implies everyone following?
-        # But the code says: `if is_following and not is_friend`.
-        # So if I am a Friend, I skip that block.
-        # So if visibility is just `['followers']`, a Friend returns False.
-        # Checking `Response` model logic (Step 12):
-        # same logic.
-        # So I will replicate this behavior.
-        
-        self.assertTrue(check_in.is_audience(self.follower))
-        self.assertFalse(check_in.is_audience(self.friend)) # Consistent with Note/Response logic implementation
+        self.assertFalse(check_in.is_audience(self.friend))
         
     def test_friends_visibility(self):
         check_in = self.create_check_in(['friends'])
