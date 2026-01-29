@@ -180,7 +180,7 @@ class QuestionList(generics.ListCreateAPIView):
         return adoor_exception_handler
 
     def get(self, request, *args, **kwargs):
-        # get 30 recent questions excluding future questions
+        # get 14 recent questions excluding future questions
         user = request.user
         try:
             tz = ZoneInfo(user.timezone)
@@ -196,7 +196,7 @@ class QuestionList(generics.ListCreateAPIView):
             AND selected_dates[array_upper(selected_dates, 1)] <= %s
             {excluded_clause}
             ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
-            LIMIT 30;
+            LIMIT 14;
         """
         params = [today]
         if excluded_ids:
