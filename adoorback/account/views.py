@@ -2219,14 +2219,24 @@ class DiscoverFeedView(generics.ListAPIView):
             i_idx = random.choice([5, 6])
             
             # Fetch user's selected interests
-            user_interest_contents = set(request.user.user_interests.values_list('content', flat=True))
+            user_interests = request.user.user_interests.all()
+            user_interest_contents = {i.content for i in user_interests}
             
             interest_list = []
+            default_interests_set = set(INTEREST_CHOICES_BASE)
             for interest in INTEREST_CHOICES_BASE:
                 interest_list.append({
                     "content": interest,
                     "is_selected": interest in user_interest_contents
                 })
+            
+            # Add custom interests
+            for user_interest in user_interests:
+                if user_interest.content not in default_interests_set:
+                    interest_list.append({
+                        "content": user_interest.content,
+                        "is_selected": True
+                    })
 
             interest_card = {
                 "type": "Interest",
@@ -2242,17 +2252,29 @@ class DiscoverFeedView(generics.ListAPIView):
             p_idx = random.choice([11, 12])
             
             # Fetch user's selected personas
-            user_persona_contents = set(request.user.user_personas.values_list('content', flat=True))
+            user_personas = request.user.user_personas.all()
+            user_persona_contents = {p.content for p in user_personas}
 
             persona_list = []
+            default_labels_formatted = set()
             for key, label in PERSONA_CHOICES:
                 # Format label to match DB content (remove spaces and #)
                 formatted_content = label.replace(' ', '').replace('#', '')
+                default_labels_formatted.add(formatted_content)
                 persona_list.append({
                     "key": key, 
                     "label": label,
                     "is_selected": formatted_content in user_persona_contents
                 })
+            
+            # Add custom personas
+            for user_persona in user_personas:
+                if user_persona.content not in default_labels_formatted:
+                    persona_list.append({
+                        "key": None,
+                        "label": user_persona.content, # Custom PascalCase content
+                        "is_selected": True
+                    })
 
             persona_card = {
                 "type": "Persona",
