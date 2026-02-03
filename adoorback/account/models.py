@@ -818,18 +818,6 @@ def connection_removed(instance, **kwargs):
 
 
 @transaction.atomic
-@receiver(post_save, sender=Connection)
-def stop_following_on_friend_connection(instance, **kwargs):
-    if not instance.deleted:
-        user1 = instance.user1
-        user2 = instance.user2
-
-        # Delete any existing Follow objects between the two users
-        Follow.objects.filter(follower=user1, followed=user2).delete(force_policy=HARD_DELETE)
-        Follow.objects.filter(follower=user2, followed=user1).delete(force_policy=HARD_DELETE)
-
-
-@transaction.atomic
 @receiver(post_save, sender=FriendRequest)
 def create_connection_noti(created, instance, **kwargs):
     if instance.deleted:
@@ -879,6 +867,10 @@ def create_connection_noti(created, instance, **kwargs):
             user1_upgrade_time=timezone.now() if instance.requester_choice == 'close_friend' else None,
             user2_upgrade_time=timezone.now() if instance.requestee_choice == 'close_friend' else None,
         )
+
+        # auto-follow logic
+        Follow.objects.get_or_create(follower=requester, followed=requestee)
+        Follow.objects.get_or_create(follower=requestee, followed=requester)
 
         # make chat room
         from chat.models import ChatRoom

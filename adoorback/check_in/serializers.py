@@ -26,8 +26,8 @@ class MyCheckInSerializer(CheckInBaseSerializer):
         }
 
     def validate_visibility(self, value):
-        if len(value) == 0:
-            raise serializers.ValidationError("visibility field is required.")
+        if len(value) != 1:
+            raise serializers.ValidationError("Please select exactly one visibility option.")
         return value
 
 

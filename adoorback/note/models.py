@@ -105,46 +105,37 @@ class Note(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
 
-        is_close_friend = user.is_close_friend(self.author)
-        connection = Connection.get_connection_between(self.author, user)
-        is_friend = connection is not None
-
-        # Check Close Friend
-        if is_close_friend:
-            if self.author == connection.user1:
-                update_past_posts = connection.user1_update_past_posts
-                upgrade_time = connection.user1_upgrade_time
-            else:
-                update_past_posts = connection.user2_update_past_posts
-                upgrade_time = connection.user2_upgrade_time
-
-            can_see_as_cf = False
-            if update_past_posts:
-                can_see_as_cf = True
-            elif upgrade_time is None:  # users were close friends from the beginning
-                can_see_as_cf = True
-            elif self.created_at > upgrade_time:
-                can_see_as_cf = True
+        # Hierarchical Visibility Checks
+        if 'public' in self.visibility:
+            return True
             
-            if can_see_as_cf and 'close_friends' in self.visibility:
+        if 'followers' in self.visibility:
+            if user.is_following(self.author):
                 return True
-        
-        # Check Friend
-        if is_friend:
-            if 'friends' in self.visibility:
-                return True
-        
-        # Check Follower (Mutually Exclusive: Not Connected)
-        is_following = user.is_following(self.author)
-        if is_following and not is_friend:
-             if 'followers' in self.visibility:
-                return True
+                
+        if 'friends' in self.visibility:
+             if user.is_connected(self.author):
+                 return True
+                 
+        if 'close_friends' in self.visibility:
+            if user.is_close_friend(self.author):
+                # Upgrade logic
+                connection = Connection.get_connection_between(self.author, user)
+                if connection:
+                    if self.author == connection.user1:
+                        update_past_posts = connection.user1_update_past_posts
+                        upgrade_time = connection.user1_upgrade_time
+                    else:
+                        update_past_posts = connection.user2_update_past_posts
+                        upgrade_time = connection.user2_upgrade_time
 
-        # Check Public (Mutually Exclusive: Not Connected, Not Following)
-        if not is_friend and not is_following:
-            if 'public' in self.visibility:
-                return True
-
+                    if update_past_posts:
+                        return True
+                    elif upgrade_time is None:
+                        return True
+                    elif self.created_at > upgrade_time:
+                        return True
+        
         return False
 
     class Meta:

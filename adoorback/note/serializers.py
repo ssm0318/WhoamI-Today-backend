@@ -78,6 +78,11 @@ class NoteSerializer(BaseNoteSerializer):
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
     visibility = VisibilityField(choices=['friends', 'close_friends', 'public', 'followers'], required=True)
 
+    def validate_visibility(self, value):
+        if len(value) != 1:
+            raise serializers.ValidationError("Please select exactly one visibility option.")
+        return list(value)
+
     def get_current_user_reaction_id_list(self, obj):
         current_user_id = self.context['request'].user.id
         content_type_id = get_generic_relation_type(obj.type).id
@@ -122,6 +127,11 @@ class DefaultFriendNoteSerializer(BaseNoteSerializer):
     like_count = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
     visibility = VisibilityField(choices=['friends', 'close_friends', 'public', 'followers'], required=True)
+
+    def validate_visibility(self, value):
+        if len(value) != 1:
+            raise serializers.ValidationError("Please select exactly one visibility option.")
+        return list(value)
 
     def get_like_count(self, obj):
         return obj.liked_user_ids.count()
