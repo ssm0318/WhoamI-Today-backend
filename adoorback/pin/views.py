@@ -55,3 +55,18 @@ class UserPinList(generics.ListAPIView):
     def get_queryset(self):
         username = self.kwargs.get('username')
         return Pin.objects.filter(user__username=username).order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        visible_pins = []
+        for pin in queryset:
+            if pin.content_object and pin.content_object.is_audience(request.user):
+                visible_pins.append(pin)
+        
+        page = self.paginate_queryset(visible_pins)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(visible_pins, many=True)
+        return Response(serializer.data)

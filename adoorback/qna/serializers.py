@@ -49,13 +49,15 @@ class ResponseSerializer(AdoorBaseSerializer):
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
     visibility = serializers.MultipleChoiceField(
-        choices=['public', 'follower', 'friends', 'close_friends'],
+        choices=['public', 'followers', 'friends', 'close_friends'],
         required=True
     )
     pinned = serializers.SerializerMethodField(read_only=True)
     pin_id = serializers.SerializerMethodField(read_only=True)
 
     def validate_visibility(self, value):
+        if len(value) != 1:
+            raise serializers.ValidationError(_("Please select exactly one visibility option."))
         return list(value)
 
     def get_current_user_read(self, obj):

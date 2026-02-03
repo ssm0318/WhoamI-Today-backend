@@ -149,51 +149,37 @@ class Response(AdoorModel, SafeDeleteModel):
         if self.author == user:
             return True
             
-        is_close_friend = user.is_close_friend(self.author)
-        is_friend = Connection.objects.filter(
-            (models.Q(user1=self.author) & models.Q(user2=user)) | 
-            (models.Q(user1=user) & models.Q(user2=self.author))
-        ).exists()
-        is_following = user.is_following(self.author)
-
-        # Check Close Friend
-        if is_close_friend:
-            # Upgrade logic for close friends
-            connection = Connection.get_connection_between(self.author, user)
-            if connection:  # Should exist if close friend
-                if self.author == connection.user1:
-                    update_past_posts = connection.user1_update_past_posts
-                    upgrade_time = connection.user1_upgrade_time
-                else:
-                    update_past_posts = connection.user2_update_past_posts
-                    upgrade_time = connection.user2_upgrade_time
-
-                can_see_as_cf = False
-                if update_past_posts:
-                    can_see_as_cf = True
-                elif upgrade_time is None:
-                    can_see_as_cf = True
-                elif self.created_at > upgrade_time:
-                    can_see_as_cf = True
+        # Hierarchical Visibility Checks
+        if 'public' in self.visibility:
+            return True
+            
+        if 'followers' in self.visibility:
+            if user.is_following(self.author):
+                return True
                 
-                if can_see_as_cf and 'close_friends' in self.visibility:
-                    return True
+        if 'friends' in self.visibility:
+             if user.is_connected(self.author):
+                 return True
+                 
+        if 'close_friends' in self.visibility:
+            if user.is_close_friend(self.author):
+                # Upgrade logic
+                connection = Connection.get_connection_between(self.author, user)
+                if connection:
+                    if self.author == connection.user1:
+                        update_past_posts = connection.user1_update_past_posts
+                        upgrade_time = connection.user1_upgrade_time
+                    else:
+                        update_past_posts = connection.user2_update_past_posts
+                        upgrade_time = connection.user2_upgrade_time
 
-        # Check Friend
-        if is_friend:
-            if 'friends' in self.visibility:
-                return True
-
-        # Check Follower (Mutually Exclusive: Not Connected)
-        if is_following and not is_friend:
-             if 'follower' in self.visibility:
-                return True
-
-        # Check Public (Mutually Exclusive: Not Connected, Not Following)
-        if not is_friend and not is_following:
-            if 'public' in self.visibility:
-                return True
-
+                    if update_past_posts:
+                        return True
+                    elif upgrade_time is None:
+                        return True
+                    elif self.created_at > upgrade_time:
+                        return True
+        
         return False
 
 
