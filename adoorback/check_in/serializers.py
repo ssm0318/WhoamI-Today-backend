@@ -22,10 +22,12 @@ class MyCheckInSerializer(CheckInBaseSerializer):
         model = CheckIn
         fields = CheckInBaseSerializer.Meta.fields
         extra_kwargs = {
-            'visibility': {'required': True}
+            'visibility': {'required': False}
         }
 
     def validate_visibility(self, value):
+        if len(value) == 0:
+            return value
         if len(value) != 1:
             raise serializers.ValidationError("Please select exactly one visibility option.")
         return value
