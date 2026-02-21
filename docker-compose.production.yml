@@ -25,6 +25,7 @@ services:
       - ./error.log:/app/error.log
       - ./adoorback/adoorback/assets/user_list.csv:/app/adoorback/adoorback/assets/user_list.csv
       - ./adoorback/adoorback/assets/created_users.csv:/app/adoorback/adoorback/assets/created_users.csv
+      - ./adoorback/adoorback/serviceAccountKey.json:/app/adoorback/adoorback/serviceAccountKey.json
     healthcheck:
       test:
         [
@@ -79,6 +80,7 @@ services:
       - ./cron:/app/cron
       - ./db_backup:/app/db_backup
       - ./.env:/app/.env
+      - ./adoorback/adoorback/serviceAccountKey.json:/app/adoorback/adoorback/serviceAccountKey.json
     depends_on:
       db:
         condition: service_healthy
