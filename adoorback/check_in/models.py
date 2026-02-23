@@ -15,6 +15,10 @@ from content_report.models import ContentReport
 User = get_user_model()
 
 
+def list_public():
+    return ['public']
+
+
 class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     SOCIAL_BATTERY_CHOICES = [
         ('completely_drained', 'Completely Drained'),
@@ -34,7 +38,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     visibility = ArrayField(
         models.CharField(max_length=20),
         blank=True,
-        default=list
+        default=list_public
     )
 
     readers = models.ManyToManyField(User, related_name='read_check_ins')
