@@ -45,7 +45,6 @@ urlpatterns = [
     path('api/ping/', include('ping.urls')),
 
     path('api/translate/', include('translate.urls')),
-    path('api/pins/', include('pin.urls')),
 ]
 
 if settings.DEBUG:
