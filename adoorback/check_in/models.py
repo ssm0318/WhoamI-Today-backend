@@ -68,12 +68,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         # Hierarchical Visibility Checks
         if 'public' in self.visibility:
             return True
-            
-        # Check Follower
-        if 'followers' in self.visibility:
-            if user.is_following(self.user):
-                return True
-                
+
         # Check Friend
         if 'friends' in self.visibility:
              # Check for connection
