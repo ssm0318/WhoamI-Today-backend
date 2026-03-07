@@ -50,10 +50,6 @@ class SongList(generics.ListCreateAPIView):
                 target_ids = user.close_friend_ids + [user.id]
                 return base_qs.filter(user_id__in=target_ids).order_by('-created_at')
 
-            elif filter_type == 'following':
-                target_ids = list(user.following.values_list('id', flat=True)) + [user.id]
-                return base_qs.filter(user_id__in=target_ids).order_by('-created_at')
-
             # Discovery Real-time Types
             exclude_ids = set(user.friend_ids + user.close_friend_ids + user.user_report_blocked_ids + [user.id])
             
@@ -247,7 +243,7 @@ class SongList(generics.ListCreateAPIView):
         serializer.save(
             user=self.request.user, 
             is_active=True,
-            visibility=['public', 'friends', 'followers'] 
+            visibility=['public', 'friends']
         )
 
 

@@ -13,7 +13,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES, PERSONA_CHOICES, FollowRequest, Follow, Interest, Persona
+    VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -185,15 +185,9 @@ class UserProfileSerializer(UserMinimalSerializer):
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     friend_count = serializers.SerializerMethodField(read_only=True)
-    is_following = serializers.SerializerMethodField(read_only=True)
-    is_followed_by = serializers.SerializerMethodField(read_only=True)
-    sent_follow_request_to = serializers.SerializerMethodField(read_only=True)
-    received_follow_request_from = serializers.SerializerMethodField(read_only=True)
     pinned_cnt = serializers.SerializerMethodField(read_only=True)
     mutual_personas = serializers.SerializerMethodField(read_only=True)
     mutual_interests = serializers.SerializerMethodField(read_only=True)
-    follower_count = serializers.SerializerMethodField(read_only=True)
-    following_count = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -203,12 +197,6 @@ class UserProfileSerializer(UserMinimalSerializer):
     
     def get_pinned_cnt(self, obj):
         return obj.pin_set.count()
-
-    def get_follower_count(self, obj):
-        return obj.followers_rel.count()
-
-    def get_following_count(self, obj):
-        return obj.following_rel.count()
 
     def get_check_in(self, obj):
         from check_in.serializers import CheckInBaseSerializer
@@ -286,30 +274,6 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_friend_count(self, obj):
         return Connection.objects.filter(Q(user1=obj) | Q(user2=obj)).count()
 
-    def get_is_following(self, obj):
-        user = self.context.get('request').user
-        if user.is_anonymous:
-            return False
-        return Follow.objects.filter(follower=user, followed=obj).exists()
-
-    def get_is_followed_by(self, obj):
-        user = self.context.get('request').user
-        if user.is_anonymous:
-            return False
-        return Follow.objects.filter(follower=obj, followed=user).exists()
-
-    def get_sent_follow_request_to(self, obj):
-        user = self.context.get('request').user
-        if user.is_anonymous:
-            return False
-        return FollowRequest.objects.filter(requester=user, requestee=obj, accepted__isnull=True).exists()
-
-    def get_received_follow_request_from(self, obj):
-        user = self.context.get('request').user
-        if user.is_anonymous:
-            return False
-        return FollowRequest.objects.filter(requester=obj, requestee=user, accepted__isnull=True).exists()
-
     user_interests = serializers.StringRelatedField(many=True, read_only=True)
     user_personas = serializers.StringRelatedField(many=True, read_only=True)
 
@@ -320,10 +284,7 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'unread_ping_count', 'connection_status',
                                                       'friend_count', 'email_verified',
-                                                      'is_following', 'is_followed_by',
-                                                      'sent_follow_request_to', 'received_follow_request_from',
-                                                      'pinned_cnt', 'mutual_personas', 'mutual_interests',
-                                                      'follower_count', 'following_count']
+                                                      'pinned_cnt', 'mutual_personas', 'mutual_interests']
 
 
 class FriendListSerializer(UserMinimalSerializer):
@@ -667,70 +628,6 @@ class UserPersonaUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"Invalid choices: {invalid}")
             
         return value
-
-
-class UserFollowRequestCreateSerializer(serializers.ModelSerializer):
-    requester_id = serializers.IntegerField()
-    requestee_id = serializers.IntegerField()
-    accepted = serializers.BooleanField(allow_null=True, required=False)
-    requester_detail = serializers.SerializerMethodField(read_only=True)
-
-    def get_requester_detail(self, obj):
-        return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
-
-    def validate(self, data):
-        data = super().validate(data)
-        
-        try:
-            requester = User.objects.get(id=data['requester_id'])
-            requestee = User.objects.get(id=data['requestee_id'])
-        except User.DoesNotExist:
-            raise serializers.ValidationError("User not found")
-
-        if data.get('requester_id') == data.get('requestee_id'):
-            raise serializers.ValidationError('You cannot follow yourself.')
-
-        if Follow.objects.filter(follower=requester, followed=requestee).exists():
-             raise serializers.ValidationError('You are already following this user.')
-
-        if FollowRequest.objects.filter(requester=requester, requestee=requestee, accepted__isnull=True).exists():
-            raise serializers.ValidationError('You have already sent a follow request to this user.')
-
-        return data
-
-    class Meta:
-        model = FollowRequest
-        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail']
-
-
-class UserFollowRequestUpdateSerializer(serializers.ModelSerializer):
-    requester_id = serializers.IntegerField(required=False)
-    requestee_id = serializers.IntegerField(required=False)
-    accepted = serializers.BooleanField(required=True)
-
-    def validate(self, data):
-        unknown = set(self.initial_data) - set(self.fields)
-        if unknown:
-            raise serializers.ValidationError("Unknown field: {}".format(", ".join(unknown)))
-        if self.instance.accepted is not None:
-            raise serializers.ValidationError("You have already responded to this follow request.")
-        
-        return data
-
-    class Meta:
-        model = FollowRequest
-        fields = ['requester_id', 'requestee_id', 'accepted']
-
-
-class UserFollowRequestSerializer(serializers.ModelSerializer):
-    requestee_detail = serializers.SerializerMethodField(read_only=True)
-
-    def get_requestee_detail(self, obj):
-        return UserMinimalSerializer(User.objects.get(id=obj.requestee_id)).data
-
-    class Meta:
-        model = FollowRequest
-        fields = ['requester_id', 'requestee_id', 'requestee_detail']
 
 
 class UserMinimumSerializer(serializers.ModelSerializer):

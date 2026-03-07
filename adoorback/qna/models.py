@@ -153,11 +153,7 @@ class Response(AdoorModel, SafeDeleteModel):
         # Hierarchical Visibility Checks
         if 'public' in self.visibility:
             return True
-            
-        if 'followers' in self.visibility:
-            if user.is_following(self.author):
-                return True
-                
+
         if 'friends' in self.visibility:
              if user.is_connected(self.author):
                  return True

@@ -46,8 +46,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
                                  AppSessionSerializer, FriendFriendListSerializer, \
-                                 UserFollowRequestCreateSerializer, UserFollowRequestSerializer, \
-                                 UserFollowRequestUpdateSerializer, UserMinimalSerializer, \
+                                 UserMinimalSerializer, \
                                  UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
                                  InterestSerializer, PersonaSerializer)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
@@ -61,7 +60,7 @@ from qna.models import ResponseRequest
 from qna.models import Question, Response as _Response
 from qna.serializers import ResponseSerializer, DailyQuestionSerializer
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
-from account.models import FollowRequest, Follow, PERSONA_CHOICES, INTEREST_CHOICES_BASE
+from account.models import PERSONA_CHOICES, INTEREST_CHOICES_BASE
 from tracking.utils import clean_session_key
 import random
 
@@ -1195,13 +1194,6 @@ class FriendList(generics.ListAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        query_type = self.request.query_params.get('type')
-        if query_type == 'following':
-            context['hide_check_in'] = True
-        return context
-
     def get_queryset(self):
         user = self.request.user
         friends = user.connected_users
@@ -1212,20 +1204,18 @@ class FriendList(generics.ListAPIView):
             return friends.order_by('username')
         elif query_type == 'close_friends':
             close_friends_ids = Connection.objects.filter(
-                Q(user1=user, user1_choice='close_friend') | 
+                Q(user1=user, user1_choice='close_friend') |
                 Q(user2=user, user2_choice='close_friend')
             ).values_list('user1_id', 'user2_id')
-            
+
             target_ids = set()
             for u1_id, u2_id in close_friends_ids:
                 if u1_id == user.id:
                     target_ids.add(u2_id)
                 else:
                     target_ids.add(u1_id)
-            
+
             return friends.filter(id__in=target_ids).order_by('username')
-        elif query_type == 'following':
-            return user.following.order_by('username')
         elif query_type == 'has_updates':
             friends = friends.exclude(hidden=True)
             friends_with_updates = [
@@ -1606,83 +1596,6 @@ class UserFriendRequestUpdateDefault(BaseUserFriendRequestUpdate):
     default_api = True
 
 
-class UserFollowRequestListCreate(generics.ListCreateAPIView):
-    queryset = FollowRequest.objects.all()
-    serializer_class = UserFollowRequestCreateSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        # List pending received follow requests
-        return FollowRequest.objects.filter(requestee=self.request.user).filter(accepted__isnull=True)
-
-    @transaction.atomic
-    def perform_create(self, serializer):
-        if int(self.request.data.get('requester_id')) != int(self.request.user.id):
-            raise PermissionDenied("The requester must be yourself.")
-        serializer.save(accepted=None)
-
-
-class UserSentFollowRequestList(generics.ListAPIView):
-    queryset = FollowRequest.objects.all()
-    serializer_class = UserFollowRequestSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        # List pending sent follow requests (not accepted, not declined)
-        return FollowRequest.objects.filter(requester=self.request.user).filter(accepted__isnull=True)
-
-
-class UserFollowRequestDestroy(generics.DestroyAPIView):
-    serializer_class = UserFollowRequestCreateSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_object(self):
-        return FollowRequest.objects.get(requester_id=self.request.user.id,
-                                         requestee_id=self.kwargs.get('pk'))
-
-    @transaction.atomic
-    def perform_destroy(self, obj):
-        obj.delete(force_policy=SOFT_DELETE_CASCADE)
-
-
-class UserFollowRequestUpdate(generics.UpdateAPIView):
-    serializer_class = UserFollowRequestUpdateSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_object(self):
-        return FollowRequest.objects.get(requester_id=self.kwargs.get('pk'),
-                                         requestee_id=self.request.user.id)
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        
-        if serializer.validated_data.get('accepted'):
-             # Check follower limit
-             if request.user.followers.count() >= 100:
-                 raise ValidationError({'error': 'You can only have up to 100 followers.'})
-
-        self.perform_update(serializer)
-        return Response(serializer.data)
-
-    @transaction.atomic
-    def perform_update(self, serializer):
-        serializer.save()
-
-
 class UserRecommendedFriendsList(generics.ListAPIView):
     serializer_class = UserMinimumSerializer
     permission_classes = [IsAuthenticated]
@@ -2021,9 +1934,7 @@ class DiscoverFeedView(generics.ListAPIView):
 
         # Filter by type if not 'all'
         type_param = type_param.lower().rstrip('/')
-        if type_param == 'following':
-            queryset = queryset.filter(category='following')
-        elif type_param == 'mutual_friends':
+        if type_param == 'mutual_friends':
             queryset = queryset.filter(category='mutual_friends')
         elif type_param == 'mutual_traits':
             queryset = queryset.filter(category='mutual_traits')
@@ -2058,7 +1969,7 @@ class DiscoverFeedView(generics.ListAPIView):
             responses = _Response.objects.filter(author_id__in=author_ids).exclude(readers=user).order_by('-created_at')
             if limit:
                 responses = responses[:limit]
-            
+
             # Notes
             notes = Note.objects.filter(author_id__in=author_ids).exclude(readers=user).order_by('-created_at')
             if limit:
@@ -2066,10 +1977,10 @@ class DiscoverFeedView(generics.ListAPIView):
 
             # Combine and sort
             combined = sorted(chain(responses, notes), key=attrgetter('created_at'), reverse=True)
-            
+
             # Filter by permission (is_audience)
             valid_candidates = []
-            count = 0 
+            count = 0
             for obj in combined:
                 if obj.is_audience(user):
                     valid_candidates.append(obj)
@@ -2078,17 +1989,8 @@ class DiscoverFeedView(generics.ListAPIView):
                     break
             return valid_candidates
 
-        # 1. Posts from people I follow (who are not friends) - Include ALL
-        following_ids = set(user.following.values_list('id', flat=True))
-        follow_but_not_friend_ids = following_ids - friend_ids - blocked_ids - {user.id}
-        
-        following_candidates = get_candidates(follow_but_not_friend_ids, limit=None)
-        
-        for obj in following_candidates:
-            feed_items.append((obj, 'following'))
+        # 1, 2, 3. Collect candidates for Mutual Friends, Mutual Traits, and Strangers
 
-        # 2, 3, 4. Collect candidates for Mutual Friends, Mutual Traits, and Strangers
-        
         # Mutual Friends Candidates
         user_friends = user.connected_users
         user_friend_ids = set(user_friends.values_list('id', flat=True))
@@ -2096,8 +1998,8 @@ class DiscoverFeedView(generics.ListAPIView):
         for friend in user_friends:
             friend_of_friend_ids = set(friend.connected_users.values_list('id', flat=True))
             mutual_friend_potential_ids.update(friend_of_friend_ids)
-        mf_ids = mutual_friend_potential_ids - user_friend_ids - following_ids - exclude_ids
-        
+        mf_ids = mutual_friend_potential_ids - user_friend_ids - exclude_ids
+
         mf_candidates = get_candidates(mf_ids, limit=20)
 
         # Mutual Traits Candidates
@@ -2105,13 +2007,13 @@ class DiscoverFeedView(generics.ListAPIView):
         user_personas = set(user.user_personas.values_list('id', flat=True))
         trait_ids = set(User.objects.filter(
             Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas)
-        ).exclude(id__in=exclude_ids | following_ids).values_list('id', flat=True))
-        
+        ).exclude(id__in=exclude_ids).values_list('id', flat=True))
+
         trait_candidates = get_candidates(trait_ids, limit=20)
 
         # Strangers (No Mutual) Candidates
         stranger_ids = set(User.objects.exclude(
-            id__in=exclude_ids | following_ids | mutual_friend_potential_ids | trait_ids
+            id__in=exclude_ids | mutual_friend_potential_ids | trait_ids
         ).exclude(is_superuser=True).values_list('id', flat=True))
         
         stranger_candidates = get_candidates(stranger_ids, limit=20)
@@ -2421,27 +2323,6 @@ class TouchSession(generics.UpdateAPIView):
         session_id = clean_session_key(session_id)
         
         return get_object_or_404(AppSession, session_id=session_id, user=self.request.user)
-
-class UserFollowerList(generics.ListAPIView):
-    serializer_class = UserMinimalSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        return self.request.user.followers
-
-
-class UserFollowingList(generics.ListAPIView):
-    serializer_class = UserMinimalSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        return self.request.user.following
 
 class InterestSearch(generics.ListAPIView):
     serializer_class = InterestSerializer

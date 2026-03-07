@@ -14,11 +14,11 @@ class CheckInLatestVisibilityAPITests(APITestCase):
 
     def test_default_visibility_no_check_ins(self):
         """
-        If the user has no check-ins, return the default ['public', 'followers', 'friends'].
+        If the user has no check-ins, return the default ['public'].
         """
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['visibility'], ['public', 'followers', 'friends'])
+        self.assertEqual(response.data['visibility'], ['public'])
 
     def test_visibility_with_existing_check_in(self):
         """
@@ -38,14 +38,14 @@ class CheckInLatestVisibilityAPITests(APITestCase):
         """
         Ensure that deleting a check-in (soft delete) respects the remaining latest one (or default).
         """
-        check_in = CheckIn.objects.create(user=self.user, visibility=['followers'], description="To be deleted")
-        
+        check_in = CheckIn.objects.create(user=self.user, visibility=['friends'], description="To be deleted")
+
         # Verify initial state
         response = self.client.get(self.url)
-        self.assertEqual(response.data['visibility'], ['followers'])
+        self.assertEqual(response.data['visibility'], ['friends'])
         
         # Delete the check-in
         check_in.delete()
         
         response = self.client.get(self.url)
-        self.assertEqual(response.data['visibility'], ['public', 'followers', 'friends'])
+        self.assertEqual(response.data['visibility'], ['public'])

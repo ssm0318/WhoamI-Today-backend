@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from check_in.models import CheckIn
-from account.models import Connection, Follow
+from account.models import Connection
 
 User = get_user_model()
 
@@ -16,9 +16,8 @@ class SongListTestCase(APITestCase):
         self.user = User.objects.create_user(username='current_user', email='current@test.com', password='password')
         self.friend = User.objects.create_user(username='friend', email='friend@test.com', password='password')
         self.close_friend = User.objects.create_user(username='close_friend', email='close@test.com', password='password')
-        self.followed_user = User.objects.create_user(username='followed', email='followed@test.com', password='password')
         self.stranger = User.objects.create_user(username='stranger', email='stranger@test.com', password='password')
-        
+
         # Mutual Friend User (Friend of Friend)
         self.mutual_friend = User.objects.create_user(username='mutual', email='mutual@test.com', password='password')
 
@@ -29,19 +28,16 @@ class SongListTestCase(APITestCase):
         Connection.objects.create(user1=self.user, user2=self.friend, user1_choice='friend', user2_choice='friend')
         # User <-> Close Friend
         Connection.objects.create(user1=self.user, user2=self.close_friend, user1_choice='close_friend', user2_choice='friend')
-        # User -> Followed
-        Follow.objects.create(follower=self.user, followed=self.followed_user)
         # Friend <-> Mutual Friend
         Connection.objects.create(user1=self.friend, user2=self.mutual_friend, user1_choice='friend', user2_choice='friend')
 
         # Create CheckIns with songs (within 7 days)
         # Ensure is_active=True and visibility allows viewing
         common_defaults = {'is_active': True, 'visibility': ['public', 'friends']}
-        
+
         self.user_song = CheckIn.objects.create(user=self.user, track_id='user_song', **common_defaults)
         self.friend_song = CheckIn.objects.create(user=self.friend, track_id='friend_song', **common_defaults)
         self.close_friend_song = CheckIn.objects.create(user=self.close_friend, track_id='close_friend_song', **common_defaults)
-        self.followed_song = CheckIn.objects.create(user=self.followed_user, track_id='followed_song', **common_defaults)
         self.stranger_song = CheckIn.objects.create(user=self.stranger, track_id='stranger_song', **common_defaults)
         self.mutual_song = CheckIn.objects.create(user=self.mutual_friend, track_id='mutual_song', **common_defaults)
 
@@ -64,8 +60,7 @@ class SongListTestCase(APITestCase):
         self.assertIn('friend_song', track_ids)
         self.assertIn('close_friend_song', track_ids)
         
-        # Followed/Stranger/Mutual should NOT be in 'friends' list unless connected
-        self.assertNotIn('followed_song', track_ids)
+        # Stranger/Mutual should NOT be in 'friends' list unless connected
         self.assertNotIn('stranger_song', track_ids)
         self.assertNotIn('mutual_song', track_ids)
         self.assertNotIn('old_song', track_ids)
@@ -81,8 +76,7 @@ class SongListTestCase(APITestCase):
         # Verify Content
         self.assertIn('mutual_song', track_ids_1)
         self.assertIn('stranger_song', track_ids_1)
-        self.assertIn('followed_song', track_ids_1)
-        self.assertEqual(len(track_ids_1), 3)
+        self.assertEqual(len(track_ids_1), 2)
         
         # Verify Persistence: Calling again should return SAME feed
         # Even if we add a new candidate, the feed should be fixed for the day.
