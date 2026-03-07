@@ -717,6 +717,7 @@ class UserAllPostList(generics.ListAPIView):
         page = self.paginate_queryset(combined_items)
         objects_to_serialize = page if page is not None else combined_items
         
+        user = request.user
         serialized_data = []
         for obj in objects_to_serialize:
             if isinstance(obj, Note):
@@ -726,8 +727,55 @@ class UserAllPostList(generics.ListAPIView):
                 serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
                 serialized['type'] = 'Response' # Optional
             serialized_data.append(serialized)
-            
+
+        for obj in objects_to_serialize:
+            obj.readers.add(user)
+
         return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
+
+
+class UserUnreadPostList(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        author_username = self.kwargs.get('username')
+        author = get_object_or_404(User, username=author_username)
+
+        all_notes = Note.objects.filter(author=author)
+        note_ids = [note.id for note in all_notes if note.is_audience(user)]
+        unread_notes = list(
+            Note.objects.filter(id__in=note_ids).exclude(readers=user).order_by('-created_at').distinct()
+        )
+
+        all_responses = _Response.objects.filter(author=author).order_by('-created_at')
+        response_ids = [response.id for response in all_responses if response.is_audience(user)]
+        unread_responses = list(
+            _Response.objects.filter(id__in=response_ids).exclude(readers=user).distinct()
+        )
+
+        combined = sorted(chain(unread_notes, unread_responses), key=lambda x: x.created_at, reverse=True)
+
+        serialized_data = []
+        for obj in combined:
+            if isinstance(obj, Note):
+                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
+                serialized['type'] = 'Note'
+            elif isinstance(obj, _Response):
+                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+                serialized['type'] = 'Response'
+            serialized_data.append(serialized)
+
+        # Mark all as read after fetching
+        for obj in unread_notes:
+            obj.readers.add(user)
+        for obj in unread_responses:
+            obj.readers.add(user)
+
+        return Response(serialized_data)
 
 
 class CurrentUserLatestVisibility(APIView):

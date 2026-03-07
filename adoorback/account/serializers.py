@@ -337,7 +337,6 @@ class FriendListSerializer(UserMinimalSerializer):
     description = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     social_battery = serializers.SerializerMethodField(read_only=True)
-    recent_post = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -366,18 +365,11 @@ class FriendListSerializer(UserMinimalSerializer):
         return None
 
     def get_current_user_read(self, obj):
-        from check_in.serializers import CheckInBaseSerializer
         responses = self.responses(obj)
         notes = self.notes(obj)
-        check_in = self.check_in(obj)
-        if check_in:
-            check_in_data = CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
-        else:
-            check_in_data = {}
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
-                            and not any(not note['current_user_read'] for note in notes) \
-                            and not (check_in_data and not check_in_data['current_user_read'])
+                            and not any(not note['current_user_read'] for note in notes)
         return current_user_read
     
     def get_unread_cnt(self, obj):
@@ -444,72 +436,11 @@ class FriendListSerializer(UserMinimalSerializer):
             return ping_room.pings.filter(receiver=user, is_read=False).count()
         return 0
 
-    def get_recent_post(self, obj):
-        responses = self.responses(obj)
-        notes = self.notes(obj)
-        
-        # Combine and sort by created_at descending
-        all_posts = []
-        for r in responses:
-            all_posts.append({
-                'type': 'Response',
-                'id': r['id'],
-                'content': r['content'],
-                'created_at': r['created_at'],
-                'question': r.get('question'), # Include full question object
-                'current_user_like_id': r.get('current_user_like_id'),
-                'current_user_reaction_id_list': r.get('current_user_reaction_id_list'),
-                'like_reaction_user_sample': r.get('like_reaction_user_sample'),
-                'is_read': r.get('current_user_read'),
-                'comment_count': r.get('comment_count'),
-            })
-        for n in notes:
-            all_posts.append({
-                'type': 'Note',
-                'id': n['id'],
-                'content': n['content'],
-                'created_at': n['created_at'],
-                'current_user_like_id': n.get('current_user_like_id'),
-                'current_user_reaction_id_list': n.get('current_user_reaction_id_list'),
-                'like_reaction_user_sample': n.get('like_reaction_user_sample'),
-                'is_read': n.get('current_user_read'),
-                'images': n.get('images'),
-                'comment_count': n.get('comment_count'),
-            })
-        
-        if not all_posts:
-            return None
-            
-        # Sort by created_at desc (assuming ISO string format sorts correctly)
-        all_posts.sort(key=lambda x: x['created_at'], reverse=True)
-        recent = all_posts[0]
-        
-        # Format output
-        preview = recent['content'][:50]
-        
-        data = {
-            'type': recent['type'],
-            'id': recent['id'],
-            'preview_content': preview,
-            'created_at': recent['created_at'],
-            'current_user_like_id': recent.get('current_user_like_id'),
-            'current_user_reaction_id_list': recent.get('current_user_reaction_id_list'),
-            'like_reaction_user_sample': recent.get('like_reaction_user_sample'),
-            'is_read': recent.get('is_read'),
-            'images': recent.get('images', []),
-            'comment_count': recent.get('comment_count'),
-        }
-        
-        if recent['type'] == 'Response':
-             data['question'] = recent.get('question')
-             
-        return data
-
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
                                                       'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count',
-                                                      'recent_post', 'social_battery']
+                                                      'social_battery']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
