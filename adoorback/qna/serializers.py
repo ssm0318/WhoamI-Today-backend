@@ -52,9 +52,6 @@ class ResponseSerializer(AdoorBaseSerializer):
         choices=['public', 'friends', 'close_friends'],
         required=True
     )
-    pinned = serializers.SerializerMethodField(read_only=True)
-    pin_id = serializers.SerializerMethodField(read_only=True)
-
     def validate_visibility(self, value):
         if len(value) != 1:
             raise serializers.ValidationError(_("Please select exactly one visibility option."))
@@ -101,19 +98,10 @@ class ResponseSerializer(AdoorBaseSerializer):
         reactions = Reaction.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
         return [{"id": reaction.id, "emoji": reaction.emoji} for reaction in reactions]
 
-    def get_pinned(self, obj):
-        from pin.models import Pin
-        return Pin.objects.filter(user=self.context['request'].user, content_type__model='response', object_id=obj.id).exists()
-
-    def get_pin_id(self, obj):
-        from pin.models import Pin
-        pin = Pin.objects.filter(user=self.context['request'].user, content_type__model='response', object_id=obj.id).first()
-        return pin.id if pin else None
-
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited', 'visibility', 'pinned', 'pin_id']
+                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited', 'visibility']
         
 
 class DailyQuestionSerializer(QuestionBaseSerializer):

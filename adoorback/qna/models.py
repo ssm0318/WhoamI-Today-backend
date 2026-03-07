@@ -99,8 +99,6 @@ class Response(AdoorModel, SafeDeleteModel):
     response_originated_notis = GenericRelation(Notification,
                                                 content_type_field='origin_type',
                                                 object_id_field='origin_id')
-    response_pins = GenericRelation('pin.Pin')
-
     _safedelete_policy = SOFT_DELETE_CASCADE
 
     class Meta:

@@ -185,7 +185,6 @@ class UserProfileSerializer(UserMinimalSerializer):
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     friend_count = serializers.SerializerMethodField(read_only=True)
-    pinned_cnt = serializers.SerializerMethodField(read_only=True)
     mutual_personas = serializers.SerializerMethodField(read_only=True)
     mutual_interests = serializers.SerializerMethodField(read_only=True)
 
@@ -195,9 +194,6 @@ class UserProfileSerializer(UserMinimalSerializer):
             return obj in request.user.favorites.all()
         return False
     
-    def get_pinned_cnt(self, obj):
-        return obj.pin_set.count()
-
     def get_check_in(self, obj):
         from check_in.serializers import CheckInBaseSerializer
         user = self.context.get('request', None).user
@@ -284,7 +280,7 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'unread_ping_count', 'connection_status',
                                                       'friend_count', 'email_verified',
-                                                      'pinned_cnt', 'mutual_personas', 'mutual_interests']
+                                                      'mutual_personas', 'mutual_interests']
 
 
 class FriendListSerializer(UserMinimalSerializer):

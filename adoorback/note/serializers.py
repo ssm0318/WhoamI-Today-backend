@@ -22,8 +22,6 @@ class BaseNoteSerializer(AdoorBaseSerializer):
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     images = serializers.SerializerMethodField()
     current_user_read = serializers.SerializerMethodField(read_only=True)
-    pinned = serializers.SerializerMethodField(read_only=True)
-    pin_id = serializers.SerializerMethodField(read_only=True)
 
     def get_current_user_read(self, obj):
         return self.context['request'].user.id in obj.reader_ids
@@ -31,18 +29,9 @@ class BaseNoteSerializer(AdoorBaseSerializer):
     def get_images(self, obj):
         return [image.image.url for image in obj.images.all().order_by('created_at')]
 
-    def get_pinned(self, obj):
-        from pin.models import Pin
-        return Pin.objects.filter(user=self.context['request'].user, content_type__model='note', object_id=obj.id).exists()
-
-    def get_pin_id(self, obj):
-        from pin.models import Pin
-        pin = Pin.objects.filter(user=self.context['request'].user, content_type__model='note', object_id=obj.id).first()
-        return pin.id if pin else None
-
     class Meta(AdoorBaseSerializer.Meta):
         model = Note
-        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_read', 'is_edited', 'pinned', 'pin_id']
+        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_read', 'is_edited']
 
 
 class VisibilityField(serializers.MultipleChoiceField):
