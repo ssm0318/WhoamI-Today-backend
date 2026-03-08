@@ -75,7 +75,12 @@ def parse_hashtags_or_list(data):
         return []
     if isinstance(data, list):
         return data
-    return re.findall(r'#([^\s#]+)', data)
+    # Try hashtag format first
+    tags = re.findall(r'#([^\s#]+)', data)
+    if tags:
+        return tags
+    # Fallback: space-separated strings without #
+    return [t.strip() for t in data.split() if t.strip()]
 
 def get_or_create_normalized_tag(model, raw_tag):
     normalized_input = normalize_tag(raw_tag)
