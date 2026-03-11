@@ -1932,24 +1932,15 @@ class DiscoverFeedView(generics.ListAPIView):
             created_at=latest_timestamp
         ).select_related('response', 'response__author', 'response__question', 'note', 'note__author')
 
-        # Filter by type if not 'all'
-        type_param = type_param.lower().rstrip('/')
-        if type_param == 'mutual_friends':
-            queryset = queryset.filter(category='mutual_friends')
-        elif type_param == 'mutual_traits':
-            queryset = queryset.filter(category='mutual_traits')
-        elif type_param == 'anonymous':
-            queryset = queryset.filter(category='anonymous')
-        elif type_param == 'random':
-            queryset = queryset.filter(category='random')
+        # Parse type param — supports single value or comma-separated (e.g. "mutual_friends,mutual_traits")
+        raw_types = [t.strip().lower().rstrip('/') for t in type_param.split(',') if t.strip()]
+        valid_types = {'mutual_friends', 'mutual_traits'}
+        selected_types = [t for t in raw_types if t in valid_types]
 
-        # If 'all', we might want a specific mixed ordering
-        if type_param == 'all':
-            # We can use the order they were added or a custom sort_order field if we add one.
-            # For now, let's just make sure it's consistent.
-            queryset = queryset.order_by('id') # Or some other stable order
-        else:
-            queryset = queryset.order_by('-id')
+        if selected_types:
+            queryset = queryset.filter(category__in=selected_types)
+
+        queryset = queryset.order_by('id')
 
         return queryset
 
