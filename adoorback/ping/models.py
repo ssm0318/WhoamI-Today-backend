@@ -36,11 +36,6 @@ class PingRoom(AdoorTimestampedModel, SafeDeleteModel):
     def __str__(self):
         return f"PingRoom between {self.user1} and {self.user2}"
     
-    def clean(self):
-        super().clean()
-        if not self.user1.is_connected(self.user2):
-            raise ValidationError("Users in the message room must be friends.")
-    
     def save(self, *args, **kwargs):
         # if deleting, do not clean
         if self.deleted:

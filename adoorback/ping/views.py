@@ -6,7 +6,7 @@ from rest_framework import generics, exceptions
 from rest_framework.permissions import IsAuthenticated
 
 from adoorback.utils.validators import adoor_exception_handler
-from .models import Ping, PingRoom, get_or_create_ping_room
+from .models import Ping, PingRoom, get_or_create_ping_room, get_ping_room
 from .serializers import PingSerializer, PingRoomSerializer
 
 User = get_user_model()
@@ -54,16 +54,18 @@ class PingList(generics.ListCreateAPIView):
         user = self.request.user
         try:
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
-            if not user.is_connected(connected_user):
-                raise exceptions.PermissionDenied("You are not connected to this user")
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
 
-        ping_room = get_or_create_ping_room(connected_user, user)
+        ping_room = get_ping_room(connected_user, user)
+        if not ping_room:
+            self.oldest_unread_page = 1
+            return []
+
         pings = list(ping_room.pings.all())  # to freeze the unread status
 
         oldest_unread = ping_room.pings.filter(receiver=user, is_read=False).order_by('id').first()
-        
+
         if oldest_unread:
             oldest_position = Ping.objects.filter(ping_room=ping_room, id__gte=oldest_unread.id).count()
             pagination_size = getattr(settings, 'REST_FRAMEWORK', {}).get('PAGE_SIZE', 10)
@@ -96,9 +98,6 @@ class PingList(generics.ListCreateAPIView):
         user = self.request.user
         try:
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
-
-            if not user.is_connected(connected_user):
-                raise exceptions.PermissionDenied("You are not connected to this user")
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
 
