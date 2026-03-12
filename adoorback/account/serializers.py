@@ -187,6 +187,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     friend_count = serializers.SerializerMethodField(read_only=True)
     mutual_personas = serializers.SerializerMethodField(read_only=True)
     mutual_interests = serializers.SerializerMethodField(read_only=True)
+    friendship_level = serializers.SerializerMethodField(read_only=True)
 
     def get_is_favorite(self, obj):
         request = self.context.get('request')
@@ -267,6 +268,18 @@ class UserProfileSerializer(UserMinimalSerializer):
                 return ping_room.pings.filter(receiver=user, is_read=False).count()
         return 0
     
+    def get_friendship_level(self, obj):
+        user = self.context.get('request', None).user
+        if user == obj:
+            return None
+        if user.is_connected(obj):
+            return '1st'
+        current_user_connections = set(user.connected_user_ids)
+        obj_connections = set(obj.connected_user_ids)
+        if current_user_connections & obj_connections:
+            return '2nd'
+        return '3rd+'
+
     def get_friend_count(self, obj):
         return Connection.objects.filter(Q(user1=obj) | Q(user2=obj)).count()
 
@@ -280,7 +293,8 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'unread_ping_count', 'connection_status',
                                                       'friend_count', 'email_verified',
-                                                      'mutual_personas', 'mutual_interests']
+                                                      'mutual_personas', 'mutual_interests',
+                                                      'friendship_level']
 
 
 class FriendListSerializer(UserMinimalSerializer):
