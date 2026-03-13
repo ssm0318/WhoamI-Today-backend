@@ -810,6 +810,25 @@ class CurrentUserLatestVisibility(APIView):
              return Response({'visibility': latest_response.visibility}, status=200)
 
 
+class CurrentUserNoteStatus(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get(self, request):
+        user = request.user
+        tz_now = timezone.now().astimezone(ZoneInfo(user.timezone))
+        start_of_today = tz_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        has_posted_note_today = Note.objects.filter(
+            author=user,
+            created_at__gte=start_of_today
+        ).exists()
+        
+        return Response({'has_posted_note_today': has_posted_note_today}, status=200)
+
+
 class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [IsAuthenticated]

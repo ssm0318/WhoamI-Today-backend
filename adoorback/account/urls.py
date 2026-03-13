@@ -28,6 +28,7 @@ urlpatterns = [
     path('me/search/', views.CurrentUserFriendSearch.as_view(), name='current-user-friend-search'),
     path('me/all-posts/', views.CurrentUserAllPostList.as_view(), name='current-user-all-post-list'),
     path('me/latest-visibility/', views.CurrentUserLatestVisibility.as_view(), name='current-user-latest-visibility'),
+    path('me/note-status/', views.CurrentUserNoteStatus.as_view(), name='current-user-note-status'),
     path('me/interests/', views.CurrentUserInterestUpdate.as_view(), name='current-user-interest-update'),
     path('me/personas/', views.CurrentUserPersonaUpdate.as_view(), name='current-user-persona-update'),
 
