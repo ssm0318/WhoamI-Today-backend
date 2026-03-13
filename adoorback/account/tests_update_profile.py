@@ -53,3 +53,48 @@ class UserProfileUpdateTest(TestCase):
         noti.refresh_from_db()
         expected_url = f"/users/{new_username}"
         self.assertEqual(noti.redirect_url, expected_url)
+
+    def test_profile_visibility_update_and_view(self):
+        # User updates visibility preferences
+        update_data = {
+            'bio_friends_only': True,
+            'interests_friends_only': True,
+            'pronouns_friends_only': True,
+            'persona_friends_only': True,
+            'bio': 'My secret bio',
+            'pronouns': 'they/them'
+        }
+        res = self.client.patch(self.url, update_data)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.bio_friends_only)
+        self.assertEqual(self.user.bio, 'My secret bio')
+        
+        # Another user, not friends, views the profile
+        other_user = User.objects.create_user(username='viewer', email='viewer@example.com', password='password')
+        other_client = APIClient()
+        other_client.force_authenticate(user=other_user)
+        
+        profile_url = reverse('user-detail', kwargs={'username': self.user.username})
+        res = other_client.get(profile_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        
+        # Verify fields are hidden
+        self.assertIsNone(res.data.get('bio'))
+        self.assertIsNone(res.data.get('pronouns'))
+        self.assertEqual(res.data.get('user_interests'), [])
+        self.assertEqual(res.data.get('persona'), [])
+        self.assertEqual(res.data.get('user_personas'), [])
+
+        # The two users become friends
+        from account.models import Connection
+        Connection.objects.create(user1=self.user, user2=other_user, user1_choice='friend', user2_choice='friend')
+
+        # The other user views the profile again
+        res = other_client.get(profile_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        
+        # Verify fields are now visible
+        self.assertEqual(res.data.get('bio'), 'My secret bio')
+        self.assertEqual(res.data.get('pronouns'), 'they/them')

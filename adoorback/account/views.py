@@ -823,23 +823,7 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
-        # NOTE: We need to use 'updated_user' which might be modified by serializer.save(),
-        # however, this method is called *around* serializer.save().
-        # Actually standard perform_update calls serializer.save().
-        # But here we are overriding it.
-        # Let's keep the logic consistent: validate first, then operate.
-        # But wait, original code did `serializer.save()` then `updated_user = self.get_object()`.
-        # And it used `self.get_object()` before that for old_personas.
-        # The refactoring above uses `updated_user` inside `update_user_...`.
-        # So I need to define `updated_user` correctly.
-        # In the original code, `updated_user` was defined AFTER `serializer.save()`.
-        # But `old_personas` were fetched from `self.get_object()` BEFORE updates?
-        # Actually in original code:
-        # `old_personas = list(self.get_object().user_personas.all())` happens inside the `if persona_str` block,
-        # which is BEFORE `serializer.save()`.
-        # So `self.get_object()` refers to the user instance.
-        
-        updated_user = self.get_object() # This is the user instance
+        updated_user = self.get_object()
         
         if serializer.is_valid(raise_exception=True):
             if 'username' in self.request.data:
@@ -859,34 +843,13 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
             interest_str = self.request.data.get('interest') or self.request.data.get('user_interests') or self.request.data.get('user_interest')
 
             if persona_str is not None:
-                # Legacy behavior: parse hashtags and replace ALL
-                # This logic is for the 'user/me' endpoint which might send mixed content or just hashtags
-                # Ideally we should keep the same behavior as before:
-                # "parse_hashtags" -> set(personas)
-                
-                # Note: `update_user_personas_logic` has been changed to support the NEW API behavior (subset replacement).
-                # The OLD `CurrentUserDetail` logic did: parse -> set.
-                # If we want to preserve OLD behavior here, we should NOT use the new `update_user_personas_logic` directly 
-                # if it does subset replacement.
-                
-                # Let's revert `CurrentUserDetail` to use the original full-replacement logic using the helpers.
-                # Or create a `update_user_personas_full_replacement` helper.
-                pass # See below
-                
-            # Wait, I need to provide the implementation in this block.
-            # I will inline the old logic here to avoid confusion, using the helpers.
+                pass
             
             if persona_str is not None:
                 old_personas = list(updated_user.user_personas.all())
                 persona_tags = parse_hashtags_or_list(persona_str)
                 persona_instances = [get_or_create_normalized_tag(Persona, tag) for tag in persona_tags]
                 updated_user.user_personas.set(persona_instances)
-                
-                # Update ArrayField if needed? 
-                # Original code: `self.get_object().user_personas.set(persona_instances)`
-                # It did NOT update `user.persona` (ArrayField) based on hashtags.
-                # So we just do M2M update.
-                
                 # Orphan cleanup
                 from account.models import PERSONA_CHOICES
                 predefined_personas = {normalize_tag(val) for _, val in PERSONA_CHOICES}
