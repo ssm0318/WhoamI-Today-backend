@@ -2083,11 +2083,35 @@ class DiscoverFeedView(generics.ListAPIView):
             note_data_map = {d['id']: d for d in serializer.data}
 
         # --- Injection Logic ---
+        req_user = request.user
+        req_user_friends = set(req_user.friend_ids + req_user.close_friend_ids)
+        req_user_interests = set(req_user.user_interests.values_list('id', flat=True))
+        req_user_personas = set(req_user.user_personas.values_list('id', flat=True))
+
         results = []
         for item in feed_objects:
+            author = item.response.author if item.response else item.note.author
+
+            mut_friends = 0
+            mut_interests = 0
+            mut_personas = 0
+
+            if req_user != author:
+                author_friends = set(author.friend_ids + author.close_friend_ids)
+                author_interests = set(author.user_interests.values_list('id', flat=True))
+                author_personas = set(author.user_personas.values_list('id', flat=True))
+                
+                mut_friends = len(req_user_friends & author_friends)
+                mut_interests = len(req_user_interests & author_interests)
+                mut_personas = len(req_user_personas & author_personas)
+
             if item.response:
                 data = resp_data_map.get(item.response.id)
                 if data:
+                    if 'author_detail' in data and isinstance(data['author_detail'], dict):
+                        data['author_detail']['mutual_friend_count'] = mut_friends
+                        data['author_detail']['mutual_interest_count'] = mut_interests
+                        data['author_detail']['mutual_persona_count'] = mut_personas
                     results.append({
                         "type": "Response",
                         "body": data
@@ -2095,6 +2119,10 @@ class DiscoverFeedView(generics.ListAPIView):
             elif item.note:
                 data = note_data_map.get(item.note.id)
                 if data:
+                    if 'author_detail' in data and isinstance(data['author_detail'], dict):
+                        data['author_detail']['mutual_friend_count'] = mut_friends
+                        data['author_detail']['mutual_interest_count'] = mut_interests
+                        data['author_detail']['mutual_persona_count'] = mut_personas
                     results.append({
                         "type": "Note",
                         "body": data
