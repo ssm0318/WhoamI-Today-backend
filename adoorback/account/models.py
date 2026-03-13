@@ -195,6 +195,12 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         help_text="Multiple persona choices for the user."
     )
 
+    # Visibility fields
+    interests_friends_only = models.BooleanField(default=False)
+    persona_friends_only = models.BooleanField(default=False)
+    pronouns_friends_only = models.BooleanField(default=False)
+    bio_friends_only = models.BooleanField(default=False)
+
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
 

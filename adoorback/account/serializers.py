@@ -97,6 +97,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
                   'user_interests', 'user_personas',
+                  'interests_friends_only', 'persona_friends_only', 'pronouns_friends_only', 'bio_friends_only',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
@@ -282,6 +283,29 @@ class UserProfileSerializer(UserMinimalSerializer):
 
     def get_friend_count(self, obj):
         return Connection.objects.filter(Q(user1=obj) | Q(user2=obj)).count()
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get('request')
+        user = request.user if request else None
+
+        # Check if the requester should see private fields
+        can_see_private = False
+        if user and user.is_authenticated:
+             if user == instance or user.is_connected(instance):
+                 can_see_private = True
+
+        if not can_see_private:
+            if instance.interests_friends_only:
+                ret['user_interests'] = []
+            if instance.persona_friends_only:
+                ret['user_personas'] = []
+            if instance.pronouns_friends_only:
+                ret['pronouns'] = None
+            if instance.bio_friends_only:
+                ret['bio'] = None
+
+        return ret
 
     user_interests = serializers.StringRelatedField(many=True, read_only=True)
     user_personas = serializers.StringRelatedField(many=True, read_only=True)
