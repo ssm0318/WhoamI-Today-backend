@@ -2512,3 +2512,81 @@ class PersonaRecommendation(generics.ListAPIView):
 
     def get_queryset(self):
         return Persona.objects.annotate(user_count=Count('users')).order_by('-user_count')[:15]
+
+
+class TmiPlaceholder(APIView):
+    """Generate a daily TMI example placeholder using the Anthropic API."""
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get(self, request, *args, **kwargs):
+        import datetime
+        from django.core.cache import cache
+
+        today_str = datetime.date.today().isoformat()
+        lang = request.query_params.get('lang', 'en')
+        cache_key = f'tmi_placeholder_{today_str}_{lang}'
+
+        cached = cache.get(cache_key)
+        if cached:
+            return Response({'placeholder': cached})
+
+        # Fallback examples in case API fails
+        fallbacks_en = [
+            "had the best reindeer hotdog today!!!",
+            "finally beat my friend at bowling 🎳",
+            "accidentally called my professor 'mom' today…",
+            "found the best ramen place near campus",
+            "my cat learned how to open the fridge 😱",
+        ]
+        fallbacks_ko = [
+            "오늘 인생 핫도그를 먹었다!!!",
+            "드디어 친구한테 볼링에서 이겼다 🎳",
+            "교수님한테 실수로 '엄마'라고 불렀다…",
+            "학교 근처에서 역대급 라멘집 발견",
+            "우리 고양이가 냉장고 여는 법을 배웠다 😱",
+        ]
+        fallbacks = fallbacks_ko if lang == 'ko' else fallbacks_en
+
+        try:
+            import anthropic
+            import os
+
+            api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+            if not api_key:
+                import random
+                placeholder = random.choice(fallbacks)
+                cache.set(cache_key, placeholder, 60 * 60 * 24)
+                return Response({'placeholder': placeholder})
+
+            client = anthropic.Anthropic(api_key=api_key)
+
+            if lang == 'ko':
+                prompt = (
+                    "한국 20대 대학생이 친구들에게 가볍게 공유할 만한 오늘의 TMI를 한 문장으로 만들어줘. "
+                    "재밌고, 일상적이고, 공감되는 내용으로. 이모지를 하나 넣어줘. "
+                    "문장만 출력하고, 따옴표나 설명은 빼줘."
+                )
+            else:
+                prompt = (
+                    "Generate a single fun, relatable TMI (Too Much Information) example that a college student "
+                    "might share with friends. It should feel casual, light-hearted, and specific. "
+                    "Include one emoji. Output only the sentence, no quotes or explanation."
+                )
+
+            message = client.messages.create(
+                model="claude-haiku-4-20250414",
+                max_tokens=80,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            placeholder = message.content[0].text.strip().strip('"').strip("'")
+            cache.set(cache_key, placeholder, 60 * 60 * 24)
+            return Response({'placeholder': placeholder})
+
+        except Exception:
+            import random
+            placeholder = random.choice(fallbacks)
+            cache.set(cache_key, placeholder, 60 * 60)
+            return Response({'placeholder': placeholder})
