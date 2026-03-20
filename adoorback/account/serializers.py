@@ -332,6 +332,7 @@ class FriendListSerializer(UserMinimalSerializer):
     description = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     social_battery = serializers.SerializerMethodField(read_only=True)
+    mood = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -407,6 +408,13 @@ class FriendListSerializer(UserMinimalSerializer):
         else:
             return None
 
+    def get_mood(self, obj):
+        check_in = self.check_in(obj)
+        if check_in:
+            return check_in.mood
+        else:
+            return None
+
     def responses(self, obj):
         from qna.serializers import ResponseSerializer
         user = self.context.get('request', None).user
@@ -435,7 +443,7 @@ class FriendListSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
                                                       'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count',
-                                                      'social_battery']
+                                                      'social_battery', 'mood']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
