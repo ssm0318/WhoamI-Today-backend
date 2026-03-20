@@ -36,7 +36,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
-from .models import Subscription, Connection, AppSession, DiscoverFeed, Persona, Interest
+from .models import Subscription, Connection, AppSession, DiscoverFeed, DiscoverFeedMusic, Persona, Interest
 from account.models import FriendRequest, BlockRec
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -1889,7 +1889,7 @@ class DiscoverFeedView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        type_param = self.request.query_params.get('type', 'all')
+        type_param = self.request.query_params.get('filter', 'all')
 
         now = timezone.now()
         last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
@@ -1948,15 +1948,19 @@ class DiscoverFeedView(generics.ListAPIView):
 
         feed_items = []  # List of (object, category)
 
-        # Helper to get candidates
+        # Helper to get candidates (only public visibility for non-friend discover)
         def get_candidates(author_ids, limit=None):
-            # Responses
-            responses = _Response.objects.filter(author_id__in=author_ids).exclude(readers=user).order_by('-created_at')
+            # Responses — only public posts
+            responses = _Response.objects.filter(
+                author_id__in=author_ids, visibility__contains=['public']
+            ).exclude(readers=user).order_by('-created_at')
             if limit:
                 responses = responses[:limit]
 
-            # Notes
-            notes = Note.objects.filter(author_id__in=author_ids).exclude(readers=user).order_by('-created_at')
+            # Notes — only public posts
+            notes = Note.objects.filter(
+                author_id__in=author_ids, visibility__contains=['public']
+            ).exclude(readers=user).order_by('-created_at')
             if limit:
                 notes = notes[:limit]
 
@@ -2040,13 +2044,17 @@ class DiscoverFeedView(generics.ListAPIView):
 
         # 5. Fallback: Fill up to 10 random posts (from any non-friends) if still not enough
         if len(feed_items) < 10:
-            # Random Response
-            random_responses = list(_Response.objects.exclude(
+            # Random Response — only public
+            random_responses = list(_Response.objects.filter(
+                visibility__contains=['public']
+            ).exclude(
                 author_id__in=exclude_ids
             ).exclude(readers=user).order_by('-created_at')[:50])
-            
-            # Random Note
-            random_notes = list(Note.objects.exclude(
+
+            # Random Note — only public
+            random_notes = list(Note.objects.filter(
+                visibility__contains=['public']
+            ).exclude(
                 author_id__in=exclude_ids
             ).exclude(readers=user).order_by('-created_at')[:50])
 
@@ -2069,12 +2077,41 @@ class DiscoverFeedView(generics.ListAPIView):
             note = obj if isinstance(obj, Note) else None
             
             DiscoverFeed.objects.create(
-                user=user, 
+                user=user,
                 response=response,
                 note=note,
-                category=category, 
+                category=category,
                 created_at=batch_time,
                 sort_order=i
+            )
+
+        # Generate music tracks for discover feed
+        from check_in.models import CheckIn
+        music_check_ins = CheckIn.objects.filter(
+            is_active=True,
+            track_id__isnull=False,
+        ).exclude(
+            track_id=''
+        ).exclude(
+            user_id__in=exclude_ids
+        ).select_related('user').order_by('-created_at')[:10]
+
+        for idx, ci in enumerate(music_check_ins):
+            # Determine category based on author
+            author_id = ci.user_id
+            if author_id in mf_ids:
+                cat = 'mutual_friends'
+            elif author_id in trait_ids:
+                cat = 'mutual_traits'
+            else:
+                cat = 'random'
+
+            DiscoverFeedMusic.objects.create(
+                user=user,
+                check_in=ci,
+                category=cat,
+                sort_order=idx,
+                created_at=batch_time,
             )
 
     def list(self, request, *args, **kwargs):
@@ -2247,11 +2284,48 @@ class DiscoverFeedView(generics.ListAPIView):
             }
             results.insert(min(len(results), p_idx), persona_card)
 
+        # Build music_tracks for the first page only
+        music_tracks_data = []
+        request_page = request.query_params.get('page', '1')
+        if str(request_page) == '1' or request_page is None:
+            # Get the latest batch timestamp for this user's discover feed music
+            latest_music = DiscoverFeedMusic.objects.filter(
+                user=request.user
+            ).order_by('-created_at').first()
+
+            if latest_music:
+                music_items = DiscoverFeedMusic.objects.filter(
+                    user=request.user,
+                    created_at=latest_music.created_at,
+                ).select_related('check_in', 'check_in__user').order_by('sort_order')
+
+                for item in music_items:
+                    ci = item.check_in
+                    author = ci.user
+                    music_tracks_data.append({
+                        'id': item.id,
+                        'user': {
+                            'id': author.id,
+                            'username': author.username,
+                            'profile_pic': author.profile_pic or None,
+                            'url': f'/api/user/{author.id}/',
+                            'profile_image': author.profile_image.url if author.profile_image else None,
+                        },
+                        'track_id': ci.track_id,
+                        'created_at': item.created_at.isoformat(),
+                    })
+
         if page is not None:
-             return self.get_paginated_response(results)
-        
+            response = self.get_paginated_response(results)
+            if music_tracks_data:
+                response.data['music_tracks'] = music_tracks_data
+            return response
+
         # If not paginated, return wrapped structure
-        return Response({"results": results})
+        resp_data = {"results": results}
+        if music_tracks_data:
+            resp_data['music_tracks'] = music_tracks_data
+        return Response(resp_data)
 
 
 

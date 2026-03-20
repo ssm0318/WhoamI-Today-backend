@@ -28,19 +28,19 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
 
 class IsShared(permissions.BasePermission):
     """
-    Custom permission to only allow friends of author to view.
+    Custom permission to allow access based on visibility and connection.
     """
 
     def has_object_permission(self, request, view, obj):
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-
         if obj.type == 'Question':
             return True
-        elif request.user.is_connected(obj.author):
+        if obj.author == request.user:
             return True
-        else:
-            return obj.author == request.user
+        if hasattr(obj, 'visibility') and 'public' in obj.visibility:
+            return True
+        if request.user.is_connected(obj.author):
+            return True
+        return False
 
 
 class IsNotBlocked(permissions.BasePermission):
