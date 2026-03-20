@@ -92,12 +92,12 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password',
+        fields = ['id', 'username', 'name', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
                   'user_interests', 'user_personas',
-                  'interests_friends_only', 'persona_friends_only', 'pronouns_friends_only', 'bio_friends_only',
+                  'name_friends_only', 'interests_friends_only', 'persona_friends_only', 'pronouns_friends_only', 'bio_friends_only',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
@@ -133,7 +133,7 @@ class UserMinimalSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'profile_pic', 'url', 'profile_image']
+        fields = ['id', 'username', 'name', 'profile_pic', 'url', 'profile_image']
 
 
 class UserPasswordSerializer(serializers.ModelSerializer):
@@ -296,6 +296,8 @@ class UserProfileSerializer(UserMinimalSerializer):
                  can_see_private = True
 
         if not can_see_private:
+            if instance.name_friends_only:
+                ret['name'] = '****'
             if instance.interests_friends_only:
                 ret['user_interests'] = []
             if instance.persona_friends_only:
@@ -312,13 +314,16 @@ class UserProfileSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
+        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals',
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
                                                       'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'unread_ping_count', 'connection_status',
                                                       'friend_count', 'email_verified',
                                                       'mutual_personas', 'mutual_interests',
-                                                      'friendship_level']
+                                                      'friendship_level',
+                                                      'name_friends_only', 'interests_friends_only',
+                                                      'persona_friends_only', 'pronouns_friends_only',
+                                                      'bio_friends_only']
 
 
 class FriendListSerializer(UserMinimalSerializer):

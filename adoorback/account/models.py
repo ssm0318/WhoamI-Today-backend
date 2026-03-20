@@ -165,6 +165,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
             'unique': _("A user with that username already exists."),
         },
     )
+    name = models.CharField(null=True, blank=True, max_length=50)
     email = models.EmailField(unique=True)
     question_history = models.CharField(null=True, max_length=500)
     profile_pic = models.CharField(default=random_profile_color, max_length=7)
@@ -200,6 +201,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     personas_updated_at = models.DateTimeField(null=True, blank=True)
 
     # Visibility fields
+    name_friends_only = models.BooleanField(default=False)
     interests_friends_only = models.BooleanField(default=False)
     persona_friends_only = models.BooleanField(default=False)
     pronouns_friends_only = models.BooleanField(default=False)

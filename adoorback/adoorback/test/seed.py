@@ -207,6 +207,14 @@ def set_seed(n):
     user_9 = User.objects.get(username="adoor_9")
     user_10 = User.objects.get(username="adoor_10")
 
+    # Set display names for key users
+    user_1.name = 'Jaewon Kim'
+    user_1.save()
+    user_2.name = 'Soyeon Choi'
+    user_2.save()
+    user_7.name = 'Ryan Cho'
+    user_7.save()
+
     # FriendRequest.objects.all().delete()
     FriendRequest.objects.get_or_create(requester=user_8, requestee=user_9)
     FriendRequest.objects.get_or_create(requester=user_8, requestee=user_10)
@@ -319,6 +327,71 @@ def set_seed(n):
                                       user1_choice='friend', user2_choice='friend')
 
     logging.info("Additional friend networks created for discover testing!") if DEBUG else None
+
+    # ===== FRIENDS-ONLY VISIBILITY: Varying settings for lurker view testing =====
+    # adoor_1's friends: adoor_2, adoor_7
+    # adoor_1's non-friends: adoor_3-6, adoor_8-10
+    # Set varying visibility + profile data so adoor_1 sees different hidden states
+
+    # adoor_3: name hidden only (2nd degree via adoor_2)
+    user_3.name = 'Mina Park'
+    user_3.pronouns = 'she/her'
+    user_3.bio = 'I love hiking and photography. Always looking for new trails!'
+    user_3.name_friends_only = True
+    user_3.save()
+
+    # adoor_4: name + pronouns hidden (2nd degree via adoor_2)
+    user_4.name = 'Jordan Lee'
+    user_4.pronouns = 'they/them'
+    user_4.bio = 'Coding enthusiast and coffee addict. Currently learning Rust.'
+    user_4.name_friends_only = True
+    user_4.pronouns_friends_only = True
+    user_4.save()
+
+    # adoor_5: name + bio hidden (2nd degree via adoor_2)
+    user_5.name = 'David Kim'
+    user_5.pronouns = 'he/him'
+    user_5.bio = 'Music producer and night owl. DM me for collabs!'
+    user_5.name_friends_only = True
+    user_5.bio_friends_only = True
+    user_5.save()
+
+    # adoor_6: name + interests + persona hidden (2nd degree via adoor_2)
+    user_6.name = 'Sage Chen'
+    user_6.pronouns = 'she/they'
+    user_6.bio = 'Artist and dreamer. Trying to make the world more colorful.'
+    user_6.name_friends_only = True
+    user_6.interests_friends_only = True
+    user_6.persona_friends_only = True
+    user_6.save()
+
+    # adoor_8: everything hidden (3rd+ degree - friend of adoor_4)
+    user_8.name = 'Alex Tanaka'
+    user_8.pronouns = 'he/him'
+    user_8.bio = 'Gym rat and early bird. 5am club member.'
+    user_8.name_friends_only = True
+    user_8.pronouns_friends_only = True
+    user_8.bio_friends_only = True
+    user_8.interests_friends_only = True
+    user_8.persona_friends_only = True
+    user_8.save()
+
+    # adoor_9: bio hidden only, name visible (3rd+ degree - friend of adoor_5/6)
+    user_9.name = 'Chris Yoon'
+    user_9.pronouns = 'he/him'
+    user_9.bio = 'Gamer and streamer. Catch me live on weekends!'
+    user_9.bio_friends_only = True
+    user_9.save()
+
+    # adoor_10: pronouns + interests hidden, name visible (3rd+ degree - no mutual friends)
+    user_10.name = 'Emily Zhao'
+    user_10.pronouns = 'she/her'
+    user_10.bio = 'Bookworm and tea enthusiast. Currently reading sci-fi.'
+    user_10.pronouns_friends_only = True
+    user_10.interests_friends_only = True
+    user_10.save()
+
+    logging.info("Friends-only visibility settings applied for lurker view testing!") if DEBUG else None
 
     # ===== DISCOVER FEATURE: Extra public posts from non-friend users =====
     discover_post_content = [
