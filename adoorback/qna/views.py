@@ -188,8 +188,12 @@ class QuestionList(generics.ListCreateAPIView):
             tz = ZoneInfo("America/Los_Angeles")
         today = timezone.now().astimezone(tz).date()
         daily_questions = list(Question.objects.daily_questions(request.user))  # To match order with DailyQuestionList
-        excluded_ids = tuple(q.id for q in daily_questions)
-        excluded_clause = "AND id NOT IN %s" if excluded_ids else ""
+        excluded_ids = [q.id for q in daily_questions]
+        if excluded_ids:
+            placeholders = ', '.join(['%s'] * len(excluded_ids))
+            excluded_clause = f"AND id NOT IN ({placeholders})"
+        else:
+            excluded_clause = ""
         sql = f"""
             SELECT * FROM qna_question
             WHERE array_length(selected_dates, 1) IS NOT NULL
@@ -198,9 +202,7 @@ class QuestionList(generics.ListCreateAPIView):
             ORDER BY selected_dates[array_upper(selected_dates, 1)] DESC
             LIMIT 14;
         """
-        params = [today]
-        if excluded_ids:
-            params.append(excluded_ids)
+        params = [today] + excluded_ids
         
         queryset = list(Question.objects.raw(sql, params))
         all_questions = daily_questions + queryset
