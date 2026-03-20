@@ -40,12 +40,23 @@ def note_image_path(instance, filename):
     return f'note_images/{instance.note.author_id}/{instance.note.id}/{unique_id}_{filename}'
 
 
+class ShareType(models.TextChoices):
+    REGULAR = 'regular', 'Regular'
+    TMI_OF_THE_DAY = 'tmi_of_the_day', 'TMI of the Day'
+    PHOTO_OF_THE_DAY = 'photo_of_the_day', 'Photo of the Day'
+
+
 class Note(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='note_set', on_delete=models.CASCADE)
     visibility = ArrayField(
         models.CharField(max_length=20),
         default=list,
         blank=True
+    )
+    share_type = models.CharField(
+        max_length=20,
+        choices=ShareType.choices,
+        default=ShareType.REGULAR,
     )
 
     note_comments = GenericRelation(Comment)
