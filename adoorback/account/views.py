@@ -1889,7 +1889,6 @@ class DiscoverFeedView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        type_param = self.request.query_params.get('filter', 'all')
 
         now = timezone.now()
         last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
@@ -1903,7 +1902,7 @@ class DiscoverFeedView(generics.ListAPIView):
             tz = timezone.get_current_timezone()
 
         now_local = now.astimezone(tz)
-        
+
         needs_new_feed = False
         if not last_feed:
             needs_new_feed = True
@@ -1919,20 +1918,12 @@ class DiscoverFeedView(generics.ListAPIView):
         if not last_feed:
             return DiscoverFeed.objects.none()
 
-        # Get only the latest batch (items with the same created_at as the latest one)
+        # Always return all items — filtering is done client-side using the category field
         latest_timestamp = last_feed.created_at
         queryset = DiscoverFeed.objects.filter(
-            user=user, 
+            user=user,
             created_at=latest_timestamp
         ).select_related('response', 'response__author', 'response__question', 'note', 'note__author')
-
-        # Parse type param — supports single value or comma-separated (e.g. "mutual_friends,mutual_traits")
-        raw_types = [t.strip().lower().rstrip('/') for t in type_param.split(',') if t.strip()]
-        valid_types = {'mutual_friends', 'mutual_traits'}
-        selected_types = [t for t in raw_types if t in valid_types]
-
-        if selected_types:
-            queryset = queryset.filter(category__in=selected_types)
 
         queryset = queryset.order_by('id')
 
@@ -2177,6 +2168,7 @@ class DiscoverFeedView(generics.ListAPIView):
                         data['author_detail']['mutual_persona_count'] = mut_personas
                     results.append({
                         "type": "Response",
+                        "category": item.category,
                         "body": data
                     })
             elif item.note:
@@ -2188,6 +2180,7 @@ class DiscoverFeedView(generics.ListAPIView):
                         data['author_detail']['mutual_persona_count'] = mut_personas
                     results.append({
                         "type": "Note",
+                        "category": item.category,
                         "body": data
                     })
 
