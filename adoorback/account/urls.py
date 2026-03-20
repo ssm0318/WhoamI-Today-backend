@@ -95,6 +95,9 @@ urlpatterns = [
     path('friends/subscribe/', views.SubscribeUserContent.as_view(), name='subscribe-user-content'),
     path('friends/<int:pk>/subscribe/', views.UnsubscribeUserContent.as_view(), name='unsubscribe-user-content'),
 
+    # TMI Placeholder
+    path('tmi-placeholder/', views.TmiPlaceholder.as_view(), name='tmi-placeholder'),
+
     # User Tracking related
     path("app-sessions/start/", views.StartSession.as_view(), name="start_session"),
     path("app-sessions/end/", views.EndSession.as_view(), name="end_session"),
