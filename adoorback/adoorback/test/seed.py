@@ -1,13 +1,15 @@
 import logging
+import os
 import random
 import sys
 import csv
 
+from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from faker import Faker
 
-from account.models import FriendRequest, Connection
+from account.models import FriendRequest, Connection, Interest, Persona
 from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
 from chat.models import ChatRoom, Message
 from check_in.models import CheckIn
@@ -49,6 +51,43 @@ def set_seed(n):
     logging.info(
         f"{User.objects.count()} User(s) created!") if DEBUG else None
 
+    # Generate profile images for test users
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        profile_dir = os.path.join(settings.MEDIA_ROOT, 'profile_images')
+        os.makedirs(profile_dir, exist_ok=True)
+
+        profile_colors = [
+            (233, 30, 99), (156, 39, 176), (63, 81, 181), (0, 150, 136),
+            (255, 87, 34), (121, 85, 72), (96, 125, 139), (76, 175, 80),
+            (255, 152, 0), (33, 150, 243),
+        ]
+        for i in range(1, 11):
+            uname = f'adoor_{i}'
+            u = User.objects.get(username=uname)
+            if not u.profile_image:
+                color = profile_colors[i - 1]
+                size = 200
+                img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+                draw = ImageDraw.Draw(img)
+                draw.ellipse([0, 0, size - 1, size - 1], fill=color)
+                letter = f'A{i}'
+                try:
+                    font = ImageFont.truetype('/System/Library/Fonts/Helvetica.ttc', 72)
+                except Exception:
+                    font = ImageFont.load_default()
+                bbox = draw.textbbox((0, 0), letter, font=font)
+                tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+                draw.text(((size - tw) / 2, (size - th) / 2 - 10), letter,
+                          fill=(255, 255, 255), font=font)
+                img_path = os.path.join(profile_dir, f'{uname}.png')
+                img.save(img_path, 'PNG')
+                u.profile_image = f'profile_images/{uname}.png'
+                u.save()
+        logging.info("Profile images created for test users!") if DEBUG else None
+    except ImportError:
+        logging.warning("Pillow not installed, skipping profile image generation") if DEBUG else None
+
     # Seed Superuser
     admin = User.objects.filter(is_superuser=True).first()
     user = User.objects.get(username="adoor_2")
@@ -66,14 +105,15 @@ def set_seed(n):
     # Select Daily Questions
     select_daily_questions()
 
-    # Seed Response
+    # Seed Response (with public visibility for discover testing)
     questions = Question.objects.all()
     for _ in range(n):
         user = random.choice(users)
         question = random.choice(questions)
         response, created = Response.objects.get_or_create(author=user,
                                                   content=faker.text(max_nb_chars=50),
-                                                  question=question)
+                                                  question=question,
+                                                  visibility=['public'])
     logging.info(
         f"{Response.objects.count()} Response(s) created!") if DEBUG else None
 
@@ -89,6 +129,20 @@ def set_seed(n):
 
     with open('adoorback/test/spotify_ids.txt', 'r') as file:
         spotify_ids = [line.strip() for line in file]
+
+    # Well-known popular Spotify track IDs (guaranteed to resolve via oEmbed)
+    popular_track_ids = [
+        '7qiZfU4dY1lWllzX7mPBI3',  # Shape of You - Ed Sheeran
+        '4Dvkj6JhhA12EX05fT7y2e',  # As It Was - Harry Styles
+        '4cOdK2wGLETKBW3PvgPWqT',  # Never Gonna Give You Up - Rick Astley
+        '3n3Ppam7vgaVa1iaRUc9Lp',  # Mr. Brightside - The Killers
+        '1BxfuPKGuaTgP7aM0Bbdwr',  # Bohemian Rhapsody - Queen
+        '60nZcImufyMA1MKQY3dcCH',  # Happy - Pharrell Williams
+        '7MXVkk9YMctZqd1Srtv4MB',  # Starboy - The Weeknd
+        '0e7ipj03S05BNilyu5bRzt',  # Somebody That I Used to Know - Gotye
+        '2Fxmhks0bxGSBdJ92vM42m',  # bad guy - Billie Eilish
+        '6UelLqGlWMcVH1E5c4H7lY',  # Watermelon Sugar - Harry Styles
+    ]
 
     emoji_list = ["🥳", "😳", "😤", "⚽️", "💥", "🍀", "🦁", "🕶️", "🧚🏻", "🐑"]
     for i in range(n):
@@ -109,11 +163,32 @@ def set_seed(n):
     logging.info(
         f"{CheckIn.objects.count()} Check-in(s) created!") if DEBUG else None
 
-    # Seed Note
+    # Ensure each non-friend user has an active check-in with a popular Spotify track
+    # (so the discover music feed always has testable data)
+    discover_music_users = [
+        User.objects.get(username=f'adoor_{i}') for i in range(3, 11)
+    ]
+    for idx, dmu in enumerate(discover_music_users):
+        active = CheckIn.objects.filter(user=dmu, is_active=True).first()
+        if not active or not active.track_id:
+            # Deactivate any existing active check-ins
+            CheckIn.objects.filter(user=dmu, is_active=True).update(is_active=False)
+            CheckIn.objects.create(
+                user=dmu,
+                social_battery=random.choice(social_battery_options),
+                mood=emoji_list[idx % 10],
+                description=faker.text(max_nb_chars=20),
+                track_id=popular_track_ids[idx % len(popular_track_ids)],
+                is_active=True,
+            )
+    logging.info("Ensured active check-ins with popular Spotify tracks for discover music!") if DEBUG else None
+
+    # Seed Note (with public visibility for discover testing)
     for _ in range(n):
         user = random.choice(users)
         note, created = Note.objects.get_or_create(author=user,
-                                          content=faker.text(max_nb_chars=50))
+                                          content=faker.text(max_nb_chars=50),
+                                          visibility=['public'])
     logging.info(
         f"{Note.objects.count()} Note(s) created!") if DEBUG else None
 
@@ -160,6 +235,124 @@ def set_seed(n):
             chat_room = ChatRoom()
             chat_room.save()
             chat_room.users.add(user_2, u)
+
+    # ===== DISCOVER FEATURE: Interests & Personas =====
+    # Ensure Interest/Persona objects exist in DB
+    interest_names = ['Gaming', 'Coding', 'Photography', 'Hiking', 'Cooking',
+                      'Drawing', 'Reading', 'Running', 'Movies', 'Anime']
+    interests_map = {}
+    for name in interest_names:
+        obj, _ = Interest.objects.get_or_create(content=name)
+        interests_map[name] = obj
+
+    persona_names = ['Lurker', 'ContentCreator', 'NightOwl', 'EarlyBird',
+                     'MusicSharer', 'OpenBook', 'ClosedBook', 'DailyScroller']
+    personas_map = {}
+    for name in persona_names:
+        obj, _ = Persona.objects.get_or_create(content=name)
+        personas_map[name] = obj
+
+    # Assign interests and personas to users for discover testing
+    # adoor_2 (test user): Gaming, Coding, Photography + Lurker, NightOwl
+    user_2_interests = ['Gaming', 'Coding', 'Photography']
+    user_2_personas = ['Lurker', 'NightOwl']
+    for i_name in user_2_interests:
+        interests_map[i_name].users.add(user_2)
+    for p_name in user_2_personas:
+        personas_map[p_name].users.add(user_2)
+
+    # adoor_7 (not friend of 2, friend of 1 & 3 → mutual friends with 2):
+    # Interests: Gaming, Photography (shares 2 with adoor_2) + NightOwl (shares 1 persona)
+    for i_name in ['Gaming', 'Photography']:
+        interests_map[i_name].users.add(user_7)
+    for p_name in ['NightOwl', 'MusicSharer']:
+        personas_map[p_name].users.add(user_7)
+
+    # adoor_8 (not friend of 2, friend of 4 → mutual friend with 2):
+    # Interests: Coding, Hiking (shares 1 with adoor_2) + EarlyBird
+    for i_name in ['Coding', 'Hiking']:
+        interests_map[i_name].users.add(user_8)
+    for p_name in ['EarlyBird']:
+        personas_map[p_name].users.add(user_8)
+
+    # adoor_9 (not friend of 2, friend of 5 & 6 → mutual friends with 2):
+    # Interests: Gaming, Cooking (shares 1 with adoor_2) + Lurker (shares 1 persona)
+    for i_name in ['Gaming', 'Cooking']:
+        interests_map[i_name].users.add(user_9)
+    for p_name in ['Lurker', 'DailyScroller']:
+        personas_map[p_name].users.add(user_9)
+
+    # adoor_10 (no mutual friends with 2, but shared traits):
+    # Interests: Coding, Photography, Gaming (shares 3 with adoor_2) + NightOwl, OpenBook
+    for i_name in ['Coding', 'Photography', 'Gaming']:
+        interests_map[i_name].users.add(user_10)
+    for p_name in ['NightOwl', 'OpenBook']:
+        personas_map[p_name].users.add(user_10)
+
+    logging.info("Interests and Personas assigned to users for discover testing!") if DEBUG else None
+
+    # ===== DISCOVER FEATURE: Additional friend networks for mutual friends =====
+    # adoor_7 is friends with adoor_1 and adoor_3 (mutual friends with adoor_2)
+    for friend_user in [user_1, user_3]:
+        u1 = min(user_7, friend_user, key=lambda u: u.id)
+        u2 = max(user_7, friend_user, key=lambda u: u.id)
+        if not Connection.objects.filter(user1=u1, user2=u2).exists():
+            Connection.objects.create(user1=u1, user2=u2,
+                                      user1_choice='friend', user2_choice='friend')
+
+    # adoor_8 is friends with adoor_4 (mutual friend with adoor_2)
+    u1 = min(user_8, user_4, key=lambda u: u.id)
+    u2 = max(user_8, user_4, key=lambda u: u.id)
+    if not Connection.objects.filter(user1=u1, user2=u2).exists():
+        Connection.objects.create(user1=u1, user2=u2,
+                                  user1_choice='friend', user2_choice='friend')
+
+    # adoor_9 is friends with adoor_5 and adoor_6 (mutual friends with adoor_2)
+    for friend_user in [user_5, user_6]:
+        u1 = min(user_9, friend_user, key=lambda u: u.id)
+        u2 = max(user_9, friend_user, key=lambda u: u.id)
+        if not Connection.objects.filter(user1=u1, user2=u2).exists():
+            Connection.objects.create(user1=u1, user2=u2,
+                                      user1_choice='friend', user2_choice='friend')
+
+    logging.info("Additional friend networks created for discover testing!") if DEBUG else None
+
+    # ===== DISCOVER FEATURE: Extra public posts from non-friend users =====
+    discover_post_content = [
+        "Just finished a marathon coding session! Who else is up late?",
+        "Photography tip: Golden hour is the best time for portraits!",
+        "Anyone else obsessed with this new game? Can't stop playing!",
+        "Hiking through the mountains today, the view is incredible!",
+        "Made the best pasta from scratch tonight, recipe in comments!",
+        "Drawing challenge day 30 - finally completed it!",
+        "Just finished reading an amazing sci-fi novel, any recommendations?",
+        "Morning run done! 5K personal best today!",
+        "Movie night recommendations? Looking for something thrilling",
+        "Late night thoughts: Why does coding feel easier at 2am?",
+        "Found the perfect coffee shop for studying",
+        "Weekend vibes: music, art, and good company",
+        "Anyone want to play Valorant later tonight?",
+        "Started learning a new programming language today",
+        "Sunset photos from today's hike are unreal",
+    ]
+
+    for user in [user_7, user_8, user_9, user_10]:
+        question = random.choice(questions)
+        for i in range(3):
+            content = random.choice(discover_post_content)
+            Response.objects.get_or_create(
+                author=user,
+                content=f"{content} - from {user.username} #{i+1}",
+                question=question,
+                visibility=['public']
+            )
+            Note.objects.get_or_create(
+                author=user,
+                content=f"{random.choice(discover_post_content)} - from {user.username} note #{i+1}",
+                visibility=['public']
+            )
+
+    logging.info("Extra public posts created for discover testing!") if DEBUG else None
 
     # Test Notifications
     response = Response.objects.first()
