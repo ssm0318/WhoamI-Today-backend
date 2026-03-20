@@ -330,9 +330,19 @@ adoorback/
 All sensitive configuration is managed through environment variables:
 
 - Database credentials
-- API keys (Firebase, Google Translate)
+- API keys (Firebase, Google Translate, Anthropic)
 - JWT secrets
 - Email configuration
+
+#### `ANTHROPIC_API_KEY`
+
+Required for AI-generated TMI placeholders on the Share page. Set this in your shell profile or `.env.development`:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+Without this key the `/api/user/tmi-placeholder/` endpoint falls back to a curated list of static examples.
 
 ### Security Features
 
