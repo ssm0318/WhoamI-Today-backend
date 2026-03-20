@@ -102,8 +102,11 @@ def set_seed(n):
     logging.info(f"{Question.objects.count()} Question(s) created!") \
         if DEBUG else None
 
-    # Select Daily Questions
-    select_daily_questions()
+    # Select Daily Questions for the past 10 days (including today)
+    import datetime
+    today = datetime.date.today()
+    for day_offset in range(10):
+        select_daily_questions(set_date=today - datetime.timedelta(days=day_offset))
 
     # Seed Response (with public visibility for discover testing)
     questions = Question.objects.all()
