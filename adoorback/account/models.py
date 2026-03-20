@@ -195,6 +195,10 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         help_text="Multiple persona choices for the user."
     )
 
+    # Tracking when interests/personas were last updated
+    interests_updated_at = models.DateTimeField(null=True, blank=True)
+    personas_updated_at = models.DateTimeField(null=True, blank=True)
+
     # Visibility fields
     interests_friends_only = models.BooleanField(default=False)
     persona_friends_only = models.BooleanField(default=False)
@@ -693,7 +697,38 @@ class DiscoverFeed(AdoorTimestampedModel):
         ]
 
     def __str__(self):
-        return f"DiscoverFeed for {self.user.username}: {self.response.id} ({self.category})"
+        content_obj = self.response or self.note
+        content_id = content_obj.id if content_obj else "?"
+        return f"DiscoverFeed for {self.user.username}: {content_id} ({self.category})"
+
+
+class DiscoverFeedMusic(AdoorTimestampedModel):
+    user = models.ForeignKey(
+        get_user_model(), related_name='discover_feed_music', on_delete=models.CASCADE
+    )
+    check_in = models.ForeignKey(
+        'check_in.CheckIn', related_name='discover_feed_music_items', on_delete=models.CASCADE
+    )
+
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    CATEGORY_CHOICES = (
+        ('mutual_friends', 'Mutual Friends'),
+        ('mutual_traits', 'Mutual Traits'),
+        ('anonymous', 'Anonymous'),
+        ('random', 'Random'),
+    )
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-created_at', 'sort_order']
+        indexes = [
+            models.Index(fields=['user', '-created_at', 'sort_order']),
+        ]
+
+    def __str__(self):
+        return f"DiscoverFeedMusic for {self.user.username}: {self.check_in.id} ({self.category})"
 
 
 class AppSession(SafeDeleteModel):

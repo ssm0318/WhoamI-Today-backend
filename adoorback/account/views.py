@@ -97,11 +97,13 @@ def get_or_create_normalized_tag(model, raw_tag):
 
 def update_user_personas_logic(user, persona_keys):
     # This function now expects a list of KEYS from PERSONA_CHOICES
-    
+
     from account.models import PERSONA_CHOICES
-    
-    # 1. Update ArrayField (stores keys)
+    from django.utils import timezone
+
+    # 1. Update ArrayField (stores keys) and timestamp
     user.persona = persona_keys
+    user.personas_updated_at = timezone.now()
     user.save()
 
     # 2. Update ManyToMany Field (stores Label objects)
@@ -139,9 +141,14 @@ def update_user_personas_logic(user, persona_keys):
 
 def update_user_interests_logic(user, interest_labels):
     # This function expects a list of LABELS from INTEREST_CHOICES_BASE
-    
+
     from account.models import INTEREST_CHOICES_BASE
-    
+    from django.utils import timezone
+
+    # Update timestamp
+    user.interests_updated_at = timezone.now()
+    user.save()
+
     # Predefined interests set for quick lookup
     all_choice_interests_normalized = {normalize_tag(label) for label in INTEREST_CHOICES_BASE}
     
