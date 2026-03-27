@@ -34,7 +34,6 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     mood = models.CharField(blank=True, null=True, max_length=5)
     social_battery = models.CharField(blank=True, null=True, max_length=30, choices=SOCIAL_BATTERY_CHOICES)
     description = models.CharField(blank=True, null=True, max_length=88)
-    track_id = models.CharField(blank=True, null=True, max_length=50)
     visibility = ArrayField(
         models.CharField(max_length=20),
         blank=True,
@@ -99,6 +98,22 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
                         return True
         
         return False
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['is_active']),
+        ]
+
+
+class Song(AdoorTimestampedModel, SafeDeleteModel):
+    user = models.ForeignKey(User, related_name='song_set', on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=False)
+    track_id = models.CharField(max_length=50)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    def __str__(self):
+        return self.track_id or ""
 
     class Meta:
         indexes = [

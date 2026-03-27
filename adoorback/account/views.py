@@ -2077,19 +2077,16 @@ class DiscoverFeedView(generics.ListAPIView):
             )
 
         # Generate music tracks for discover feed
-        from check_in.models import CheckIn
-        music_check_ins = CheckIn.objects.filter(
+        from check_in.models import Song
+        music_songs = Song.objects.filter(
             is_active=True,
-            track_id__isnull=False,
-        ).exclude(
-            track_id=''
         ).exclude(
             user_id__in=exclude_ids
         ).select_related('user').order_by('-created_at')[:10]
 
-        for idx, ci in enumerate(music_check_ins):
+        for idx, song in enumerate(music_songs):
             # Determine category based on author
-            author_id = ci.user_id
+            author_id = song.user_id
             if author_id in mf_ids:
                 cat = 'mutual_friends'
             elif author_id in trait_ids:
@@ -2099,7 +2096,7 @@ class DiscoverFeedView(generics.ListAPIView):
 
             DiscoverFeedMusic.objects.create(
                 user=user,
-                check_in=ci,
+                song=song,
                 category=cat,
                 sort_order=idx,
                 created_at=batch_time,
@@ -2290,11 +2287,11 @@ class DiscoverFeedView(generics.ListAPIView):
                 music_items = DiscoverFeedMusic.objects.filter(
                     user=request.user,
                     created_at=latest_music.created_at,
-                ).select_related('check_in', 'check_in__user').order_by('sort_order')
+                ).select_related('song', 'song__user').order_by('sort_order')
 
                 for item in music_items:
-                    ci = item.check_in
-                    author = ci.user
+                    song = item.song
+                    author = song.user
                     music_tracks_data.append({
                         'id': item.id,
                         'user': {
@@ -2304,7 +2301,7 @@ class DiscoverFeedView(generics.ListAPIView):
                             'url': f'/api/user/{author.id}/',
                             'profile_image': author.profile_image.url if author.profile_image else None,
                         },
-                        'track_id': ci.track_id,
+                        'track_id': song.track_id,
                         'created_at': item.created_at.isoformat(),
                     })
 

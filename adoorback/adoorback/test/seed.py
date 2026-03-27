@@ -12,7 +12,7 @@ from faker import Faker
 from account.models import FriendRequest, Connection, Interest, Persona
 from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
 from chat.models import ChatRoom, Message
-from check_in.models import CheckIn
+from check_in.models import CheckIn, Song
 from comment.models import Comment
 from like.models import Like
 from note.models import Note
@@ -161,30 +161,30 @@ def set_seed(n):
                                                 social_battery=social_battery,
                                                 mood=emoji_list[i%10],
                                                 description=faker.text(max_nb_chars=20),
-                                                track_id=track_id,
                                                 is_active=True)
+        # Create Song separately
+        Song.objects.filter(user=user, is_active=True).update(is_active=False)
+        Song.objects.create(user=user, track_id=track_id, is_active=True)
     logging.info(
         f"{CheckIn.objects.count()} Check-in(s) created!") if DEBUG else None
+    logging.info(
+        f"{Song.objects.count()} Song(s) created!") if DEBUG else None
 
-    # Ensure each non-friend user has an active check-in with a popular Spotify track
+    # Ensure each non-friend user has an active song with a popular Spotify track
     # (so the discover music feed always has testable data)
     discover_music_users = [
         User.objects.get(username=f'adoor_{i}') for i in range(3, 11)
     ]
     for idx, dmu in enumerate(discover_music_users):
-        active = CheckIn.objects.filter(user=dmu, is_active=True).first()
-        if not active or not active.track_id:
-            # Deactivate any existing active check-ins
-            CheckIn.objects.filter(user=dmu, is_active=True).update(is_active=False)
-            CheckIn.objects.create(
+        active_song = Song.objects.filter(user=dmu, is_active=True).first()
+        if not active_song:
+            Song.objects.filter(user=dmu, is_active=True).update(is_active=False)
+            Song.objects.create(
                 user=dmu,
-                social_battery=random.choice(social_battery_options),
-                mood=emoji_list[idx % 10],
-                description=faker.text(max_nb_chars=20),
                 track_id=popular_track_ids[idx % len(popular_track_ids)],
                 is_active=True,
             )
-    logging.info("Ensured active check-ins with popular Spotify tracks for discover music!") if DEBUG else None
+    logging.info("Ensured active songs with popular Spotify tracks for discover music!") if DEBUG else None
 
     # Seed Note (with public visibility for discover testing)
     for _ in range(n):

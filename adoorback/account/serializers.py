@@ -388,11 +388,10 @@ class FriendListSerializer(UserMinimalSerializer):
         return None
 
     def get_track_id(self, obj):
-        check_in = self.check_in(obj)
-        if check_in:
-            return check_in.track_id
-        else:
-            return None
+        song = obj.song_set.filter(is_active=True).first()
+        if song:
+            return song.track_id
+        return None
 
     def get_description(self, obj):
         check_in = self.check_in(obj)

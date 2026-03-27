@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from check_in.models import CheckIn
+from check_in.models import Song
 from account.serializers import UserMinimalSerializer
 
 
@@ -8,5 +8,5 @@ class SongSerializer(serializers.ModelSerializer):
     user = UserMinimalSerializer(read_only=True)
 
     class Meta:
-        model = CheckIn
+        model = Song
         fields = ['id', 'user', 'track_id', 'created_at']
