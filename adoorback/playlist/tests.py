@@ -1,113 +1,115 @@
-from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from check_in.models import CheckIn
+from check_in.models import Song
 from account.models import Connection
+from playlist.models import PlaylistFeed
 
 User = get_user_model()
 
-from playlist.models import PlaylistFeed, Song
 
-class SongListTestCase(APITestCase):
+class PlaylistFeedTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='current_user', email='current@test.com', password='password')
         self.friend = User.objects.create_user(username='friend', email='friend@test.com', password='password')
         self.close_friend = User.objects.create_user(username='close_friend', email='close@test.com', password='password')
         self.stranger = User.objects.create_user(username='stranger', email='stranger@test.com', password='password')
-
-        # Mutual Friend User (Friend of Friend)
         self.mutual_friend = User.objects.create_user(username='mutual', email='mutual@test.com', password='password')
 
         self.client.force_authenticate(user=self.user)
 
-        # Setup relationships
         # User <-> Friend
         Connection.objects.create(user1=self.user, user2=self.friend, user1_choice='friend', user2_choice='friend')
         # User <-> Close Friend
         Connection.objects.create(user1=self.user, user2=self.close_friend, user1_choice='close_friend', user2_choice='friend')
-        # Friend <-> Mutual Friend
+        # Friend <-> Mutual Friend (makes mutual_friend a "mutual friend" of user)
         Connection.objects.create(user1=self.friend, user2=self.mutual_friend, user1_choice='friend', user2_choice='friend')
 
-        # Create CheckIns with songs (within 7 days)
-        # Ensure is_active=True and visibility allows viewing
-        common_defaults = {'is_active': True, 'visibility': ['public', 'friends']}
+        # Create active songs (friends/close_friends excluded from discover feed)
+        Song.objects.create(user=self.stranger, track_id='stranger_song', is_active=True)
+        Song.objects.create(user=self.mutual_friend, track_id='mutual_song', is_active=True)
 
-        self.user_song = CheckIn.objects.create(user=self.user, track_id='user_song', **common_defaults)
-        self.friend_song = CheckIn.objects.create(user=self.friend, track_id='friend_song', **common_defaults)
-        self.close_friend_song = CheckIn.objects.create(user=self.close_friend, track_id='close_friend_song', **common_defaults)
-        self.stranger_song = CheckIn.objects.create(user=self.stranger, track_id='stranger_song', **common_defaults)
-        self.mutual_song = CheckIn.objects.create(user=self.mutual_friend, track_id='mutual_song', **common_defaults)
-
-        # Old song (older than 7 days)
-        old_time = timezone.now() - timedelta(days=8)
-        self.old_song = CheckIn.objects.create(user=self.user, track_id='old_song', is_active=True, visibility=['public'])
-        CheckIn.objects.filter(pk=self.old_song.pk).update(created_at=old_time) # Force update created_at
-
-        # Ensure no existing feed
         PlaylistFeed.objects.all().delete()
 
-    def test_list_songs_friends(self):
-        """Test type='friends' (Connected users + Self)"""
-        response = self.client.get('/api/playlist/feed/?type=friends')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        data = response.data['results'] if 'results' in response.data else response.data
-        track_ids = [s['track_id'] for s in data]
-        
-        self.assertIn('user_song', track_ids)
-        self.assertIn('friend_song', track_ids)
-        self.assertIn('close_friend_song', track_ids)
-        
-        # Stranger/Mutual should NOT be in 'friends' list unless connected
-        self.assertNotIn('stranger_song', track_ids)
-        self.assertNotIn('mutual_song', track_ids)
-        self.assertNotIn('old_song', track_ids)
-
-    def test_list_songs_default_mix(self):
-        """Test default behavior (Daily Digest with Persistence)"""
-        # First request: Creates new feed
+    def test_default_feed_generates_daily_digest(self):
+        """Default request generates a daily digest."""
         response = self.client.get('/api/playlist/feed/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.data['results'] if 'results' in response.data else response.data
-        track_ids_1 = [s['track_id'] for s in data]
+        track_ids = [s['track_id'] for s in data]
 
-        # Verify Content
-        self.assertIn('mutual_song', track_ids_1)
-        self.assertIn('stranger_song', track_ids_1)
-        self.assertEqual(len(track_ids_1), 2)
-        
-        # Verify Persistence: Calling again should return SAME feed
-        # Even if we add a new candidate, the feed should be fixed for the day.
-        
-        new_stranger = User.objects.create_user(username='new_stranger', email='new@test.com', password='password')
-        CheckIn.objects.create(user=new_stranger, track_id='new_song', is_active=True, visibility=['public'])
-        
-        response_2 = self.client.get('/api/playlist/feed/')
-        data_2 = response_2.data['results'] if 'results' in response_2.data else response_2.data
-        track_ids_2 = [s['track_id'] for s in data_2]
-        
-        self.assertEqual(track_ids_1, track_ids_2)
-        self.assertNotIn('new_song', track_ids_2) # New candidate ignored due to persistence
-        
-    def test_list_songs_mutual_friends(self):
-        """Test type='mutual_friends'"""
+        self.assertIn('mutual_song', track_ids)
+        self.assertIn('stranger_song', track_ids)
+
+    def test_default_feed_is_persistent(self):
+        """Same feed returned within the same day."""
+        resp1 = self.client.get('/api/playlist/feed/')
+        data1 = resp1.data['results'] if 'results' in resp1.data else resp1.data
+        ids1 = [s['track_id'] for s in data1]
+
+        # Add new song — should NOT appear in today's feed
+        new_user = User.objects.create_user(username='newcomer', email='new@test.com', password='password')
+        Song.objects.create(user=new_user, track_id='new_song', is_active=True)
+
+        resp2 = self.client.get('/api/playlist/feed/')
+        data2 = resp2.data['results'] if 'results' in resp2.data else resp2.data
+        ids2 = [s['track_id'] for s in data2]
+
+        self.assertEqual(ids1, ids2)
+        self.assertNotIn('new_song', ids2)
+
+    def test_filter_mutual_friends(self):
+        """?type=mutual_friends returns only mutual_friends from daily digest."""
+        # Generate the digest first
+        self.client.get('/api/playlist/feed/')
+
         response = self.client.get('/api/playlist/feed/?type=mutual_friends')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.data['results'] if 'results' in response.data else response.data
         track_ids = [s['track_id'] for s in data]
-        
+
         self.assertIn('mutual_song', track_ids)
         self.assertNotIn('stranger_song', track_ids)
-        self.assertNotIn('friend_song', track_ids)
 
-    def test_list_songs_anonymous(self):
-        """Test type='anonymous'"""
-        response = self.client.get('/api/playlist/feed/?type=anonymous')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+    def test_filter_mutual_traits(self):
+        """?type=mutual_traits returns only mutual_traits from daily digest."""
+        self.client.get('/api/playlist/feed/')
+
+        response = self.client.get('/api/playlist/feed/?type=mutual_traits')
+        data = response.data['results'] if 'results' in response.data else response.data
+        # No mutual_traits songs set up, so should be empty
+        self.assertEqual(len(data), 0)
+
+    def test_filter_combined(self):
+        """?type=mutual_friends,mutual_traits returns both categories."""
+        self.client.get('/api/playlist/feed/')
+
+        response = self.client.get('/api/playlist/feed/?type=mutual_friends,mutual_traits')
         data = response.data['results'] if 'results' in response.data else response.data
         track_ids = [s['track_id'] for s in data]
-        
-        self.assertIn('stranger_song', track_ids)
-        self.assertNotIn('mutual_song', track_ids)
+
+        # mutual_song is categorized as mutual_friends
+        self.assertIn('mutual_song', track_ids)
+
+    def test_filter_is_subset_of_digest(self):
+        """Filtered results should be a subset of the full digest."""
+        resp_all = self.client.get('/api/playlist/feed/')
+        data_all = resp_all.data['results'] if 'results' in resp_all.data else resp_all.data
+        all_ids = {s['id'] for s in data_all}
+
+        resp_mf = self.client.get('/api/playlist/feed/?type=mutual_friends')
+        data_mf = resp_mf.data['results'] if 'results' in resp_mf.data else resp_mf.data
+        mf_ids = {s['id'] for s in data_mf}
+
+        self.assertTrue(mf_ids.issubset(all_ids))
+
+    def test_inactive_songs_excluded(self):
+        """Inactive songs should not appear in the feed."""
+        Song.objects.filter(track_id='stranger_song').update(is_active=False)
+
+        response = self.client.get('/api/playlist/feed/')
+        data = response.data['results'] if 'results' in response.data else response.data
+        track_ids = [s['track_id'] for s in data]
+
+        self.assertNotIn('stranger_song', track_ids)

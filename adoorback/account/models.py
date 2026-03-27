@@ -706,8 +706,8 @@ class DiscoverFeedMusic(AdoorTimestampedModel):
     user = models.ForeignKey(
         get_user_model(), related_name='discover_feed_music', on_delete=models.CASCADE
     )
-    check_in = models.ForeignKey(
-        'check_in.CheckIn', related_name='discover_feed_music_items', on_delete=models.CASCADE
+    song = models.ForeignKey(
+        'check_in.Song', related_name='discover_feed_music_items', on_delete=models.CASCADE
     )
 
     created_at = models.DateTimeField(default=timezone.now, editable=False)
@@ -728,7 +728,7 @@ class DiscoverFeedMusic(AdoorTimestampedModel):
         ]
 
     def __str__(self):
-        return f"DiscoverFeedMusic for {self.user.username}: {self.check_in.id} ({self.category})"
+        return f"DiscoverFeedMusic for {self.user.username}: {self.song.id} ({self.category})"
 
 
 class AppSession(SafeDeleteModel):

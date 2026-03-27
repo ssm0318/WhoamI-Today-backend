@@ -6,4 +6,8 @@ urlpatterns = [
     path('<int:pk>/', views.CheckInDetail.as_view(), name='check-in-detail'),
     path('read/<int:pk>/', views.CheckInRead.as_view(), name='check-in-read'),
     path('latest-visibility/', views.CurrentUserLatestCheckInVisibility.as_view(), name='current-user-latest-check-in-visibility'),
+    path('latest/', views.LatestCheckIn.as_view(), name='latest-check-in'),
+
+    path('song/', views.CurrentSong.as_view(), name='current-song'),
+    path('song/<int:pk>/', views.SongDetail.as_view(), name='my-song-detail'),
 ]
