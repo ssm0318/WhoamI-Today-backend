@@ -11,6 +11,9 @@ urlpatterns = [
     path('song/', views.CurrentSong.as_view(), name='current-song'),
     path('song/<int:pk>/', views.SongDetail.as_view(), name='my-song-detail'),
 
+    path('<int:pk>/react/', views.CheckInReact.as_view(), name='check-in-react'),
+    path('<int:pk>/reactions/', views.CheckInReactions.as_view(), name='check-in-reactions'),
+
     path('poke/', views.PokeCreate.as_view(), name='poke-create'),
     path('poke/sent/', views.PokeSent.as_view(), name='poke-sent'),
     path('poke/<int:pk>/', views.PokeDelete.as_view(), name='poke-delete'),

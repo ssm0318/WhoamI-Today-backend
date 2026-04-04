@@ -48,7 +48,19 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return self.description or ""
-    
+
+    @property
+    def author(self):
+        return self.user
+
+    @property
+    def content(self):
+        return self.description or self.mood or ""
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
     @property
     def reader_ids(self):
         return self.readers.values_list('id', flat=True)

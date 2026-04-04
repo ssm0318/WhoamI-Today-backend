@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -6,10 +7,13 @@ from django.utils import timezone
 from rest_framework import generics, exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from adoorback.utils.validators import adoor_exception_handler
 
 from check_in.models import CheckIn, Song, Poke
+from reaction.models import Reaction
+from reaction.serializers import ReactionSerializer
 import check_in.serializers as cs
 
 User = get_user_model()
@@ -301,3 +305,78 @@ class PokeDelete(generics.DestroyAPIView):
         if self.request.user != poke.sender:
             raise exceptions.PermissionDenied("Only the sender can delete a poke.")
         return poke
+
+
+class CheckInReact(APIView):
+    """
+    POST /api/check_in/<id>/react/
+    Toggle a reaction on a check-in.
+    Body: { "emoji": "..." }
+    If the same user+emoji+checkin combo exists, delete it (toggle off).
+    Otherwise create it.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            check_in = CheckIn.objects.get(id=pk)
+        except CheckIn.DoesNotExist:
+            raise exceptions.NotFound("Check-in not found.")
+
+        if not check_in.is_active:
+            raise exceptions.PermissionDenied("This check-in is no longer active.")
+
+        emoji = request.data.get('emoji')
+        if not emoji:
+            raise exceptions.ValidationError("emoji is required.")
+
+        content_type = ContentType.objects.get_for_model(CheckIn)
+
+        existing = Reaction.objects.filter(
+            user=request.user,
+            emoji=emoji,
+            content_type=content_type,
+            object_id=pk,
+        ).first()
+
+        if existing:
+            existing.delete()
+            return Response({'toggled': 'off'}, status=status.HTTP_200_OK)
+        else:
+            reaction = Reaction.objects.create(
+                user=request.user,
+                emoji=emoji,
+                content_type=content_type,
+                object_id=pk,
+            )
+            serializer = ReactionSerializer(reaction, context={'request': request})
+            return Response({**serializer.data, 'toggled': 'on'}, status=status.HTTP_201_CREATED)
+
+
+class CheckInReactions(generics.ListAPIView):
+    """
+    GET /api/check_in/<id>/reactions/
+    List all reactions on a check-in.
+    """
+    serializer_class = ReactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        pk = self.kwargs.get('pk')
+        try:
+            check_in = CheckIn.objects.get(id=pk)
+        except CheckIn.DoesNotExist:
+            raise exceptions.NotFound("Check-in not found.")
+
+        content_type = ContentType.objects.get_for_model(CheckIn)
+        return Reaction.objects.filter(
+            content_type=content_type,
+            object_id=pk,
+        ).order_by('-created_at')
