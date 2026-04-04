@@ -13,7 +13,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona
+    VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona, CustomChip, CHIP_CATEGORY_CHOICES
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -34,6 +34,20 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     current_ver = serializers.ChoiceField(choices=VERSION_CHOICES, read_only=True)
     user_interests = serializers.StringRelatedField(many=True, read_only=True)
     user_personas = serializers.StringRelatedField(many=True, read_only=True)
+    chips_by_category = serializers.SerializerMethodField(read_only=True)
+    custom_chips = serializers.SerializerMethodField(read_only=True)
+
+    def get_chips_by_category(self, obj):
+        """Return user's interests grouped by category."""
+        result = {}
+        for cat_key, cat_label in CHIP_CATEGORY_CHOICES:
+            chips = obj.user_interests.filter(category=cat_key).values_list('content', flat=True)
+            result[cat_key] = list(chips)
+        return result
+
+    def get_custom_chips(self, obj):
+        """Return user's custom chips."""
+        return CustomChipSerializer(obj.custom_chips.all(), many=True).data
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -96,7 +110,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
-                  'user_interests', 'user_personas',
+                  'user_interests', 'user_personas', 'chips_by_category', 'custom_chips',
                   'interests_friends_only', 'persona_friends_only', 'pronouns_friends_only', 'bio_friends_only',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
@@ -699,10 +713,16 @@ class AppSessionSerializer(serializers.ModelSerializer):
 class InterestSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interest
-        fields = ['id', 'content']
+        fields = ['id', 'content', 'category']
 
 
 class PersonaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Persona
         fields = ['id', 'content']
+
+
+class CustomChipSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomChip
+        fields = ['id', 'text', 'category']

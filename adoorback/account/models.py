@@ -642,8 +642,21 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
         return f'{self.subscriber} subscribed to {self.content_type} of {self.subscribed_to}'
 
 
+CHIP_CATEGORY_CHOICES = [
+    ('music_entertainment', 'Music & Entertainment'),
+    ('hobbies_activities', 'Hobbies & Activities'),
+    ('on_my_mind', 'On My Mind'),
+    ('as_a_friend', 'As a Friend'),
+    ('online_persona', 'Online Persona'),
+    ('favorite_platform', 'Favorite Platform'),
+    ('least_favorite_platform', 'Least Favorite Platform'),
+]
+
+
 class Interest(AdoorTimestampedModel, SafeDeleteModel):
+    """Stores all chip selections across all 7 categories."""
     content = models.CharField(max_length=100, unique=True)
+    category = models.CharField(max_length=50, choices=CHIP_CATEGORY_CHOICES, default='hobbies_activities', blank=True)
     users = models.ManyToManyField(get_user_model(), related_name='user_interests', blank=True)
 
     _safedelete_policy = SOFT_DELETE_CASCADE
@@ -651,6 +664,7 @@ class Interest(AdoorTimestampedModel, SafeDeleteModel):
     class Meta:
         indexes = [
             models.Index(fields=['content']),
+            models.Index(fields=['category']),
         ]
 
     def __str__(self):
@@ -658,6 +672,7 @@ class Interest(AdoorTimestampedModel, SafeDeleteModel):
 
 
 class Persona(AdoorTimestampedModel, SafeDeleteModel):
+    """Kept for backward compatibility. New chips go into Interest with category."""
     content = models.CharField(max_length=100, unique=True)
     users = models.ManyToManyField(get_user_model(), related_name='user_personas', blank=True)
 
@@ -670,6 +685,26 @@ class Persona(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return self.content
+
+
+class CustomChip(AdoorTimestampedModel, SafeDeleteModel):
+    """User-created custom chips. Max 5 per category per user, max 25 chars."""
+    user = models.ForeignKey(get_user_model(), related_name='custom_chips', on_delete=models.CASCADE)
+    text = models.CharField(max_length=25)
+    category = models.CharField(max_length=50, choices=CHIP_CATEGORY_CHOICES)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'category']),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'text', 'category'], name='unique_custom_chip_per_user'),
+        ]
+
+    def __str__(self):
+        return f'{self.user.username}: {self.text} ({self.category})'
 
 
 class DiscoverFeed(AdoorTimestampedModel):

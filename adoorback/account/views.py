@@ -37,7 +37,7 @@ from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
 from .models import Subscription, Connection, AppSession, DiscoverFeed, DiscoverFeedMusic, Persona, Interest
-from account.models import FriendRequest, BlockRec
+from account.models import FriendRequest, BlockRec, CustomChip
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
@@ -140,35 +140,39 @@ def update_user_personas_logic(user, persona_keys):
                  p.delete()
 
 def update_user_interests_logic(user, interest_labels):
-    # This function expects a list of LABELS from INTEREST_CHOICES_BASE
-
-    from account.models import INTEREST_CHOICES_BASE
+    """Update user interests. Accepts flat list of labels or dict of {category: [labels]}."""
     from django.utils import timezone
 
-    # Update timestamp
     user.interests_updated_at = timezone.now()
     user.save()
 
-    # Predefined interests set for quick lookup
+    # If it's a dict (chips_by_category format), handle per-category
+    if isinstance(interest_labels, dict):
+        all_new_interests = []
+        for category, labels in interest_labels.items():
+            for label in labels:
+                interest = get_or_create_normalized_tag(Interest, label)
+                if interest.category != category:
+                    interest.category = category
+                    interest.save()
+                all_new_interests.append(interest)
+        current_interests = list(user.user_interests.all())
+        user.user_interests.set(all_new_interests)
+        # Orphan cleanup
+        removed = [i for i in current_interests if i not in all_new_interests]
+        for i in removed:
+            if i.users.count() == 0:
+                i.delete()
+        return
+
+    # Flat list fallback (backward compatible)
+    from account.models import INTEREST_CHOICES_BASE
     all_choice_interests_normalized = {normalize_tag(label) for label in INTEREST_CHOICES_BASE}
-    
-    # Get all current interests
     current_interests = list(user.user_interests.all())
-    
-    # Separate Custom vs Base
-    custom_interests = []
-    for i in current_interests:
-        if normalize_tag(i.content) not in all_choice_interests_normalized:
-            custom_interests.append(i)
-            
-    # Get or create new Interest instances for the new selection
+    custom_interests = [i for i in current_interests if normalize_tag(i.content) not in all_choice_interests_normalized]
     new_choice_interests = [get_or_create_normalized_tag(Interest, label) for label in interest_labels]
-    
-    # Final set = Custom Interests (preserved) + New Choice Interests
     final_interest_set = custom_interests + new_choice_interests
     user.user_interests.set(final_interest_set)
-
-    # Orphan cleanup
     removed_interests = [i for i in current_interests if i not in final_interest_set]
     for i in removed_interests:
         if i.users.count() == 0:
@@ -996,6 +1000,53 @@ class CurrentUserPersonaUpdate(generics.UpdateAPIView):
              update_user_personas_logic(self.get_object(), user_personas)
 
         return Response(status=status.HTTP_200_OK, data={"message": "Personas updated successfully"})
+
+
+class CurrentUserChipsUpdate(generics.GenericAPIView):
+    """Accept chips_by_category dict: {category_key: [chip_labels]}."""
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        chips_by_category = request.data.get('chips_by_category', {})
+        if not isinstance(chips_by_category, dict):
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "chips_by_category must be a dict"})
+        update_user_interests_logic(request.user, chips_by_category)
+        return Response(status=status.HTTP_200_OK, data={"message": "Chips updated"})
+
+
+class CustomChipListCreate(generics.ListCreateAPIView):
+    """List and create custom chips for the current user."""
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        return CustomChip.objects.filter(user=self.request.user)
+
+    def get_serializer_class(self):
+        from account.serializers import CustomChipSerializer
+        return CustomChipSerializer
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        user = self.request.user
+        category = serializer.validated_data.get('category')
+        # Enforce max 5 per category
+        count = CustomChip.objects.filter(user=user, category=category).count()
+        if count >= 5:
+            raise serializers.ValidationError("Maximum 5 custom chips per category")
+        serializer.save(user=user)
+
+    def delete(self, request, *args, **kwargs):
+        chip_id = request.data.get('id')
+        if chip_id:
+            CustomChip.objects.filter(user=request.user, id=chip_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CurrentUserDelete(generics.DestroyAPIView):
