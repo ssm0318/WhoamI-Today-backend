@@ -569,3 +569,64 @@ def set_seed(n):
                 interest = Interest.objects.get(content=label)
                 user.user_interests.add(interest)
     logging.info("Chip category test data created!") if DEBUG else None
+
+    # ===== COMPREHENSIVE EDGE CASE TESTING =====
+
+    # 1. User with partial check-in (only song, no status/battery)
+    CheckIn.objects.filter(user=user_4, is_active=True).update(
+        social_battery=None, mood=None, description=None
+    )
+    logging.info("adoor_4: partial check-in (song only)") if DEBUG else None
+
+    # 2. User with same platform as both Favorite and Least Favorite
+    fav_ig = Interest.objects.get_or_create(content='Instagram')[0]
+    fav_ig.category = 'favorite_platform'
+    fav_ig.save()
+    least_ig = Interest.objects.get_or_create(content='Instagram (least)')[0]
+    least_ig.category = 'least_favorite_platform'
+    least_ig.save()
+    user_6.user_interests.add(fav_ig, least_ig)
+    logging.info("adoor_6: same platform favorite + least favorite") if DEBUG else None
+
+    # 3. Two users sharing same custom chip text (case-insensitive match)
+    from account.models import CustomChip
+    CustomChip.objects.get_or_create(user=user_1, text='late night coder', category='hobbies_activities')
+    CustomChip.objects.get_or_create(user=user_5, text='Late Night Coder', category='hobbies_activities')
+    logging.info("Custom chip mutual match: adoor_1 + adoor_5") if DEBUG else None
+
+    # 4. User with max 5 custom chips in one category
+    for i in range(5):
+        CustomChip.objects.get_or_create(
+            user=user_2,
+            text=f'custom hobby {i+1}',
+            category='hobbies_activities'
+        )
+    logging.info("adoor_2: max 5 custom chips in hobbies") if DEBUG else None
+
+    # 5. User with friends-only visibility flags set
+    user_6.bio_friends_only = True
+    user_6.interests_friends_only = True
+    user_6.pronouns_friends_only = True
+    user_6.save()
+    logging.info("adoor_6: friends-only visibility on bio/interests/pronouns") if DEBUG else None
+
+    # 6. Ensure 2nd and 3rd degree connections exist for degree badge testing
+    # adoor_8 is NOT friends with adoor_1 but IS friends with adoor_2 (mutual friend)
+    # This makes adoor_8 a 2nd degree connection to adoor_1
+    u8 = User.objects.get(username='adoor_8')
+    u1_sorted = min(user_2, u8, key=lambda u: u.id)
+    u2_sorted = max(user_2, u8, key=lambda u: u.id)
+    if not Connection.objects.filter(user1=u1_sorted, user2=u2_sorted).exists():
+        Connection.objects.create(user1=u1_sorted, user2=u2_sorted, user1_choice='friend', user2_choice='friend')
+    logging.info("adoor_8: 2nd degree connection to adoor_1 via adoor_2") if DEBUG else None
+
+    # adoor_10 is 3rd+ degree (no mutual friends with adoor_1)
+    logging.info("adoor_10: 3rd+ degree connection to adoor_1") if DEBUG else None
+
+    # 7. Users with bio, pronouns, profile data for visibility testing
+    user_6.bio = "Secret bio only for friends"
+    user_6.pronouns = "they/them"
+    user_6.save()
+    logging.info("adoor_6: has bio + pronouns for visibility testing") if DEBUG else None
+
+    logging.info("=== Comprehensive seed data complete! ===") if DEBUG else None
