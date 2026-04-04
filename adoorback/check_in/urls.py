@@ -10,4 +10,8 @@ urlpatterns = [
 
     path('song/', views.CurrentSong.as_view(), name='current-song'),
     path('song/<int:pk>/', views.SongDetail.as_view(), name='my-song-detail'),
+
+    path('poke/', views.PokeCreate.as_view(), name='poke-create'),
+    path('poke/sent/', views.PokeSent.as_view(), name='poke-sent'),
+    path('poke/<int:pk>/', views.PokeDelete.as_view(), name='poke-delete'),
 ]

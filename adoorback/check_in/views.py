@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from rest_framework import generics, exceptions, status
 from rest_framework.permissions import IsAuthenticated
@@ -8,7 +9,7 @@ from rest_framework.response import Response
 
 from adoorback.utils.validators import adoor_exception_handler
 
-from check_in.models import CheckIn, Song
+from check_in.models import CheckIn, Song, Poke
 import check_in.serializers as cs
 
 User = get_user_model()
@@ -209,3 +210,94 @@ class SongDetail(generics.RetrieveUpdateAPIView):
         instance.save()
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PokeCreate(generics.CreateAPIView):
+    """
+    Create a poke (nudge) to ask a friend to share a component.
+    POST body: { receiver_id, component_type }
+    """
+    serializer_class = cs.PokeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        sender = self.request.user
+        receiver_id = serializer.validated_data.pop('receiver_id')
+        receiver = get_object_or_404(User, id=receiver_id)
+
+        if sender == receiver:
+            raise exceptions.ValidationError("You cannot poke yourself.")
+
+        # Check daily poke limit
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        sent_today = Poke.objects.filter(sender=sender, created_at__gte=today_start).count()
+        if sent_today >= Poke.DAILY_POKE_LIMIT:
+            raise exceptions.Throttled(detail="Daily poke limit reached.")
+
+        # Check duplicate: same sender->receiver->component_type today
+        component_type = serializer.validated_data.get('component_type')
+        already_poked = Poke.objects.filter(
+            sender=sender,
+            receiver=receiver,
+            component_type=component_type,
+            created_at__gte=today_start,
+        ).exists()
+        if already_poked:
+            raise exceptions.ValidationError("You already poked this component today.")
+
+        serializer.save(sender=sender, receiver=receiver)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class PokeSent(generics.ListAPIView):
+    """
+    Get pokes sent by the current user to a specific receiver today.
+    GET /poke/sent/?receiver_id=X
+    """
+    serializer_class = cs.PokeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        sender = self.request.user
+        receiver_id = self.request.query_params.get('receiver_id')
+        if not receiver_id:
+            raise exceptions.ValidationError("receiver_id query parameter is required.")
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        return Poke.objects.filter(
+            sender=sender,
+            receiver_id=receiver_id,
+            created_at__gte=today_start,
+        )
+
+
+class PokeDelete(generics.DestroyAPIView):
+    """
+    Delete (un-poke) a specific poke. Only the sender can delete their own poke.
+    DELETE /poke/<id>/
+    """
+    serializer_class = cs.PokeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        try:
+            poke = Poke.objects.get(id=self.kwargs.get('pk'))
+        except Poke.DoesNotExist:
+            raise exceptions.NotFound("Poke not found.")
+        if self.request.user != poke.sender:
+            raise exceptions.PermissionDenied("Only the sender can delete a poke.")
+        return poke

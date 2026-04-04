@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from account.serializers import UserMinimalSerializer
-from check_in.models import CheckIn, Song
+from check_in.models import CheckIn, Song, Poke
 
 
 class CheckInBaseSerializer(serializers.ModelSerializer):
@@ -43,6 +43,15 @@ class MySongSerializer(SongBaseSerializer):
     class Meta:
         model = Song
         fields = SongBaseSerializer.Meta.fields
+
+
+class PokeSerializer(serializers.ModelSerializer):
+    receiver_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Poke
+        fields = ['id', 'sender', 'receiver', 'receiver_id', 'component_type', 'created_at']
+        read_only_fields = ['id', 'sender', 'receiver', 'created_at']
 
 
 class TrackSerializer(serializers.Serializer):
