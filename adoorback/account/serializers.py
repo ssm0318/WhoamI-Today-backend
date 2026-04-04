@@ -342,6 +342,7 @@ class FriendListSerializer(UserMinimalSerializer):
     connection_status = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
+    unread_post_cnt = serializers.SerializerMethodField(read_only=True)
     check_in_id = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
     description = serializers.SerializerMethodField(read_only=True)
@@ -383,6 +384,18 @@ class FriendListSerializer(UserMinimalSerializer):
                             and not any(not note['current_user_read'] for note in notes)
         return current_user_read
     
+    def get_unread_post_cnt(self, obj):
+        """Count unread notes + responses from this friend."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
+        user = request.user
+        from note.models import Note
+        from qna.models import Response as _Response
+        unread_notes = Note.objects.filter(author=obj).exclude(readers=user).count()
+        unread_responses = _Response.objects.filter(author=obj).exclude(readers=user).count()
+        return unread_notes + unread_responses
+
     def get_unread_cnt(self, obj):
         from chat.models import ChatRoom
         request = self.context.get('request')
@@ -462,8 +475,8 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'bio', 'check_in_id', 'track_id', 'description', 'unread_ping_count',
-                                                      'social_battery', 'mood']
+                                                      'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'description',
+                                                      'unread_ping_count', 'social_battery', 'mood']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
