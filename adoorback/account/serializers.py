@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
@@ -349,6 +350,10 @@ class FriendListSerializer(UserMinimalSerializer):
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     social_battery = serializers.SerializerMethodField(read_only=True)
     mood = serializers.SerializerMethodField(read_only=True)
+    battery_visibility = serializers.SerializerMethodField(read_only=True)
+    mood_visibility = serializers.SerializerMethodField(read_only=True)
+    song_visibility = serializers.SerializerMethodField(read_only=True)
+    thought_visibility = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -448,6 +453,28 @@ class FriendListSerializer(UserMinimalSerializer):
         else:
             return None
 
+    def _component_visibility(self, check_in, visibility_field, updated_at_field):
+        """Return component visibility, applying auto-archive if >12h old."""
+        from datetime import timedelta
+        if not check_in:
+            return None
+        updated_at = getattr(check_in, updated_at_field, None)
+        if updated_at and (timezone.now() - updated_at > timedelta(hours=12)):
+            return 'only_me'
+        return getattr(check_in, visibility_field)
+
+    def get_battery_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'battery_visibility', 'battery_updated_at')
+
+    def get_mood_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'mood_visibility', 'mood_updated_at')
+
+    def get_song_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'song_visibility', 'song_updated_at')
+
+    def get_thought_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'thought_visibility', 'thought_updated_at')
+
     def responses(self, obj):
         from qna.serializers import ResponseSerializer
         user = self.context.get('request', None).user
@@ -476,7 +503,8 @@ class FriendListSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
                                                       'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'description',
-                                                      'unread_ping_count', 'social_battery', 'mood']
+                                                      'unread_ping_count', 'social_battery', 'mood',
+                                                      'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):

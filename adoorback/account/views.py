@@ -1918,6 +1918,17 @@ class FullFriendFeed(generics.ListAPIView):
                 serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
             elif isinstance(obj, _Response):
                 serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+            # Add connection_status to author_detail for close friend indicator
+            if 'author_detail' in serialized and serialized['author_detail']:
+                author = obj.author
+                if author == user:
+                    serialized['author_detail']['connection_status'] = None
+                elif author.is_close_friend(user):
+                    serialized['author_detail']['connection_status'] = 'close_friend'
+                elif user.is_connected(author):
+                    serialized['author_detail']['connection_status'] = 'friend'
+                else:
+                    serialized['author_detail']['connection_status'] = None
             serialized_data.append(serialized)
 
         # mark all notes as read

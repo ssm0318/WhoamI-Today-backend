@@ -42,12 +42,62 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         default=list_public
     )
 
+    # Per-component visibility
+    VISIBILITY_CHOICES = [
+        ('public', 'Public'),
+        ('friends', 'Friends'),
+        ('close_friends', 'Close Friends'),
+        ('only_me', 'Only Me'),
+    ]
+    battery_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+    mood_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+    song_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='public')
+    thought_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+
+    # Per-component update timestamps (for auto-archive after 12h)
+    battery_updated_at = models.DateTimeField(null=True, blank=True)
+    mood_updated_at = models.DateTimeField(null=True, blank=True)
+    song_updated_at = models.DateTimeField(null=True, blank=True)
+    thought_updated_at = models.DateTimeField(null=True, blank=True)
+
     readers = models.ManyToManyField(User, related_name='read_check_ins')
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
     def __str__(self):
         return self.description or ""
+
+    def save(self, *args, **kwargs):
+        now = timezone.now()
+        is_new = self.pk is None
+
+        if is_new:
+            # Set all component timestamps on creation if content exists
+            if self.social_battery:
+                self.battery_updated_at = now
+            if self.mood:
+                self.mood_updated_at = now
+            if self.description:
+                self.thought_updated_at = now
+            # song_updated_at is set separately since Song is a separate model
+        else:
+            # On update, detect which fields changed and update their timestamps
+            try:
+                old = CheckIn.objects.get(pk=self.pk)
+            except CheckIn.DoesNotExist:
+                old = None
+
+            if old:
+                if self.social_battery != old.social_battery or self.battery_visibility != old.battery_visibility:
+                    self.battery_updated_at = now
+                if self.mood != old.mood or self.mood_visibility != old.mood_visibility:
+                    self.mood_updated_at = now
+                if self.description != old.description or self.thought_visibility != old.thought_visibility:
+                    self.thought_updated_at = now
+                if self.song_visibility != old.song_visibility:
+                    self.song_updated_at = now
+
+        super().save(*args, **kwargs)
 
     @property
     def author(self):
@@ -140,7 +190,8 @@ class Poke(AdoorTimestampedModel, SafeDeleteModel):
 
     COMPONENT_TYPE_CHOICES = [
         ('song', 'Song'),
-        ('status', 'Status'),
+        ('mood', 'Mood'),
+        ('thought', 'Thought Snippet'),
         ('battery', 'Battery'),
     ]
 
@@ -187,12 +238,14 @@ def create_poke_notification(created, instance, **kwargs):
 
     COMPONENT_LABELS_KO = {
         'song': '노래',
-        'status': '상태',
+        'mood': '기분',
+        'thought': '한마디',
         'battery': '소셜 배터리',
     }
     COMPONENT_LABELS_EN = {
         'song': 'song',
-        'status': 'vibe check',
+        'mood': 'mood',
+        'thought': 'thought snippet',
         'battery': 'social battery',
     }
 
