@@ -7,13 +7,14 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 from django.urls import reverse
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona
+    VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona, CustomChip, CHIP_CATEGORY_CHOICES
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -34,6 +35,20 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     current_ver = serializers.ChoiceField(choices=VERSION_CHOICES, read_only=True)
     user_interests = serializers.StringRelatedField(many=True, read_only=True)
     user_personas = serializers.StringRelatedField(many=True, read_only=True)
+    chips_by_category = serializers.SerializerMethodField(read_only=True)
+    custom_chips = serializers.SerializerMethodField(read_only=True)
+
+    def get_chips_by_category(self, obj):
+        """Return user's interests grouped by category."""
+        result = {}
+        for cat_key, cat_label in CHIP_CATEGORY_CHOICES:
+            chips = obj.user_interests.filter(category=cat_key).values_list('content', flat=True)
+            result[cat_key] = list(chips)
+        return result
+
+    def get_custom_chips(self, obj):
+        """Return user's custom chips."""
+        return CustomChipSerializer(obj.custom_chips.all(), many=True).data
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -96,7 +111,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
-                  'user_interests', 'user_personas',
+                  'user_interests', 'user_personas', 'chips_by_category', 'custom_chips',
                   'interests_friends_only', 'persona_friends_only', 'pronouns_friends_only', 'bio_friends_only',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
@@ -328,11 +343,17 @@ class FriendListSerializer(UserMinimalSerializer):
     connection_status = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
+    unread_post_cnt = serializers.SerializerMethodField(read_only=True)
+    check_in_id = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
     description = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     social_battery = serializers.SerializerMethodField(read_only=True)
     mood = serializers.SerializerMethodField(read_only=True)
+    battery_visibility = serializers.SerializerMethodField(read_only=True)
+    mood_visibility = serializers.SerializerMethodField(read_only=True)
+    song_visibility = serializers.SerializerMethodField(read_only=True)
+    thought_visibility = serializers.SerializerMethodField(read_only=True)
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -368,6 +389,18 @@ class FriendListSerializer(UserMinimalSerializer):
                             and not any(not note['current_user_read'] for note in notes)
         return current_user_read
     
+    def get_unread_post_cnt(self, obj):
+        """Count unread notes + responses from this friend."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
+        user = request.user
+        from note.models import Note
+        from qna.models import Response as _Response
+        unread_notes = Note.objects.filter(author=obj).exclude(readers=user).count()
+        unread_responses = _Response.objects.filter(author=obj).exclude(readers=user).count()
+        return unread_notes + unread_responses
+
     def get_unread_cnt(self, obj):
         from chat.models import ChatRoom
         request = self.context.get('request')
@@ -385,6 +418,12 @@ class FriendListSerializer(UserMinimalSerializer):
         check_in = obj.check_in_set.filter(is_active=True).first()
         if check_in and CheckIn.is_audience(check_in, user):
             return check_in
+        return None
+
+    def get_check_in_id(self, obj):
+        check_in = self.check_in(obj)
+        if check_in:
+            return check_in.id
         return None
 
     def get_track_id(self, obj):
@@ -414,6 +453,28 @@ class FriendListSerializer(UserMinimalSerializer):
         else:
             return None
 
+    def _component_visibility(self, check_in, visibility_field, updated_at_field):
+        """Return component visibility, applying auto-archive if >12h old."""
+        from datetime import timedelta
+        if not check_in:
+            return None
+        updated_at = getattr(check_in, updated_at_field, None)
+        if updated_at and (timezone.now() - updated_at > timedelta(hours=12)):
+            return 'only_me'
+        return getattr(check_in, visibility_field)
+
+    def get_battery_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'battery_visibility', 'battery_updated_at')
+
+    def get_mood_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'mood_visibility', 'mood_updated_at')
+
+    def get_song_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'song_visibility', 'song_updated_at')
+
+    def get_thought_visibility(self, obj):
+        return self._component_visibility(self.check_in(obj), 'thought_visibility', 'thought_updated_at')
+
     def responses(self, obj):
         from qna.serializers import ResponseSerializer
         user = self.context.get('request', None).user
@@ -441,8 +502,9 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'bio', 'track_id', 'description', 'unread_ping_count',
-                                                      'social_battery', 'mood']
+                                                      'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'description',
+                                                      'unread_ping_count', 'social_battery', 'mood',
+                                                      'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
@@ -699,10 +761,16 @@ class AppSessionSerializer(serializers.ModelSerializer):
 class InterestSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interest
-        fields = ['id', 'content']
+        fields = ['id', 'content', 'category']
 
 
 class PersonaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Persona
         fields = ['id', 'content']
+
+
+class CustomChipSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomChip
+        fields = ['id', 'text', 'category']

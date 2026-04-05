@@ -1,14 +1,19 @@
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from rest_framework import generics, exceptions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from adoorback.utils.validators import adoor_exception_handler
 
-from check_in.models import CheckIn, Song
+from check_in.models import CheckIn, Song, Poke
+from reaction.models import Reaction
+from reaction.serializers import ReactionSerializer
 import check_in.serializers as cs
 
 User = get_user_model()
@@ -27,14 +32,21 @@ class CurrentCheckIn(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         current_user = self.request.user
-        
-        # TODO: Refactor this temporary logic later (default visibility)
+
+        # Inherit visibility settings from last check-in if not provided
         if not serializer.validated_data.get('visibility'):
             last_check_in = CheckIn.objects.filter(user=current_user).order_by('-created_at').first()
             if last_check_in:
                 serializer.validated_data['visibility'] = last_check_in.visibility
             else:
                 serializer.validated_data['visibility'] = ['public']
+
+        # Inherit per-component visibility from last check-in if not provided
+        last_check_in = CheckIn.objects.filter(user=current_user).order_by('-created_at').first()
+        if last_check_in:
+            for field in ['battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']:
+                if field not in serializer.validated_data:
+                    serializer.validated_data[field] = getattr(last_check_in, field)
 
         serializer.save(user=current_user, is_active=True)
 
@@ -44,7 +56,7 @@ class CurrentCheckIn(generics.ListCreateAPIView):
         if previous_check_in:
             previous_check_in.is_active = False
             previous_check_in.save()
-        
+
         return Response(serializer.data)
 
     def get_queryset(self):
@@ -209,3 +221,176 @@ class SongDetail(generics.RetrieveUpdateAPIView):
         instance.save()
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PokeCreate(generics.CreateAPIView):
+    """
+    Create a poke (nudge) to ask a friend to share a component.
+    POST body: { receiver_id, component_type }
+    """
+    serializer_class = cs.PokeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        sender = self.request.user
+        receiver_id = serializer.validated_data.pop('receiver_id')
+        receiver = get_object_or_404(User, id=receiver_id)
+
+        if sender == receiver:
+            raise exceptions.ValidationError("You cannot poke yourself.")
+
+        # Check daily poke limit
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        sent_today = Poke.objects.filter(sender=sender, created_at__gte=today_start).count()
+        if sent_today >= Poke.DAILY_POKE_LIMIT:
+            raise exceptions.Throttled(detail="Daily poke limit reached.")
+
+        # Check duplicate: same sender->receiver->component_type today
+        component_type = serializer.validated_data.get('component_type')
+        already_poked = Poke.objects.filter(
+            sender=sender,
+            receiver=receiver,
+            component_type=component_type,
+            created_at__gte=today_start,
+        ).exists()
+        if already_poked:
+            raise exceptions.ValidationError("You already poked this component today.")
+
+        serializer.save(sender=sender, receiver=receiver)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class PokeSent(generics.ListAPIView):
+    """
+    Get pokes sent by the current user to a specific receiver today.
+    GET /poke/sent/?receiver_id=X
+    """
+    serializer_class = cs.PokeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        sender = self.request.user
+        receiver_id = self.request.query_params.get('receiver_id')
+        if not receiver_id:
+            raise exceptions.ValidationError("receiver_id query parameter is required.")
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        return Poke.objects.filter(
+            sender=sender,
+            receiver_id=receiver_id,
+            created_at__gte=today_start,
+        )
+
+
+class PokeDelete(generics.DestroyAPIView):
+    """
+    Delete (un-poke) a specific poke. Only the sender can delete their own poke.
+    DELETE /poke/<id>/
+    """
+    serializer_class = cs.PokeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        try:
+            poke = Poke.objects.get(id=self.kwargs.get('pk'))
+        except Poke.DoesNotExist:
+            raise exceptions.NotFound("Poke not found.")
+        if self.request.user != poke.sender:
+            raise exceptions.PermissionDenied("Only the sender can delete a poke.")
+        return poke
+
+
+class CheckInReact(APIView):
+    """
+    POST /api/check_in/<id>/react/
+    Toggle a reaction on a check-in.
+    Body: { "emoji": "..." }
+    If the same user+emoji+checkin combo exists, delete it (toggle off).
+    Otherwise create it.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def post(self, request, pk):
+        try:
+            check_in = CheckIn.objects.get(id=pk)
+        except CheckIn.DoesNotExist:
+            raise exceptions.NotFound("Check-in not found.")
+
+        if not check_in.is_active:
+            raise exceptions.PermissionDenied("This check-in is no longer active.")
+
+        emoji = request.data.get('emoji')
+        if not emoji:
+            raise exceptions.ValidationError("emoji is required.")
+
+        content_type = ContentType.objects.get_for_model(CheckIn)
+
+        existing = Reaction.objects.filter(
+            user=request.user,
+            emoji=emoji,
+            content_type=content_type,
+            object_id=pk,
+        ).first()
+
+        if existing:
+            # Delete associated notifications before removing the reaction
+            reaction_ct = ContentType.objects.get_for_model(type(existing))
+            from notification.models import Notification
+            Notification.objects.filter(
+                target_type=reaction_ct,
+                target_id=existing.id,
+            ).delete()
+            existing.delete()
+            return Response({'toggled': 'off'}, status=status.HTTP_200_OK)
+        else:
+            reaction = Reaction.objects.create(
+                user=request.user,
+                emoji=emoji,
+                content_type=content_type,
+                object_id=pk,
+            )
+            serializer = ReactionSerializer(reaction, context={'request': request})
+            return Response({**serializer.data, 'toggled': 'on'}, status=status.HTTP_201_CREATED)
+
+
+class CheckInReactions(generics.ListAPIView):
+    """
+    GET /api/check_in/<id>/reactions/
+    List all reactions on a check-in.
+    """
+    serializer_class = ReactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        pk = self.kwargs.get('pk')
+        try:
+            check_in = CheckIn.objects.get(id=pk)
+        except CheckIn.DoesNotExist:
+            raise exceptions.NotFound("Check-in not found.")
+
+        content_type = ContentType.objects.get_for_model(CheckIn)
+        return Reaction.objects.filter(
+            content_type=content_type,
+            object_id=pk,
+        ).order_by('-created_at')

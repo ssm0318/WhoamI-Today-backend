@@ -1,9 +1,11 @@
+from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from adoorback.models import AdoorTimestampedModel
 
@@ -40,13 +42,75 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         default=list_public
     )
 
+    # Per-component visibility
+    VISIBILITY_CHOICES = [
+        ('public', 'Public'),
+        ('friends', 'Friends'),
+        ('close_friends', 'Close Friends'),
+        ('only_me', 'Only Me'),
+    ]
+    battery_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+    mood_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+    song_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='public')
+    thought_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+
+    # Per-component update timestamps (for auto-archive after 12h)
+    battery_updated_at = models.DateTimeField(null=True, blank=True)
+    mood_updated_at = models.DateTimeField(null=True, blank=True)
+    song_updated_at = models.DateTimeField(null=True, blank=True)
+    thought_updated_at = models.DateTimeField(null=True, blank=True)
+
     readers = models.ManyToManyField(User, related_name='read_check_ins')
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
     def __str__(self):
         return self.description or ""
-    
+
+    def save(self, *args, **kwargs):
+        now = timezone.now()
+        is_new = self.pk is None
+
+        if is_new:
+            # Set all component timestamps on creation if content exists
+            if self.social_battery:
+                self.battery_updated_at = now
+            if self.mood:
+                self.mood_updated_at = now
+            if self.description:
+                self.thought_updated_at = now
+            # song_updated_at is set separately since Song is a separate model
+        else:
+            # On update, detect which fields changed and update their timestamps
+            try:
+                old = CheckIn.objects.get(pk=self.pk)
+            except CheckIn.DoesNotExist:
+                old = None
+
+            if old:
+                if self.social_battery != old.social_battery or self.battery_visibility != old.battery_visibility:
+                    self.battery_updated_at = now
+                if self.mood != old.mood or self.mood_visibility != old.mood_visibility:
+                    self.mood_updated_at = now
+                if self.description != old.description or self.thought_visibility != old.thought_visibility:
+                    self.thought_updated_at = now
+                if self.song_visibility != old.song_visibility:
+                    self.song_updated_at = now
+
+        super().save(*args, **kwargs)
+
+    @property
+    def author(self):
+        return self.user
+
+    @property
+    def content(self):
+        return self.description or self.mood or ""
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
     @property
     def reader_ids(self):
         return self.readers.values_list('id', flat=True)
@@ -119,6 +183,84 @@ class Song(AdoorTimestampedModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['is_active']),
         ]
+
+
+class Poke(AdoorTimestampedModel, SafeDeleteModel):
+    DAILY_POKE_LIMIT = 5
+
+    COMPONENT_TYPE_CHOICES = [
+        ('song', 'Song'),
+        ('mood', 'Mood'),
+        ('thought', 'Thought Snippet'),
+        ('battery', 'Battery'),
+    ]
+
+    sender = models.ForeignKey(User, related_name='sent_pokes', on_delete=models.CASCADE)
+    receiver = models.ForeignKey(User, related_name='received_pokes', on_delete=models.CASCADE)
+    component_type = models.CharField(max_length=20, choices=COMPONENT_TYPE_CHOICES)
+
+    poke_targetted_notis = GenericRelation(
+        'notification.Notification',
+        content_type_field='target_type',
+        object_id_field='target_id',
+    )
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['sender', 'created_at']),
+            models.Index(fields=['receiver']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.sender} poked {self.receiver} ({self.component_type})"
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+
+@transaction.atomic
+@receiver(post_save, sender=Poke)
+def create_poke_notification(created, instance, **kwargs):
+    if not created:
+        return
+
+    from notification.models import Notification, NotificationActor
+
+    sender = instance.sender
+    receiver = instance.receiver
+
+    if receiver.id in sender.user_report_blocked_ids:
+        return
+
+    COMPONENT_LABELS_KO = {
+        'song': '노래',
+        'mood': '기분',
+        'thought': '한마디',
+        'battery': '소셜 배터리',
+    }
+    COMPONENT_LABELS_EN = {
+        'song': 'song',
+        'mood': 'mood',
+        'thought': 'thought snippet',
+        'battery': 'social battery',
+    }
+
+    label_ko = COMPONENT_LABELS_KO.get(instance.component_type, instance.component_type)
+    label_en = COMPONENT_LABELS_EN.get(instance.component_type, instance.component_type)
+
+    noti = Notification.objects.create(
+        user=receiver,
+        origin=sender,
+        target=instance,
+        message_ko=f"{sender.username}님이 {label_ko}을(를) 공유해달라고 콕 찔렀어요!",
+        message_en=f"{sender.username} nudged you to share your {label_en}!",
+        redirect_url=f"/check-in/",
+    )
+    NotificationActor.objects.create(user=sender, notification=noti)
 
 
 @transaction.atomic

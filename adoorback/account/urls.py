@@ -31,6 +31,8 @@ urlpatterns = [
     path('me/note-status/', views.CurrentUserNoteStatus.as_view(), name='current-user-note-status'),
     path('me/interests/', views.CurrentUserInterestUpdate.as_view(), name='current-user-interest-update'),
     path('me/personas/', views.CurrentUserPersonaUpdate.as_view(), name='current-user-persona-update'),
+    path('me/chips/', views.CurrentUserChipsUpdate.as_view(), name='current-user-chips-update'),
+    path('me/custom-chips/', views.CustomChipListCreate.as_view(), name='custom-chip-list-create'),
 
     # Interest/Persona Search
     path('interests/search/', views.InterestSearch.as_view(), name='interest-search'),

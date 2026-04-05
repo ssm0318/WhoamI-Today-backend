@@ -239,6 +239,17 @@ def set_seed(n):
             chat_room.save()
             chat_room.users.add(user_2, u)
 
+    # Add more friends for adoor_1 (for testing new posts, poke, etc.)
+    for friend_user in [user_3, user_4, user_5, user_6]:
+        u1_sorted = min(user_1, friend_user, key=lambda u: u.id)
+        u2_sorted = max(user_1, friend_user, key=lambda u: u.id)
+        if not Connection.objects.filter(user1=u1_sorted, user2=u2_sorted).exists():
+            Connection.objects.create(
+                user1=u1_sorted, user2=u2_sorted,
+                user1_choice='friend', user2_choice='friend'
+            )
+    logging.info("Extra friends added for adoor_1!") if DEBUG else None
+
     # ===== DISCOVER FEATURE: Interests & Personas =====
     # Ensure Interest/Persona objects exist in DB
     interest_names = ['Gaming', 'Coding', 'Photography', 'Hiking', 'Cooking',
@@ -484,3 +495,138 @@ def set_seed(n):
                                               chat_room=chat_room)
     logging.info(
         f"{Message.objects.count()} Message(s) created!") if DEBUG else None
+
+    # ===== NEW POST TESTING =====
+    # Create recent unread posts from adoor_1's friends so the "New post" badge shows
+    new_post_authors = [user_2, user_3, user_7]
+    new_post_content = [
+        "Just discovered an amazing coffee shop nearby!",
+        "Anyone want to go hiking this weekend?",
+        "New song on repeat - can't stop listening",
+        "Finally finished that book I've been reading",
+        "Late night thoughts: what if we could fly?",
+    ]
+    for author in new_post_authors:
+        note = Note.objects.create(
+            author=author,
+            content=random.choice(new_post_content),
+            visibility=['friends'],
+        )
+        # Do NOT add adoor_1 to readers — this makes it "unread" / "new"
+        note.readers.add(author)
+        logging.info(f"New unread post created by {author.username}") if DEBUG else None
+
+    # Also create a TMI post and a Photo post for testing share types
+    Note.objects.create(
+        author=user_2,
+        content="Hot take: pineapple on pizza is actually good",
+        visibility=['friends'],
+        share_type='tmi_of_the_day',
+    )
+    Note.objects.create(
+        author=user_3,
+        content="Sunset from my window today",
+        visibility=['friends'],
+        share_type='photo_of_the_day',
+    )
+    # Make adoor_3 have NO active check-in (for poke testing)
+    # Deactivate all check-ins and songs for adoor_3
+    CheckIn.objects.filter(user=user_3, is_active=True).update(is_active=False)
+    Song.objects.filter(user=user_3, is_active=True).update(is_active=False)
+    logging.info("adoor_3 check-in cleared for poke testing!") if DEBUG else None
+
+    logging.info("New post test data created!") if DEBUG else None
+
+    # ===== CHIP CATEGORY TESTING =====
+    # Assign chips with proper categories for the 7-category system
+    from account.models import CHIP_CATEGORY_CHOICES
+    category_chips = {
+        'music_entertainment': ['Hip-Hop', 'K-Pop', 'Anime', 'Lo-Fi', 'Podcasts'],
+        'hobbies_activities': ['Gaming', 'Basketball', 'Photography', 'Cooking', 'Hiking', 'Coding'],
+        'on_my_mind': ['Psychology', 'Mental Health', 'AI & Tech', 'Finance'],
+        'as_a_friend': ['Good Listener', 'Night Owl', 'Overthinker', 'Hype Person'],
+        'online_persona': ['Lurker', 'Meme Collector', 'Late Replier', 'Content Creator'],
+        'favorite_platform': ['Instagram', 'YouTube', 'Discord', 'TikTok'],
+        'least_favorite_platform': ['X / Twitter', 'Threads'],
+    }
+    for cat_key, chip_labels in category_chips.items():
+        for label in chip_labels:
+            interest, _ = Interest.objects.get_or_create(content=label)
+            interest.category = cat_key
+            interest.save()
+
+    # Assign chips to users with category awareness
+    user_chip_assignments = {
+        user_1: {'music_entertainment': ['Hip-Hop', 'Anime'], 'hobbies_activities': ['Gaming', 'Coding'], 'online_persona': ['Lurker']},
+        user_2: {'music_entertainment': ['K-Pop', 'Lo-Fi'], 'hobbies_activities': ['Photography', 'Hiking'], 'as_a_friend': ['Good Listener']},
+        user_3: {'hobbies_activities': ['Basketball', 'Cooking'], 'on_my_mind': ['Psychology'], 'favorite_platform': ['YouTube']},
+        user_5: {'music_entertainment': ['Podcasts'], 'on_my_mind': ['AI & Tech', 'Finance'], 'online_persona': ['Content Creator']},
+        user_7: {'hobbies_activities': ['Gaming', 'Photography'], 'as_a_friend': ['Night Owl', 'Hype Person'], 'favorite_platform': ['Discord']},
+    }
+    for user, categories in user_chip_assignments.items():
+        for cat_key, labels in categories.items():
+            for label in labels:
+                interest = Interest.objects.get(content=label)
+                user.user_interests.add(interest)
+    logging.info("Chip category test data created!") if DEBUG else None
+
+    # ===== COMPREHENSIVE EDGE CASE TESTING =====
+
+    # 1. User with partial check-in (only song, no status/battery)
+    CheckIn.objects.filter(user=user_4, is_active=True).update(
+        social_battery=None, mood=None, description=None
+    )
+    logging.info("adoor_4: partial check-in (song only)") if DEBUG else None
+
+    # 2. User with same platform as both Favorite and Least Favorite
+    fav_ig = Interest.objects.get_or_create(content='Instagram')[0]
+    fav_ig.category = 'favorite_platform'
+    fav_ig.save()
+    least_ig = Interest.objects.get_or_create(content='Instagram (least)')[0]
+    least_ig.category = 'least_favorite_platform'
+    least_ig.save()
+    user_6.user_interests.add(fav_ig, least_ig)
+    logging.info("adoor_6: same platform favorite + least favorite") if DEBUG else None
+
+    # 3. Two users sharing same custom chip text (case-insensitive match)
+    from account.models import CustomChip
+    CustomChip.objects.get_or_create(user=user_1, text='late night coder', category='hobbies_activities')
+    CustomChip.objects.get_or_create(user=user_5, text='Late Night Coder', category='hobbies_activities')
+    logging.info("Custom chip mutual match: adoor_1 + adoor_5") if DEBUG else None
+
+    # 4. User with max 5 custom chips in one category
+    for i in range(5):
+        CustomChip.objects.get_or_create(
+            user=user_2,
+            text=f'custom hobby {i+1}',
+            category='hobbies_activities'
+        )
+    logging.info("adoor_2: max 5 custom chips in hobbies") if DEBUG else None
+
+    # 5. User with friends-only visibility flags set
+    user_6.bio_friends_only = True
+    user_6.interests_friends_only = True
+    user_6.pronouns_friends_only = True
+    user_6.save()
+    logging.info("adoor_6: friends-only visibility on bio/interests/pronouns") if DEBUG else None
+
+    # 6. Ensure 2nd and 3rd degree connections exist for degree badge testing
+    # adoor_8 is NOT friends with adoor_1 but IS friends with adoor_2 (mutual friend)
+    # This makes adoor_8 a 2nd degree connection to adoor_1
+    u8 = User.objects.get(username='adoor_8')
+    u1_sorted = min(user_2, u8, key=lambda u: u.id)
+    u2_sorted = max(user_2, u8, key=lambda u: u.id)
+    if not Connection.objects.filter(user1=u1_sorted, user2=u2_sorted).exists():
+        Connection.objects.create(user1=u1_sorted, user2=u2_sorted, user1_choice='friend', user2_choice='friend')
+    logging.info("adoor_8: 2nd degree connection to adoor_1 via adoor_2") if DEBUG else None
+
+    # adoor_10 is 3rd+ degree (no mutual friends with adoor_1)
+    logging.info("adoor_10: 3rd+ degree connection to adoor_1") if DEBUG else None
+
+    # 7. Users with bio, pronouns, profile data for visibility testing
+    user_6.bio = "Secret bio only for friends"
+    user_6.pronouns = "they/them"
+    user_6.save()
+    logging.info("adoor_6: has bio + pronouns for visibility testing") if DEBUG else None
+
+    logging.info("=== Comprehensive seed data complete! ===") if DEBUG else None
