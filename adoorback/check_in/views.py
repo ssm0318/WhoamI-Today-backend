@@ -351,6 +351,13 @@ class CheckInReact(APIView):
         ).first()
 
         if existing:
+            # Delete associated notifications before removing the reaction
+            reaction_ct = ContentType.objects.get_for_model(type(existing))
+            from notification.models import Notification
+            Notification.objects.filter(
+                target_type=reaction_ct,
+                target_id=existing.id,
+            ).delete()
             existing.delete()
             return Response({'toggled': 'off'}, status=status.HTTP_200_OK)
         else:
