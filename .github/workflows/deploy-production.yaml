@@ -1,0 +1,43 @@
+name: Deploy Backend to Production Server
+
+on:
+  push:
+    branches:
+      - release/final-research
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Connect to EC2 and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.NEW_SERVER_HOST }}
+          username: ${{ secrets.NEW_SERVER_USER }}
+          key: ${{ secrets.NEW_SERVER_KEY }}
+          command_timeout: 30m
+          script: |
+            set -e
+
+            echo "🚀 선택한 브랜치(${{ github.ref_name }})로 강제 checkout"
+            cd ~/WhoamI-Today-backend
+            git fetch --all --prune
+            git checkout ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+
+            echo "🏗  새 이미지 빌드 (기존 컨테이너는 계속 동작 중 — 다운타임 없음)"
+            docker compose -f docker-compose.production.yml build
+
+            echo "🛑 기존 컨테이너 종료 (다운타임 시작)"
+            docker compose -f docker-compose.production.yml down
+
+            echo "🔄 새 컨테이너 기동 (-d로 백그라운드 실행)"
+            docker compose -f docker-compose.production.yml up -d
+
+            echo "✅ 배포 완료!"
