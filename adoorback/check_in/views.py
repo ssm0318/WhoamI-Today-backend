@@ -183,6 +183,12 @@ class CurrentSong(generics.ListCreateAPIView):
             previous_song.is_active = False
             previous_song.save()
 
+        # Mirror the song change to the active check-in's song_updated_at so the
+        # auto-archive logic (>12h) doesn't hide the just-saved song. Use update()
+        # to bypass CheckIn.save()'s per-field timestamp logic.
+        CheckIn.objects.filter(user=current_user, is_active=True) \
+                       .update(song_updated_at=timezone.now())
+
         return Response(serializer.data)
 
     def get_queryset(self):
@@ -219,6 +225,12 @@ class SongDetail(generics.RetrieveUpdateAPIView):
         instance = self.get_object()
         instance.is_active = False
         instance.save()
+
+        # Mirror the song removal to the active check-in's song_updated_at so the
+        # auto-archive logic stays consistent with the song state.
+        CheckIn.objects.filter(user=request.user, is_active=True) \
+                       .update(song_updated_at=timezone.now())
+
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

@@ -10,26 +10,46 @@ from check_in.models import CheckIn, Song
 User = get_user_model()
 
 
-class CheckInWithoutTrackIdTests(APITestCase):
-    """CheckIn should no longer accept or return track_id."""
+class CheckInTrackIdTests(APITestCase):
+    """
+    CheckIn responses surface the user's active song's track_id via a
+    read-only SerializerMethodField, even though Song is a separate model.
+    POSTing track_id is silently ignored (it must be saved via /check_in/song/).
+    """
 
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', email='test@test.com', password='password')
         self.client.force_authenticate(user=self.user)
         self.url = reverse('current-check-in')
 
-    def test_create_check_in_without_track_id(self):
+    def test_create_check_in_returns_empty_track_id_when_no_song(self):
         data = {'mood': '😎', 'social_battery': 'fully_charged', 'description': 'no song'}
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertNotIn('track_id', response.data)
+        self.assertEqual(response.data['track_id'], '')
 
-    def test_check_in_response_has_no_track_id(self):
+    def test_check_in_response_includes_active_song_track_id(self):
         CheckIn.objects.create(user=self.user, is_active=True, description='test')
+        Song.objects.create(user=self.user, track_id='spotify:track:active', is_active=True)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        for item in response.data['results']:
-            self.assertNotIn('track_id', item)
+        self.assertEqual(response.data['results'][0]['track_id'], 'spotify:track:active')
+
+    def test_check_in_response_track_id_empty_when_song_inactive(self):
+        CheckIn.objects.create(user=self.user, is_active=True, description='test')
+        Song.objects.create(user=self.user, track_id='spotify:track:old', is_active=False)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'][0]['track_id'], '')
+
+    def test_post_track_id_is_ignored(self):
+        # Backend should not persist track_id sent via /check_in/ — it must use /check_in/song/.
+        data = {'mood': '😎', 'track_id': 'spotify:track:should-be-ignored'}
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        # No active song was created on the side
+        self.assertEqual(response.data['track_id'], '')
+        self.assertFalse(Song.objects.filter(user=self.user).exists())
 
     def test_create_check_in_deactivates_previous(self):
         data1 = {'mood': '😎', 'description': 'first'}

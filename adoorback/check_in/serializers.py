@@ -15,6 +15,10 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
     mood_visibility = serializers.SerializerMethodField(read_only=True)
     song_visibility = serializers.SerializerMethodField(read_only=True)
     thought_visibility = serializers.SerializerMethodField(read_only=True)
+    # Song lives in a separate model. Surface the active song's track_id here so
+    # that consumers reading `checkIn.track_id` (e.g. MyCheckInCard) work without
+    # an extra fetch. Mirrors the pattern in account.serializers.get_track_id.
+    track_id = serializers.SerializerMethodField(read_only=True)
 
     def _is_archived(self, updated_at):
         """Check if a component should be auto-archived (>12h since last update)."""
@@ -46,12 +50,17 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
         current_user_id = self.context['request'].user.id
         return current_user_id in obj.reader_ids
 
+    def get_track_id(self, obj):
+        song = obj.user.song_set.filter(is_active=True).first()
+        return song.track_id if song else ''
+
     class Meta:
         model = CheckIn
         fields = ['id', 'created_at', 'is_active', 'mood',
                   'social_battery', 'description', 'current_user_read', 'visibility',
                   'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
-                  'battery_updated_at', 'mood_updated_at', 'song_updated_at', 'thought_updated_at']
+                  'battery_updated_at', 'mood_updated_at', 'song_updated_at', 'thought_updated_at',
+                  'track_id']
 
 
 class MyCheckInSerializer(CheckInBaseSerializer):
