@@ -147,6 +147,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'adoorback.experiment_logging.middleware.ExperimentLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'adoorback.urls'
@@ -291,6 +292,9 @@ LOGGING = {
             'datefmt': '%Y-%m-%d %H:%M:%S',
             'class': 'adoorback.safe_formatter.SafeFormatter',
         },
+        'experiment_json': {
+            '()': 'adoorback.experiment_logging.formatters.JSONExperimentFormatter',
+        },
     },
     'filters': {
         'add_user_info': {
@@ -324,6 +328,14 @@ LOGGING = {
             'interval': 1,
             'formatter': 'verbose',
         },
+        'experiment_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'experiment.log'),
+            'when': 'midnight',
+            'interval': 1,
+            'formatter': 'experiment_json',
+        },
     },
     'loggers': {
         'django': {
@@ -344,6 +356,11 @@ LOGGING = {
         'adoorback': {
             'handlers': ['error_file', 'info_file', 'debug_file'],
             'level': 'DEBUG',
+            'propagate': False,
+        },
+        'experiment': {
+            'handlers': ['experiment_file'],
+            'level': 'INFO',
             'propagate': False,
         },
     },
