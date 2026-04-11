@@ -3,6 +3,7 @@ FROM python:3.9
 WORKDIR /app
 
 # Install system packages
+# Note: `ant` is required to build JPype1 from source (transitive dep of konlpy)
 RUN apt-get update && apt-get install -y \
     curl \
     gcc \
@@ -12,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libev-dev \
     libevent-dev \
     default-jdk \
+    ant \
     libxml2-dev \
     libxslt-dev \
     libffi-dev \
