@@ -66,6 +66,67 @@ USER_TYPE_CHOICES = (
     ('indirect', 'Indirect Participant'),
 )
 
+CHIP_CATEGORY_CHOICES = [
+    ('music_entertainment', 'Music & Entertainment'),
+    ('hobbies_activities', 'Hobbies & Activities'),
+    ('on_my_mind', 'On My Mind'),
+    ('as_a_friend', 'As a Friend'),
+    ('online_persona', 'Online Persona'),
+    ('favorite_platform', 'Favorite Platform'),
+    ('least_favorite_platform', 'Least Favorite Platform'),
+]
+
+CHIP_CATEGORY_DESCRIPTIONS = {
+    'music_entertainment': 'What you consume — genres, media, formats.',
+    'hobbies_activities': 'What you do with your time — sports, creative work, lifestyle.',
+    'on_my_mind': 'Current rabbit holes, intellectual interests, life-phase topics.',
+    'as_a_friend': 'How you show up in relationships — personality and values.',
+    'online_persona': 'How you behave on the internet — distinct behavioral archetypes.',
+    'favorite_platform': 'The platforms you love most.',
+    'least_favorite_platform': 'The platforms you could do without.',
+}
+
+CHIPS_BY_CATEGORY = {
+    'music_entertainment': [
+        'Hip-Hop', 'R&B', 'Pop', 'Indie', 'K-Pop', 'Rock', 'EDM', 'Jazz', 'Lo-Fi',
+        'Anime', 'K-Drama', 'Reality TV', 'Horror', 'Sci-Fi', 'Documentaries',
+        'Comedy', 'Podcasts', 'Manga/Webtoons',
+    ],
+    'hobbies_activities': [
+        'Gaming', 'Basketball', 'Soccer', 'Volleyball', 'Tennis', 'Gym', 'Running',
+        'Skating', 'Climbing', 'Hiking', 'Surfing', 'Cycling', 'Drawing',
+        'Photography', 'Cooking', 'Baking', 'Thrifting', 'Journaling', 'Reading',
+        'Coding', 'Music Production', 'Video Editing', 'Fashion', 'DIY',
+    ],
+    'on_my_mind': [
+        'Astrology', 'Psychology', 'Philosophy', 'Sustainability', 'Mental Health',
+        'Skincare', 'Spirituality', 'Finance', 'Language Learning', 'AI & Tech',
+        'Design', 'Writing', 'College/Career', 'Fitness Journey',
+    ],
+    'as_a_friend': [
+        'Good Listener', 'Brutally Honest', 'Hype Person', 'Low Maintenance',
+        'Planner', 'Spontaneous', 'Night Owl', 'Early Bird', 'Overthinker',
+        'Go With the Flow', 'Needs Alone Time', 'Always Down to Talk',
+        'Dry Humor', 'Keeps It Real',
+    ],
+    'online_persona': [
+        'Lurker', 'Content Creator', 'Meme Collector', 'Night Scroller',
+        'Occasional Poster', 'Story Watcher', 'Always in the Comments',
+        'Curated Feed', 'Posts and Deletes', 'Oversharer', 'Silent Supporter',
+        'Late Replier',
+    ],
+    'favorite_platform': [
+        'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
+        'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
+    ],
+    'least_favorite_platform': [
+        'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
+        'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
+    ],
+}
+
+ALL_CHIP_NAMES = {chip for chips in CHIPS_BY_CATEGORY.values() for chip in chips}
+
 PERSONA_CHOICES = [
     ('lurker', 'Lurker'),
     ('content_creator', 'Content Creator'),
@@ -207,6 +268,11 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
+
+    last_interest_card_category = models.CharField(
+        max_length=50, choices=CHIP_CATEGORY_CHOICES, null=True, blank=True,
+        help_text="Last interest category shown in discover feed card, for rotation."
+    )
 
     ver_changed_at = models.DateTimeField(null=True)
     current_ver = models.CharField(max_length=20, choices=VERSION_CHOICES, default='experiment')
@@ -640,17 +706,6 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return f'{self.subscriber} subscribed to {self.content_type} of {self.subscribed_to}'
-
-
-CHIP_CATEGORY_CHOICES = [
-    ('music_entertainment', 'Music & Entertainment'),
-    ('hobbies_activities', 'Hobbies & Activities'),
-    ('on_my_mind', 'On My Mind'),
-    ('as_a_friend', 'As a Friend'),
-    ('online_persona', 'Online Persona'),
-    ('favorite_platform', 'Favorite Platform'),
-    ('least_favorite_platform', 'Least Favorite Platform'),
-]
 
 
 class Interest(AdoorTimestampedModel, SafeDeleteModel):
