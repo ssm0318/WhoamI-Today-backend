@@ -12,7 +12,7 @@ from faker import Faker
 from account.models import FriendRequest, Connection, Interest, Persona
 from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
 from chat.models import ChatRoom, Message
-from check_in.models import CheckIn, Song
+from check_in.models import CheckIn, Poke, Song
 from comment.models import Comment
 from like.models import Like
 from note.models import Note
@@ -632,5 +632,47 @@ def set_seed(n):
     user_6.pronouns = "they/them"
     user_6.save()
     logging.info("adoor_6: has bio + pronouns for visibility testing") if DEBUG else None
+
+    # ===== CHECK-IN REACTIONS & NUDGE TEST DATA =====
+    from reaction.models import Reaction
+    from django.contrib.contenttypes.models import ContentType
+
+    checkin_ct = ContentType.objects.get_for_model(CheckIn)
+
+    # adoor_1 reacts to adoor_2's check-in (🔥 and 👍)
+    ci_2 = CheckIn.objects.filter(user=user_2, is_active=True).first()
+    if ci_2:
+        Reaction.objects.get_or_create(user=user_1, emoji='🔥', content_type=checkin_ct, object_id=ci_2.id)
+        Reaction.objects.get_or_create(user=user_1, emoji='👍', content_type=checkin_ct, object_id=ci_2.id)
+        logging.info("adoor_1 reacted 🔥 and 👍 to adoor_2's check-in") if DEBUG else None
+
+    # adoor_2 reacts to adoor_5's check-in (❤️)
+    ci_5 = CheckIn.objects.filter(user=user_5, is_active=True).first()
+    if ci_5:
+        Reaction.objects.get_or_create(user=user_2, emoji='❤️', content_type=checkin_ct, object_id=ci_5.id)
+        logging.info("adoor_2 reacted ❤️ to adoor_5's check-in") if DEBUG else None
+
+    # adoor_5 reacts to adoor_1's check-in (🤗 and 🚀)
+    ci_1 = CheckIn.objects.filter(user=user_1, is_active=True).first()
+    if ci_1:
+        Reaction.objects.get_or_create(user=user_5, emoji='🤗', content_type=checkin_ct, object_id=ci_1.id)
+        Reaction.objects.get_or_create(user=user_5, emoji='🚀', content_type=checkin_ct, object_id=ci_1.id)
+        logging.info("adoor_5 reacted 🤗 and 🚀 to adoor_1's check-in") if DEBUG else None
+
+    # Nudges: adoor_1 nudges adoor_3 for all 4 components (adoor_3 has empty check-in)
+    for comp in ['battery', 'mood', 'thought', 'song']:
+        Poke.objects.get_or_create(sender=user_1, receiver=user_3, component_type=comp)
+    logging.info("adoor_1 nudged adoor_3 for all 4 components") if DEBUG else None
+
+    # Nudges: adoor_2 nudges adoor_4 for mood and song only
+    Poke.objects.get_or_create(sender=user_2, receiver=user_4, component_type='mood')
+    Poke.objects.get_or_create(sender=user_2, receiver=user_4, component_type='song')
+    logging.info("adoor_2 nudged adoor_4 for mood and song") if DEBUG else None
+
+    # Nudges: adoor_5 nudges adoor_1 for thought (so adoor_1 sees a received nudge)
+    Poke.objects.get_or_create(sender=user_5, receiver=user_1, component_type='thought')
+    logging.info("adoor_5 nudged adoor_1 for thought") if DEBUG else None
+
+    logging.info("Check-in reactions & nudge test data created!") if DEBUG else None
 
     logging.info("=== Comprehensive seed data complete! ===") if DEBUG else None
