@@ -33,9 +33,9 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
 
     user = models.ForeignKey(User, related_name='check_in_set', on_delete=models.CASCADE)
     is_active = models.BooleanField(default=False)
-    mood = models.CharField(blank=True, null=True, max_length=5)
+    mood = models.JSONField(default=list, blank=True)  # Array of emoji strings, max 5
     social_battery = models.CharField(blank=True, null=True, max_length=30, choices=SOCIAL_BATTERY_CHOICES)
-    description = models.CharField(blank=True, null=True, max_length=88)
+    thought = models.CharField(blank=True, null=True, max_length=88)
     visibility = ArrayField(
         models.CharField(max_length=20),
         blank=True,
@@ -65,7 +65,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     _safedelete_policy = SOFT_DELETE_CASCADE
 
     def __str__(self):
-        return self.description or ""
+        return self.thought or ""
 
     def save(self, *args, **kwargs):
         now = timezone.now()
@@ -77,7 +77,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
                 self.battery_updated_at = now
             if self.mood:
                 self.mood_updated_at = now
-            if self.description:
+            if self.thought:
                 self.thought_updated_at = now
             # song_updated_at is set separately since Song is a separate model
         else:
@@ -92,7 +92,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
                     self.battery_updated_at = now
                 if self.mood != old.mood or self.mood_visibility != old.mood_visibility:
                     self.mood_updated_at = now
-                if self.description != old.description or self.thought_visibility != old.thought_visibility:
+                if self.thought != old.thought or self.thought_visibility != old.thought_visibility:
                     self.thought_updated_at = now
                 if self.song_visibility != old.song_visibility:
                     self.song_updated_at = now
@@ -105,7 +105,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
 
     @property
     def content(self):
-        return self.description or self.mood or ""
+        return self.thought or (', '.join(self.mood) if self.mood else "") or ""
 
     @property
     def type(self):

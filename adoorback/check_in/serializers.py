@@ -57,7 +57,7 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = CheckIn
         fields = ['id', 'created_at', 'is_active', 'mood',
-                  'social_battery', 'description', 'current_user_read', 'visibility',
+                  'social_battery', 'thought', 'current_user_read', 'visibility',
                   'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
                   'battery_updated_at', 'mood_updated_at', 'song_updated_at', 'thought_updated_at',
                   'track_id']
@@ -75,11 +75,19 @@ class MyCheckInSerializer(CheckInBaseSerializer):
         fields = CheckInBaseSerializer.Meta.fields
         extra_kwargs = {
             'visibility': {'required': False},
+            'mood': {'required': False},
             'battery_updated_at': {'read_only': True},
             'mood_updated_at': {'read_only': True},
             'song_updated_at': {'read_only': True},
             'thought_updated_at': {'read_only': True},
         }
+
+    def validate_mood(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("mood must be a list of emoji strings.")
+        if len(value) > 5:
+            raise serializers.ValidationError("Maximum 5 mood emojis allowed.")
+        return value
 
     def validate_visibility(self, value):
         if len(value) == 0:

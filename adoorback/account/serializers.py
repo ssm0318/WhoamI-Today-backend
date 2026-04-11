@@ -346,7 +346,7 @@ class FriendListSerializer(UserMinimalSerializer):
     unread_post_cnt = serializers.SerializerMethodField(read_only=True)
     check_in_id = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
-    description = serializers.SerializerMethodField(read_only=True)
+    thought = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     social_battery = serializers.SerializerMethodField(read_only=True)
     mood = serializers.SerializerMethodField(read_only=True)
@@ -432,10 +432,10 @@ class FriendListSerializer(UserMinimalSerializer):
             return song.track_id
         return None
 
-    def get_description(self, obj):
+    def get_thought(self, obj):
         check_in = self.check_in(obj)
         if check_in:
-            return check_in.description
+            return check_in.thought
         else:
             return None
             
@@ -502,7 +502,7 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'description',
+                                                      'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_ping_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']
 
