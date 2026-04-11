@@ -15,9 +15,9 @@ from rest_framework.views import APIView
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
-from like.serializers import InteractionSerializer, LikeSerializer
+from like.serializers import InteractionSerializer
 from note.models import Note, NoteImage
-from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
+from note.serializers import NoteSerializer
 
 
 class NoteCreate(generics.CreateAPIView):
@@ -111,74 +111,6 @@ class NoteDetail(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return Note.objects.all()
-
-
-class DefaultFriendNoteDetail(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = DefaultFriendNoteSerializer
-    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly, IsShared, IsNotBlocked]
-    parser_classes = (MultiPartParser, FormParser, JSONParser)
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_object(self):
-        queryset = self.filter_queryset(self.get_queryset())
-
-        pk = self.kwargs.get('pk')
-        obj = queryset.filter(pk=pk).first()
-
-        if obj is None:
-            raise Http404('No Note matches the given query.')
-
-        self.check_object_permissions(self.request, obj)
-
-        if not obj.is_audience(self.request.user):
-            raise PermissionDenied("Sorry, you do not have permission to view this note.")
-
-        return obj
-
-    def get_queryset(self):
-        return Note.objects.all()
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-
-        new_images = request.FILES.getlist('images', [])
-        instance.images.all().delete()  # hard delete images
-
-        for image in new_images:
-            n = NoteImage.objects.create(note=instance, image=image)
-        
-        self.perform_update(serializer)
-        return Response(serializer.data)
-
-    def patch(self, request, *args, **kwargs):
-        if 'visibility' in request.data:
-            return self.partial_update(request, *args, **kwargs)
-        return super().patch(request, *args, **kwargs)
-
-
-class NoteLikes(generics.ListAPIView):
-    '''
-    for default ver., visible to friends
-    '''
-    serializer_class = LikeSerializer
-    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        from like.models import Like
-        note_id = self.kwargs['pk']
-
-        note = get_object_or_404(Note, id=note_id)
-        if not note.is_audience(self.request.user):
-            raise PermissionDenied("Sorry, you do not have permission to view this note's likes.")
-
-        return Like.objects.filter(content_type__model='note', object_id=note_id)
 
 
 class NoteInteractions(generics.ListAPIView):

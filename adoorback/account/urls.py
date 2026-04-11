@@ -22,7 +22,6 @@ urlpatterns = [
     path('me/delete/', views.CurrentUserDelete.as_view(), name='current-user-delete'),
     path('me/profile/', views.CurrentUserProfile.as_view(), name='current-user-profile'),
     path('me/notes/', views.CurrentUserNoteList.as_view(), name='current-user-note-list'),
-    path('me/notes/default/', views.DefaultCurrentUserNoteList.as_view(), name='default-current-user-note-list'),
     path('me/responses/', views.CurrentUserResponseList.as_view(), name='current-user-response-list'),
     path('me/response-requests/', views.ReceivedResponseRequestList.as_view(), name='received-response-request-list'),
     path('me/search/', views.CurrentUserFriendSearch.as_view(), name='current-user-friend-search'),
@@ -47,7 +46,6 @@ urlpatterns = [
     path(r'search/', views.UserSearch.as_view(), name='user-search'),
     path('<str:username>/profile/', views.UserProfile.as_view(), name='user-detail'),
     path('<str:username>/notes/', views.UserNoteList.as_view(), name='user-note-list'),
-    path('<str:username>/notes/default/', views.DefaultUserNoteList.as_view(), name='default-user-note-list'),
     path('<str:username>/responses/', views.UserResponseList.as_view(), name='user-response-list'),
     path('<str:username>/friend-list/', views.FriendFriendList.as_view(), name='friend-friend-list'),
     path('<str:username>/all-posts/', views.UserAllPostList.as_view(), name='user-all-post-list'),
@@ -79,16 +77,12 @@ urlpatterns = [
     # FriendRequest related
     path('friend-requests/', views.UserFriendRequest.as_view(),
          name='user-friend-request-list'),
-    path('friend-requests/default/', views.UserFriendRequestDefault.as_view(), 
-         name='user-friend-request-default'),
     path('friend-requests/sent/', views.UserSentFriendRequestList.as_view(),
          name='user-sent-friend-request-list'),
     path('friend-requests/<int:pk>/', views.UserFriendRequestDestroy.as_view(),
          name='user-friend-request-destroy'),
     path('friend-requests/<int:pk>/respond/', views.UserFriendRequestUpdate.as_view(),
          name='user-friend-request-update'),
-    path('friend-requests/<int:pk>/respond/default/', views.UserFriendRequestUpdateDefault.as_view(), 
-         name='user-friend-request-update-default'),
 
     # Friend Recommend related
     path('recommended-friends/', views.UserRecommendedFriendsList.as_view(), name='user-recommended-friends-list'),

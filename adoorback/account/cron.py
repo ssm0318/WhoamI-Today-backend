@@ -52,23 +52,13 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
             noti_datetime = user_now.replace(hour=user.noti_time.hour, minute=user.noti_time.minute)
             time_diff = abs(user_now - noti_datetime)
             if time_diff <= timedelta(minutes=10):
-                # daily notification
-                if user.current_ver == 'default':
-                    noti = Notification.objects.create(user=user,
-                                                    target=admin,
-                                                    origin=admin,
-                                                    message_ko=f"{user.username}님, 오늘 친구들에게 한 마디 남겨보세요!",
-                                                    message_en=f"{user.username}, quick reminder to share something with your friends today!",
-                                                    redirect_url=f'/friends/feed')
-                    NotificationActor.objects.create(user=admin, notification=noti)
-                elif user.current_ver == 'experiment':
-                    noti = Notification.objects.create(user=user,
-                                                    target=admin,
-                                                    origin=admin,
-                                                    message_ko=f"{user.username}님, 오늘 친구들에게 한 마디 남겨보세요! — {daily_question_ko}",
-                                                    message_en=f"{user.username}, quick reminder to share something with your friends today! — {daily_question_en}",
-                                                    redirect_url=f'/questions/{daily_question_id}/new')
-                    NotificationActor.objects.create(user=admin, notification=noti)
+                noti = Notification.objects.create(user=user,
+                                                target=admin,
+                                                origin=admin,
+                                                message_ko=f"{user.username}님, 오늘 친구들에게 한 마디 남겨보세요! — {daily_question_ko}",
+                                                message_en=f"{user.username}, quick reminder to share something with your friends today! — {daily_question_en}",
+                                                redirect_url=f'/questions/{daily_question_id}/new')
+                NotificationActor.objects.create(user=admin, notification=noti)
 
         num_notis_after = Notification.objects.admin_only().count()
         print(f'{num_notis_after - num_notis_before} notifications sent!')

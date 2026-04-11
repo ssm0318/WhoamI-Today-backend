@@ -108,28 +108,3 @@ class NoteSerializer(BaseNoteSerializer):
         fields = BaseNoteSerializer.Meta.fields + ['current_user_reaction_id_list', 'like_reaction_user_sample', 'visibility', 'share_type']
 
 
-class DefaultFriendNoteSerializer(BaseNoteSerializer):
-    '''
-    Friend Note Serializer for default ver.
-    1) includes like count even when viewing others' notes
-    2) excludes reactions
-    '''
-    like_count = serializers.SerializerMethodField(read_only=True)
-    like_user_sample = serializers.SerializerMethodField(read_only=True)
-    visibility = VisibilityField(choices=['only_me', 'close_friends', 'friends', 'public'], required=True)
-
-    def validate_visibility(self, value):
-        if len(value) != 1:
-            raise serializers.ValidationError("Please select exactly one visibility option.")
-        return list(value)
-
-    def get_like_count(self, obj):
-        return obj.liked_user_ids.count()
-
-    def get_like_user_sample(self, obj):
-        recent_likes = obj.note_likes.order_by('-created_at')[:3]
-        recent_users = [like.user for like in recent_likes]
-        return UserMinimalSerializer(recent_users, many=True, context=self.context).data
-
-    class Meta(BaseNoteSerializer.Meta):
-        fields = BaseNoteSerializer.Meta.fields + ['like_count', 'like_user_sample', 'visibility', 'share_type']

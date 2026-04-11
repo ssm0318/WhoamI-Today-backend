@@ -50,15 +50,13 @@ ETHNICITY_CHOICES = (
 )
 
 VERSION_CHOICES = (
-    ('default', 'Default'),
-    ('experiment', 'Experiment'),
+    ('version_w', 'Version W'),
+    ('version_q', 'Version Q'),
 )
 
 USER_GROUP_CHOICES = (
-    ('group_1', 'Group 1: US / default (ver.R) -> experiment (ver.Q)'),
-    ('group_2', 'Group 2: US / experiment (ver.Q) -> default (ver.R)'),
-    ('group_3', 'Group 3: Korea / default (ver.R) -> experiment (ver.Q)'),
-    ('group_4', 'Group 4: Korea / experiment (ver.Q) -> default (ver.R)'),
+    ('group_w_first', 'Start with Version W, then swap to Q'),
+    ('group_q_first', 'Start with Version Q, then swap to W'),
 )
 
 USER_TYPE_CHOICES = (
@@ -275,8 +273,8 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     )
 
     ver_changed_at = models.DateTimeField(null=True)
-    current_ver = models.CharField(max_length=20, choices=VERSION_CHOICES, default='experiment')
-    user_group = models.CharField(max_length=20, choices=USER_GROUP_CHOICES, default='group_1')
+    current_ver = models.CharField(max_length=20, choices=VERSION_CHOICES, default='version_w')
+    user_group = models.CharField(max_length=20, choices=USER_GROUP_CHOICES, default='group_w_first')
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='indirect')
     invited_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, 
                                      related_name="invited_users")
