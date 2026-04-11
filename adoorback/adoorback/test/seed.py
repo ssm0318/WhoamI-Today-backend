@@ -147,7 +147,8 @@ def set_seed(n):
         '6UelLqGlWMcVH1E5c4H7lY',  # Watermelon Sugar - Harry Styles
     ]
 
-    emoji_list = ["🥳", "😳", "😤", "⚽️", "💥", "🍀", "🦁", "🕶️", "🧚🏻", "🐑"]
+    emoji_pool = ["🥳", "😳", "😤", "⚽️", "💥", "🍀", "🦁", "🕶️", "🧚🏻", "🐑",
+                   "😎", "🔥", "🎉", "💀", "😂", "🤔", "😴", "🙃", "✨", "🌈"]
     for i in range(n):
         user = random.choice(users)
         social_battery = random.choice(social_battery_options)
@@ -157,10 +158,13 @@ def set_seed(n):
             for check_in in original_check_in:
                 check_in.is_active = False
                 check_in.save()
+        # Generate 1-5 random mood emojis per user
+        num_emojis = random.randint(1, 5)
+        mood_emojis = random.sample(emoji_pool, num_emojis)
         checkin, created = CheckIn.objects.get_or_create(user=user,
                                                 social_battery=social_battery,
-                                                mood=emoji_list[i%10],
-                                                description=faker.text(max_nb_chars=20),
+                                                mood=mood_emojis,
+                                                thought=faker.text(max_nb_chars=20),
                                                 is_active=True)
         # Create Song separately
         Song.objects.filter(user=user, is_active=True).update(is_active=False)
@@ -574,7 +578,7 @@ def set_seed(n):
 
     # 1. User with partial check-in (only song, no status/battery)
     CheckIn.objects.filter(user=user_4, is_active=True).update(
-        social_battery=None, mood=None, description=None
+        social_battery=None, mood=[], thought=None
     )
     logging.info("adoor_4: partial check-in (song only)") if DEBUG else None
 
