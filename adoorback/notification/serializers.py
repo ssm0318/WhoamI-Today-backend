@@ -32,7 +32,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_recent_actors(self, obj):
         from account.serializers import UserMinimalSerializer
 
-        if obj.target and hasattr(obj.target, '_meta') and obj.target._meta.model_name == 'ping':
+        if obj.target and hasattr(obj.target, '_meta') and obj.target._meta.model_name == 'message':
             recent_actors = obj.actors.all()[:1]
         else:
             recent_actors = obj.actors.all()[:3]

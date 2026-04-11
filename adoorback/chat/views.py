@@ -1,167 +1,621 @@
-from collections import OrderedDict
-
-from django.db.models import F, Value, TextField
-from django.db.models.functions import Lower, Replace
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.models import OuterRef, Subquery, Count, Q
 from rest_framework import generics, exceptions
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
-from account.models import User
 from adoorback.utils.validators import adoor_exception_handler
-from chat.models import Message, ChatRoom, MessageLike
-import chat.serializers as cs
-from collections import OrderedDict
+from django.contrib.contenttypes.models import ContentType
+from .models import Message, ChatRoom, ChatRequest, MessageReaction, GroupReadCursor, MAX_GROUP_MEMBERS, get_or_create_chat_room, get_chat_room
+from .serializers import (
+    MessageSerializer, ChatRoomSerializer,
+    ChatRequestSerializer, ChatRequestUpdateSerializer,
+    MessageReactionSerializer,
+)
+
+User = get_user_model()
+
+
+def _get_chat_group_name(user_id_1, user_id_2):
+    ids = sorted([user_id_1, user_id_2])
+    return f"chat_{ids[0]}_{ids[1]}"
 
 
 class ChatRoomList(generics.ListAPIView):
-    """
-    Get all chat rooms of request user.
-    """
-    serializer_class = cs.ChatRoomSerializer
+    serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
     def get_queryset(self):
-        current_user = self.request.user
-        current_user.chat_rooms.all()
-        return current_user.chat_rooms.filter(messages__isnull=False).distinct()
+        user = self.request.user
+
+        latest_msg = Message.objects.filter(
+            chat_room=OuterRef('pk')
+        ).order_by('-created_at')
+
+        return ChatRoom.objects.filter(
+            Q(user1=user) | Q(user2=user) | Q(members=user)
+        ).distinct().annotate(
+            last_message_time=Subquery(latest_msg.values('created_at')[:1]),
+            last_message_content=Subquery(latest_msg.values('content')[:1]),
+            last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
+            unread_cnt=Count(
+                'messages',
+                filter=Q(messages__receiver=user, messages__is_read=False)
+            )
+        ).filter(
+            last_message_time__isnull=False
+        ).order_by('-last_message_time')
 
 
-class ReversePagination(PageNumberPagination):
-    page_size = 30
+class MessageList(generics.ListCreateAPIView):
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
 
-    def get_paginated_response(self, data):
-        return Response(OrderedDict([
-            ('count', self.page.paginator.count),
-            ('next', self.get_next_link()),
-            ('previous', self.get_previous_link()),
-            ('results', list(reversed(data)))
-        ]))
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        try:
+            connected_user = User.objects.get(id=self.kwargs.get('pk'))
+        except User.DoesNotExist:
+            raise exceptions.NotFound("Connected user not found")
+
+        chat_room = get_chat_room(connected_user, user)
+        if not chat_room:
+            self.oldest_unread_page = 1
+            return Message.objects.none()
+
+        qs = chat_room.messages.select_related(
+            'sender', 'parent', 'parent__sender'
+        ).prefetch_related('reactions').all()
+
+        oldest_unread = chat_room.messages.filter(receiver=user, is_read=False).order_by('id').first()
+
+        if oldest_unread:
+            oldest_position = Message.objects.filter(chat_room=chat_room, id__gte=oldest_unread.id).count()
+            pagination_size = getattr(settings, 'REST_FRAMEWORK', {}).get('PAGE_SIZE', 10)
+            page_number = (oldest_position - 1) // pagination_size + 1
+        else:
+            page_number = 1
+        self.oldest_unread_page = page_number
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+
+        try:
+            connected_user = User.objects.get(id=self.kwargs.get('pk'))
+        except User.DoesNotExist:
+            raise exceptions.NotFound("Connected user not found")
+        response.data['username'] = connected_user.username
+        response.data['oldest_unread_page'] = self.oldest_unread_page
+
+        paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)
+        if paginated_queryset:
+            msg_ids = [msg.id for msg in paginated_queryset]
+            Message.objects.filter(id__in=msg_ids, receiver=request.user, is_read=False).update(is_read=True)
+
+        return response
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        try:
+            connected_user = User.objects.get(id=self.kwargs.get('pk'))
+        except User.DoesNotExist:
+            raise exceptions.NotFound("Connected user not found")
+
+        if not user.is_connected(connected_user):
+            req = ChatRequest.objects.filter(
+                Q(requester=user, requestee=connected_user) |
+                Q(requester=connected_user, requestee=user)
+            ).first()
+
+            if req is None:
+                ChatRequest.objects.create(requester=user, requestee=connected_user)
+            elif req.accepted is False:
+                raise exceptions.PermissionDenied("This chat request was declined.")
+            elif req.accepted is None and req.requester != user:
+                raise exceptions.PermissionDenied(
+                    "You have a pending chat request from this user. Accept it first."
+                )
+
+        chat_room = get_or_create_chat_room(user, connected_user)
+
+        parent_id = self.request.data.get('parent')
+        parent = None
+        if parent_id:
+            parent = Message.objects.filter(id=parent_id, chat_room=chat_room).first()
+
+        # Shared content
+        extra = {}
+        shared_type = self.request.data.get('shared_content_type')
+        shared_id = self.request.data.get('shared_object_id')
+        if shared_type and shared_id:
+            try:
+                ct = ContentType.objects.get(model=shared_type)
+                extra['shared_content_type'] = ct
+                extra['shared_object_id'] = int(shared_id)
+            except ContentType.DoesNotExist:
+                pass
+
+        serializer.save(sender=user, receiver=connected_user, chat_room=chat_room, parent=parent, **extra)
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+
+        user = request.user
+        try:
+            connected_user = User.objects.get(id=self.kwargs.get('pk'))
+            chat_room = get_or_create_chat_room(user, connected_user)
+            unread_count = chat_room.messages.filter(receiver=user, is_read=False).count()
+        except User.DoesNotExist:
+            raise exceptions.NotFound("Connected user not found")
+
+        response.data['unread_count'] = unread_count
+
+        # Broadcast via WebSocket to the chat room
+        group_name = _get_chat_group_name(user.id, connected_user.id)
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {"type": "chat.message", "data": response.data},
+        )
+
+        # Broadcast to both users' chat list so the list page updates
+        print(f"[CHAT] Broadcasting chat list update for room between {user.id} and {connected_user.id}")
+        content = response.data.get('content') or response.data.get('emoji') or ''
+        timestamp = response.data.get('created_at', '')
+        receiver_unread = chat_room.messages.filter(receiver=connected_user, is_read=False).count()
+        for target_user, unread in [(connected_user, receiver_unread), (user, 0)]:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{target_user.id}_chat_list",
+                    {
+                        "type": "chat.list.update",
+                        "data": {
+                            "opponent_id": user.id if target_user == connected_user else connected_user.id,
+                            "last_message": content,
+                            "last_message_time": timestamp,
+                            "unread_count": unread,
+                        },
+                    },
+                )
+            except Exception as e:
+                print(f"[CHAT LIST BROADCAST ERROR] user={target_user.id}: {e}")
+
+        return response
 
 
-class ChatRoomDetail(generics.RetrieveAPIView):
-    serializer_class = cs.ChatRoomSerializer
+class MarkMessagesRead(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def post(self, request, pk):
+        user = request.user
+        try:
+            connected_user = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            raise exceptions.NotFound("Connected user not found")
+
+        chat_room = get_chat_room(user, connected_user)
+        if chat_room:
+            count = chat_room.messages.filter(receiver=user, is_read=False).update(is_read=True)
+            return Response({'marked_read': count})
+        return Response({'marked_read': 0})
+
+
+class MarkGroupMessagesRead(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def post(self, request, pk):
+        user = request.user
+        try:
+            room = ChatRoom.objects.get(id=pk, is_group=True)
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Group not found.")
+
+        if not room.members.filter(id=user.id).exists():
+            raise exceptions.PermissionDenied("You are not a member of this group.")
+
+        last_msg = room.messages.order_by('-created_at').first()
+        if last_msg:
+            cursor, _ = GroupReadCursor.objects.get_or_create(user=user, chat_room=room)
+            cursor.last_read_message = last_msg
+            cursor.save()
+
+        return Response({'status': 'ok'})
+
+
+class MessageReactionCreate(generics.CreateAPIView):
+    serializer_class = MessageReactionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        message = Message.objects.get(id=self.kwargs.get('message_id'))
+
+        chat_room = message.chat_room
+        if chat_room.is_group:
+            if not chat_room.members.filter(id=user.id).exists():
+                raise exceptions.PermissionDenied("You are not a participant in this chat.")
+        elif user != chat_room.user1 and user != chat_room.user2:
+            raise exceptions.PermissionDenied("You are not a participant in this chat.")
+
+        serializer.save(user=user, message=message)
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+
+        message = Message.objects.get(id=self.kwargs.get('message_id'))
+        chat_room = message.chat_room
+
+        # Broadcast reaction via WebSocket
+        serializer = MessageSerializer(message, context={'request': request})
+        channel_layer = get_channel_layer()
+
+        if chat_room.is_group:
+            group_name = f"chat_group_{chat_room.id}"
+        else:
+            group_name = _get_chat_group_name(request.user.id,
+                (chat_room.user2 if chat_room.user1 == request.user else chat_room.user1).id)
+
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "chat.reaction",
+                "data": {
+                    "action": "reaction",
+                    "message_id": message.id,
+                    "reactions": serializer.data['reactions'],
+                },
+            },
+        )
+
+        return response
+
+
+class MessageReactionDestroy(generics.DestroyAPIView):
+    serializer_class = MessageReactionSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_object(self):
-        chat_room_id = self.kwargs.get('pk')
-        current_user = self.request.user
-
         try:
-            chat_room = ChatRoom.objects.get(id=chat_room_id)
-        except ChatRoom.DoesNotExist:
-            raise exceptions.NotFound("ChatRoom not found")
+            reaction = MessageReaction.objects.get(id=self.kwargs.get('pk'), user=self.request.user)
+        except MessageReaction.DoesNotExist:
+            raise exceptions.NotFound("Reaction not found.")
+        return reaction
 
-        if current_user not in chat_room.users.all():
-            raise exceptions.PermissionDenied("You are not a member of this chat room")
+    def perform_destroy(self, instance):
+        message = instance.message
+        instance.delete()
 
-        return chat_room
+        chat_room = message.chat_room
+
+        # Broadcast reaction removal via WebSocket
+        channel_layer = get_channel_layer()
+
+        if chat_room.is_group:
+            group_name = f"chat_group_{chat_room.id}"
+        else:
+            other_user = chat_room.user2 if chat_room.user1 == self.request.user else chat_room.user1
+            group_name = _get_chat_group_name(self.request.user.id, other_user.id)
+
+        serializer = MessageSerializer(message, context={'request': self.request})
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {
+                "type": "chat.reaction",
+                "data": {
+                    "action": "reaction",
+                    "message_id": message.id,
+                    "reactions": serializer.data['reactions'],
+                },
+            },
+        )
 
 
-class ChatRoomFriendList(generics.ListAPIView):
-    """
-    Get chat rooms with a friend.
-    """
-    serializer_class = cs.ChatRoomSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        current_user = self.request.user
-        friend_id = self.kwargs.get('pk')
-        friend = User.objects.get(id=friend_id)
-
-        if not current_user.is_connected(friend):
-            raise exceptions.PermissionDenied("You are not friend with this user")
-
-        if (friend == current_user):
-            raise exceptions.PermissionDenied("You cannot chat with yourself")
-
-        chat_rooms = ChatRoom.objects.filter(users=current_user).filter(users=friend) \
-            .filter(messages__isnull=False).distinct()
-
-        return chat_rooms
-
-
-class ChatMessageSearch(generics.ListAPIView):
-    '''
-    Get chatroom messages that contain query.
-    '''
-    serializer_class = cs.SearchMessageSerializer
+class ChatRequestCreate(generics.ListCreateAPIView):
+    serializer_class = ChatRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
-        query = self.request.GET.get('query', '').replace(" ", "").lower()
+        return ChatRequest.objects.filter(
+            requestee=self.request.user, accepted__isnull=True
+        )
+
+    def perform_create(self, serializer):
         user = self.request.user
-        chat_rooms = user.chat_rooms.filter(active=True)
+        requestee_id = serializer.validated_data['requestee_id']
+        requestee = User.objects.get(id=requestee_id)
 
-        if query:
-            messages = Message.objects.filter(
-                chat_room__in=chat_rooms
-            ).annotate(
-                lower_content=Lower(Replace(F('content'), Value(" "), Value(""), output_field=TextField()))
-            ).filter(
-                lower_content__icontains=query
-            ).order_by('-timestamp')
-            return messages
+        if user.is_connected(requestee):
+            raise exceptions.ValidationError("You are already friends. No request needed.")
 
-        return Message.objects.none()
+        existing = ChatRequest.objects.filter(
+            Q(requester=user, requestee=requestee) |
+            Q(requester=requestee, requestee=user)
+        ).first()
+        if existing:
+            raise exceptions.ValidationError("A chat request already exists between these users.")
 
-
-class ChatMessagesListView(generics.ListAPIView):
-    serializer_class = cs.ChatRoomMessageSerializer
-    pagination_class = ReversePagination
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        try:
-            chat_room = ChatRoom.objects.get(id=self.kwargs.get('pk'))
-            if self.request.user not in chat_room.users.all():
-                raise exceptions.PermissionDenied("You are not in this chat room")
-        except ChatRoom.DoesNotExist:
-            raise exceptions.NotFound("Chat room not found")
-
-        chat_messages = Message.objects.filter(chat_room__id=self.kwargs.get('pk')).order_by('-id')
-        return chat_messages
+        serializer.save(requester=user, requestee=requestee)
 
 
-class OneOnOneChatRoomId(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated]
-
-    def retrieve(self, request, *args, **kwargs):
-        friend_id = kwargs.get('pk')
-        current_user = request.user
-
-        try:
-            friend = User.objects.get(id=friend_id)
-        except User.DoesNotExist:
-            raise exceptions.NotFound("Friend not found")
-        
-        if friend == current_user:
-            raise exceptions.PermissionDenied("You cannot chat with yourself")
-
-        if not current_user.is_connected(friend):
-            raise exceptions.PermissionDenied("You are not friends with this user")
-
-        try:
-            chat_room = ChatRoom.objects.filter(users=current_user).filter(users=friend).first()
-        except ChatRoom.DoesNotExist:
-            raise exceptions.NotFound("Chat room not found")
-
-        return Response({'chat_room_id': chat_room.id})
-
-
-class MessageLikeList(generics.ListAPIView):
-    serializer_class = cs.MessageLikeSerializer
+class ChatRequestSentList(generics.ListAPIView):
+    serializer_class = ChatRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
-        return MessageLike.objects.filter(message_id=self.kwargs.get('pk'))
+        return ChatRequest.objects.filter(requester=self.request.user)
+
+
+class ChatRequestUpdate(generics.UpdateAPIView):
+    serializer_class = ChatRequestUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        try:
+            return ChatRequest.objects.get(
+                id=self.kwargs.get('pk'),
+                requestee=self.request.user
+            )
+        except ChatRequest.DoesNotExist:
+            raise exceptions.NotFound("Chat request not found.")
+
+
+class MessageSearch(generics.ListAPIView):
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        query = self.request.query_params.get('q', '').strip()
+        if not query:
+            return Message.objects.none()
+
+        user_rooms = ChatRoom.objects.filter(Q(user1=user) | Q(user2=user))
+        return Message.objects.filter(
+            chat_room__in=user_rooms,
+            content__icontains=query,
+        ).select_related('sender', 'chat_room', 'chat_room__user1', 'chat_room__user2').order_by('-created_at')[:50]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        user = request.user
+
+        # Add opponent info to each result
+        for msg_data in response.data.get('results', response.data if isinstance(response.data, list) else []):
+            msg = Message.objects.select_related('chat_room__user1', 'chat_room__user2').filter(id=msg_data['id']).first()
+            if msg:
+                room = msg.chat_room
+                opponent = room.user2 if room.user1 == user else room.user1
+                msg_data['opponent'] = {'id': opponent.id, 'username': opponent.username}
+
+        return response
+
+
+# ---- Group Chat Views ----
+
+class GroupChatCreate(generics.CreateAPIView):
+    """POST /chat/groups/ — create a group chat with name + member IDs."""
+    serializer_class = ChatRoomSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        name = request.data.get('name', '')
+        member_ids = request.data.get('member_ids', [])
+
+        if not member_ids or len(member_ids) < 1:
+            raise exceptions.ValidationError("At least one other member is required.")
+
+        all_member_ids = list(set([user.id] + [int(m) for m in member_ids]))
+        if len(all_member_ids) > MAX_GROUP_MEMBERS:
+            raise exceptions.ValidationError(f"Group cannot exceed {MAX_GROUP_MEMBERS} members.")
+
+        members = User.objects.filter(id__in=all_member_ids)
+        if members.count() != len(all_member_ids):
+            raise exceptions.NotFound("One or more users not found.")
+
+        room = ChatRoom.objects.create(is_group=True, name=name)
+        room.members.set(members)
+
+        serializer = ChatRoomSerializer(room, context={'request': request})
+        return Response(serializer.data, status=201)
+
+
+class GroupChatUpdate(generics.GenericAPIView):
+    """GET/PATCH /chat/groups/{id}/ — get or update group chat."""
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get(self, request, pk):
+        user = request.user
+        try:
+            room = ChatRoom.objects.get(id=pk, is_group=True)
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Group not found.")
+
+        if not room.members.filter(id=user.id).exists():
+            raise exceptions.PermissionDenied("You are not a member of this group.")
+
+        serializer = ChatRoomSerializer(room, context={'request': request})
+        return Response(serializer.data)
+
+    def patch(self, request, pk):
+        user = request.user
+        try:
+            room = ChatRoom.objects.get(id=pk, is_group=True)
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Group not found.")
+
+        if not room.members.filter(id=user.id).exists():
+            raise exceptions.PermissionDenied("You are not a member of this group.")
+
+        # Update name
+        name = request.data.get('name')
+        if name is not None:
+            room.name = name
+            room.save()
+
+        # Add members
+        add_ids = request.data.get('add_member_ids', [])
+        if add_ids:
+            current_count = room.members.count()
+            if current_count + len(add_ids) > MAX_GROUP_MEMBERS:
+                raise exceptions.ValidationError(f"Group cannot exceed {MAX_GROUP_MEMBERS} members.")
+            new_members = User.objects.filter(id__in=add_ids)
+            room.members.add(*new_members)
+
+        # Remove members
+        remove_ids = request.data.get('remove_member_ids', [])
+        if remove_ids:
+            room.members.remove(*User.objects.filter(id__in=remove_ids))
+
+        serializer = ChatRoomSerializer(room, context={'request': request})
+        return Response(serializer.data)
+
+
+class GroupChatLeave(generics.GenericAPIView):
+    """POST /chat/groups/{id}/leave/ — leave a group chat."""
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def post(self, request, pk):
+        user = request.user
+        try:
+            room = ChatRoom.objects.get(id=pk, is_group=True)
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Group not found.")
+
+        if not room.members.filter(id=user.id).exists():
+            raise exceptions.PermissionDenied("You are not a member of this group.")
+
+        room.members.remove(user)
+
+        # Delete group if no members left
+        if room.members.count() == 0:
+            room.delete()
+
+        return Response({'status': 'left'})
+
+
+class GroupMessageList(generics.ListCreateAPIView):
+    """GET/POST /chat/groups/{id}/messages/ — list/send messages in a group."""
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        room_id = self.kwargs.get('pk')
+        try:
+            room = ChatRoom.objects.get(id=room_id, is_group=True)
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Group not found.")
+
+        if not room.members.filter(id=user.id).exists():
+            raise exceptions.PermissionDenied("You are not a member of this group.")
+
+        return room.messages.select_related(
+            'sender', 'parent', 'parent__sender'
+        ).prefetch_related('reactions').all()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        room_id = self.kwargs.get('pk')
+        room = ChatRoom.objects.get(id=room_id, is_group=True)
+
+        if not room.members.filter(id=user.id).exists():
+            raise exceptions.PermissionDenied("You are not a member of this group.")
+
+        parent_id = self.request.data.get('parent')
+        parent = None
+        if parent_id:
+            parent = Message.objects.filter(id=parent_id, chat_room=room).first()
+
+        serializer.save(sender=user, receiver=None, chat_room=room, parent=parent)
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+
+        room_id = self.kwargs.get('pk')
+        room = ChatRoom.objects.get(id=room_id, is_group=True)
+
+        # Broadcast to group WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"chat_group_{room_id}",
+            {"type": "chat.message", "data": response.data},
+        )
+
+        # Broadcast to all members' chat list (per-user unread count)
+        content = response.data.get('content') or response.data.get('emoji') or ''
+        timestamp = response.data.get('created_at', '')
+        for member in room.members.exclude(id=request.user.id):
+            cursor = GroupReadCursor.objects.filter(user=member, chat_room=room).first()
+            if cursor and cursor.last_read_message:
+                unread = room.messages.exclude(sender=member).filter(
+                    created_at__gt=cursor.last_read_message.created_at
+                ).count()
+            else:
+                unread = room.messages.exclude(sender=member).count()
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{member.id}_chat_list",
+                    {
+                        "type": "chat.list.update",
+                        "data": {
+                            "room_id": int(room_id),
+                            "is_group": True,
+                            "group_name": room.name,
+                            "last_message": content,
+                            "last_message_time": timestamp,
+                            "unread_count": unread,
+                        },
+                    },
+                )
+            except Exception:
+                pass
+
+        return response

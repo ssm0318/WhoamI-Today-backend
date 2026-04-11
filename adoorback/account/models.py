@@ -492,11 +492,26 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
 
     @property
     def unread_message_cnt(self):
-        chat_rooms = self.chat_rooms.all()
-        unread_cnt = 0
-        for room in chat_rooms:
-            unread_cnt += room.unread_cnt(self)
-        return unread_cnt
+        from chat.models import ChatRoom, Message, GroupReadCursor
+        from django.db.models import Q
+
+        # 1-on-1 unread
+        dm_rooms = ChatRoom.objects.filter(Q(user1=self) | Q(user2=self), is_group=False)
+        dm_unread = Message.objects.filter(chat_room__in=dm_rooms, receiver=self, is_read=False).count()
+
+        # Group unread (using read cursors)
+        group_rooms = ChatRoom.objects.filter(members=self, is_group=True)
+        group_unread = 0
+        for room in group_rooms:
+            cursor = GroupReadCursor.objects.filter(user=self, chat_room=room).first()
+            if cursor and cursor.last_read_message:
+                group_unread += room.messages.exclude(sender=self).filter(
+                    created_at__gt=cursor.last_read_message.created_at
+                ).count()
+            else:
+                group_unread += room.messages.exclude(sender=self).count()
+
+        return dm_unread + group_unread
 
     def most_recent_update(self, user):
         # most recent update time of self (among self's content that user can access)
@@ -873,13 +888,7 @@ def connection_removed(instance, **kwargs):
         pass
 
 
-    # 3. Inactivate chat rooms
-    from chat.models import ChatRoom
-    chat_rooms = ChatRoom.objects.filter(users__in=[user1, user2])
-    for chat_room in chat_rooms:
-        if chat_room.users.count() == 2:
-            chat_room.active = False
-            chat_room.save()
+    # 3. No-op: chat rooms use FK pairs, no deactivation needed on unfriend
 
 
 @transaction.atomic
@@ -933,11 +942,9 @@ def create_connection_noti(created, instance, **kwargs):
             user2_upgrade_time=timezone.now() if instance.requestee_choice == 'close_friend' else None,
         )
 
-        # make chat room
-        from chat.models import ChatRoom
-        chat_room = ChatRoom()
-        chat_room.save()
-        chat_room.users.add(requester, requestee)
+        # create chat room for new friends
+        from chat.models import get_or_create_chat_room
+        get_or_create_chat_room(requester, requestee)
 
     # make friend request notification invisible once requestee has responded
     instance.friend_request_targetted_notis.filter(user=requestee,
