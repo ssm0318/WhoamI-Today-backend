@@ -31,6 +31,15 @@ jobs:
             git checkout ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
 
+            echo "🧹 사전 디스크 정리 — build cache(>72h), dangling images, unused images(>168h)"
+            echo "    (volume은 절대 건드리지 않음 — DB 데이터 보존)"
+            df -h / | tail -1
+            docker builder prune -f --filter "until=72h" || true
+            docker image prune -f || true
+            docker image prune -af --filter "until=168h" || true
+            echo "    정리 후 디스크:"
+            df -h / | tail -1
+
             echo "🏗  새 이미지 빌드 (기존 컨테이너는 계속 동작 중 — 다운타임 없음)"
             docker compose -f docker-compose.production.yml build
 
@@ -40,4 +49,5 @@ jobs:
             echo "🔄 새 컨테이너 기동 (-d로 백그라운드 실행)"
             docker compose -f docker-compose.production.yml up -d
 
-            echo "✅ 배포 완료!"
+            echo "✅ 배포 완료! 최종 디스크 상태:"
+            df -h / | tail -1
