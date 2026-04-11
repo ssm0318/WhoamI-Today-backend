@@ -54,7 +54,7 @@ from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUs
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
-from note.serializers import NoteSerializer, DefaultFriendNoteSerializer
+from note.serializers import NoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Question, Response as _Response
@@ -664,20 +664,6 @@ class UserNoteList(generics.ListAPIView):
         return Note.objects.filter(id__in=note_ids).order_by('-created_at')
 
 
-class DefaultUserNoteList(generics.ListAPIView):
-    serializer_class = DefaultFriendNoteSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        user = self.request.user
-        all_notes = Note.objects.filter(author__username=self.kwargs.get('username'))
-        note_ids = [note.id for note in all_notes if note.is_audience(user)]
-        return Note.objects.filter(id__in=note_ids).order_by('-created_at')
-
-
 class UserResponseList(generics.ListAPIView):
     queryset = _Response.objects.all().order_by('-created_at')
     permission_classes = [IsAuthenticated]
@@ -1153,19 +1139,6 @@ class CurrentUserNoteList(generics.ListAPIView):
         return Note.objects.filter(author=user).order_by('-created_at')
     
 
-class DefaultCurrentUserNoteList(generics.ListAPIView):
-    queryset = Note.objects.all()
-    serializer_class = DefaultFriendNoteSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_queryset(self):
-        user = self.request.user
-        return Note.objects.filter(author=user).order_by('-created_at')
-
-
 class CurrentUserResponseList(generics.ListAPIView):
     queryset = _Response.objects.all()
     permission_classes = [IsAuthenticated]
@@ -1545,26 +1518,6 @@ class UserFriendRequest(generics.ListCreateAPIView):
                 raise PermissionDenied("Users belong to different groups, so a friend request cannot be sent.")
             raise e
 
-class UserFriendRequestDefault(generics.CreateAPIView):
-    queryset = FriendRequest.objects.all()
-    serializer_class = UserFriendRequestCreateSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["default_api"] = True
-        return context
-
-    @transaction.atomic
-    def perform_create(self, serializer):
-        if int(self.request.data.get('requester_id')) != int(self.request.user.id):
-            raise PermissionDenied("The requester must be yourself.")
-        serializer.save(accepted=None, requester_choice='friend')
-
-
 class UserSentFriendRequestList(generics.ListAPIView):
     queryset = FriendRequest.objects.all()
     serializer_class = UserFriendRequestSerializer
@@ -1682,10 +1635,6 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
 
 class UserFriendRequestUpdate(BaseUserFriendRequestUpdate):
     default_api = False
-
-
-class UserFriendRequestUpdateDefault(BaseUserFriendRequestUpdate):
-    default_api = True
 
 
 class UserRecommendedFriendsList(generics.ListAPIView):
@@ -1910,14 +1859,19 @@ class FriendFeed(generics.ListAPIView):
 
         page = self.paginate_queryset(notes_before_update)
         if page is not None:
-            serialized_data = DefaultFriendNoteSerializer(page, many=True, context=self.get_serializer_context()).data
+            serialized_data = NoteSerializer(page, many=True, context=self.get_serializer_context()).data
         else:
-            serialized_data = DefaultFriendNoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
+            serialized_data = NoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
 
         # mark all notes as read
         unread_note_ids = queryset.exclude(readers=request.user).values_list("id", flat=True)
         if unread_note_ids:
             request.user.read_notes.add(*unread_note_ids)
+
+        if page is not None:
+            return self.get_paginated_response(serialized_data)
+        return Response(serialized_data)
+
 
 class FullFriendFeed(generics.ListAPIView):
     permission_classes = [IsAuthenticated]

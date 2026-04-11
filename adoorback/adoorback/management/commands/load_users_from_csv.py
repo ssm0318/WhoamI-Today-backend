@@ -66,9 +66,9 @@ class Command(BaseCommand):
                 print(f"⛔ {email}: {reason}")
                 return None
 
-            user_group = f"group_{row['user_group']}"
+            user_group = row['user_group']
             user_country = row['country']
-            current_ver = 'default' if user_group in ['group_1', 'group_3'] else 'experiment'
+            current_ver = 'version_w' if user_group == 'group_w_first' else 'version_q'
 
             # ✅ Set language and timezone based on country
             if user_country == 'Korea':

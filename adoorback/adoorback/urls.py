@@ -45,6 +45,11 @@ urlpatterns = [
     path('api/ping/', include('ping.urls')),
 
     path('api/translate/', include('translate.urls')),
+
+    # Version Q endpoints (subset — only where behavior differs from W)
+    path('api/q/user/', include('account.urls_q')),
+    path('api/q/notes/', include('note.urls_q')),
+    path('api/q/qna/', include('qna.urls_q')),
 ]
 
 if settings.DEBUG:

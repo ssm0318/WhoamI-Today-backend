@@ -123,6 +123,40 @@ def get_ping_room(user1, user2):
     return PingRoom.objects.filter(user1=user1, user2=user2).first()
 
 
+class PingRequest(AdoorTimestampedModel, SafeDeleteModel):
+    """
+    Chat request for non-friends. Must be accepted before messaging is allowed.
+    Like Instagram's DM request system.
+    """
+    requester = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, related_name='sent_ping_requests'
+    )
+    requestee = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, related_name='received_ping_requests'
+    )
+    accepted = models.BooleanField(null=True, default=None)  # None=pending, True=accepted, False=declined
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['requester', 'requestee'],
+                condition=Q(deleted__isnull=True),
+                name='unique_ping_request'
+            ),
+            models.CheckConstraint(
+                check=~Q(requester=F('requestee')),
+                name='no_self_ping_request'
+            )
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        status = 'pending' if self.accepted is None else ('accepted' if self.accepted else 'declined')
+        return f"PingRequest from {self.requester} to {self.requestee} ({status})"
+
+
 @transaction.atomic
 @receiver(post_save, sender=Ping)
 def create_ping_notification(created, instance, **kwargs):
