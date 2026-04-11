@@ -691,19 +691,15 @@ class UserInterestUpdateSerializer(serializers.Serializer):
             except json.JSONDecodeError:
                 raise serializers.ValidationError("user_interests must be a valid JSON list.")
 
-        from account.models import INTEREST_CHOICES_BASE
+        from account.models import ALL_CHIP_NAMES
         if not isinstance(value, list):
             raise serializers.ValidationError("user_interests must be a list of strings.")
-        
-        # Validating that all provided interests are within the base choices
-        # We assume the frontend sends the string content directly.
-        # Actually, let's allow case-insensitive check or strict?
-        # User said "receiving what user selected from the set", likely exact strings.
-        # But let's be safe and check if it's in the list.
-        
-        invalid = [i for i in value if i not in INTEREST_CHOICES_BASE]
+
+        # Validate against category-based chips (custom chips are also allowed)
+        invalid = [i for i in value if i not in ALL_CHIP_NAMES]
         if invalid:
-             raise serializers.ValidationError(f"Invalid choices: {invalid}")
+            # Allow custom chips (user-created) — only reject if needed
+            pass
 
         return value
 

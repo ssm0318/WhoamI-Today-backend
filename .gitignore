@@ -49,6 +49,7 @@
 logs/
 
 # python
+.python-version
 adoorback/.python-version
 
 # Google translation

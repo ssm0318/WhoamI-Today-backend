@@ -60,7 +60,7 @@ from qna.models import ResponseRequest
 from qna.models import Question, Response as _Response
 from qna.serializers import ResponseSerializer, DailyQuestionSerializer
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
-from account.models import PERSONA_CHOICES, INTEREST_CHOICES_BASE
+from account.models import INTEREST_CHOICES_BASE, CHIP_CATEGORY_CHOICES, CHIP_CATEGORY_DESCRIPTIONS, CHIPS_BY_CATEGORY, ALL_CHIP_NAMES
 from tracking.utils import clean_session_key
 import random
 
@@ -890,17 +890,48 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                                 p.delete()
 
             if interest_str is not None:
-                old_interests = list(updated_user.user_interests.all())
-                interest_tags = parse_hashtags_or_list(interest_str)
-                interest_instances = [get_or_create_normalized_tag(Interest, tag) for tag in interest_tags]
-                updated_user.user_interests.set(interest_instances)
+                interest_category = self.request.data.get('interest_category')
 
-                # Orphan cleanup
-                from account.models import INTEREST_CHOICES_BASE
-                predefined_interests = {normalize_tag(val) for val in INTEREST_CHOICES_BASE}
-                for i in old_interests:
-                    if i not in interest_instances:
-                        if normalize_tag(i.content) not in predefined_interests:
+                if interest_category and interest_category in dict(CHIP_CATEGORY_CHOICES):
+                    # Category-specific update: only modify interests for this category
+                    if isinstance(interest_str, str):
+                        try:
+                            interest_tags = json.loads(interest_str)
+                        except json.JSONDecodeError:
+                            interest_tags = parse_hashtags_or_list(interest_str)
+                    else:
+                        interest_tags = interest_str if isinstance(interest_str, list) else parse_hashtags_or_list(interest_str)
+
+                    # Remove user's existing interests in this category
+                    old_category_interests = list(updated_user.user_interests.filter(category=interest_category))
+                    for i in old_category_interests:
+                        updated_user.user_interests.remove(i)
+                        if i.users.count() == 0:
+                            i.delete()
+
+                    # Add new interests for this category (preserve exact chip names)
+                    for tag in interest_tags:
+                        # Handle SafeDelete: check all_with_deleted to avoid unique constraint issues
+                        try:
+                            interest = Interest.objects.all_with_deleted().get(content=tag)
+                            if interest.deleted:
+                                interest.undelete()
+                        except Interest.DoesNotExist:
+                            interest = Interest.objects.create(content=tag, category=interest_category)
+                        if interest.category != interest_category:
+                            interest.category = interest_category
+                            interest.save()
+                        updated_user.user_interests.add(interest)
+                else:
+                    # Full replacement (backward compatible)
+                    old_interests = list(updated_user.user_interests.all())
+                    interest_tags = parse_hashtags_or_list(interest_str)
+                    interest_instances = [get_or_create_normalized_tag(Interest, tag) for tag in interest_tags]
+                    updated_user.user_interests.set(interest_instances)
+
+                    # Orphan cleanup
+                    for i in old_interests:
+                        if i not in interest_instances:
                             if i.users.count() == 0:
                                 i.delete()
 
@@ -1016,6 +1047,22 @@ class CurrentUserChipsUpdate(generics.GenericAPIView):
             return Response(status=status.HTTP_400_BAD_REQUEST, data={"error": "chips_by_category must be a dict"})
         update_user_interests_logic(request.user, chips_by_category)
         return Response(status=status.HTTP_200_OK, data={"message": "Chips updated"})
+
+
+class ChipCategoriesView(APIView):
+    """Return all chip category definitions (single source of truth)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, _request):
+        result = []
+        for key, label in CHIP_CATEGORY_CHOICES:
+            result.append({
+                'key': key,
+                'label': label,
+                'description': CHIP_CATEGORY_DESCRIPTIONS.get(key, ''),
+                'chips': CHIPS_BY_CATEGORY.get(key, []),
+            })
+        return Response(result)
 
 
 class CustomChipListCreate(generics.ListCreateAPIView):
@@ -2265,26 +2312,54 @@ class DiscoverFeedView(generics.ListAPIView):
         
         original_count = len(results)
 
-        # Inject Interest
+        # Inject Interest (single category, rotating)
         if original_count >= 5:
-            # Insert at 6th (idx 5) or 7th (idx 6)
             i_idx = random.choice([5, 6])
-            
-            # Fetch user's selected interests
-            user_interests = request.user.user_interests.all()
-            user_interest_contents = {i.content for i in user_interests}
-            
+
+            user = request.user
+            user_interests = user.user_interests.all()
+            all_categories = [key for key, _ in CHIP_CATEGORY_CHOICES]
+
+            # Count user's selections per category
+            selection_counts = {}
+            for cat_key in all_categories:
+                selection_counts[cat_key] = user_interests.filter(category=cat_key).count()
+
+            # Sort by fewest selections (ascending), then shuffle ties
+            sorted_cats = sorted(all_categories, key=lambda c: (selection_counts[c], random.random()))
+
+            # Pick first category that differs from last shown; fall back to first if all same
+            last_shown = user.last_interest_card_category
+            chosen_category = sorted_cats[0]
+            if last_shown and len(sorted_cats) > 1:
+                for cat in sorted_cats:
+                    if cat != last_shown:
+                        chosen_category = cat
+                        break
+
+            # Save chosen category for next rotation
+            user.last_interest_card_category = chosen_category
+            user.save(update_fields=['last_interest_card_category'])
+
+            # Build interest list for the chosen category
+            category_label = dict(CHIP_CATEGORY_CHOICES)[chosen_category]
+            category_interests = user_interests.filter(category=chosen_category)
+            user_interest_contents = {i.content for i in category_interests}
+
+            # Use CHIPS_BY_CATEGORY (matching frontend chips.ts)
+            category_chips = CHIPS_BY_CATEGORY.get(chosen_category, [])
+            category_chips_set = set(category_chips)
+
             interest_list = []
-            default_interests_set = set(INTEREST_CHOICES_BASE)
-            for interest in INTEREST_CHOICES_BASE:
+            for chip_name in category_chips:
                 interest_list.append({
-                    "content": interest,
-                    "is_selected": interest in user_interest_contents
+                    "content": chip_name,
+                    "is_selected": chip_name in user_interest_contents
                 })
-            
-            # Add custom interests
-            for user_interest in user_interests:
-                if user_interest.content not in default_interests_set:
+
+            # Add custom interests in this category (user-created, not in predefined chips)
+            for user_interest in category_interests:
+                if user_interest.content not in category_chips_set:
                     interest_list.append({
                         "content": user_interest.content,
                         "is_selected": True
@@ -2293,48 +2368,12 @@ class DiscoverFeedView(generics.ListAPIView):
             interest_card = {
                 "type": "Interest",
                 "body": {
+                    "category": chosen_category,
+                    "category_label": category_label,
                     "list": interest_list
                 }
             }
             results.insert(min(len(results), i_idx), interest_card)
-
-        # Inject Persona
-        if original_count >= 9:
-            # Insert at 12th (idx 11) or 13th (idx 12)
-            p_idx = random.choice([11, 12])
-            
-            # Fetch user's selected personas
-            user_personas = request.user.user_personas.all()
-            user_persona_contents = {p.content for p in user_personas}
-
-            persona_list = []
-            default_labels_formatted = set()
-            for key, label in PERSONA_CHOICES:
-                # Format label to match DB content (remove spaces and #)
-                formatted_content = label.replace(' ', '').replace('#', '')
-                default_labels_formatted.add(formatted_content)
-                persona_list.append({
-                    "key": key, 
-                    "label": label,
-                    "is_selected": formatted_content in user_persona_contents
-                })
-            
-            # Add custom personas
-            for user_persona in user_personas:
-                if user_persona.content not in default_labels_formatted:
-                    persona_list.append({
-                        "key": None,
-                        "label": user_persona.content, # Custom PascalCase content
-                        "is_selected": True
-                    })
-
-            persona_card = {
-                "type": "Persona",
-                "body": {
-                    "list": persona_list
-                }
-            }
-            results.insert(min(len(results), p_idx), persona_card)
 
         # Build music_tracks for the first page only
         music_tracks_data = []
