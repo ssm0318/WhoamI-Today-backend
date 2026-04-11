@@ -12,7 +12,7 @@ from faker import Faker
 from account.models import FriendRequest, Connection, Interest, Persona
 from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
 from chat.models import ChatRoom, Message
-from check_in.models import CheckIn, Song
+from check_in.models import CheckIn, Poke, Song
 from comment.models import Comment
 from like.models import Like
 from note.models import Note
@@ -147,7 +147,8 @@ def set_seed(n):
         '6UelLqGlWMcVH1E5c4H7lY',  # Watermelon Sugar - Harry Styles
     ]
 
-    emoji_list = ["🥳", "😳", "😤", "⚽️", "💥", "🍀", "🦁", "🕶️", "🧚🏻", "🐑"]
+    emoji_pool = ["🥳", "😳", "😤", "⚽️", "💥", "🍀", "🦁", "🕶️", "🧚🏻", "🐑",
+                   "😎", "🔥", "🎉", "💀", "😂", "🤔", "😴", "🙃", "✨", "🌈"]
     for i in range(n):
         user = random.choice(users)
         social_battery = random.choice(social_battery_options)
@@ -157,10 +158,13 @@ def set_seed(n):
             for check_in in original_check_in:
                 check_in.is_active = False
                 check_in.save()
+        # Generate 1-5 random mood emojis per user
+        num_emojis = random.randint(1, 5)
+        mood_emojis = random.sample(emoji_pool, num_emojis)
         checkin, created = CheckIn.objects.get_or_create(user=user,
                                                 social_battery=social_battery,
-                                                mood=emoji_list[i%10],
-                                                description=faker.text(max_nb_chars=20),
+                                                mood=mood_emojis,
+                                                thought=faker.text(max_nb_chars=20),
                                                 is_active=True)
         # Create Song separately
         Song.objects.filter(user=user, is_active=True).update(is_active=False)
@@ -574,7 +578,7 @@ def set_seed(n):
 
     # 1. User with partial check-in (only song, no status/battery)
     CheckIn.objects.filter(user=user_4, is_active=True).update(
-        social_battery=None, mood=None, description=None
+        social_battery=None, mood=[], thought=None
     )
     logging.info("adoor_4: partial check-in (song only)") if DEBUG else None
 
@@ -628,5 +632,90 @@ def set_seed(n):
     user_6.pronouns = "they/them"
     user_6.save()
     logging.info("adoor_6: has bio + pronouns for visibility testing") if DEBUG else None
+
+    # ===== CHECK-IN REACTIONS & NUDGE TEST DATA =====
+    from reaction.models import Reaction
+    from django.contrib.contenttypes.models import ContentType
+
+    checkin_ct = ContentType.objects.get_for_model(CheckIn)
+
+    # adoor_1 reacts to adoor_2's check-in (🔥 and 👍)
+    ci_2 = CheckIn.objects.filter(user=user_2, is_active=True).first()
+    if ci_2:
+        Reaction.objects.get_or_create(user=user_1, emoji='🔥', content_type=checkin_ct, object_id=ci_2.id)
+        Reaction.objects.get_or_create(user=user_1, emoji='👍', content_type=checkin_ct, object_id=ci_2.id)
+        logging.info("adoor_1 reacted 🔥 and 👍 to adoor_2's check-in") if DEBUG else None
+
+    # adoor_2 reacts to adoor_5's check-in (❤️)
+    ci_5 = CheckIn.objects.filter(user=user_5, is_active=True).first()
+    if ci_5:
+        Reaction.objects.get_or_create(user=user_2, emoji='❤️', content_type=checkin_ct, object_id=ci_5.id)
+        logging.info("adoor_2 reacted ❤️ to adoor_5's check-in") if DEBUG else None
+
+    # adoor_5 reacts to adoor_1's check-in (🤗 and 🚀)
+    ci_1 = CheckIn.objects.filter(user=user_1, is_active=True).first()
+    if ci_1:
+        Reaction.objects.get_or_create(user=user_5, emoji='🤗', content_type=checkin_ct, object_id=ci_1.id)
+        Reaction.objects.get_or_create(user=user_5, emoji='🚀', content_type=checkin_ct, object_id=ci_1.id)
+        logging.info("adoor_5 reacted 🤗 and 🚀 to adoor_1's check-in") if DEBUG else None
+
+    # Nudges: adoor_1 nudges adoor_3 for all 4 components (adoor_3 has empty check-in)
+    for comp in ['battery', 'mood', 'thought', 'song']:
+        Poke.objects.get_or_create(sender=user_1, receiver=user_3, component_type=comp)
+    logging.info("adoor_1 nudged adoor_3 for all 4 components") if DEBUG else None
+
+    # Nudges: adoor_2 nudges adoor_4 for mood and song only
+    Poke.objects.get_or_create(sender=user_2, receiver=user_4, component_type='mood')
+    Poke.objects.get_or_create(sender=user_2, receiver=user_4, component_type='song')
+    logging.info("adoor_2 nudged adoor_4 for mood and song") if DEBUG else None
+
+    # Nudges: adoor_5 nudges adoor_1 for thought (so adoor_1 sees a received nudge)
+    Poke.objects.get_or_create(sender=user_5, receiver=user_1, component_type='thought')
+    logging.info("adoor_5 nudged adoor_1 for thought") if DEBUG else None
+
+    logging.info("Check-in reactions & nudge test data created!") if DEBUG else None
+
+    # ===== CHECK-IN VISIBILITY TEST DATA =====
+    from datetime import timedelta
+
+    # adoor_5: mood set to "only_me" (should be hidden from friends)
+    ci_5 = CheckIn.objects.filter(user=user_5, is_active=True).first()
+    if ci_5:
+        ci_5.mood_visibility = 'only_me'
+        ci_5.thought_visibility = 'close_friends'
+        ci_5.save()
+        logging.info("adoor_5: mood=only_me, thought=close_friends") if DEBUG else None
+
+    # adoor_6: battery set to "public", thought to "only_me"
+    ci_6 = CheckIn.objects.filter(user=user_6, is_active=True).first()
+    if ci_6:
+        ci_6.battery_visibility = 'public'
+        ci_6.thought_visibility = 'only_me'
+        ci_6.save()
+        logging.info("adoor_6: battery=public, thought=only_me") if DEBUG else None
+
+    # adoor_7: simulate auto-archive by setting battery_updated_at to 13 hours ago
+    ci_7 = CheckIn.objects.filter(user=user_7, is_active=True).first()
+    if ci_7:
+        ci_7.battery_updated_at = timezone.now() - timedelta(hours=13)
+        ci_7.mood_updated_at = timezone.now() - timedelta(hours=13)
+        # Use update to bypass save() which would reset timestamps
+        CheckIn.objects.filter(pk=ci_7.pk).update(
+            battery_updated_at=timezone.now() - timedelta(hours=13),
+            mood_updated_at=timezone.now() - timedelta(hours=13),
+        )
+        logging.info("adoor_7: battery and mood auto-archived (13h old)") if DEBUG else None
+
+    # adoor_8: all components set to "public"
+    ci_8 = CheckIn.objects.filter(user=u8, is_active=True).first()
+    if ci_8:
+        ci_8.battery_visibility = 'public'
+        ci_8.mood_visibility = 'public'
+        ci_8.thought_visibility = 'public'
+        ci_8.song_visibility = 'public'
+        ci_8.save()
+        logging.info("adoor_8: all components public") if DEBUG else None
+
+    logging.info("Check-in visibility test data created!") if DEBUG else None
 
     logging.info("=== Comprehensive seed data complete! ===") if DEBUG else None

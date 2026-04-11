@@ -346,7 +346,7 @@ class FriendListSerializer(UserMinimalSerializer):
     unread_post_cnt = serializers.SerializerMethodField(read_only=True)
     check_in_id = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
-    description = serializers.SerializerMethodField(read_only=True)
+    thought = serializers.SerializerMethodField(read_only=True)
     unread_ping_count = serializers.SerializerMethodField(read_only=True)
     social_battery = serializers.SerializerMethodField(read_only=True)
     mood = serializers.SerializerMethodField(read_only=True)
@@ -427,31 +427,41 @@ class FriendListSerializer(UserMinimalSerializer):
         return None
 
     def get_track_id(self, obj):
+        if not self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
+            return None
         song = obj.song_set.filter(is_active=True).first()
         if song:
             return song.track_id
         return None
 
-    def get_description(self, obj):
+    def _is_component_visible(self, obj, visibility_field, updated_at_field):
+        """Check if a component should be visible to the current viewer."""
         check_in = self.check_in(obj)
-        if check_in:
-            return check_in.description
-        else:
+        if not check_in:
+            return False
+        effective_vis = self._component_visibility(check_in, visibility_field, updated_at_field)
+        if effective_vis == 'only_me':
+            user = self.context.get('request', None).user
+            return user == obj  # Only visible to the owner
+        return True
+
+    def get_thought(self, obj):
+        if not self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
             return None
-            
+        check_in = self.check_in(obj)
+        return check_in.thought if check_in else None
+
     def get_social_battery(self, obj):
-        check_in = self.check_in(obj)
-        if check_in:
-            return check_in.social_battery
-        else:
+        if not self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
             return None
+        check_in = self.check_in(obj)
+        return check_in.social_battery if check_in else None
 
     def get_mood(self, obj):
-        check_in = self.check_in(obj)
-        if check_in:
-            return check_in.mood
-        else:
+        if not self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
             return None
+        check_in = self.check_in(obj)
+        return check_in.mood if check_in else None
 
     def _component_visibility(self, check_in, visibility_field, updated_at_field):
         """Return component visibility, applying auto-archive if >12h old."""
@@ -502,7 +512,7 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'description',
+                                                      'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_ping_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']
 
