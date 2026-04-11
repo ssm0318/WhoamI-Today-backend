@@ -38,3 +38,15 @@ CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
 
 FRONTEND_URL = 'http://localhost:3000'
+
+# Use local Redis by default for WebSocket channel layer
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}

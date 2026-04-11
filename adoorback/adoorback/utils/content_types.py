@@ -52,9 +52,9 @@ def get_note_type():
     return ContentType.objects.get_for_model(Note)
 
 
-def get_ping_type():
-    from ping.models import Ping
-    return ContentType.objects.get_for_model(Ping)
+def get_message_type():
+    from chat.models import Message
+    return ContentType.objects.get_for_model(Message)
 
 
 def get_generic_relation_type(model):
@@ -67,7 +67,7 @@ def get_generic_relation_type(model):
         return get_question_type()
     elif model == 'Note':
         return get_note_type()
-    elif model == 'Ping':
-        return get_ping_type()
+    elif model == 'Message':
+        return get_message_type()
     else:
         return None

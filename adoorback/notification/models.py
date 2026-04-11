@@ -109,12 +109,12 @@ class NotificationManager(SafeDeleteManager):
                                                message_ko=message_ko, message_en=message_en)
             NotificationActor.objects.create(user=actor, notification=noti)
 
-    def find_recent_ping(self, user, actor):
+    def find_recent_message(self, user, actor):
         cutoff = timezone.now() - timezone.timedelta(minutes=5)
         return self.filter(
             user=user,
             actors__in=[actor],
-            target_type__model='ping',
+            target_type__model='message',
             is_read=False,
             is_visible=True,
             notification_updated_at__gte=cutoff

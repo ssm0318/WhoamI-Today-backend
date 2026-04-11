@@ -42,7 +42,6 @@ urlpatterns = [
     path('api/', include('custom_fcm.urls')), 
     path('api/tracking/', include('tracking.urls')),
     path('api/chat/', include('chat.urls')),
-    path('api/ping/', include('ping.urls')),
 
     path('api/translate/', include('translate.urls')),
 

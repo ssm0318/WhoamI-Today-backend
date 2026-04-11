@@ -11,7 +11,7 @@ from faker import Faker
 
 from account.models import FriendRequest, Connection, Interest, Persona
 from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
-from chat.models import ChatRoom, Message
+from chat.models import ChatRoom, Message, get_or_create_chat_room
 from check_in.models import CheckIn, Poke, Song
 from comment.models import Comment
 from like.models import Like
@@ -236,12 +236,7 @@ def set_seed(n):
         Connection.objects.bulk_create(connections)
 
     for u in [user_1, user_3, user_4, user_5, user_6]:
-        # Check if chat room already exists with these two users
-        existing_chat_room = ChatRoom.objects.filter(users=user_2).filter(users=u)
-        if not existing_chat_room.exists():
-            chat_room = ChatRoom()
-            chat_room.save()
-            chat_room.users.add(user_2, u)
+        get_or_create_chat_room(user_2, u)
 
     # Add more friends for adoor_1 (for testing new posts, poke, etc.)
     for friend_user in [user_3, user_4, user_5, user_6]:
@@ -491,12 +486,15 @@ def set_seed(n):
 
     # Seed Chat Messages
     for chat_room in ChatRoom.objects.all():
-        participants = chat_room.users.all()
-        for p in participants:
-            timestamp = timezone.now()
+        users = [chat_room.user1, chat_room.user2]
+        for sender in users:
+            receiver = chat_room.user2 if sender == chat_room.user1 else chat_room.user1
             for _ in range(random.randint(3, 5)):
-                Message.objects.get_or_create(sender=p, content=faker.text(max_nb_chars=50), timestamp=timestamp,
-                                              chat_room=chat_room)
+                Message.objects.create(
+                    sender=sender, receiver=receiver,
+                    content=faker.text(max_nb_chars=50),
+                    chat_room=chat_room
+                )
     logging.info(
         f"{Message.objects.count()} Message(s) created!") if DEBUG else None
 

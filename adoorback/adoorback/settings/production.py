@@ -67,3 +67,15 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 # FRONTEND_URL = 'https://whoami.gina-park.site'
 FRONTEND_URL = 'https://whoami-test-group.gina-park.site'
+
+# Redis for WebSocket channel layer (docker service name = redis)
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}

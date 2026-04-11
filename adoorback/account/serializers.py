@@ -20,7 +20,7 @@ from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
 from notification.models import Notification
-from ping.models import get_ping_room, get_or_create_ping_room
+from chat.models import get_chat_room, get_or_create_chat_room
 from qna.models import Response
 
 from django_countries.serializers import CountryFieldMixin
@@ -116,7 +116,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
-                  'has_changed_pw']
+                  'has_changed_pw', 'unread_message_cnt']
         extra_kwargs = {'password': {'write_only': True}}
 
 
@@ -199,7 +199,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     connection_status = serializers.SerializerMethodField(read_only=True)
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
-    unread_ping_count = serializers.SerializerMethodField(read_only=True)
+    unread_chat_count = serializers.SerializerMethodField(read_only=True)
     friend_count = serializers.SerializerMethodField(read_only=True)
     mutual_personas = serializers.SerializerMethodField(read_only=True)
     mutual_interests = serializers.SerializerMethodField(read_only=True)
@@ -273,15 +273,15 @@ class UserProfileSerializer(UserMinimalSerializer):
         user = self.context.get('request').user
         return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
     
-    def get_unread_ping_count(self, obj):
+    def get_unread_chat_count(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             user = request.user
             if user == obj:
                 return 0
-            ping_room = get_ping_room(user, obj)
-            if ping_room:
-                return ping_room.pings.filter(receiver=user, is_read=False).count()
+            chat_room = get_chat_room(user, obj)
+            if chat_room:
+                return chat_room.messages.filter(receiver=user, is_read=False).count()
         return 0
     
     def get_friendship_level(self, obj):
@@ -330,7 +330,7 @@ class UserProfileSerializer(UserMinimalSerializer):
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
                                                       'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
-                                                      'unread_ping_count', 'connection_status',
+                                                      'unread_chat_count', 'unread_message_cnt', 'connection_status',
                                                       'friend_count', 'email_verified',
                                                       'mutual_personas', 'mutual_interests',
                                                       'friendship_level']
@@ -347,7 +347,7 @@ class FriendListSerializer(UserMinimalSerializer):
     check_in_id = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
     thought = serializers.SerializerMethodField(read_only=True)
-    unread_ping_count = serializers.SerializerMethodField(read_only=True)
+    unread_chat_count = serializers.SerializerMethodField(read_only=True)
     social_battery = serializers.SerializerMethodField(read_only=True)
     mood = serializers.SerializerMethodField(read_only=True)
     battery_visibility = serializers.SerializerMethodField(read_only=True)
@@ -402,13 +402,13 @@ class FriendListSerializer(UserMinimalSerializer):
         return unread_notes + unread_responses
 
     def get_unread_cnt(self, obj):
-        from chat.models import ChatRoom
+        from chat.models import get_chat_room
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             user = request.user
-            chat_room = ChatRoom.objects.filter(users__in=[user, obj]).annotate(user_count=Count('users')).filter(user_count=2).first()
+            chat_room = get_chat_room(user, obj)
             if chat_room:
-                return chat_room.unread_cnt(user)
+                return chat_room.messages.filter(receiver=user, is_read=False).count()
         return 0
 
     def check_in(self, obj):
@@ -501,19 +501,19 @@ class FriendListSerializer(UserMinimalSerializer):
         notes = NoteSerializer(note_queryset, many=True, read_only=True, context=self.context).data
         return notes
     
-    def get_unread_ping_count(self, obj):
+    def get_unread_chat_count(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             user = request.user
-            ping_room = get_or_create_ping_room(user, obj)
-            return ping_room.pings.filter(receiver=user, is_read=False).count()
+            chat_room = get_or_create_chat_room(user, obj)
+            return chat_room.messages.filter(receiver=user, is_read=False).count()
         return 0
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
                                                       'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'thought',
-                                                      'unread_ping_count', 'social_battery', 'mood',
+                                                      'unread_chat_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']
 
 
@@ -661,15 +661,16 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
         return user.is_connected(obj)
 
     def get_chat_room_id(self, obj):
-        from chat.models import ChatRoom
+        from chat.models import get_chat_room
         user = self.context.get('request', None).user
 
         if (obj.id not in user.connected_user_ids) or (obj == user):
             return None
 
-        chat_room = ChatRoom.objects.filter(users=user).filter(users=obj) \
-            .filter(messages__isnull=False).first()
-        return chat_room.id if chat_room else None
+        chat_room = get_chat_room(user, obj)
+        if chat_room and chat_room.messages.exists():
+            return chat_room.id
+        return None
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
