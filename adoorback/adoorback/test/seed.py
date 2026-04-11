@@ -675,4 +675,47 @@ def set_seed(n):
 
     logging.info("Check-in reactions & nudge test data created!") if DEBUG else None
 
+    # ===== CHECK-IN VISIBILITY TEST DATA =====
+    from datetime import timedelta
+
+    # adoor_5: mood set to "only_me" (should be hidden from friends)
+    ci_5 = CheckIn.objects.filter(user=user_5, is_active=True).first()
+    if ci_5:
+        ci_5.mood_visibility = 'only_me'
+        ci_5.thought_visibility = 'close_friends'
+        ci_5.save()
+        logging.info("adoor_5: mood=only_me, thought=close_friends") if DEBUG else None
+
+    # adoor_6: battery set to "public", thought to "only_me"
+    ci_6 = CheckIn.objects.filter(user=user_6, is_active=True).first()
+    if ci_6:
+        ci_6.battery_visibility = 'public'
+        ci_6.thought_visibility = 'only_me'
+        ci_6.save()
+        logging.info("adoor_6: battery=public, thought=only_me") if DEBUG else None
+
+    # adoor_7: simulate auto-archive by setting battery_updated_at to 13 hours ago
+    ci_7 = CheckIn.objects.filter(user=user_7, is_active=True).first()
+    if ci_7:
+        ci_7.battery_updated_at = timezone.now() - timedelta(hours=13)
+        ci_7.mood_updated_at = timezone.now() - timedelta(hours=13)
+        # Use update to bypass save() which would reset timestamps
+        CheckIn.objects.filter(pk=ci_7.pk).update(
+            battery_updated_at=timezone.now() - timedelta(hours=13),
+            mood_updated_at=timezone.now() - timedelta(hours=13),
+        )
+        logging.info("adoor_7: battery and mood auto-archived (13h old)") if DEBUG else None
+
+    # adoor_8: all components set to "public"
+    ci_8 = CheckIn.objects.filter(user=u8, is_active=True).first()
+    if ci_8:
+        ci_8.battery_visibility = 'public'
+        ci_8.mood_visibility = 'public'
+        ci_8.thought_visibility = 'public'
+        ci_8.song_visibility = 'public'
+        ci_8.save()
+        logging.info("adoor_8: all components public") if DEBUG else None
+
+    logging.info("Check-in visibility test data created!") if DEBUG else None
+
     logging.info("=== Comprehensive seed data complete! ===") if DEBUG else None
