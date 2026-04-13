@@ -33,21 +33,6 @@ class CurrentCheckIn(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         current_user = self.request.user
 
-        # Inherit visibility settings from last check-in if not provided
-        if not serializer.validated_data.get('visibility'):
-            last_check_in = CheckIn.objects.filter(user=current_user).order_by('-created_at').first()
-            if last_check_in:
-                serializer.validated_data['visibility'] = last_check_in.visibility
-            else:
-                serializer.validated_data['visibility'] = ['public']
-
-        # Inherit per-component visibility from last check-in if not provided
-        last_check_in = CheckIn.objects.filter(user=current_user).order_by('-created_at').first()
-        if last_check_in:
-            for field in ['battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']:
-                if field not in serializer.validated_data:
-                    serializer.validated_data[field] = getattr(last_check_in, field)
-
         serializer.save(user=current_user, is_active=True)
 
         # deactivate previous check-in
