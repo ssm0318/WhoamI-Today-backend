@@ -387,6 +387,12 @@ class FriendListSerializer(UserMinimalSerializer):
 
         current_user_read = not any(not response['current_user_read'] for response in responses) \
                             and not any(not note['current_user_read'] for note in notes)
+
+        # 체크인 읽음 상태도 확인
+        check_in = self.check_in(obj)
+        if check_in and self.context['request'].user.id not in check_in.reader_ids:
+            current_user_read = False
+
         return current_user_read
     
     def get_unread_post_cnt(self, obj):

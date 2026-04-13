@@ -70,6 +70,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     def save(self, *args, **kwargs):
         now = timezone.now()
         is_new = self.pk is None
+        content_changed = False
 
         if is_new:
             # Set all component timestamps on creation if content exists
@@ -90,14 +91,23 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
             if old:
                 if self.social_battery != old.social_battery or self.battery_visibility != old.battery_visibility:
                     self.battery_updated_at = now
+                    content_changed = True
                 if self.mood != old.mood or self.mood_visibility != old.mood_visibility:
                     self.mood_updated_at = now
+                    content_changed = True
                 if self.thought != old.thought or self.thought_visibility != old.thought_visibility:
                     self.thought_updated_at = now
+                    content_changed = True
                 if self.song_visibility != old.song_visibility:
                     self.song_updated_at = now
+                    content_changed = True
 
         super().save(*args, **kwargs)
+
+        # 콘텐츠 변경 시 readers 초기화 (author만 유지)
+        if content_changed:
+            self.readers.clear()
+            self.readers.add(self.user)
 
     @property
     def author(self):
