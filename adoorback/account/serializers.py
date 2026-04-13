@@ -344,6 +344,7 @@ class FriendListSerializer(UserMinimalSerializer):
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     unread_post_cnt = serializers.SerializerMethodField(read_only=True)
+    latest_unread_post = serializers.SerializerMethodField(read_only=True)
     check_in_id = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
     thought = serializers.SerializerMethodField(read_only=True)
@@ -406,6 +407,23 @@ class FriendListSerializer(UserMinimalSerializer):
         unread_notes = Note.objects.filter(author=obj).exclude(readers=user).count()
         unread_responses = _Response.objects.filter(author=obj).exclude(readers=user).count()
         return unread_notes + unread_responses
+
+    def get_latest_unread_post(self, obj):
+        """Return the most recent unread note/response from this friend for widget display."""
+        notes = self.notes(obj)
+        responses = self.responses(obj)
+
+        unread = [p for p in notes + responses if not p.get('current_user_read', True)]
+        if not unread:
+            return None
+
+        latest = max(unread, key=lambda p: p.get('created_at', ''))
+        return {
+            'id': latest['id'],
+            'type': latest['type'],
+            'content': latest.get('content', ''),
+            'images': latest.get('images', []),
+        }
 
     def get_unread_cnt(self, obj):
         from chat.models import get_chat_room
@@ -518,7 +536,8 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'unread_post_cnt', 'bio', 'check_in_id', 'track_id', 'thought',
+                                                      'unread_cnt', 'unread_post_cnt', 'latest_unread_post',
+                                                      'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']
 
