@@ -74,7 +74,7 @@ class MyCheckInSerializer(CheckInBaseSerializer):
         model = CheckIn
         fields = CheckInBaseSerializer.Meta.fields
         extra_kwargs = {
-            'visibility': {'required': False},
+            'visibility': {'required': True},
             'mood': {'required': False},
             'battery_updated_at': {'read_only': True},
             'mood_updated_at': {'read_only': True},
