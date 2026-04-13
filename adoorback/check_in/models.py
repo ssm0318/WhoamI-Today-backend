@@ -257,7 +257,7 @@ def create_poke_notification(created, instance, **kwargs):
         origin=sender,
         target=instance,
         message_ko=f"{sender.username}님이 {label_ko}을(를) 공유해달라고 콕 찔렀어요!",
-        message_en=f"{sender.username} nudged you to share your {label_en}!",
+        message_en=f"{sender.username} pinged you to share your {label_en}!",
         redirect_url=f"/check-in/",
     )
     NotificationActor.objects.create(user=sender, notification=noti)

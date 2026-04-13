@@ -222,7 +222,7 @@ class SongDetail(generics.RetrieveUpdateAPIView):
 
 class PokeCreate(generics.CreateAPIView):
     """
-    Create a poke (nudge) to ask a friend to share a component.
+    Create a poke (ping) to ask a friend to share a component.
     POST body: { receiver_id, component_type }
     """
     serializer_class = cs.PokeSerializer

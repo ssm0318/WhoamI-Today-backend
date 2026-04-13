@@ -631,7 +631,7 @@ def set_seed(n):
     user_6.save()
     logging.info("adoor_6: has bio + pronouns for visibility testing") if DEBUG else None
 
-    # ===== CHECK-IN REACTIONS & NUDGE TEST DATA =====
+    # ===== CHECK-IN REACTIONS & PING TEST DATA =====
     from reaction.models import Reaction
     from django.contrib.contenttypes.models import ContentType
 
@@ -657,21 +657,21 @@ def set_seed(n):
         Reaction.objects.get_or_create(user=user_5, emoji='🚀', content_type=checkin_ct, object_id=ci_1.id)
         logging.info("adoor_5 reacted 🤗 and 🚀 to adoor_1's check-in") if DEBUG else None
 
-    # Nudges: adoor_1 nudges adoor_3 for all 4 components (adoor_3 has empty check-in)
+    # Nudges: adoor_1 pings adoor_3 for all 4 components (adoor_3 has empty check-in)
     for comp in ['battery', 'mood', 'thought', 'song']:
         Poke.objects.get_or_create(sender=user_1, receiver=user_3, component_type=comp)
     logging.info("adoor_1 nudged adoor_3 for all 4 components") if DEBUG else None
 
-    # Nudges: adoor_2 nudges adoor_4 for mood and song only
+    # Nudges: adoor_2 pings adoor_4 for mood and song only
     Poke.objects.get_or_create(sender=user_2, receiver=user_4, component_type='mood')
     Poke.objects.get_or_create(sender=user_2, receiver=user_4, component_type='song')
     logging.info("adoor_2 nudged adoor_4 for mood and song") if DEBUG else None
 
-    # Nudges: adoor_5 nudges adoor_1 for thought (so adoor_1 sees a received nudge)
+    # Nudges: adoor_5 pings adoor_1 for thought (so adoor_1 sees a received ping)
     Poke.objects.get_or_create(sender=user_5, receiver=user_1, component_type='thought')
     logging.info("adoor_5 nudged adoor_1 for thought") if DEBUG else None
 
-    logging.info("Check-in reactions & nudge test data created!") if DEBUG else None
+    logging.info("Check-in reactions & ping test data created!") if DEBUG else None
 
     # ===== CHECK-IN VISIBILITY TEST DATA =====
     from datetime import timedelta
