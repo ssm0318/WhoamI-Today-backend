@@ -133,6 +133,8 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         return obj.messages.filter(receiver=user, is_read=False).count()
 
     def get_request_status(self, obj):
+        if obj.is_group:
+            return None
         user = self.context['request'].user
         opponent = obj.user2 if obj.user1 == user else obj.user1
         if user.is_connected(opponent):
