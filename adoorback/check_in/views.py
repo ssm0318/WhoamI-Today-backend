@@ -33,14 +33,21 @@ class CurrentCheckIn(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         current_user = self.request.user
 
-        serializer.save(user=current_user, is_active=True)
+        # Check if there's an active check-in
+        existing_checkin = CheckIn.objects.filter(
+            user=current_user,
+            is_active=True
+        ).first()
 
-        # deactivate previous check-in
-        previous_check_in = CheckIn.objects.filter(user=current_user, is_active=True) \
-                                           .exclude(id=serializer.instance.id).first()
-        if previous_check_in:
-            previous_check_in.is_active = False
-            previous_check_in.save()
+        if existing_checkin:
+            # Update existing check-in
+            for field, value in serializer.validated_data.items():
+                setattr(existing_checkin, field, value)
+            existing_checkin.save()
+            serializer.instance = existing_checkin
+        else:
+            # Create new check-in
+            serializer.save(user=current_user, is_active=True)
 
         return Response(serializer.data)
 

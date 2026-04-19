@@ -65,10 +65,22 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
 
 class MyCheckInSerializer(CheckInBaseSerializer):
     # Writable versions of the visibility fields (override read-only SerializerMethodField)
-    battery_visibility = serializers.CharField(required=False)
-    mood_visibility = serializers.CharField(required=False)
-    song_visibility = serializers.CharField(required=False)
-    thought_visibility = serializers.CharField(required=False)
+    battery_visibility = serializers.ChoiceField(
+        choices=['public', 'friends', 'close_friends', 'only_me'],
+        required=False
+    )
+    mood_visibility = serializers.ChoiceField(
+        choices=['public', 'friends', 'close_friends', 'only_me'],
+        required=False
+    )
+    song_visibility = serializers.ChoiceField(
+        choices=['public', 'friends', 'close_friends', 'only_me'],
+        required=False
+    )
+    thought_visibility = serializers.ChoiceField(
+        choices=['public', 'friends', 'close_friends', 'only_me'],
+        required=False
+    )
 
     class Meta:
         model = CheckIn
