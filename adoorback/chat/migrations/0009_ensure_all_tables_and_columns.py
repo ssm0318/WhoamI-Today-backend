@@ -75,7 +75,7 @@ def ensure_all(apps, schema_editor):
         cursor.execute("CREATE INDEX chat_messagereaction_user_id_idx ON chat_messagereaction (user_id)")
         cursor.execute("CREATE INDEX chat_messagereaction_deleted_idx ON chat_messagereaction (deleted)")
 
-    if not constraint_exists(cursor, 'unique_message_reaction'):
+    if not index_exists(cursor, 'unique_message_reaction'):
         cursor.execute("""
             CREATE UNIQUE INDEX unique_message_reaction
             ON chat_messagereaction (user_id, message_id, emoji)
