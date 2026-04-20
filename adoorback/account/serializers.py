@@ -442,6 +442,10 @@ class FriendListSerializer(UserMinimalSerializer):
     mood_visibility = serializers.SerializerMethodField(read_only=True)
     song_visibility = serializers.SerializerMethodField(read_only=True)
     thought_visibility = serializers.SerializerMethodField(read_only=True)
+    sent_pokes = serializers.SerializerMethodField(read_only=True)
+
+    def get_sent_pokes(self, obj):
+        return self.context.get('pokes_by_receiver', {}).get(obj.id, {})
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -525,11 +529,14 @@ class FriendListSerializer(UserMinimalSerializer):
     def check_in(self, obj):
         if self.context.get('hide_check_in'):
             return None
+        cache = self.context.setdefault('_check_in_cache', {})
+        if obj.id in cache:
+            return cache[obj.id]
         user = self.context.get('request', None).user
         check_in = obj.check_in_set.filter(is_active=True).first()
-        if check_in and CheckIn.is_audience(check_in, user):
-            return check_in
-        return None
+        result = check_in if check_in and CheckIn.is_audience(check_in, user) else None
+        cache[obj.id] = result
+        return result
 
     def get_check_in_id(self, obj):
         check_in = self.check_in(obj)
@@ -626,7 +633,8 @@ class FriendListSerializer(UserMinimalSerializer):
                                                       'unread_cnt', 'unread_post_cnt', 'latest_unread_post',
                                                       'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',
-                                                      'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility']
+                                                      'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
+                                                      'sent_pokes']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):

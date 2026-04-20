@@ -1260,13 +1260,16 @@ class FriendList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        if hasattr(self, '_qs'):
+            return self._qs
+
         user = self.request.user
         friends = user.connected_users
 
         query_type = self.request.query_params.get('type')
 
         if query_type == 'all' or query_type == 'friends':
-            return friends.order_by('username')
+            self._qs = friends.order_by('username')
         elif query_type == 'close_friends':
             close_friends_ids = Connection.objects.filter(
                 Q(user1=user, user1_choice='close_friend') |
@@ -1280,17 +1283,39 @@ class FriendList(generics.ListAPIView):
                 else:
                     target_ids.add(u1_id)
 
-            return friends.filter(id__in=target_ids).order_by('username')
+            self._qs = friends.filter(id__in=target_ids).order_by('username')
         elif query_type == 'has_updates':
             friends = friends.exclude(hidden=True)
             friends_with_updates = [
                 friend for friend in friends if not User.user_read(user, friend)
             ]
-            return sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
+            self._qs = sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
         elif query_type == 'favorites':
-            return user.favorites.all().order_by('username')
+            self._qs = user.favorites.all().order_by('username')
         else:
             raise Http404("Query parameter 'type' is invalid or not provided.")
+
+        return self._qs
+
+    def get_serializer_context(self):
+        from check_in.models import Poke
+        ctx = super().get_serializer_context()
+        qs = self.get_queryset()
+        if hasattr(qs, 'values_list'):
+            friend_ids = list(qs.values_list('id', flat=True))
+        else:
+            friend_ids = [f.id for f in qs]
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        pokes = Poke.objects.filter(
+            sender=self.request.user,
+            receiver_id__in=friend_ids,
+            created_at__gte=today_start,
+        ).values('receiver_id', 'component_type', 'id')
+        bucket = {}
+        for p in pokes:
+            bucket.setdefault(p['receiver_id'], {})[p['component_type']] = p['id']
+        ctx['pokes_by_receiver'] = bucket
+        return ctx
 
 
 class FriendListUpdate(generics.UpdateAPIView):
