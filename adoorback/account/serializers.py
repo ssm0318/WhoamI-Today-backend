@@ -21,8 +21,7 @@ from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
 from note.models import Note
 from notification.models import Notification
-from chat.models import get_chat_room, get_or_create_chat_room
-from qna.models import Response
+from chat.models import get_chat_room
 
 from django_countries.serializers import CountryFieldMixin
 
@@ -451,106 +450,81 @@ class FriendListSerializer(UserMinimalSerializer):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
 
     def get_is_favorite(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return obj in request.user.favorites.all()
-        return False
+        return obj.id in self.context.get('favorite_ids', set())
 
     def get_is_hidden(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return obj in request.user.hidden.all()
-        return False
-    
+        return obj.id in self.context.get('hidden_ids', set())
+
     def get_connection_status(self, obj):  # what user has set obj as
-        user = self.context.get('request', None).user
+        user = self.context['request'].user
         if user == obj:
             return None
-        if user.is_connected(obj):
-            if obj.is_close_friend(user):
-                return 'close_friend'
-            if obj.is_friend(user):
-                return 'friend'
+        conn = self.context.get('connection_by_friend_id', {}).get(obj.id)
+        if not conn:
+            return None
+        # viewer's choice for obj (viewer is whichever side of the Connection isn't obj)
+        viewer_choice = conn.user1_choice if conn.user1_id == user.id else conn.user2_choice
+        if viewer_choice in ('close_friend', 'friend'):
+            return viewer_choice
         return None
 
     def get_current_user_read(self, obj):
-        responses = self.responses(obj)
-        notes = self.notes(obj)
+        viewer_id = self.context['request'].user.id
+        for n in self.context.get('visible_notes_by_author', {}).get(obj.id, []):
+            if viewer_id not in {r.id for r in n.readers.all()}:
+                return False
+        for r in self.context.get('visible_resps_by_author', {}).get(obj.id, []):
+            if viewer_id not in {u.id for u in r.readers.all()}:
+                return False
+        ci = self.check_in(obj)
+        if ci and viewer_id not in {u.id for u in ci.readers.all()}:
+            return False
+        return True
 
-        current_user_read = not any(not response['current_user_read'] for response in responses) \
-                            and not any(not note['current_user_read'] for note in notes)
-
-        # 체크인 읽음 상태도 확인
-        check_in = self.check_in(obj)
-        if check_in and self.context['request'].user.id not in check_in.reader_ids:
-            current_user_read = False
-
-        return current_user_read
-    
     def get_unread_post_cnt(self, obj):
-        """Count unread notes + responses from this friend."""
-        request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return 0
-        user = request.user
-        from note.models import Note
-        from qna.models import Response as _Response
-        unread_notes = Note.objects.filter(author=obj).exclude(readers=user).count()
-        unread_responses = _Response.objects.filter(author=obj).exclude(readers=user).count()
-        return unread_notes + unread_responses
+        return (self.context.get('unread_note_count_by_author', {}).get(obj.id, 0)
+                + self.context.get('unread_response_count_by_author', {}).get(obj.id, 0))
 
     def get_latest_unread_post(self, obj):
-        """Return the most recent unread note/response from this friend for widget display."""
-        notes = self.notes(obj)
-        responses = self.responses(obj)
-
-        unread = [p for p in notes + responses if not p.get('current_user_read', True)]
+        viewer_id = self.context['request'].user.id
+        unread = []
+        for n in self.context.get('visible_notes_by_author', {}).get(obj.id, []):
+            if viewer_id not in {r.id for r in n.readers.all()}:
+                unread.append(n)
+        for r in self.context.get('visible_resps_by_author', {}).get(obj.id, []):
+            if viewer_id not in {u.id for u in r.readers.all()}:
+                unread.append(r)
         if not unread:
             return None
-
-        latest = max(unread, key=lambda p: p.get('created_at', ''))
+        latest = max(unread, key=lambda p: p.created_at)
+        if isinstance(latest, Note):
+            images = [img.image.url for img in sorted(latest.images.all(), key=lambda i: i.created_at)]
+        else:
+            images = []
         return {
-            'id': latest['id'],
-            'type': latest['type'],
-            'content': latest.get('content', ''),
-            'images': latest.get('images', []),
+            'id': latest.id,
+            'type': latest.type,
+            'content': latest.content,
+            'images': images,
         }
 
     def get_unread_cnt(self, obj):
-        from chat.models import get_chat_room
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            user = request.user
-            chat_room = get_chat_room(user, obj)
-            if chat_room:
-                return chat_room.messages.filter(receiver=user, is_read=False).count()
-        return 0
+        return self.context.get('unread_chat_count_by_friend_id', {}).get(obj.id, 0)
 
     def check_in(self, obj):
         if self.context.get('hide_check_in'):
             return None
-        cache = self.context.setdefault('_check_in_cache', {})
-        if obj.id in cache:
-            return cache[obj.id]
-        user = self.context.get('request', None).user
-        check_in = obj.check_in_set.filter(is_active=True).first()
-        result = check_in if check_in and CheckIn.is_audience(check_in, user) else None
-        cache[obj.id] = result
-        return result
+        return self.context.get('visible_check_in_by_user_id', {}).get(obj.id)
 
     def get_check_in_id(self, obj):
         check_in = self.check_in(obj)
-        if check_in:
-            return check_in.id
-        return None
+        return check_in.id if check_in else None
 
     def get_track_id(self, obj):
         if not self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
             return None
-        song = obj.song_set.filter(is_active=True).first()
-        if song:
-            return song.track_id
-        return None
+        song = self.context.get('active_song_by_user_id', {}).get(obj.id)
+        return song.track_id if song else None
 
     def _is_component_visible(self, obj, visibility_field, updated_at_field):
         """Check if a component should be visible to the current viewer."""
@@ -603,29 +577,8 @@ class FriendListSerializer(UserMinimalSerializer):
     def get_thought_visibility(self, obj):
         return self._component_visibility(self.check_in(obj), 'thought_visibility', 'thought_updated_at')
 
-    def responses(self, obj):
-        from qna.serializers import ResponseSerializer
-        user = self.context.get('request', None).user
-        response_ids = [response.id for response in obj.response_set.all() if Response.is_audience(response, user)]
-        response_queryset = Response.objects.filter(id__in=response_ids).order_by('question__id', 'created_at')
-        responses = ResponseSerializer(response_queryset, many=True, read_only=True, context=self.context).data
-        return responses
-
-    def notes(self, obj):
-        from note.serializers import NoteSerializer
-        user = self.context.get('request', None).user
-        note_ids = [note.id for note in obj.note_set.all() if Note.is_audience(note, user)]
-        note_queryset = Note.objects.filter(id__in=note_ids)
-        notes = NoteSerializer(note_queryset, many=True, read_only=True, context=self.context).data
-        return notes
-    
     def get_unread_chat_count(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            user = request.user
-            chat_room = get_or_create_chat_room(user, obj)
-            return chat_room.messages.filter(receiver=user, is_read=False).count()
-        return 0
+        return self.context.get('unread_chat_count_by_friend_id', {}).get(obj.id, 0)
 
     class Meta(UserMinimalSerializer.Meta):
         model = User

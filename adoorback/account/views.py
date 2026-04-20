@@ -1297,25 +1297,188 @@ class FriendList(generics.ListAPIView):
 
         return self._qs
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            self._page_friend_ids = [f.id for f in page]
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        self._page_friend_ids = [f.id for f in queryset]
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def get_serializer_context(self):
-        from check_in.models import Poke
         ctx = super().get_serializer_context()
-        qs = self.get_queryset()
-        if hasattr(qs, 'values_list'):
-            friend_ids = list(qs.values_list('id', flat=True))
-        else:
-            friend_ids = [f.id for f in qs]
+        friend_ids = getattr(self, '_page_friend_ids', None)
+        if friend_ids is None:
+            qs = self.get_queryset()
+            if hasattr(qs, 'values_list'):
+                friend_ids = list(qs.values_list('id', flat=True))
+            else:
+                friend_ids = [f.id for f in qs]
+        self._build_batch_context(ctx, friend_ids)
+        return ctx
+
+    def _build_batch_context(self, ctx, friend_ids):
+        from collections import defaultdict
+        from check_in.models import CheckIn, Song, Poke
+        from chat.models import ChatRoom, Message
+        from note.models import Note
+        from qna.models import Response as QnaResponse
+        from content_report.models import ContentReport
+
+        user = self.request.user
+        ctx['friend_ids'] = friend_ids
+        if not friend_ids:
+            ctx.update({
+                'favorite_ids': set(), 'hidden_ids': set(),
+                'connection_by_friend_id': {},
+                'visible_check_in_by_user_id': {},
+                'active_song_by_user_id': {},
+                'unread_note_count_by_author': {},
+                'unread_response_count_by_author': {},
+                'unread_chat_count_by_friend_id': {},
+                'visible_notes_by_author': {},
+                'visible_resps_by_author': {},
+                'user_report_blocked_ids': set(),
+                'content_report_keys': set(),
+                'pokes_by_receiver': {},
+            })
+            return
+
+        # 1. Favorites / hidden M2M
+        ctx['favorite_ids'] = set(user.favorites.filter(id__in=friend_ids).values_list('id', flat=True))
+        ctx['hidden_ids'] = set(user.hidden.filter(id__in=friend_ids).values_list('id', flat=True))
+
+        # 2. Connection rows
+        conns = Connection.objects.filter(
+            Q(user1=user, user2_id__in=friend_ids) | Q(user2=user, user1_id__in=friend_ids)
+        )
+        connection_by_friend_id = {}
+        for c in conns:
+            other_id = c.user2_id if c.user1_id == user.id else c.user1_id
+            connection_by_friend_id[other_id] = c
+        ctx['connection_by_friend_id'] = connection_by_friend_id
+
+        # 3. User-report block set (cached once; property issues 2 queries)
+        user_report_blocked_ids = set(user.user_report_blocked_ids)
+        ctx['user_report_blocked_ids'] = user_report_blocked_ids
+
+        # 4. ContentType ids + viewer's ContentReport keys for Note/Response/CheckIn
+        ct_note = ContentType.objects.get_for_model(Note)
+        ct_resp = ContentType.objects.get_for_model(QnaResponse)
+        ct_ci = ContentType.objects.get_for_model(CheckIn)
+        ctx['ct_ids'] = {'note': ct_note.id, 'response': ct_resp.id, 'check_in': ct_ci.id}
+        content_report_keys = set(
+            ContentReport.objects.filter(
+                user=user,
+                content_type_id__in=[ct_note.id, ct_resp.id, ct_ci.id],
+            ).values_list('content_type_id', 'object_id')
+        )
+        ctx['content_report_keys'] = content_report_keys
+
+        def _passes_close_friends(author_id, created_at):
+            conn = connection_by_friend_id.get(author_id)
+            if not conn:
+                return False
+            # author's choice for viewer
+            author_choice = conn.user1_choice if conn.user1_id == author_id else conn.user2_choice
+            if author_choice != 'close_friend':
+                return False
+            if author_id == conn.user1_id:
+                update_past = conn.user1_update_past_posts
+                upgrade_time = conn.user1_upgrade_time
+            else:
+                update_past = conn.user2_update_past_posts
+                upgrade_time = conn.user2_upgrade_time
+            return update_past or upgrade_time is None or created_at > upgrade_time
+
+        def _is_audience(author_id, visibility, pk, ct_id, created_at):
+            if (ct_id, pk) in content_report_keys:
+                return False
+            if author_id in user_report_blocked_ids:
+                return False
+            if author_id == user.id:
+                return True
+            if 'public' in visibility:
+                return True
+            if 'friends' in visibility:
+                return True  # viewer is, by definition, in connected_users
+            if 'close_friends' in visibility:
+                return _passes_close_friends(author_id, created_at)
+            return False
+
+        # 5. Active check-ins (with readers prefetch) + visibility filter
+        check_ins = list(
+            CheckIn.objects.filter(user_id__in=friend_ids, is_active=True)
+            .prefetch_related('readers')
+        )
+        visible_check_in_by_user_id = {}
+        for ci in check_ins:
+            if _is_audience(ci.user_id, ci.visibility, ci.pk, ct_ci.id, ci.created_at):
+                visible_check_in_by_user_id[ci.user_id] = ci
+        ctx['visible_check_in_by_user_id'] = visible_check_in_by_user_id
+
+        # 6. Active songs
+        ctx['active_song_by_user_id'] = {
+            s.user_id: s for s in Song.objects.filter(user_id__in=friend_ids, is_active=True)
+        }
+
+        # 7. Unread note / response counts (GROUP BY author)
+        unread_note_rows = (Note.objects.filter(author_id__in=friend_ids)
+                            .exclude(readers=user)
+                            .values('author_id').annotate(c=Count('id')))
+        ctx['unread_note_count_by_author'] = {r['author_id']: r['c'] for r in unread_note_rows}
+        unread_resp_rows = (QnaResponse.objects.filter(author_id__in=friend_ids)
+                            .exclude(readers=user)
+                            .values('author_id').annotate(c=Count('id')))
+        ctx['unread_response_count_by_author'] = {r['author_id']: r['c'] for r in unread_resp_rows}
+
+        # 8. Chat rooms + unread counts (read-only; no writes)
+        rooms = list(ChatRoom.objects.filter(is_group=False).filter(
+            Q(user1=user, user2_id__in=friend_ids) | Q(user2=user, user1_id__in=friend_ids)
+        ))
+        room_to_other = {}
+        for r in rooms:
+            other_id = r.user2_id if r.user1_id == user.id else r.user1_id
+            room_to_other[r.id] = other_id
+        unread_rows = (Message.objects.filter(
+            chat_room_id__in=list(room_to_other.keys()),
+            receiver=user, is_read=False,
+        ).values('chat_room_id').annotate(c=Count('id')))
+        unread_chat_count_by_friend_id = {}
+        for row in unread_rows:
+            other_id = room_to_other.get(row['chat_room_id'])
+            if other_id is not None:
+                unread_chat_count_by_friend_id[other_id] = row['c']
+        ctx['unread_chat_count_by_friend_id'] = unread_chat_count_by_friend_id
+
+        # 9. Visible notes / responses (model instances, readers + images prefetched)
+        notes_qs = (Note.objects.filter(author_id__in=friend_ids)
+                    .prefetch_related('readers', 'images'))
+        resps_qs = (QnaResponse.objects.filter(author_id__in=friend_ids)
+                    .prefetch_related('readers'))
+        visible_notes_by_author = defaultdict(list)
+        for n in notes_qs:
+            if _is_audience(n.author_id, n.visibility, n.pk, ct_note.id, n.created_at):
+                visible_notes_by_author[n.author_id].append(n)
+        visible_resps_by_author = defaultdict(list)
+        for r in resps_qs:
+            if _is_audience(r.author_id, r.visibility, r.pk, ct_resp.id, r.created_at):
+                visible_resps_by_author[r.author_id].append(r)
+        ctx['visible_notes_by_author'] = visible_notes_by_author
+        ctx['visible_resps_by_author'] = visible_resps_by_author
+
+        # 10. Pokes (preserved from prior implementation)
         today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         pokes = Poke.objects.filter(
-            sender=self.request.user,
-            receiver_id__in=friend_ids,
-            created_at__gte=today_start,
+            sender=user, receiver_id__in=friend_ids, created_at__gte=today_start,
         ).values('receiver_id', 'component_type', 'id')
         bucket = {}
         for p in pokes:
             bucket.setdefault(p['receiver_id'], {})[p['component_type']] = p['id']
         ctx['pokes_by_receiver'] = bucket
-        return ctx
 
 
 class FriendListUpdate(generics.UpdateAPIView):
