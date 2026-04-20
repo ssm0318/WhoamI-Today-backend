@@ -35,7 +35,7 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     is_active = models.BooleanField(default=False)
     mood = models.JSONField(default=list, blank=True)  # Array of emoji strings, max 5
     social_battery = models.CharField(blank=True, null=True, max_length=30, choices=SOCIAL_BATTERY_CHOICES)
-    thought = models.CharField(blank=True, null=True, max_length=88)
+    thought = models.CharField(blank=True, null=True, max_length=100)
     visibility = ArrayField(
         models.CharField(max_length=20),
         blank=True,
