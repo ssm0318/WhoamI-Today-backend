@@ -10,21 +10,30 @@ def cleanup_old_apps(apps, schema_editor):
     connection = schema_editor.connection
     cursor = connection.cursor()
 
+    def table_exists(table_name):
+        cursor.execute(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s)",
+            [table_name],
+        )
+        return cursor.fetchone()[0]
+
     # 1. Clean up notifications referencing old ping content types
-    cursor.execute("""
-        DELETE FROM notification_notificationactor
-        WHERE notification_id IN (
-            SELECT n.id FROM notification_notification n
-            JOIN django_content_type ct ON n.target_type_id = ct.id
-            WHERE ct.app_label = 'ping'
-        )
-    """)
-    cursor.execute("""
-        DELETE FROM notification_notification
-        WHERE target_type_id IN (
-            SELECT id FROM django_content_type WHERE app_label = 'ping'
-        )
-    """)
+    if table_exists('notification_notificationactor'):
+        cursor.execute("""
+            DELETE FROM notification_notificationactor
+            WHERE notification_id IN (
+                SELECT n.id FROM notification_notification n
+                JOIN django_content_type ct ON n.target_type_id = ct.id
+                WHERE ct.app_label = 'ping'
+            )
+        """)
+    if table_exists('notification_notification'):
+        cursor.execute("""
+            DELETE FROM notification_notification
+            WHERE target_type_id IN (
+                SELECT id FROM django_content_type WHERE app_label = 'ping'
+            )
+        """)
 
     # 2. Drop old ping tables
     cursor.execute("DROP TABLE IF EXISTS ping_pingrequest CASCADE")
@@ -46,10 +55,11 @@ def cleanup_old_apps(apps, schema_editor):
     """)
 
     # 5. Clean up permissions and content types for ping app
-    cursor.execute("""
-        DELETE FROM auth_permission
-        WHERE content_type_id IN (SELECT id FROM django_content_type WHERE app_label = 'ping')
-    """)
+    if table_exists('auth_permission'):
+        cursor.execute("""
+            DELETE FROM auth_permission
+            WHERE content_type_id IN (SELECT id FROM django_content_type WHERE app_label = 'ping')
+        """)
     cursor.execute("DELETE FROM django_content_type WHERE app_label = 'ping'")
 
 

@@ -890,6 +890,11 @@ def connection_removed(instance, **kwargs):
 
     # 3. No-op: chat rooms use FK pairs, no deactivation needed on unfriend
 
+    # 4. Remove all subscriptions between the two users
+    Subscription.objects.filter(
+        Q(subscriber=user1, subscribed_to=user2) | Q(subscriber=user2, subscribed_to=user1)
+    ).delete()
+
 
 @transaction.atomic
 @receiver(post_save, sender=FriendRequest)
@@ -945,6 +950,19 @@ def create_connection_noti(created, instance, **kwargs):
         # create chat room for new friends
         from chat.models import get_or_create_chat_room
         get_or_create_chat_room(requester, requestee)
+
+        # auto-subscribe close friends to check-in updates (version_w only)
+        if requester.current_ver == 'version_w':
+            from adoorback.utils.content_types import get_check_in_type
+            check_in_ct = get_check_in_type()
+            if instance.requester_choice == 'close_friend':
+                Subscription.objects.create(
+                    subscriber=requester, subscribed_to=requestee, content_type=check_in_ct
+                )
+            if instance.requestee_choice == 'close_friend':
+                Subscription.objects.create(
+                    subscriber=requestee, subscribed_to=requester, content_type=check_in_ct
+                )
 
     # make friend request notification invisible once requestee has responded
     instance.friend_request_targetted_notis.filter(user=requestee,
