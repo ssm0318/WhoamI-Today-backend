@@ -178,6 +178,12 @@ class ChatRequest(AdoorTimestampedModel, SafeDeleteModel):
     )
     accepted = models.BooleanField(null=True, default=None)
 
+    chat_request_targetted_notis = GenericRelation(
+        "notification.Notification",
+        content_type_field='target_type',
+        object_id_field='target_id'
+    )
+
     _safedelete_policy = SOFT_DELETE_CASCADE
 
     class Meta:
@@ -257,3 +263,37 @@ def create_message_notification(created, instance, **kwargs):
             redirect_url=f"/users/{sender.id}/chat",
         )
         NotificationActor.objects.create(user=sender, notification=noti)
+
+
+@transaction.atomic
+@receiver(post_save, sender=ChatRequest)
+def create_chat_request_noti(created, instance, **kwargs):
+    if instance.deleted:
+        return
+
+    requester = instance.requester
+    requestee = instance.requestee
+
+    if requester.id in requestee.user_report_blocked_ids:
+        return
+
+    if created:
+        noti = Notification.objects.create(
+            user=requestee,
+            origin=requester,
+            target=instance,
+            message_ko=f'{requester.username}님이 채팅 요청을 보냈습니다.',
+            message_en=f'{requester.username} sent you a chat request.',
+            redirect_url='/chat/requests',
+        )
+        NotificationActor.objects.create(user=requester, notification=noti)
+    elif instance.accepted is True:
+        noti = Notification.objects.create(
+            user=requester,
+            origin=requestee,
+            target=instance,
+            message_ko=f'{requestee.username}님이 채팅 요청을 수락했습니다.',
+            message_en=f'{requestee.username} accepted your chat request.',
+            redirect_url=f'/users/{requestee.id}/chat',
+        )
+        NotificationActor.objects.create(user=requestee, notification=noti)

@@ -3,7 +3,7 @@ from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import OuterRef, Subquery, Count, Q
-from rest_framework import generics, exceptions
+from rest_framework import generics, exceptions, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
@@ -345,6 +345,25 @@ class ChatRequestCreate(generics.ListCreateAPIView):
             requestee=self.request.user, accepted__isnull=True
         )
 
+    def create(self, request, *args, **kwargs):
+        self._auto_accepted = False
+        self._auto_accepted_request = None
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        if self._auto_accepted:
+            response_serializer = ChatRequestSerializer(
+                self._auto_accepted_request, context={'request': request}
+            )
+            data = response_serializer.data
+            data['auto_accepted'] = True
+            return Response(data, status=status.HTTP_200_OK)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     def perform_create(self, serializer):
         user = self.request.user
         requestee_id = serializer.validated_data['requestee_id']
@@ -357,8 +376,31 @@ class ChatRequestCreate(generics.ListCreateAPIView):
             Q(requester=user, requestee=requestee) |
             Q(requester=requestee, requestee=user)
         ).first()
+
         if existing:
-            raise exceptions.ValidationError("A chat request already exists between these users.")
+            if existing.requester == user:
+                if existing.accepted is None:
+                    raise exceptions.ValidationError("You already have a pending chat request to this user.")
+                elif existing.accepted is True:
+                    raise exceptions.ValidationError("A chat request between you has already been accepted.")
+                else:
+                    existing.delete()
+                    serializer.save(requester=user, requestee=requestee)
+                    return
+            else:
+                if existing.accepted is None:
+                    existing.accepted = True
+                    existing.save()
+                    get_or_create_chat_room(user, requestee)
+                    self._auto_accepted = True
+                    self._auto_accepted_request = existing
+                    return
+                elif existing.accepted is True:
+                    raise exceptions.ValidationError("A chat request between you has already been accepted.")
+                else:
+                    existing.delete()
+                    serializer.save(requester=user, requestee=requestee)
+                    return
 
         serializer.save(requester=user, requestee=requestee)
 
@@ -389,6 +431,11 @@ class ChatRequestUpdate(generics.UpdateAPIView):
             )
         except ChatRequest.DoesNotExist:
             raise exceptions.NotFound("Chat request not found.")
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        if instance.accepted:
+            get_or_create_chat_room(instance.requester, instance.requestee)
 
 
 class MessageSearch(generics.ListAPIView):
