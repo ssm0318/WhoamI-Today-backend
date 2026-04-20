@@ -57,6 +57,11 @@ def get_message_type():
     return ContentType.objects.get_for_model(Message)
 
 
+def get_check_in_type():
+    from check_in.models import CheckIn
+    return ContentType.objects.get_for_model(CheckIn)
+
+
 def get_generic_relation_type(model):
     model = model.capitalize()
     if model == 'Comment':
@@ -69,5 +74,7 @@ def get_generic_relation_type(model):
         return get_note_type()
     elif model == 'Message':
         return get_message_type()
+    elif model in ('Check_in', 'Checkin'):
+        return get_check_in_type()
     else:
         return None

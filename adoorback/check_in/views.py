@@ -21,6 +21,79 @@ import check_in.serializers as cs
 User = get_user_model()
 
 
+# --- Check-in subscription notification helpers ---
+
+CONTENT_FIELDS = ('mood', 'social_battery', 'thought')
+
+
+def _has_visible_content(check_in, has_active_song=False):
+    """Check if the check-in has any non-empty user-visible content."""
+    return (
+        bool(check_in.mood)
+        or bool(check_in.social_battery)
+        or bool(check_in.thought)
+        or has_active_song
+    )
+
+
+def notify_check_in_subscribers(check_in):
+    """Send notifications to check-in subscribers (version_w only, 5-min batching)."""
+    from adoorback.utils.content_types import get_check_in_type
+    from notification.models import Notification, NotificationActor
+    from account.models import Subscription
+
+    user = check_in.user
+    if user.current_ver != 'version_w':
+        return
+
+    check_in_ct = get_check_in_type()
+    subscriber_ids = list(Subscription.objects.filter(
+        subscribed_to=user, content_type=check_in_ct
+    ).values_list('subscriber_id', flat=True))
+
+    if not subscriber_ids:
+        return
+
+    blocked_ids = user.user_report_blocked_ids
+
+    for subscriber_id in subscriber_ids:
+        if subscriber_id in blocked_ids:
+            continue
+
+        recent_noti = _find_recent_check_in_noti(subscriber_id, user)
+
+        if recent_noti:
+            recent_noti.notification_updated_at = timezone.now()
+            recent_noti.target = check_in
+            recent_noti.save()
+        else:
+            noti = Notification.objects.create(
+                user_id=subscriber_id,
+                origin=user,
+                target=check_in,
+                message_ko=f"{user.username}님이 체크인을 업데이트했습니다!",
+                message_en=f"{user.username} updated their check-in!",
+                redirect_url=f"/users/{user.username}",
+            )
+            NotificationActor.objects.create(user=user, notification=noti)
+
+
+def _find_recent_check_in_noti(subscriber_id, actor):
+    """Find a recent (within 5 min) unread check-in notification from this actor."""
+    from notification.models import Notification
+
+    cutoff = timezone.now() - timezone.timedelta(minutes=5)
+    check_in_ct = ContentType.objects.get_for_model(CheckIn)
+    return Notification.objects.filter(
+        user_id=subscriber_id,
+        actors__in=[actor],
+        target_type=check_in_ct,
+        is_read=False,
+        is_visible=True,
+        notification_updated_at__gte=cutoff,
+    ).order_by('-notification_updated_at').first()
+
+
 class CurrentCheckIn(generics.ListCreateAPIView):
     """
     Get current active check-in of request user or create a new check-in.
@@ -42,14 +115,27 @@ class CurrentCheckIn(generics.ListCreateAPIView):
         ).first()
 
         if existing_checkin:
+            # Snapshot content before update
+            old_content = {f: getattr(existing_checkin, f) for f in CONTENT_FIELDS}
+
             # Update existing check-in
             for field, value in serializer.validated_data.items():
                 setattr(existing_checkin, field, value)
             existing_checkin.save()
             serializer.instance = existing_checkin
+
+            # Notify only if content actually changed and result is non-empty
+            new_content = {f: getattr(existing_checkin, f) for f in CONTENT_FIELDS}
+            if old_content != new_content:
+                has_song = Song.objects.filter(user=current_user, is_active=True).exists()
+                if _has_visible_content(existing_checkin, has_song):
+                    notify_check_in_subscribers(existing_checkin)
         else:
             # Create new check-in
             serializer.save(user=current_user, is_active=True)
+            has_song = Song.objects.filter(user=current_user, is_active=True).exists()
+            if _has_visible_content(serializer.instance, has_song):
+                notify_check_in_subscribers(serializer.instance)
 
         return Response(serializer.data)
 
@@ -184,6 +270,11 @@ class CurrentSong(generics.ListCreateAPIView):
         # to bypass CheckIn.save()'s per-field timestamp logic.
         CheckIn.objects.filter(user=current_user, is_active=True) \
                        .update(song_updated_at=timezone.now())
+
+        # Notify check-in subscribers about song change
+        active_check_in = CheckIn.objects.filter(user=current_user, is_active=True).first()
+        if active_check_in:
+            notify_check_in_subscribers(active_check_in)
 
         return Response(serializer.data)
 

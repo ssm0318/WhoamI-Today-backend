@@ -1480,6 +1480,17 @@ class FriendList(generics.ListAPIView):
             bucket.setdefault(p['receiver_id'], {})[p['component_type']] = p['id']
         ctx['pokes_by_receiver'] = bucket
 
+        # 11. Check-in subscriptions (version_w only)
+        if user.current_ver == 'version_w':
+            from adoorback.utils.content_types import get_check_in_type
+            ctx['check_in_subscription_ids'] = set(
+                Subscription.objects.filter(
+                    subscriber=user, content_type=get_check_in_type()
+                ).values_list('subscribed_to_id', flat=True)
+            )
+        else:
+            ctx['check_in_subscription_ids'] = set()
+
 
 class FriendListUpdate(generics.UpdateAPIView):
     serializer_class = UserFriendsUpdateSerializer
@@ -2015,6 +2026,64 @@ class UnsubscribeUserContent(generics.DestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class CheckInSubscribeAdd(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if request.user.current_ver != 'version_w':
+            return Response({'error': 'This feature is only available in version W.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        friend_id = request.data.get('friend_id')
+        if not friend_id:
+            return Response({'error': 'Friend ID must be provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            friend_id = int(friend_id)
+        except ValueError:
+            return Response({'error': 'Invalid Friend ID.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        friend = get_object_or_404(User, id=friend_id)
+
+        if not user.is_connected(friend):
+            return Response({'error': 'User is not your friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from adoorback.utils.content_types import get_check_in_type
+        check_in_ct = get_check_in_type()
+        if Subscription.objects.filter(subscriber=user, subscribed_to=friend, content_type=check_in_ct).exists():
+            return Response({'error': 'Already subscribed to this friend\'s check-in.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        Subscription.objects.create(subscriber=user, subscribed_to=friend, content_type=check_in_ct)
+        return Response({'message': 'Subscribed to check-in successfully.'}, status=status.HTTP_201_CREATED)
+
+
+class CheckInSubscribeDestroy(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def destroy(self, request, *args, **kwargs):
+        if request.user.current_ver != 'version_w':
+            return Response({'error': 'This feature is only available in version W.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        friend_id = kwargs.get('pk')
+        friend = get_object_or_404(User, id=friend_id)
+        from adoorback.utils.content_types import get_check_in_type
+        check_in_ct = get_check_in_type()
+        subscription = get_object_or_404(
+            Subscription, subscriber=request.user, subscribed_to=friend, content_type=check_in_ct
+        )
+        subscription.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class FriendFeed(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
@@ -2039,6 +2108,7 @@ class FriendFeed(generics.ListAPIView):
         return page
 
     def list(self, request, *args, **kwargs):
+        user = request.user
         queryset = self.get_queryset()
 
         # freeze notes before marking them as read
@@ -2050,6 +2120,17 @@ class FriendFeed(generics.ListAPIView):
             serialized_data = NoteSerializer(page, many=True, context=self.get_serializer_context()).data
         else:
             serialized_data = NoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
+
+        # inject is_check_in_subscribed into author_detail (version_w only)
+        if user.current_ver == 'version_w':
+            from adoorback.utils.content_types import get_check_in_type
+            check_in_sub_ids = set(Subscription.objects.filter(
+                subscriber=user, content_type=get_check_in_type()
+            ).values_list('subscribed_to_id', flat=True))
+            source_items = page if page is not None else notes_before_update
+            for item, serialized in zip(source_items, serialized_data):
+                if 'author_detail' in serialized and serialized['author_detail']:
+                    serialized['author_detail']['is_check_in_subscribed'] = item.author_id in check_in_sub_ids
 
         # mark all notes as read
         unread_note_ids = queryset.exclude(readers=request.user).values_list("id", flat=True)
@@ -2101,13 +2182,21 @@ class FullFriendFeed(generics.ListAPIView):
         page = self.paginate_queryset(frozen_items)
         objects_to_serialize = page if page is not None else frozen_items
 
+        # prefetch check-in subscriptions (version_w only)
+        check_in_sub_ids = set()
+        if user.current_ver == 'version_w':
+            from adoorback.utils.content_types import get_check_in_type
+            check_in_sub_ids = set(Subscription.objects.filter(
+                subscriber=user, content_type=get_check_in_type()
+            ).values_list('subscribed_to_id', flat=True))
+
         serialized_data = []
         for obj in objects_to_serialize:
             if isinstance(obj, Note):
                 serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
             elif isinstance(obj, _Response):
                 serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
-            # Add connection_status to author_detail for close friend indicator
+            # Add connection_status and is_check_in_subscribed to author_detail
             if 'author_detail' in serialized and serialized['author_detail']:
                 author = obj.author
                 if author == user:
@@ -2118,6 +2207,8 @@ class FullFriendFeed(generics.ListAPIView):
                     serialized['author_detail']['connection_status'] = 'friend'
                 else:
                     serialized['author_detail']['connection_status'] = None
+                if user.current_ver == 'version_w':
+                    serialized['author_detail']['is_check_in_subscribed'] = obj.author_id in check_in_sub_ids
             serialized_data.append(serialized)
 
         # mark all notes as read

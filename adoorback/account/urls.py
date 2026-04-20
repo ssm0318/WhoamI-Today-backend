@@ -92,6 +92,10 @@ urlpatterns = [
     path('friends/subscribe/', views.SubscribeUserContent.as_view(), name='subscribe-user-content'),
     path('friends/<int:pk>/subscribe/', views.UnsubscribeUserContent.as_view(), name='unsubscribe-user-content'),
 
+    # Check-in subscribe (version_w only)
+    path('friends/check-in-subscribe/', views.CheckInSubscribeAdd.as_view(), name='check-in-subscribe-add'),
+    path('friends/<int:pk>/check-in-subscribe/', views.CheckInSubscribeDestroy.as_view(), name='check-in-subscribe-destroy'),
+
     # TMI Placeholder
     path('tmi-placeholder/', views.TmiPlaceholder.as_view(), name='tmi-placeholder'),
 
