@@ -1,9 +1,6 @@
 name: Deploy Backend to Production Server
 
 on:
-  push:
-    branches:
-      - release/final-research
   workflow_dispatch:
 
 concurrency:
