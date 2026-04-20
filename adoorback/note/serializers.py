@@ -8,7 +8,7 @@ from rest_framework import serializers
 from account.serializers import UserMinimalSerializer
 from adoorback.serializers import AdoorBaseSerializer
 from adoorback.utils.content_types import get_generic_relation_type
-from note.models import Note
+from note.models import Note, ShareType
 from reaction.models import Reaction
 
 
@@ -67,11 +67,30 @@ class NoteSerializer(BaseNoteSerializer):
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
     visibility = VisibilityField(choices=['only_me', 'close_friends', 'friends', 'public'], required=True)
     share_type = serializers.CharField(required=False, default='regular')
+    content = serializers.CharField(required=False, allow_blank=True, default='')
 
     def validate_visibility(self, value):
         if len(value) != 1:
             raise serializers.ValidationError("Please select exactly one visibility option.")
         return list(value)
+
+    def validate(self, attrs):
+        if self.instance is not None:
+            return attrs
+
+        share_type = attrs.get('share_type') or ShareType.REGULAR
+        content = (attrs.get('content') or '').strip()
+        request = self.context.get('request')
+        has_images = bool(request.FILES.getlist('images')) if request else False
+
+        if share_type == ShareType.PHOTO_OF_THE_DAY:
+            if not has_images:
+                raise serializers.ValidationError({'images': 'Photo of the Day는 이미지가 필요합니다.'})
+        else:
+            if not content and not has_images:
+                raise serializers.ValidationError('텍스트 또는 이미지 중 하나 이상을 포함해야 합니다.')
+
+        return attrs
 
     def get_current_user_reaction_id_list(self, obj):
         current_user_id = self.context['request'].user.id
