@@ -2,6 +2,7 @@ import csv
 import json
 import os
 import traceback
+from datetime import timedelta
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -26,6 +27,91 @@ from qna.models import Response
 from django_countries.serializers import CountryFieldMixin
 
 User = get_user_model()
+
+CHECKIN_AUTO_ARCHIVE_HOURS = 12
+
+
+def viewer_sees_check_in_component(check_in, profile_user, viewer, visibility_field, updated_at_field):
+    """
+    Whether `viewer` may see a check-in component's value on another user's profile.
+    Applies 12h auto-archive (same as FriendListSerializer) and per-component visibility
+    (public / friends / close_friends / only_me).
+    """
+    if viewer == profile_user:
+        return True
+
+    updated_at = getattr(check_in, updated_at_field, None)
+    if updated_at and (timezone.now() - updated_at > timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)):
+        effective_vis = 'only_me'
+    else:
+        effective_vis = getattr(check_in, visibility_field)
+
+    if effective_vis == 'only_me':
+        return False
+    if effective_vis == 'public':
+        return True
+    if effective_vis == 'friends':
+        return viewer.is_connected(profile_user)
+    if effective_vis == 'close_friends':
+        if not viewer.is_close_friend(profile_user):
+            return False
+        connection = Connection.get_connection_between(profile_user, viewer)
+        if not connection:
+            return False
+        if profile_user == connection.user1:
+            update_past_posts = connection.user1_update_past_posts
+            upgrade_time = connection.user1_upgrade_time
+        else:
+            update_past_posts = connection.user2_update_past_posts
+            upgrade_time = connection.user2_upgrade_time
+        if update_past_posts:
+            return True
+        if upgrade_time is None:
+            return True
+        if check_in.created_at > upgrade_time:
+            return True
+        return False
+    return False
+
+
+def redact_check_in_base_data_for_viewer(data, check_in, profile_user, viewer):
+    """
+    Apply per-component visibility to a CheckInBaseSerializer payload (mutates a plain dict).
+    Single place for profile, read endpoint, and any other viewer-scoped check-in responses.
+    """
+    out = dict(data)
+    component_pairs = [
+        ('social_battery', 'battery_visibility', 'battery_updated_at'),
+        ('mood', 'mood_visibility', 'mood_updated_at'),
+        ('thought', 'thought_visibility', 'thought_updated_at'),
+        ('track_id', 'song_visibility', 'song_updated_at'),
+    ]
+    for value_field, vis_field, updated_field in component_pairs:
+        if not viewer_sees_check_in_component(
+            check_in, profile_user, viewer, vis_field, updated_field
+        ):
+            if value_field == 'mood':
+                out[value_field] = []
+            elif value_field == 'track_id':
+                out[value_field] = ''
+            else:
+                out[value_field] = None
+    return out
+
+
+def serialize_check_in_base_for_viewer(check_in, request, context=None):
+    """
+    CheckInBaseSerializer output with per-component redaction for `request.user`.
+    """
+    from check_in.serializers import CheckInBaseSerializer
+
+    ctx = dict(context) if context else {}
+    if request is not None:
+        ctx.setdefault('request', request)
+    data = CheckInBaseSerializer(check_in, read_only=True, context=ctx).data
+    return redact_check_in_base_data_for_viewer(
+        data, check_in, check_in.user, request.user
+    )
 
 
 class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
@@ -212,11 +298,12 @@ class UserProfileSerializer(UserMinimalSerializer):
         return False
     
     def get_check_in(self, obj):
-        from check_in.serializers import CheckInBaseSerializer
         user = self.context.get('request', None).user
         check_in = obj.check_in_set.filter(is_active=True).first()
         if check_in and CheckIn.is_audience(check_in, user):
-            return CheckInBaseSerializer(check_in, read_only=True, context=self.context).data
+            return serialize_check_in_base_for_viewer(
+                check_in, self.context.get('request'), self.context
+            )
         return {}
 
     def get_mutuals(self, obj):

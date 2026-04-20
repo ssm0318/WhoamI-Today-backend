@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 
 from adoorback.utils.validators import adoor_exception_handler
 
+from account.serializers import serialize_check_in_base_for_viewer
+
 from check_in.models import CheckIn, Song, Poke
 from reaction.models import Reaction
 from reaction.serializers import ReactionSerializer
@@ -104,6 +106,8 @@ class CheckInRead(generics.UpdateAPIView):
             raise exceptions.NotFound("Check-in not found.")
         if not check_in.is_active:
             raise exceptions.PermissionDenied("This check-in has been edited or deleted.")
+        if not check_in.is_audience(self.request.user):
+            raise exceptions.PermissionDenied("You cannot access this check-in.")
         return check_in
     
     def patch(self, request, *args, **kwargs):
@@ -113,8 +117,8 @@ class CheckInRead(generics.UpdateAPIView):
         current_user = self.request.user
         instance = self.get_object()
         instance.readers.add(current_user)
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = serialize_check_in_base_for_viewer(instance, request)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class CurrentUserLatestCheckInVisibility(generics.RetrieveAPIView):
@@ -341,6 +345,9 @@ class CheckInReact(APIView):
         if not check_in.is_active:
             raise exceptions.PermissionDenied("This check-in is no longer active.")
 
+        if not check_in.is_audience(request.user):
+            raise exceptions.PermissionDenied("You cannot interact with this check-in.")
+
         emoji = request.data.get('emoji')
         if not emoji:
             raise exceptions.ValidationError("emoji is required.")
@@ -392,6 +399,12 @@ class CheckInReactions(generics.ListAPIView):
             check_in = CheckIn.objects.get(id=pk)
         except CheckIn.DoesNotExist:
             raise exceptions.NotFound("Check-in not found.")
+
+        if not check_in.is_active:
+            raise exceptions.PermissionDenied("This check-in is no longer active.")
+
+        if not check_in.is_audience(self.request.user):
+            raise exceptions.PermissionDenied("You cannot access reactions for this check-in.")
 
         content_type = ContentType.objects.get_for_model(CheckIn)
         return Reaction.objects.filter(

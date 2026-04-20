@@ -48,7 +48,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  AppSessionSerializer, FriendFriendListSerializer, \
                                  UserMinimalSerializer, \
                                  UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
-                                 InterestSerializer, PersonaSerializer)
+                                 InterestSerializer, PersonaSerializer, viewer_sees_check_in_component)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -2139,13 +2139,29 @@ class DiscoverFeedView(generics.ListAPIView):
                 sort_order=i
             )
 
-        # Generate music tracks for discover feed
-        from check_in.models import Song
-        music_songs = Song.objects.filter(
+        # Generate music tracks for discover feed (respect check-in + song_visibility)
+        from check_in.models import Song, CheckIn as CheckInModel
+        music_candidates = Song.objects.filter(
             is_active=True,
         ).exclude(
             user_id__in=exclude_ids
-        ).select_related('user').order_by('-created_at')[:10]
+        ).select_related('user').order_by('-created_at')[:40]
+
+        music_songs = []
+        for song in music_candidates:
+            if len(music_songs) >= 10:
+                break
+            author = song.user
+            active_check_in = CheckInModel.objects.filter(user=author, is_active=True).first()
+            if not active_check_in:
+                continue
+            if not active_check_in.is_audience(user):
+                continue
+            if not viewer_sees_check_in_component(
+                active_check_in, author, user, 'song_visibility', 'song_updated_at'
+            ):
+                continue
+            music_songs.append(song)
 
         for idx, song in enumerate(music_songs):
             # Determine category based on author
