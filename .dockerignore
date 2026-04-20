@@ -8,3 +8,5 @@ __pycache__
 env/
 venv/
 .idea/
+*.sql
+db_backup/
