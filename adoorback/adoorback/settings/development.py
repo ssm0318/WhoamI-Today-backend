@@ -42,11 +42,19 @@ FRONTEND_URL = 'http://localhost:3000'
 # Use local Redis by default for WebSocket channel layer
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
+# Use In-Memory channel layer for development (no Redis required)
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
     },
 }
+
+# Uncomment below to use Redis (requires Redis server running)
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [REDIS_URL],
+#         },
+#     },
+# }
