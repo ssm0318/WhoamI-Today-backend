@@ -4,7 +4,7 @@ import traceback
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from rest_framework.exceptions import NotAuthenticated, AuthenticationFailed, PermissionDenied
+from rest_framework.exceptions import NotAuthenticated, AuthenticationFailed, PermissionDenied, Throttled
 from rest_framework.views import exception_handler
 
 from adoorback.utils.alerts import send_msg_to_slack, send_gmail_alert
@@ -52,8 +52,8 @@ def adoor_exception_handler(exc, context):
             return exception_handler(exc, context)
 
     # Slack notification
-    # Ignore authentication failures and user input related exceptions
-    if isinstance(exc, (NotAuthenticated, AuthenticationFailed)) or isinstance(exc, USER_INPUT_EXCEPTIONS):
+    # Ignore authentication failures, throttling, and user input related exceptions
+    if isinstance(exc, (NotAuthenticated, AuthenticationFailed, Throttled)) or isinstance(exc, USER_INPUT_EXCEPTIONS):
         return exception_handler(exc, context)
 
     slack_level = getattr(exc, 'slack_level', 'ERROR')  # Default is ERROR
