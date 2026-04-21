@@ -204,6 +204,10 @@ class ChatRequest(AdoorTimestampedModel, SafeDeleteModel):
         status = 'pending' if self.accepted is None else ('accepted' if self.accepted else 'declined')
         return f"ChatRequest from {self.requester} to {self.requestee} ({status})"
 
+    @property
+    def type(self):
+        return self.__class__.__name__
+
 
 @transaction.atomic
 def get_or_create_chat_room(user1, user2):

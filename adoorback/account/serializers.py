@@ -284,6 +284,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     connection_status = serializers.SerializerMethodField(read_only=True)
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
+    sent_chat_request_to = serializers.SerializerMethodField(read_only=True)
     unread_chat_count = serializers.SerializerMethodField(read_only=True)
     friend_count = serializers.SerializerMethodField(read_only=True)
     mutual_personas = serializers.SerializerMethodField(read_only=True)
@@ -369,7 +370,11 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_sent_friend_request_to(self, obj):
         user = self.context.get('request').user
         return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
-    
+
+    def get_sent_chat_request_to(self, obj):
+        user = self.context.get('request').user
+        return obj.received_chat_requests.filter(requester=user, accepted__isnull=True).exists()
+
     def get_unread_chat_count(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -424,8 +429,9 @@ class UserProfileSerializer(UserMinimalSerializer):
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
-        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals', 
+        fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals',
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
+                                                      'sent_chat_request_to',
                                                       'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'unread_chat_count', 'unread_message_cnt', 'connection_status',
                                                       'friend_count', 'email_verified',
