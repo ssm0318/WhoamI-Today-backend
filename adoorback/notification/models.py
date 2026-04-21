@@ -15,6 +15,7 @@ from notification.helpers import find_like_noti, construct_message
 
 from firebase_admin.messaging import Message
 from firebase_admin.messaging import Notification as FirebaseNotification
+from firebase_admin._messaging_utils import UnregisteredError
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
@@ -208,6 +209,9 @@ def notify_firebase(instance):
         )
         try:
             device.send_message(message)
+        except UnregisteredError:
+            device.active = False
+            device.save()
         except Exception as e:
             stack_trace = traceback.format_exc()
             send_msg_to_slack(
