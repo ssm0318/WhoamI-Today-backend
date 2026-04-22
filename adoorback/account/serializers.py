@@ -460,9 +460,35 @@ class FriendListSerializer(UserMinimalSerializer):
     thought_visibility = serializers.SerializerMethodField(read_only=True)
     sent_pokes = serializers.SerializerMethodField(read_only=True)
     is_check_in_subscribed = serializers.SerializerMethodField(read_only=True)
+    last_updated_field = serializers.SerializerMethodField(read_only=True)
 
     def get_is_check_in_subscribed(self, obj):
         return obj.id in self.context.get('check_in_subscription_ids', set())
+
+    def get_last_updated_field(self, obj):
+        check_in = self.check_in(obj)
+        if not check_in:
+            return None
+        candidates = []
+        if self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
+            ts = getattr(check_in, 'mood_updated_at', None)
+            if ts:
+                candidates.append(('mood', ts))
+        if self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
+            ts = getattr(check_in, 'battery_updated_at', None)
+            if ts:
+                candidates.append(('social_battery', ts))
+        if self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
+            ts = getattr(check_in, 'song_updated_at', None)
+            if ts:
+                candidates.append(('song', ts))
+        if self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
+            ts = getattr(check_in, 'thought_updated_at', None)
+            if ts:
+                candidates.append(('thought', ts))
+        if not candidates:
+            return None
+        return max(candidates, key=lambda c: c[1])[0]
 
     def get_sent_pokes(self, obj):
         return self.context.get('pokes_by_receiver', {}).get(obj.id, {})
@@ -608,7 +634,7 @@ class FriendListSerializer(UserMinimalSerializer):
                                                       'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
-                                                      'sent_pokes', 'is_check_in_subscribed']
+                                                      'sent_pokes', 'is_check_in_subscribed', 'last_updated_field']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
