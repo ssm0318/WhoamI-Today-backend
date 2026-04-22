@@ -1,6 +1,10 @@
+import contextlib
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+
+from account.signals import suppress_version_push
 
 User = get_user_model()
 
@@ -17,6 +21,10 @@ class Command(BaseCommand):
             '--user-ids', nargs='*', type=int,
             help='Only swap specific user IDs (default: all non-superusers).'
         )
+        parser.add_argument(
+            '--no-push', action='store_true',
+            help='Skip dispatching silent pushes for the current_ver changes.'
+        )
 
     def handle(self, *args, **options):
         queryset = User.objects.exclude(is_superuser=True)
@@ -25,14 +33,17 @@ class Command(BaseCommand):
 
         now = timezone.now()
         count = 0
-        for user in queryset:
-            old_ver = user.current_ver
-            user.current_ver = 'version_q' if old_ver == 'version_w' else 'version_w'
-            user.ver_changed_at = now
-            if not options['dry_run']:
-                user.save(update_fields=['current_ver', 'ver_changed_at'])
-            self.stdout.write(f'  {user.username}: {old_ver} -> {user.current_ver}')
-            count += 1
+        push_ctx = suppress_version_push() if options['no_push'] else contextlib.nullcontext()
+        with push_ctx:
+            for user in queryset:
+                old_ver = user.current_ver
+                user.current_ver = 'version_q' if old_ver == 'version_w' else 'version_w'
+                user.ver_changed_at = now
+                if not options['dry_run']:
+                    user.save(update_fields=['current_ver', 'ver_changed_at'])
+                self.stdout.write(f'  {user.username}: {old_ver} -> {user.current_ver}')
+                count += 1
 
         action = 'Would swap' if options['dry_run'] else 'Swapped'
-        self.stdout.write(self.style.SUCCESS(f'{action} {count} users.'))
+        push_note = ' (pushes suppressed)' if options['no_push'] and not options['dry_run'] else ''
+        self.stdout.write(self.style.SUCCESS(f'{action} {count} users.{push_note}'))
