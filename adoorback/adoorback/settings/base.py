@@ -189,12 +189,10 @@ CHANNEL_LAYERS = {
 # https://docs.djangoproject.com/en/3.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
-    {'NAME': 'adoorback.utils.validators.NumberValidator', },
-    {'NAME': 'adoorback.utils.validators.UppercaseValidator', },
-    {'NAME': 'adoorback.utils.validators.LowercaseValidator', },
-    {'NAME': 'adoorback.utils.validators.SymbolValidator', },
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator', },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 4},
+    },
 ]
 
 # Password reset token timeout (1 hour in seconds)
