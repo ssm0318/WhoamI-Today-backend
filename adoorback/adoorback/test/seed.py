@@ -17,6 +17,7 @@ from comment.models import Comment
 from like.models import Like
 from note.models import Note
 from qna.algorithms.data_crawler import select_daily_questions
+from qna.load_questions_tsv import bulk_create_questions_from_tsv
 from qna.models import Response, Question, ResponseRequest
 
 DEBUG = True
@@ -93,13 +94,31 @@ def set_seed(n):
     user = User.objects.get(username="adoor_2")
     logging.info("Superuser created!") if DEBUG else None
 
-    # Seed Article/AdminQuestion/CustomQuestionPost
+    # Seed admin questions from questions.tsv (production catalog)
     users = User.objects.all()
-    for _ in range(n):
-        user = random.choice(users)
-        (Question.objects.create(
-            author=admin, is_admin_question=True, content_en=faker.word(), content_ko=faker.word()))
-    logging.info(f"{Question.objects.count()} Question(s) created!") \
+    tsv_count, tsv_status = bulk_create_questions_from_tsv(
+        admin, skip_duplicates=True
+    )
+    if tsv_status == "missing_file":
+        for _ in range(n):
+            w = faker.word()
+            Question.objects.create(
+                author=admin,
+                is_admin_question=True,
+                content=w,
+                content_en=w,
+                content_ko=w,
+            )
+        logging.warning(
+            "questions.tsv missing; seeded %s placeholder admin questions", n
+        ) if DEBUG else None
+    elif DEBUG:
+        logging.info(
+            "Imported %s question(s) from questions.tsv (status=%s)",
+            tsv_count,
+            tsv_status,
+        )
+    logging.info(f"{Question.objects.count()} Question(s) in DB after seed!") \
         if DEBUG else None
 
     # Select Daily Questions for the past 10 days (including today)

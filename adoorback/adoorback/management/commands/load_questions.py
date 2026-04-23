@@ -1,33 +1,50 @@
-import csv
-
 from django.core.management.base import BaseCommand
 
 from account.models import User
-from qna.models import Question
+from qna.load_questions_tsv import bulk_create_questions_from_tsv, questions_tsv_path
 
 
 class Command(BaseCommand):
-    help = "Load questions from a TSV file and create Question objects"
+    help = "Load questions from questions.tsv and create Question objects (admin author)."
 
-    def handle(self, *args, **kwargs):
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--path",
+            type=str,
+            default=None,
+            help="TSV file path (default: assets/questions.tsv under BASE_DIR).",
+        )
+        parser.add_argument(
+            "--skip-duplicates",
+            action="store_true",
+            help="Skip rows whose (content_en, content_ko) already exists for this admin.",
+        )
+
+    def handle(self, *args, **options):
         admin = User.objects.filter(is_superuser=True).first()
         if not admin:
-            self.stdout.write(self.style.ERROR("No superuser found. Create a superuser first."))
+            self.stdout.write(
+                self.style.ERROR("No superuser found. Create a superuser first.")
+            )
             return
 
-        file_path = "adoorback/assets/questions.tsv"
+        path = options.get("path")
+        skip = options.get("skip_duplicates", False)
+        count, status = bulk_create_questions_from_tsv(
+            admin, path=path, skip_duplicates=skip
+        )
 
-        questions = []
-        with open(file_path, newline='', encoding='utf-8') as file:
-            reader = csv.DictReader(file, delimiter='\t')
-            for row in reader:
-                question = Question(
-                    author=admin,
-                    is_admin_question=True,
-                    content_en=row["content_en"],
-                    content_ko=row["content_ko"]
-                )
-                questions.append(question)
+        if status == "missing_file":
+            self.stdout.write(
+                self.style.ERROR(f"TSV not found: {questions_tsv_path(path)}")
+            )
+            return
+        if status == "nothing_new":
+            self.stdout.write(
+                self.style.WARNING("No new questions to import (all duplicates or empty).")
+            )
+            return
 
-        Question.objects.bulk_create(questions)
-        self.stdout.write(self.style.SUCCESS(f"{len(questions)} questions successfully imported."))
+        self.stdout.write(
+            self.style.SUCCESS(f"{count} questions successfully imported.")
+        )
