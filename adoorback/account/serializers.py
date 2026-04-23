@@ -285,6 +285,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     sent_friend_request_to = serializers.SerializerMethodField(read_only=True)
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     sent_chat_request_to = serializers.SerializerMethodField(read_only=True)
+    received_chat_request_from = serializers.SerializerMethodField(read_only=True)
     unread_chat_count = serializers.SerializerMethodField(read_only=True)
     friend_count = serializers.SerializerMethodField(read_only=True)
     mutual_personas = serializers.SerializerMethodField(read_only=True)
@@ -375,6 +376,11 @@ class UserProfileSerializer(UserMinimalSerializer):
         user = self.context.get('request').user
         return obj.received_chat_requests.filter(requester=user, accepted__isnull=True).exists()
 
+    def get_received_chat_request_from(self, obj):
+        user = self.context.get('request').user
+        req = obj.sent_chat_requests.filter(requestee=user, accepted__isnull=True).first()
+        return req.id if req else None
+
     def get_unread_chat_count(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -431,7 +437,7 @@ class UserProfileSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals',
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'sent_chat_request_to',
+                                                      'sent_chat_request_to', 'received_chat_request_from',
                                                       'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'unread_chat_count', 'unread_message_cnt', 'connection_status',
                                                       'friend_count', 'email_verified',
