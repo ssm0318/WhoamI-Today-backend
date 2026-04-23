@@ -1688,6 +1688,19 @@ class UserFriendDestroy(generics.DestroyAPIView):
         connection = Connection.get_connection_between(user, obj)
         connection.delete()
 
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from chat.views import _get_chat_group_name
+        channel_layer = get_channel_layer()
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                _get_chat_group_name(user.id, obj.id),
+                {"type": "friendship.broken", "data": {
+                    "action": "friendship_broken",
+                    "broken_by": user.id,
+                }},
+            )
+
 
 class UserFriendRequest(generics.ListCreateAPIView):
     queryset = FriendRequest.objects.all()

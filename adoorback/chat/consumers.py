@@ -149,3 +149,7 @@ class ChatConsumer(WebsocketConsumer):
         user = self.scope["user"]
         if event["data"]["user_id"] != user.id:
             self.send(text_data=json.dumps(event["data"]))
+
+    def friendship_broken(self, event):
+        """Notify both sides that the friendship between the chat participants was broken."""
+        self.send(text_data=json.dumps(event["data"]))
