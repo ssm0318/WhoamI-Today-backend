@@ -259,10 +259,21 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     personas_updated_at = models.DateTimeField(null=True, blank=True)
 
     # Visibility fields
+    # interests_friends_only / persona_friends_only are legacy — kept for migration backfill only.
+    # Per-category flags below are the source of truth.
     interests_friends_only = models.BooleanField(default=False)
     persona_friends_only = models.BooleanField(default=False)
     pronouns_friends_only = models.BooleanField(default=False)
     bio_friends_only = models.BooleanField(default=False)
+
+    # Per-category visibility (one flag per CHIP_CATEGORY_CHOICES key)
+    music_entertainment_friends_only = models.BooleanField(default=False)
+    hobbies_activities_friends_only = models.BooleanField(default=False)
+    on_my_mind_friends_only = models.BooleanField(default=False)
+    as_a_friend_friends_only = models.BooleanField(default=False)
+    online_persona_friends_only = models.BooleanField(default=False)
+    favorite_platform_friends_only = models.BooleanField(default=False)
+    least_favorite_platform_friends_only = models.BooleanField(default=False)
 
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
