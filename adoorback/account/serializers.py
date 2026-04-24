@@ -198,6 +198,9 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
                   'user_interests', 'user_personas', 'chips_by_category', 'custom_chips',
                   'interests_friends_only', 'persona_friends_only', 'pronouns_friends_only', 'bio_friends_only',
+                  'music_entertainment_friends_only', 'hobbies_activities_friends_only',
+                  'on_my_mind_friends_only', 'as_a_friend_friends_only', 'online_persona_friends_only',
+                  'favorite_platform_friends_only', 'least_favorite_platform_friends_only',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
@@ -419,9 +422,16 @@ class UserProfileSerializer(UserMinimalSerializer):
                  can_see_private = True
 
         if not can_see_private:
-            if instance.interests_friends_only:
-                ret['user_interests'] = []
-            if instance.persona_friends_only:
+            hidden_categories = {
+                cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
+                if getattr(instance, f"{cat_key}_friends_only", False)
+            }
+            if hidden_categories:
+                visible_interests = instance.user_interests.exclude(
+                    category__in=hidden_categories
+                ).values_list('content', flat=True)
+                ret['user_interests'] = list(visible_interests)
+            if instance.online_persona_friends_only:
                 ret['user_personas'] = []
             if instance.pronouns_friends_only:
                 ret['pronouns'] = None
@@ -453,7 +463,7 @@ class FriendListSerializer(UserMinimalSerializer):
     current_user_read = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     unread_post_cnt = serializers.SerializerMethodField(read_only=True)
-    latest_unread_post = serializers.SerializerMethodField(read_only=True)
+    recent_posts = serializers.SerializerMethodField(read_only=True)
     check_in_id = serializers.SerializerMethodField(read_only=True)
     track_id = serializers.SerializerMethodField(read_only=True)
     thought = serializers.SerializerMethodField(read_only=True)
@@ -548,28 +558,26 @@ class FriendListSerializer(UserMinimalSerializer):
         return (self.context.get('unread_note_count_by_author', {}).get(obj.id, 0)
                 + self.context.get('unread_response_count_by_author', {}).get(obj.id, 0))
 
-    def get_latest_unread_post(self, obj):
-        viewer_id = self.context['request'].user.id
-        unread = []
-        for n in self.context.get('visible_notes_by_author', {}).get(obj.id, []):
-            if viewer_id not in {r.id for r in n.readers.all()}:
-                unread.append(n)
-        for r in self.context.get('visible_resps_by_author', {}).get(obj.id, []):
-            if viewer_id not in {u.id for u in r.readers.all()}:
-                unread.append(r)
-        if not unread:
-            return None
-        latest = max(unread, key=lambda p: p.created_at)
-        if isinstance(latest, Note):
-            images = [img.image.url for img in sorted(latest.images.all(), key=lambda i: i.created_at)]
-        else:
-            images = []
-        return {
-            'id': latest.id,
-            'type': latest.type,
-            'content': latest.content,
-            'images': images,
-        }
+    def get_recent_posts(self, obj):
+        from itertools import chain
+        from note.serializers import NoteSerializer
+        from qna.serializers import ResponseSerializer
+        cutoff = timezone.now() - timedelta(hours=48)
+        notes = [n for n in self.context.get('visible_notes_by_author', {}).get(obj.id, [])
+                 if n.created_at >= cutoff]
+        resps = [r for r in self.context.get('visible_resps_by_author', {}).get(obj.id, [])
+                 if r.created_at >= cutoff]
+        combined = sorted(chain(notes, resps), key=lambda p: p.created_at, reverse=True)
+        out = []
+        for p in combined:
+            if isinstance(p, Note):
+                data = NoteSerializer(p, context=self.context).data
+                data['type'] = 'Note'
+            else:
+                data = ResponseSerializer(p, context=self.context).data
+                data['type'] = 'Response'
+            out.append(data)
+        return out
 
     def get_unread_cnt(self, obj):
         return self.context.get('unread_chat_count_by_friend_id', {}).get(obj.id, 0)
@@ -646,7 +654,7 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
-                                                      'unread_cnt', 'unread_post_cnt', 'latest_unread_post',
+                                                      'unread_cnt', 'unread_post_cnt', 'recent_posts',
                                                       'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',

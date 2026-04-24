@@ -1560,9 +1560,13 @@ class FriendList(generics.ListAPIView):
 
         # 9. Visible notes / responses (model instances, readers + images prefetched)
         notes_qs = (Note.objects.filter(author_id__in=friend_ids)
-                    .prefetch_related('readers', 'images'))
+                    .select_related('author')
+                    .prefetch_related('readers', 'images', 'note_likes',
+                                      'note_comments', 'note_comments__replies'))
         resps_qs = (QnaResponse.objects.filter(author_id__in=friend_ids)
-                    .prefetch_related('readers'))
+                    .select_related('author', 'question')
+                    .prefetch_related('readers', 'response_likes',
+                                      'response_comments', 'response_comments__replies'))
         visible_notes_by_author = defaultdict(list)
         for n in notes_qs:
             if _is_audience(n.author_id, n.visibility, n.pk, ct_note.id, n.created_at):

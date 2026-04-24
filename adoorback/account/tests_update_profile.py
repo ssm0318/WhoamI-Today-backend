@@ -55,31 +55,37 @@ class UserProfileUpdateTest(TestCase):
         self.assertEqual(noti.redirect_url, expected_url)
 
     def test_profile_visibility_update_and_view(self):
-        # User updates visibility preferences
+        # User updates visibility preferences (per-category flags are the source of truth)
         update_data = {
             'bio_friends_only': True,
-            'interests_friends_only': True,
             'pronouns_friends_only': True,
-            'persona_friends_only': True,
+            'music_entertainment_friends_only': True,
+            'hobbies_activities_friends_only': True,
+            'on_my_mind_friends_only': True,
+            'as_a_friend_friends_only': True,
+            'online_persona_friends_only': True,
+            'favorite_platform_friends_only': True,
+            'least_favorite_platform_friends_only': True,
             'bio': 'My secret bio',
             'pronouns': 'they/them'
         }
         res = self.client.patch(self.url, update_data)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        
+
         self.user.refresh_from_db()
         self.assertTrue(self.user.bio_friends_only)
+        self.assertTrue(self.user.online_persona_friends_only)
         self.assertEqual(self.user.bio, 'My secret bio')
-        
+
         # Another user, not friends, views the profile
         other_user = User.objects.create_user(username='viewer', email='viewer@example.com', password='password')
         other_client = APIClient()
         other_client.force_authenticate(user=other_user)
-        
+
         profile_url = reverse('user-detail', kwargs={'username': self.user.username})
         res = other_client.get(profile_url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        
+
         # Verify fields are hidden
         self.assertIsNone(res.data.get('bio'))
         self.assertIsNone(res.data.get('pronouns'))
