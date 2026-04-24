@@ -241,6 +241,117 @@ class CheckInRead(generics.UpdateAPIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+def _get_own_entry_or_404(user, pk):
+    """Fetch a CheckInComponentEntry scoped to the current user.
+
+    Other users' entries (and deleted rows) come back as 404 rather than
+    403 so the endpoint does not leak the existence of foreign rows.
+    """
+    try:
+        return CheckInComponentEntry.objects.get(pk=pk, owner=user)
+    except CheckInComponentEntry.DoesNotExist:
+        raise exceptions.NotFound("Entry not found.")
+
+
+def _is_live_entry(entry):
+    """True when the entry is still the live component value for its owner."""
+    if entry.superseded_at is not None:
+        return False
+    return timezone.now() - entry.created_at <= timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
+
+
+class ArchiveEntryPinToggle(APIView):
+    """PATCH /api/check_in/entries/<pk>/pin/
+
+    Body: none (toggles current pin state). When turning the pin ON the
+    entry's current `visibility` — the value the owner explicitly chose
+    at save time, not the auto-downgraded only_me — is copied into
+    `pin_visibility`. When turning OFF, `pin_visibility` is cleared.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        entry = _get_own_entry_or_404(request.user, pk)
+        if entry.is_pinned:
+            entry.is_pinned = False
+            entry.pin_visibility = None
+        else:
+            entry.is_pinned = True
+            entry.pin_visibility = entry.visibility
+        entry.save(update_fields=['is_pinned', 'pin_visibility', 'updated_at'])
+        return Response(
+            cs.ArchiveEntrySerializer(entry).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ArchiveEntryPinVisibility(APIView):
+    """PATCH /api/check_in/entries/<pk>/pin_visibility/
+
+    Body: {"pin_visibility": "public|friends|close_friends|only_me"}
+
+    Updates only the pin's independent visibility. Entries must already
+    be pinned; otherwise 400 so clients can't silently set a value that
+    has no effect.
+    """
+    permission_classes = [IsAuthenticated]
+
+    ALLOWED = {'public', 'friends', 'close_friends', 'only_me'}
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        entry = _get_own_entry_or_404(request.user, pk)
+        if not entry.is_pinned:
+            return Response(
+                {'detail': 'Entry is not pinned.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        value = request.data.get('pin_visibility')
+        if value not in self.ALLOWED:
+            return Response(
+                {'detail': f'pin_visibility must be one of {sorted(self.ALLOWED)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        entry.pin_visibility = value
+        entry.save(update_fields=['pin_visibility', 'updated_at'])
+        return Response(
+            cs.ArchiveEntrySerializer(entry).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ArchiveEntryDelete(APIView):
+    """DELETE /api/check_in/entries/<pk>/
+
+    Soft-deletes an archived entry via SafeDeleteModel (matches the rest
+    of the codebase). Live entries — superseded_at IS NULL AND created_at
+    within the 12h window — are rejected with 400 so the mutation can
+    only retire rows that have already aged out or been displaced.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def delete(self, request, pk):
+        entry = _get_own_entry_or_404(request.user, pk)
+        if _is_live_entry(entry):
+            return Response(
+                {'detail': 'Live entries cannot be deleted from the archive.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        entry.delete()  # SafeDeleteModel soft-delete (sets `deleted` timestamp)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class OwnArchiveEntries(generics.ListAPIView):
     """GET /check_in/entries/?tab=all|pinned&cursor=...
 
