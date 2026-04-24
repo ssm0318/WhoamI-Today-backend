@@ -195,6 +195,81 @@ class Song(AdoorTimestampedModel, SafeDeleteModel):
         ]
 
 
+class CheckInComponentEntry(AdoorTimestampedModel, SafeDeleteModel):
+    """
+    A single snapshot of one check-in component (battery/mood/thought/song).
+
+    Every component save creates a new entry. An entry is considered *live*
+    when it is the most recent non-superseded row for (owner, component) and
+    its created_at is within the 12h archive window. Once a newer entry is
+    written for the same component, the prior row's superseded_at is set.
+
+    Pinning is independent of the live/archive state: is_pinned + pin_visibility
+    let the owner surface any past entry on their profile and on each friend
+    card, with its own visibility decoupled from the original.
+    """
+
+    COMPONENT_CHOICES = [
+        ('battery', 'Battery'),
+        ('mood', 'Mood'),
+        ('thought', 'Thought'),
+        ('song', 'Song'),
+    ]
+
+    VISIBILITY_CHOICES = [
+        ('public', 'Public'),
+        ('friends', 'Friends'),
+        ('close_friends', 'Close Friends'),
+        ('only_me', 'Only Me'),
+    ]
+
+    owner = models.ForeignKey(
+        User,
+        related_name='check_in_entry_set',
+        on_delete=models.CASCADE,
+    )
+    component = models.CharField(max_length=20, choices=COMPONENT_CHOICES)
+    # Shape varies per component:
+    #   battery: {"social_battery": "<choice>"}
+    #   mood:    {"mood": ["🙂", ...]}            (up to 5 emoji strings)
+    #   thought: {"thought": "<string>"}
+    #   song:    {"track_id": "<spotify id>", "title": "<str>",
+    #             "artist": "<str>", "album_cover_url": "<str>"}
+    data = models.JSONField(default=dict, blank=True)
+    visibility = models.CharField(
+        max_length=20,
+        choices=VISIBILITY_CHOICES,
+        default='friends',
+    )
+    superseded_at = models.DateTimeField(null=True, blank=True)
+
+    is_pinned = models.BooleanField(default=False)
+    # null when not pinned; otherwise the pin's independent visibility
+    pin_visibility = models.CharField(
+        max_length=20,
+        choices=VISIBILITY_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['owner', 'component', '-created_at']),
+            models.Index(fields=['owner', 'is_pinned']),
+            models.Index(fields=['owner', 'component', 'superseded_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.owner.username} · {self.component} · {self.created_at:%Y-%m-%d %H:%M}"
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+
 class Poke(AdoorTimestampedModel, SafeDeleteModel):
     DAILY_POKE_LIMIT = 5
 
