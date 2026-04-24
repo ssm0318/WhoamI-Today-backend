@@ -138,19 +138,29 @@ def ensure_all(apps, schema_editor):
     if not column_exists(cursor, 'chat_chatroom', 'deleted_by_cascade'):
         cursor.execute("ALTER TABLE chat_chatroom ADD COLUMN deleted_by_cascade boolean NOT NULL DEFAULT false")
 
-    # Make user1/user2 nullable (0004 AlterField)
-    cursor.execute("""
-        ALTER TABLE chat_chatroom ALTER COLUMN user1_id DROP NOT NULL
-    """)
-    cursor.execute("""
-        ALTER TABLE chat_chatroom ALTER COLUMN user2_id DROP NOT NULL
-    """)
+    # Make user1/user2 nullable (0004 AlterField) — only if columns exist
+    if column_exists(cursor, 'chat_chatroom', 'user1_id'):
+        cursor.execute("ALTER TABLE chat_chatroom ALTER COLUMN user1_id DROP NOT NULL")
+    if column_exists(cursor, 'chat_chatroom', 'user2_id'):
+        cursor.execute("ALTER TABLE chat_chatroom ALTER COLUMN user2_id DROP NOT NULL")
 
     # =====================================================================
     # 5. Missing columns on chat_message
     # =====================================================================
+    if not column_exists(cursor, 'chat_message', 'receiver_id'):
+        cursor.execute(f"""
+            ALTER TABLE chat_message ADD COLUMN receiver_id bigint NULL
+            REFERENCES "{USER_TABLE}" (id)
+            ON DELETE CASCADE
+            DEFERRABLE INITIALLY DEFERRED
+        """)
+        cursor.execute("CREATE INDEX chat_message_receiver_id_idx ON chat_message (receiver_id)")
+
     if not column_exists(cursor, 'chat_message', 'emoji'):
         cursor.execute("ALTER TABLE chat_message ADD COLUMN emoji varchar(20) NULL")
+
+    if not column_exists(cursor, 'chat_message', 'is_read'):
+        cursor.execute("ALTER TABLE chat_message ADD COLUMN is_read boolean NOT NULL DEFAULT false")
 
     if not column_exists(cursor, 'chat_message', 'parent_id'):
         cursor.execute("ALTER TABLE chat_message ADD COLUMN parent_id bigint NULL REFERENCES chat_message (id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED")
@@ -183,7 +193,7 @@ def ensure_all(apps, schema_editor):
     if not index_exists(cursor, 'chat_messag_chat_ro_bda5c0_idx'):
         cursor.execute("CREATE INDEX chat_messag_chat_ro_bda5c0_idx ON chat_message (chat_room_id, created_at)")
 
-    if not index_exists(cursor, 'chat_messag_receive_14362e_idx'):
+    if not index_exists(cursor, 'chat_messag_receive_14362e_idx') and column_exists(cursor, 'chat_message', 'receiver_id') and column_exists(cursor, 'chat_message', 'is_read'):
         cursor.execute("CREATE INDEX chat_messag_receive_14362e_idx ON chat_message (receiver_id, is_read)")
 
     if not index_exists(cursor, 'chat_chatro_user1_i_3351ba_idx'):
