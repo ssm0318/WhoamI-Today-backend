@@ -12,7 +12,7 @@ from faker import Faker
 from account.models import FriendRequest, Connection, Interest, Persona
 from adoorback.utils.content_types import get_comment_type, get_response_type, get_question_type, get_note_type
 from chat.models import ChatRoom, Message, get_or_create_chat_room
-from check_in.models import CheckIn, Poke, Song
+from check_in.models import CheckIn, CheckInComponentEntry, Poke, Song
 from comment.models import Comment
 from like.models import Like
 from note.models import Note
@@ -735,4 +735,73 @@ def set_seed(n):
 
     logging.info("Check-in visibility test data created!") if DEBUG else None
 
+    # ===== ARCHIVE + PINNED CHECK-INS TEST DATA =====
+    _seed_archive_pins(User)
+
     logging.info("=== Comprehensive seed data complete! ===") if DEBUG else None
+
+
+def _seed_archive_pins(User):
+    """Populate CheckInComponentEntry pins across adoor_1's friends so the
+    archive + pinned-check-ins UI has testable data:
+
+    * Upgrades a couple of adoor_1 ↔ friend Connections to close_friend
+      (both directions) so close_friends pins register for the viewer.
+    * For every connected friend of adoor_1, picks their most-recent 4
+      archived entries and assigns one pin per visibility tier
+      (public / friends / close_friends / only_me). Missing tiers are
+      skipped if the friend doesn't have enough archive history.
+
+    Idempotent: running twice doesn't double-pin rows (each friend's
+    slice is re-stamped to the same state). Safe to call from set_seed
+    or standalone via `python manage.py shell -c 'from adoorback.test.seed
+    import _seed_archive_pins; from django.contrib.auth import
+    get_user_model; _seed_archive_pins(get_user_model())'`.
+    """
+    try:
+        viewer = User.objects.get(username='adoor_1')
+    except User.DoesNotExist:
+        logging.info("adoor_1 not found; skipping archive pin seed.") if DEBUG else None
+        return
+
+    # Upgrade two of adoor_1's friends to close_friend in both directions
+    # so the close_friends pin visibility tier is reachable from adoor_1.
+    # Uses the canonical sort-by-id rule the existing seed sections use.
+    close_pair_targets = ['admin', 'adoor_2']
+    for username in close_pair_targets:
+        try:
+            other = User.objects.get(username=username)
+        except User.DoesNotExist:
+            continue
+        conn = Connection.get_connection_between(viewer, other)
+        if not conn:
+            u1, u2 = (viewer, other) if viewer.id < other.id else (other, viewer)
+            conn = Connection.objects.create(
+                user1=u1, user2=u2, user1_choice='close_friend', user2_choice='close_friend'
+            )
+        else:
+            conn.user1_choice = 'close_friend'
+            conn.user2_choice = 'close_friend'
+            conn.save(update_fields=['user1_choice', 'user2_choice'])
+
+    # Pin diverse archive entries on every connected friend so the Friends
+    # tab chip renders with non-zero counts for most of the list.
+    visibility_cycle = ['public', 'friends', 'close_friends', 'only_me']
+    friends = list(viewer.connected_users.all())
+    pinned_total = 0
+    for friend in friends:
+        archived_entries = list(
+            CheckInComponentEntry.objects
+            .filter(owner=friend, superseded_at__isnull=False)
+            .order_by('-id')[:len(visibility_cycle)]
+        )
+        for entry, vis in zip(archived_entries, visibility_cycle):
+            CheckInComponentEntry.objects.filter(pk=entry.pk).update(
+                is_pinned=True,
+                pin_visibility=vis,
+            )
+            pinned_total += 1
+
+    logging.info(
+        f"Seeded {pinned_total} archive pins across {len(friends)} of adoor_1's friends."
+    ) if DEBUG else None
