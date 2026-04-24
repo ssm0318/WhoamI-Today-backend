@@ -467,6 +467,16 @@ class FriendListSerializer(UserMinimalSerializer):
     sent_pokes = serializers.SerializerMethodField(read_only=True)
     is_check_in_subscribed = serializers.SerializerMethodField(read_only=True)
     last_updated_field = serializers.SerializerMethodField(read_only=True)
+    pinned_count = serializers.SerializerMethodField(read_only=True)
+
+    def get_pinned_count(self, obj):
+        """Viewer-visible pinned archive entries for this friend.
+
+        Hydrated from the context bulk-fetch in
+        `FriendList._build_batch_context` so a page of friends costs one
+        query total, not one-per-card.
+        """
+        return self.context.get('pinned_count_by_friend_id', {}).get(obj.id, 0)
 
     def get_is_check_in_subscribed(self, obj):
         return obj.id in self.context.get('check_in_subscription_ids', set())
@@ -640,7 +650,8 @@ class FriendListSerializer(UserMinimalSerializer):
                                                       'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
-                                                      'sent_pokes', 'is_check_in_subscribed', 'last_updated_field']
+                                                      'sent_pokes', 'is_check_in_subscribed', 'last_updated_field',
+                                                      'pinned_count']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):

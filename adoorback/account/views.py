@@ -1447,6 +1447,7 @@ class FriendList(generics.ListAPIView):
                 'user_report_blocked_ids': set(),
                 'content_report_keys': set(),
                 'pokes_by_receiver': {},
+                'pinned_count_by_friend_id': {},
             })
             return
 
@@ -1582,6 +1583,42 @@ class FriendList(generics.ListAPIView):
         for p in pokes:
             bucket.setdefault(p['receiver_id'], {})[p['component_type']] = p['id']
         ctx['pokes_by_receiver'] = bucket
+
+        # 11. Viewer-visible pinned archive entries per friend.
+        # Avoids N+1 on the friend-card `Pinned Check-ins (N)` chip by
+        # bulk-fetching all pinned rows for this page's friends in one
+        # query and applying pin_visibility × relationship filtering in
+        # Python, reusing the same helpers that drive the single-user
+        # pinned endpoint. Only fields required for the filter are
+        # selected so the scan is cheap even for heavy users.
+        from check_in.models import CheckInComponentEntry
+
+        pinned_rows = CheckInComponentEntry.objects.filter(
+            owner_id__in=friend_ids,
+            is_pinned=True,
+            pin_visibility__isnull=False,
+        ).values('owner_id', 'pin_visibility', 'created_at')
+
+        pinned_count_by_friend_id = {}
+        for row in pinned_rows:
+            owner_id = row['owner_id']
+            if owner_id in user_report_blocked_ids:
+                continue
+            vis = row['pin_visibility']
+            if vis == 'only_me':
+                continue
+            if vis in ('public', 'friends'):
+                # Every entry in friend_ids is already connected_users, so
+                # `friends` visibility is trivially satisfied.
+                pinned_count_by_friend_id[owner_id] = (
+                    pinned_count_by_friend_id.get(owner_id, 0) + 1
+                )
+            elif vis == 'close_friends':
+                if _passes_close_friends(owner_id, row['created_at']):
+                    pinned_count_by_friend_id[owner_id] = (
+                        pinned_count_by_friend_id.get(owner_id, 0) + 1
+                    )
+        ctx['pinned_count_by_friend_id'] = pinned_count_by_friend_id
 
         # 11. Check-in subscriptions (version_w only)
         if user.current_ver == 'version_w':
