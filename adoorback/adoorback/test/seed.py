@@ -504,7 +504,7 @@ def set_seed(n):
         f"{Like.objects.count()} Like(s) created!") if DEBUG else None
 
     # Seed Chat Messages
-    for chat_room in ChatRoom.objects.all():
+    for chat_room in ChatRoom.objects.filter(is_group=False, user1__isnull=False, user2__isnull=False):
         users = [chat_room.user1, chat_room.user2]
         for sender in users:
             receiver = chat_room.user2 if sender == chat_room.user1 else chat_room.user1

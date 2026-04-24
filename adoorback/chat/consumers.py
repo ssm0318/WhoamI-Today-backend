@@ -87,10 +87,23 @@ class ChatConsumer(WebsocketConsumer):
     """WebSocket consumer for real-time chat message and reaction delivery."""
 
     def connect(self):
+        from chat.models import ChatRoom
+
         user = self.scope["user"]
         other_user_id = int(self.scope["url_route"]["kwargs"]["user_id"])
 
         ids = sorted([user.id, other_user_id])
+
+        if user.id not in ids:
+            self.close()
+            return
+
+        if not ChatRoom.objects.filter(
+            user1_id=ids[0], user2_id=ids[1], is_group=False
+        ).exists():
+            self.close()
+            return
+
         self.room_group_id = f"chat_{ids[0]}_{ids[1]}"
 
         async_to_sync(self.channel_layer.group_add)(
