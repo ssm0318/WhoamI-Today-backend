@@ -224,6 +224,32 @@ class MySongSerializer(SongBaseSerializer):
         fields = SongBaseSerializer.Meta.fields
 
 
+class ArchiveEntrySerializer(serializers.ModelSerializer):
+    """Read serializer for the owner's archive feed.
+
+    Surfaces every field needed to render a square card in the 2-col grid:
+    the component type and payload, the entry's visibility (for the pin's
+    inherited value and the per-card ⋯ → modify visibility modal), the
+    pin state + its independent visibility, and the original created_at
+    timestamp (the grid groups by date and renders timestamps relative
+    for <7d old / absolute otherwise).
+    """
+
+    class Meta:
+        model = CheckInComponentEntry
+        fields = [
+            'id',
+            'component',
+            'data',
+            'visibility',
+            'is_pinned',
+            'pin_visibility',
+            'created_at',
+            'superseded_at',
+        ]
+        read_only_fields = fields
+
+
 class PokeSerializer(serializers.ModelSerializer):
     receiver_id = serializers.IntegerField(write_only=True)
 
