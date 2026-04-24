@@ -50,6 +50,7 @@ urlpatterns = [
     path('<str:username>/friend-list/', views.FriendFriendList.as_view(), name='friend-friend-list'),
     path('<str:username>/all-posts/', views.UserAllPostList.as_view(), name='user-all-post-list'),
     path('<str:username>/unread-posts/', views.UserUnreadPostList.as_view(), name='user-unread-post-list'),
+    path('<str:username>/check_in/pinned/', views.UserPinnedCheckInEntries.as_view(), name='user-check-in-pinned'),
     path('mark-all-notes-as-read/', views.UserMarkAllNotesAsRead.as_view(), name='user-mark-all-notes-as-read'),
     path('mark-all-responses-as-read/', views.UserMarkAllResponsesAsRead.as_view(), name='user-mark-all-responses-as-read'),
 

@@ -1,10 +1,13 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from rest_framework import generics, exceptions, status
+from rest_framework import generics, exceptions, pagination, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,12 +16,43 @@ from adoorback.utils.validators import adoor_exception_handler
 
 from account.serializers import serialize_check_in_base_for_viewer
 
-from check_in.models import CheckIn, Song, Poke
+from check_in.models import CheckIn, CheckInComponentEntry, Song, Poke
 from reaction.models import Reaction
 from reaction.serializers import ReactionSerializer
 import check_in.serializers as cs
 
 User = get_user_model()
+
+
+CHECKIN_AUTO_ARCHIVE_HOURS = 12
+
+
+def _archive_filter(user):
+    """Queryset filter for the OP's archive view.
+
+    An entry is "archived" (belongs in the feed) when it is no longer live —
+    i.e. either it has been superseded by a newer entry for the same
+    (owner, component), or its created_at is older than the 12h auto-archive
+    window. This mirrors the visibility collapse in CheckInBaseSerializer.
+    """
+    threshold = timezone.now() - timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
+    return CheckInComponentEntry.objects.filter(owner=user).filter(
+        Q(superseded_at__isnull=False) | Q(created_at__lt=threshold)
+    )
+
+
+class ArchiveCursorPagination(pagination.CursorPagination):
+    """Cursor-paginated feed for the archive endpoint.
+
+    Ordering by `-id` rather than `-created_at` so the cursor value is
+    guaranteed unique (CursorPagination requires strict ordering). For
+    append-only entry rows the id order matches the chronological order
+    — including the backfilled rows, since they were bulk_create'd in
+    ascending created_at order.
+    """
+    page_size = 20
+    ordering = '-id'
+    cursor_query_param = 'cursor'
 
 
 # --- Check-in subscription notification helpers ---
@@ -205,6 +239,154 @@ class CheckInRead(generics.UpdateAPIView):
         instance.readers.add(current_user)
         data = serialize_check_in_base_for_viewer(instance, request)
         return Response(data, status=status.HTTP_200_OK)
+
+
+def _get_own_entry_or_404(user, pk):
+    """Fetch a CheckInComponentEntry scoped to the current user.
+
+    Other users' entries (and deleted rows) come back as 404 rather than
+    403 so the endpoint does not leak the existence of foreign rows.
+    """
+    try:
+        return CheckInComponentEntry.objects.get(pk=pk, owner=user)
+    except CheckInComponentEntry.DoesNotExist:
+        raise exceptions.NotFound("Entry not found.")
+
+
+def _is_live_entry(entry):
+    """True when the entry is still the live component value for its owner."""
+    if entry.superseded_at is not None:
+        return False
+    return timezone.now() - entry.created_at <= timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
+
+
+class ArchiveEntryPinToggle(APIView):
+    """PATCH /api/check_in/entries/<pk>/pin/
+
+    Body: none (toggles current pin state). When turning the pin ON the
+    entry's current `visibility` — the value the owner explicitly chose
+    at save time, not the auto-downgraded only_me — is copied into
+    `pin_visibility`. When turning OFF, `pin_visibility` is cleared.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        entry = _get_own_entry_or_404(request.user, pk)
+        if entry.is_pinned:
+            entry.is_pinned = False
+            entry.pin_visibility = None
+        else:
+            entry.is_pinned = True
+            entry.pin_visibility = entry.visibility
+        entry.save(update_fields=['is_pinned', 'pin_visibility', 'updated_at'])
+        return Response(
+            cs.ArchiveEntrySerializer(entry).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ArchiveEntryPinVisibility(APIView):
+    """PATCH /api/check_in/entries/<pk>/pin_visibility/
+
+    Body: {"pin_visibility": "public|friends|close_friends|only_me"}
+
+    Updates only the pin's independent visibility. Entries must already
+    be pinned; otherwise 400 so clients can't silently set a value that
+    has no effect.
+    """
+    permission_classes = [IsAuthenticated]
+
+    ALLOWED = {'public', 'friends', 'close_friends', 'only_me'}
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        entry = _get_own_entry_or_404(request.user, pk)
+        if not entry.is_pinned:
+            return Response(
+                {'detail': 'Entry is not pinned.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        value = request.data.get('pin_visibility')
+        if value not in self.ALLOWED:
+            return Response(
+                {'detail': f'pin_visibility must be one of {sorted(self.ALLOWED)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        entry.pin_visibility = value
+        entry.save(update_fields=['pin_visibility', 'updated_at'])
+        return Response(
+            cs.ArchiveEntrySerializer(entry).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ArchiveEntryDelete(APIView):
+    """DELETE /api/check_in/entries/<pk>/
+
+    Soft-deletes an archived entry via SafeDeleteModel (matches the rest
+    of the codebase). Live entries — superseded_at IS NULL AND created_at
+    within the 12h window — are rejected with 400 so the mutation can
+    only retire rows that have already aged out or been displaced.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def delete(self, request, pk):
+        entry = _get_own_entry_or_404(request.user, pk)
+        if _is_live_entry(entry):
+            return Response(
+                {'detail': 'Live entries cannot be deleted from the archive.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        entry.delete()  # SafeDeleteModel soft-delete (sets `deleted` timestamp)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class OwnArchiveEntries(generics.ListAPIView):
+    """GET /check_in/entries/?tab=all|pinned&cursor=...
+
+    Owner-only archive feed of per-component entries. Excludes live entries
+    (superseded_at IS NULL AND created_at within the 12h window). The flat
+    list is ordered newest-first; the frontend groups by `created_at` date
+    to render the section headers (Today / Yesterday / Mar 12 / …). The
+    top-level response augments the default paginated payload with
+    `pinned_count` (OP's total pinned archived entries) and
+    `archived_count` (total archived rows, unfiltered by tab) so the
+    `[ All (N) | Pinned (M) ]` segmented control can render without a
+    second request.
+    """
+    serializer_class = cs.ArchiveEntrySerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = ArchiveCursorPagination
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = _archive_filter(user)
+        tab = self.request.query_params.get('tab', 'all')
+        if tab == 'pinned':
+            qs = qs.filter(is_pinned=True)
+        return qs.order_by('-id')
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        user = request.user
+        archived_qs = _archive_filter(user)
+        response.data['archived_count'] = archived_qs.count()
+        response.data['pinned_count'] = archived_qs.filter(is_pinned=True).count()
+        return response
 
 
 class CurrentUserLatestCheckInVisibility(generics.RetrieveAPIView):

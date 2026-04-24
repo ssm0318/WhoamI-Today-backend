@@ -779,6 +779,109 @@ class UserUnreadPostList(generics.ListAPIView):
         return Response(serialized_data)
 
 
+def _viewer_can_see_pinned_entry(entry, owner, viewer):
+    """Pin visibility check for a given viewer.
+
+    Mirrors the rules used by viewer_sees_check_in_component (public /
+    friends / close_friends with upgrade-time handling) but applied to
+    entry.pin_visibility. Unlike the live check-in collapse, pinned
+    entries are not subject to the 12h only_me auto-archive — a pin is
+    an explicit sharing action that the owner can modify anytime via
+    the archive's ⋯ → modify visibility modal.
+    """
+    vis = entry.pin_visibility
+    if vis is None:
+        return False
+    if viewer == owner:
+        return True
+    if vis == 'only_me':
+        return False
+    if vis == 'public':
+        return True
+    if vis == 'friends':
+        return viewer.is_connected(owner)
+    if vis == 'close_friends':
+        if not viewer.is_close_friend(owner):
+            return False
+        connection = Connection.get_connection_between(owner, viewer)
+        if not connection:
+            return False
+        if owner == connection.user1:
+            update_past_posts = connection.user1_update_past_posts
+            upgrade_time = connection.user1_upgrade_time
+        else:
+            update_past_posts = connection.user2_update_past_posts
+            upgrade_time = connection.user2_upgrade_time
+        if update_past_posts:
+            return True
+        if upgrade_time is None:
+            return True
+        if entry.created_at > upgrade_time:
+            return True
+        return False
+    return False
+
+
+class UserPinnedCheckInEntries(generics.ListAPIView):
+    """GET /api/user/<username>/check_in/pinned/
+
+    Friend-visible pinned archive entries for the target user. Response
+    matches the owner archive feed (cursor-paginated flat list, newest
+    first, each row carrying id/component/data/visibility/is_pinned/
+    pin_visibility/created_at/superseded_at). The top-level
+    `pinned_count` reflects only pins this viewer can see, so it powers
+    the friend card's `Pinned Check-ins (N)` badge directly — no
+    second request.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @property
+    def pagination_class(self):
+        from check_in.views import ArchiveCursorPagination
+        return ArchiveCursorPagination
+
+    def get_serializer_class(self):
+        from check_in.serializers import ArchiveEntrySerializer
+        return ArchiveEntrySerializer
+
+    def _get_owner(self):
+        if not hasattr(self, '_cached_owner'):
+            self._cached_owner = get_object_or_404(
+                User, username=self.kwargs.get('username')
+            )
+        return self._cached_owner
+
+    def _visible_ids(self):
+        if hasattr(self, '_cached_visible_ids'):
+            return self._cached_visible_ids
+        from check_in.models import CheckInComponentEntry
+        viewer = self.request.user
+        owner = self._get_owner()
+        # User-level block short-circuit — mirrors CheckIn.is_audience.
+        if owner.id in viewer.user_report_blocked_ids:
+            self._cached_visible_ids = []
+            return self._cached_visible_ids
+        qs = CheckInComponentEntry.objects.filter(owner=owner, is_pinned=True)
+        self._cached_visible_ids = [
+            e.id for e in qs
+            if _viewer_can_see_pinned_entry(e, owner, viewer)
+        ]
+        return self._cached_visible_ids
+
+    def get_queryset(self):
+        from check_in.models import CheckInComponentEntry
+        ids = self._visible_ids()
+        return CheckInComponentEntry.objects.filter(id__in=ids).order_by('-id')
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        response.data['pinned_count'] = len(self._visible_ids())
+        return response
+
+
 class CurrentUserLatestVisibility(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -787,7 +890,7 @@ class CurrentUserLatestVisibility(APIView):
 
     def get(self, request):
         user = request.user
-        
+
         latest_note = Note.objects.filter(author=user).order_by('-created_at').first()
         latest_response = _Response.objects.filter(author=user).order_by('-created_at').first()
         
@@ -1344,6 +1447,7 @@ class FriendList(generics.ListAPIView):
                 'user_report_blocked_ids': set(),
                 'content_report_keys': set(),
                 'pokes_by_receiver': {},
+                'pinned_count_by_friend_id': {},
             })
             return
 
@@ -1479,6 +1583,42 @@ class FriendList(generics.ListAPIView):
         for p in pokes:
             bucket.setdefault(p['receiver_id'], {})[p['component_type']] = p['id']
         ctx['pokes_by_receiver'] = bucket
+
+        # 11. Viewer-visible pinned archive entries per friend.
+        # Avoids N+1 on the friend-card `Pinned Check-ins (N)` chip by
+        # bulk-fetching all pinned rows for this page's friends in one
+        # query and applying pin_visibility × relationship filtering in
+        # Python, reusing the same helpers that drive the single-user
+        # pinned endpoint. Only fields required for the filter are
+        # selected so the scan is cheap even for heavy users.
+        from check_in.models import CheckInComponentEntry
+
+        pinned_rows = CheckInComponentEntry.objects.filter(
+            owner_id__in=friend_ids,
+            is_pinned=True,
+            pin_visibility__isnull=False,
+        ).values('owner_id', 'pin_visibility', 'created_at')
+
+        pinned_count_by_friend_id = {}
+        for row in pinned_rows:
+            owner_id = row['owner_id']
+            if owner_id in user_report_blocked_ids:
+                continue
+            vis = row['pin_visibility']
+            if vis == 'only_me':
+                continue
+            if vis in ('public', 'friends'):
+                # Every entry in friend_ids is already connected_users, so
+                # `friends` visibility is trivially satisfied.
+                pinned_count_by_friend_id[owner_id] = (
+                    pinned_count_by_friend_id.get(owner_id, 0) + 1
+                )
+            elif vis == 'close_friends':
+                if _passes_close_friends(owner_id, row['created_at']):
+                    pinned_count_by_friend_id[owner_id] = (
+                        pinned_count_by_friend_id.get(owner_id, 0) + 1
+                    )
+        ctx['pinned_count_by_friend_id'] = pinned_count_by_friend_id
 
         # 11. Check-in subscriptions (version_w only)
         if user.current_ver == 'version_w':

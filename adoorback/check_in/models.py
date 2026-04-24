@@ -72,14 +72,33 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         is_new = self.pk is None
         content_changed = False
 
+        # Each item: (component, kind, data_or_None, visibility_or_None)
+        # Replayed post-super() to keep CheckInComponentEntry in sync.
+        pending_entry_ops = []
+
         if is_new:
             # Set all component timestamps on creation if content exists
             if self.social_battery:
                 self.battery_updated_at = now
+                pending_entry_ops.append((
+                    'battery', 'create_or_update',
+                    {'social_battery': self.social_battery},
+                    self.battery_visibility,
+                ))
             if self.mood:
                 self.mood_updated_at = now
+                pending_entry_ops.append((
+                    'mood', 'create_or_update',
+                    {'mood': list(self.mood)},
+                    self.mood_visibility,
+                ))
             if self.thought:
                 self.thought_updated_at = now
+                pending_entry_ops.append((
+                    'thought', 'create_or_update',
+                    {'thought': self.thought},
+                    self.thought_visibility,
+                ))
             # song_updated_at is set separately since Song is a separate model
         else:
             # On update, detect which fields changed and update their timestamps
@@ -89,18 +108,83 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
                 old = None
 
             if old:
-                if self.social_battery != old.social_battery or self.battery_visibility != old.battery_visibility:
+                # Battery
+                b_data_changed = self.social_battery != old.social_battery
+                b_vis_changed = self.battery_visibility != old.battery_visibility
+                if b_data_changed or b_vis_changed:
                     self.battery_updated_at = now
                     content_changed = True
-                if self.mood != old.mood or self.mood_visibility != old.mood_visibility:
+                    if b_data_changed:
+                        if self.social_battery:
+                            pending_entry_ops.append((
+                                'battery', 'create_or_update',
+                                {'social_battery': self.social_battery},
+                                self.battery_visibility,
+                            ))
+                        else:
+                            pending_entry_ops.append(
+                                ('battery', 'clear', None, None)
+                            )
+                    else:
+                        pending_entry_ops.append((
+                            'battery', 'visibility_only',
+                            None, self.battery_visibility,
+                        ))
+
+                # Mood
+                m_data_changed = self.mood != old.mood
+                m_vis_changed = self.mood_visibility != old.mood_visibility
+                if m_data_changed or m_vis_changed:
                     self.mood_updated_at = now
                     content_changed = True
-                if self.thought != old.thought or self.thought_visibility != old.thought_visibility:
+                    if m_data_changed:
+                        if self.mood:
+                            pending_entry_ops.append((
+                                'mood', 'create_or_update',
+                                {'mood': list(self.mood)},
+                                self.mood_visibility,
+                            ))
+                        else:
+                            pending_entry_ops.append(
+                                ('mood', 'clear', None, None)
+                            )
+                    else:
+                        pending_entry_ops.append((
+                            'mood', 'visibility_only',
+                            None, self.mood_visibility,
+                        ))
+
+                # Thought
+                t_data_changed = self.thought != old.thought
+                t_vis_changed = self.thought_visibility != old.thought_visibility
+                if t_data_changed or t_vis_changed:
                     self.thought_updated_at = now
                     content_changed = True
+                    if t_data_changed:
+                        if self.thought:
+                            pending_entry_ops.append((
+                                'thought', 'create_or_update',
+                                {'thought': self.thought},
+                                self.thought_visibility,
+                            ))
+                        else:
+                            pending_entry_ops.append(
+                                ('thought', 'clear', None, None)
+                            )
+                    else:
+                        pending_entry_ops.append((
+                            'thought', 'visibility_only',
+                            None, self.thought_visibility,
+                        ))
+
+                # Song (data owned by Song model; visibility lives here)
                 if self.song_visibility != old.song_visibility:
                     self.song_updated_at = now
                     content_changed = True
+                    pending_entry_ops.append((
+                        'song', 'visibility_only',
+                        None, self.song_visibility,
+                    ))
 
         super().save(*args, **kwargs)
 
@@ -108,6 +192,31 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         if content_changed:
             self.readers.clear()
             self.readers.add(self.user)
+
+        # Replay component diffs into the entry table.
+        if pending_entry_ops:
+            with transaction.atomic():
+                for component, kind, data, visibility in pending_entry_ops:
+                    if kind == 'create_or_update':
+                        CheckInComponentEntry.upsert_live(
+                            owner=self.user,
+                            component=component,
+                            data=data,
+                            visibility=visibility,
+                            at=now,
+                        )
+                    elif kind == 'clear':
+                        CheckInComponentEntry.supersede_live(
+                            owner=self.user,
+                            component=component,
+                            at=now,
+                        )
+                    elif kind == 'visibility_only':
+                        CheckInComponentEntry.update_live_visibility(
+                            owner=self.user,
+                            component=component,
+                            visibility=visibility,
+                        )
 
     @property
     def author(self):
@@ -195,6 +304,139 @@ class Song(AdoorTimestampedModel, SafeDeleteModel):
         ]
 
 
+class CheckInComponentEntry(AdoorTimestampedModel, SafeDeleteModel):
+    """
+    A single snapshot of one check-in component (battery/mood/thought/song).
+
+    Every component save creates a new entry. An entry is considered *live*
+    when it is the most recent non-superseded row for (owner, component) and
+    its created_at is within the 12h archive window. Once a newer entry is
+    written for the same component, the prior row's superseded_at is set.
+
+    Pinning is independent of the live/archive state: is_pinned + pin_visibility
+    let the owner surface any past entry on their profile and on each friend
+    card, with its own visibility decoupled from the original.
+    """
+
+    COMPONENT_CHOICES = [
+        ('battery', 'Battery'),
+        ('mood', 'Mood'),
+        ('thought', 'Thought'),
+        ('song', 'Song'),
+    ]
+
+    VISIBILITY_CHOICES = [
+        ('public', 'Public'),
+        ('friends', 'Friends'),
+        ('close_friends', 'Close Friends'),
+        ('only_me', 'Only Me'),
+    ]
+
+    owner = models.ForeignKey(
+        User,
+        related_name='check_in_entry_set',
+        on_delete=models.CASCADE,
+    )
+    component = models.CharField(max_length=20, choices=COMPONENT_CHOICES)
+    # Shape varies per component:
+    #   battery: {"social_battery": "<choice>"}
+    #   mood:    {"mood": ["🙂", ...]}            (up to 5 emoji strings)
+    #   thought: {"thought": "<string>"}
+    #   song:    {"track_id": "<spotify id>", "title": "<str>",
+    #             "artist": "<str>", "album_cover_url": "<str>"}
+    data = models.JSONField(default=dict, blank=True)
+    visibility = models.CharField(
+        max_length=20,
+        choices=VISIBILITY_CHOICES,
+        default='friends',
+    )
+    superseded_at = models.DateTimeField(null=True, blank=True)
+
+    is_pinned = models.BooleanField(default=False)
+    # null when not pinned; otherwise the pin's independent visibility
+    pin_visibility = models.CharField(
+        max_length=20,
+        choices=VISIBILITY_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['owner', 'component', '-created_at']),
+            models.Index(fields=['owner', 'is_pinned']),
+            models.Index(fields=['owner', 'component', 'superseded_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.owner.username} · {self.component} · {self.created_at:%Y-%m-%d %H:%M}"
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+    @classmethod
+    def upsert_live(cls, *, owner, component, data, visibility, at=None):
+        """
+        Create or refresh the live entry for (owner, component).
+
+        If the current live entry has identical `data`, only its `visibility`
+        is updated in place (no new archive row). Otherwise the prior live
+        entry's `superseded_at` is stamped with `at` and a new entry is
+        inserted. Returns the entry that is live after the call.
+        """
+        at = at or timezone.now()
+        current = (
+            cls.objects
+            .filter(owner=owner, component=component, superseded_at__isnull=True)
+            .order_by('-created_at')
+            .first()
+        )
+        if current and current.data == data:
+            if current.visibility != visibility:
+                current.visibility = visibility
+                current.save(update_fields=['visibility', 'updated_at'])
+            return current
+        if current:
+            cls.objects.filter(pk=current.pk).update(superseded_at=at)
+        return cls.objects.create(
+            owner=owner,
+            component=component,
+            data=data,
+            visibility=visibility,
+        )
+
+    @classmethod
+    def supersede_live(cls, *, owner, component, at=None):
+        """Stamp the live entry (if any) for (owner, component) as superseded."""
+        at = at or timezone.now()
+        return cls.objects.filter(
+            owner=owner, component=component, superseded_at__isnull=True
+        ).update(superseded_at=at)
+
+    @classmethod
+    def update_live_visibility(cls, *, owner, component, visibility):
+        """
+        Update the live entry's visibility in place without creating a new row.
+
+        Used when the user changes only the visibility setting for a component
+        whose data is unchanged.
+        """
+        current = (
+            cls.objects
+            .filter(owner=owner, component=component, superseded_at__isnull=True)
+            .order_by('-created_at')
+            .first()
+        )
+        if current and current.visibility != visibility:
+            current.visibility = visibility
+            current.save(update_fields=['visibility', 'updated_at'])
+        return current
+
+
 class Poke(AdoorTimestampedModel, SafeDeleteModel):
     DAILY_POKE_LIMIT = 5
 
@@ -280,3 +522,80 @@ def add_user_to_readers(instance, created, **kwargs):
         return
     instance.readers.add(instance.user)
     instance.save()
+
+
+def _fetch_spotify_oembed(track_id, timeout=2):
+    """Best-effort Spotify oEmbed resolution. Returns a dict or None on failure.
+
+    Called synchronously from the Song post_save signal; the short timeout
+    keeps the save path bounded even if Spotify is slow or unreachable.
+    """
+    import requests
+
+    clean_id = track_id.rsplit(':', 1)[-1] if ':' in track_id else track_id
+    url = (
+        'https://open.spotify.com/oembed'
+        f'?url=https://open.spotify.com/track/{clean_id}'
+    )
+    try:
+        resp = requests.get(url, timeout=timeout)
+        if resp.status_code == 200:
+            return resp.json()
+    except (requests.RequestException, ValueError):
+        pass
+    return None
+
+
+@transaction.atomic
+@receiver(post_save, sender=Song)
+def write_song_component_entry(instance, created, **kwargs):
+    """Mirror Song saves into the CheckInComponentEntry archive.
+
+    * When a new active Song is created, resolve Spotify oEmbed best-effort
+      and upsert a live song entry with the resolved metadata (or just
+      `{track_id}` on fetch failure). Visibility is inherited from the user's
+      active CheckIn's `song_visibility` (defaults to `public`).
+    * When an existing Song is deactivated *and* it matches the current live
+      song entry's track_id, supersede that entry. We guard on track_id so
+      deactivating an old song right after a replacement doesn't accidentally
+      retire the freshly-written new live entry.
+    """
+    if instance.is_active and created:
+        active_ci = CheckIn.objects.filter(
+            user=instance.user, is_active=True
+        ).first()
+        visibility = active_ci.song_visibility if active_ci else 'public'
+
+        data = {'track_id': instance.track_id}
+        oembed = _fetch_spotify_oembed(instance.track_id)
+        if oembed:
+            data['title'] = oembed.get('title')
+            data['album_cover_url'] = oembed.get('thumbnail_url')
+            # Spotify oEmbed does not expose artist separately; left blank
+            # so the frontend can fall back to its own resolver if needed.
+            data['artist'] = None
+
+        CheckInComponentEntry.upsert_live(
+            owner=instance.user,
+            component='song',
+            data=data,
+            visibility=visibility,
+        )
+        return
+
+    if not instance.is_active and not created:
+        current_live = (
+            CheckInComponentEntry.objects
+            .filter(
+                owner=instance.user,
+                component='song',
+                superseded_at__isnull=True,
+            )
+            .order_by('-created_at')
+            .first()
+        )
+        if current_live and current_live.data.get('track_id') == instance.track_id:
+            now = timezone.now()
+            CheckInComponentEntry.objects.filter(pk=current_live.pk).update(
+                superseded_at=now
+            )
