@@ -325,6 +325,8 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
         return
     if instance.is_wit_admin_mirror:
         return  # loop guard
+    if getattr(instance, 'deleted', None) is not None:
+        return  # don't fan out tombstones
 
     # Lazy import to avoid circular module load
     from chat.wit_admin import (
@@ -355,12 +357,16 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
                 user1=u1, user2=u2, is_wit_admin_proxy=True,
             ).first()
             if proxy_room is None:
-                # Auto-heal: provision then re-fetch
+                # Auto-heal best-effort: provision, then re-fetch. If still missing
+                # (e.g. transient drift), skip this operator's mirror rather than
+                # rolling back the user's original message.
                 from chat.wit_admin import provision_user_rooms
                 provision_user_rooms(user)
-                proxy_room = ChatRoom.objects.get(
+                proxy_room = ChatRoom.objects.filter(
                     user1=u1, user2=u2, is_wit_admin_proxy=True,
-                )
+                ).first()
+                if proxy_room is None:
+                    continue
             Message.objects.create(
                 chat_room=proxy_room,
                 sender=user,

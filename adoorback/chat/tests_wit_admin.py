@@ -246,5 +246,5 @@ class InboundFanOutTests(TestCase):
         room = self._alice_wit_room()
         wit = self._wit_admin()
         Message.objects.create(chat_room=room, sender=wit, receiver=self.alice, content='from-admin')
-        # No inbound mirrors for outbound message direction
-        self.assertEqual(Message.objects.filter(is_wit_admin_mirror=True, sender=wit).count(), 0)
+        # No inbound mirrors at all — branch 1 must not match outbound direction.
+        self.assertEqual(Message.objects.filter(is_wit_admin_mirror=True).count(), 0)
