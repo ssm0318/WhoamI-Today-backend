@@ -32,11 +32,23 @@ class ChatRoomList(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        from django.db.models import Case, When, Value, BooleanField
+        from chat.wit_admin import WIT_ADMIN_USERNAME
+
         user = self.request.user
 
         latest_msg = Message.objects.filter(
             chat_room=OuterRef('pk')
         ).order_by('-created_at')
+
+        is_pinned_top = Case(
+            When(
+                Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME),
+                then=Value(True),
+            ),
+            default=Value(False),
+            output_field=BooleanField(),
+        )
 
         return ChatRoom.objects.filter(
             Q(user1=user) | Q(user2=user) | Q(members=user)
@@ -47,10 +59,11 @@ class ChatRoomList(generics.ListAPIView):
             unread_cnt=Count(
                 'messages',
                 filter=Q(messages__receiver=user, messages__is_read=False)
-            )
+            ),
+            is_pinned_top=is_pinned_top,
         ).filter(
-            last_message_time__isnull=False
-        ).order_by('-last_message_time')
+            Q(last_message_time__isnull=False) | Q(is_pinned_top=True)
+        ).order_by('-is_pinned_top', '-last_message_time')
 
 
 class MessageList(generics.ListCreateAPIView):

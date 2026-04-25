@@ -390,3 +390,44 @@ class LoopGuardTests(TestCase):
         # 1 original + 1 (alice WIT room) + 2 (observer logs) = 4
         self.assertEqual(Message.objects.count(), 4)
         self.assertEqual(Message.objects.filter(is_wit_admin_mirror=True).count(), 3)
+
+
+class ChatListPinTests(TestCase):
+    def setUp(self):
+        from django.core.management import call_command
+        User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        self.charlie = User.objects.create_user(username='charlie', email='c@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _list(self, user):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from chat.views import ChatRoomList
+        factory = APIRequestFactory()
+        req = factory.get('/api/chat/rooms/')
+        force_authenticate(req, user=user)
+        view = ChatRoomList.as_view()
+        resp = view(req)
+        return resp.data
+
+    def test_wit_admin_room_appears_first_for_regular_user(self):
+        # Make charlie send alice a message to ensure their non-WIT chat has a last_message_time
+        from chat.models import get_or_create_chat_room
+        from chat.wit_admin import ensure_wit_admin_user
+        room = get_or_create_chat_room(self.alice, self.charlie)
+        Message.objects.create(chat_room=room, sender=self.charlie, receiver=self.alice, content='hi')
+        data = self._list(self.alice)
+        results = data.get('results', data)  # paginated or not
+        first = results[0]
+        wit = ensure_wit_admin_user()
+        u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
+        wit_room = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+        self.assertEqual(first['id'], wit_room.id)
+
+    def test_wit_admin_room_appears_even_when_empty(self):
+        # Alice has not messaged WIT Admin, has no other chats
+        data = self._list(self.alice)
+        results = data.get('results', data)
+        self.assertGreaterEqual(len(results), 1)
