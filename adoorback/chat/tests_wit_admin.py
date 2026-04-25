@@ -536,3 +536,56 @@ class ProxyVisibilityTests(TestCase):
         proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
         self.assertIn(proxy.id, room_ids,
                       "Operator must see proxy rooms with messages in their chat list")
+
+
+class ChatRequestBypassTests(TestCase):
+    """ChatRequest gate must be skipped for WIT-Admin-related chats."""
+
+    def setUp(self):
+        from django.core.management import call_command
+        from chat.models import ChatRequest
+        self.ChatRequest = ChatRequest
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _post(self, sender, recipient_id, content):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from chat.views import MessageList
+        factory = APIRequestFactory()
+        req = factory.post(f'/api/chat/messages/{recipient_id}/', {'content': content}, format='json')
+        force_authenticate(req, user=sender)
+        return MessageList.as_view()(req, pk=recipient_id)
+
+    def test_wit_admin_typing_to_user_does_not_create_chat_request(self):
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        wit.is_active = True
+        wit.set_password('x')
+        wit.save()
+        resp = self._post(wit, self.alice.id, 'hi from support')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(self.ChatRequest.objects.count(), 0)
+
+    def test_user_typing_to_wit_admin_does_not_create_chat_request(self):
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        resp = self._post(self.alice, wit.id, 'help me')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(self.ChatRequest.objects.count(), 0)
+
+    def test_jaewon_replying_in_proxy_does_not_create_chat_request(self):
+        # alice and jaewon are not friends; without the bypass this would create
+        # a ChatRequest from jaewon to alice.
+        resp = self._post(self.jaewon, self.alice.id, 'reply from operator')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(self.ChatRequest.objects.count(), 0)
+
+    def test_normal_user_to_user_still_creates_chat_request(self):
+        # Sanity: the gate still works for non-WIT-Admin chats.
+        bob = User.objects.create_user(username='bob', email='bob@e.com', password='x')
+        resp = self._post(self.alice, bob.id, 'hey bob')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(self.ChatRequest.objects.count(), 1)

@@ -187,13 +187,29 @@ class MessageList(generics.ListCreateAPIView):
         return response
 
     def perform_create(self, serializer):
+        from chat.wit_admin import is_wit_admin
+
         user = self.request.user
         try:
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
 
-        if not user.is_connected(connected_user):
+        # Skip the ChatRequest gate for WIT-Admin-related chats. The support
+        # persona, the per-user operator proxy chats, and the operator blast
+        # rooms are all known operational surfaces — friend-consent rules don't
+        # apply. See docs/superpowers/specs/2026-04-25-wit-admin-chat-hotfix-design.md.
+        is_wit_admin_surface = (
+            is_wit_admin(user)
+            or is_wit_admin(connected_user)
+            or ChatRoom.objects.filter(
+                (Q(user1=user, user2=connected_user) | Q(user1=connected_user, user2=user)),
+            ).filter(
+                Q(is_wit_admin_proxy=True) | Q(is_wit_admin_blast_room=True)
+            ).exists()
+        )
+
+        if not is_wit_admin_surface and not user.is_connected(connected_user):
             req = ChatRequest.objects.filter(
                 Q(requester=user, requestee=connected_user) |
                 Q(requester=connected_user, requestee=user)
