@@ -168,3 +168,41 @@ class SeedWitAdminChatsCommandTests(TestCase):
         self.koyrkr.delete()
         with self.assertRaises(CommandError):
             call_command('seed_wit_admin_chats')
+
+
+class AutoSignupProvisioningTests(TestCase):
+    def setUp(self):
+        # Pre-create operators so resolve_operators() succeeds
+        User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        from chat.wit_admin import ensure_wit_admin_user, ensure_blast_rooms
+        ensure_wit_admin_user()
+        ensure_blast_rooms()
+
+    def test_new_user_gets_four_rooms_automatically(self):
+        new_user = User.objects.create_user(username='new', email='new@e.com', password='x')
+        rooms = ChatRoom.objects.filter(Q(user1=new_user) | Q(user2=new_user))
+        self.assertEqual(rooms.count(), 4)
+        self.assertEqual(rooms.filter(is_wit_admin_proxy=True).count(), 3)
+
+    def test_inactive_new_user_skipped(self):
+        new_user = User.objects.create_user(
+            username='nope', email='nope@e.com', password='x', is_active=False,
+        )
+        rooms = ChatRoom.objects.filter(Q(user1=new_user) | Q(user2=new_user))
+        self.assertEqual(rooms.count(), 0)
+
+    def test_operator_signup_does_not_get_provisioned(self):
+        # Already pre-created in setUp; check no per-operator user-rooms exist
+        # for jaewon as a regular user (he should only be in proxy + blast rooms).
+        jaewon = User.objects.get(email='jaewonkim628@gmail.com')
+        # No room where jaewon is the "regular user" with WIT Admin (i.e., his is the
+        # blast room, not a regular-user provision)
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        u1, u2 = (jaewon, wit) if jaewon.id < wit.id else (wit, jaewon)
+        rooms = ChatRoom.objects.filter(user1=u1, user2=u2)
+        # Exactly one room — the blast room — must be flagged as such.
+        self.assertEqual(rooms.count(), 1)
+        self.assertTrue(rooms.first().is_wit_admin_blast_room)
