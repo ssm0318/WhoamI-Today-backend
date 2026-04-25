@@ -97,7 +97,13 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             return None
         user = self.context['request'].user
         opponent = obj.user2 if obj.user1 == user else obj.user1
-        return UserMinimalSerializer(opponent).data
+        data = UserMinimalSerializer(opponent).data
+        # Rebrand the operator's blast room as "Announcements" so it's clear
+        # the chat is the broadcast composer / log, not a regular wit_admin DM.
+        from chat.wit_admin import is_wit_admin
+        if obj.is_wit_admin_blast_room and is_wit_admin(opponent):
+            data['username'] = 'Announcements'
+        return data
 
     def get_members_detail(self, obj):
         if not obj.is_group:

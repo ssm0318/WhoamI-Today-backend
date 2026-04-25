@@ -120,7 +120,7 @@ class ChatRoomList(generics.ListAPIView):
         if user.email not in ALL_OPERATOR_EMAILS:
             qs = qs.exclude(is_wit_admin_proxy=True)
 
-        return qs.annotate(
+        annotated = qs.annotate(
             last_message_time=Subquery(latest_msg.values('created_at')[:1]),
             last_message_content=Subquery(latest_msg.values('content')[:1]),
             last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
@@ -129,9 +129,21 @@ class ChatRoomList(generics.ListAPIView):
                 filter=Q(messages__receiver=user, messages__is_read=False)
             ),
             is_pinned_top=is_pinned_top,
-        ).filter(
-            Q(last_message_time__isnull=False) | Q(is_pinned_top=True)
-        ).order_by('-is_pinned_top', '-last_message_time')
+        )
+
+        # Surface every WIT Admin proxy room in operators' chat lists, even
+        # before the user has messaged in (so jaewon's inbox shows all 11 user
+        # chats from day 1, not just the ones with traffic).
+        if user.email in ALL_OPERATOR_EMAILS:
+            visibility = (
+                Q(last_message_time__isnull=False)
+                | Q(is_pinned_top=True)
+                | Q(is_wit_admin_proxy=True)
+            )
+        else:
+            visibility = Q(last_message_time__isnull=False) | Q(is_pinned_top=True)
+
+        return annotated.filter(visibility).order_by('-is_pinned_top', '-last_message_time')
 
 
 class MessageList(generics.ListCreateAPIView):
@@ -176,7 +188,15 @@ class MessageList(generics.ListCreateAPIView):
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
-        response.data['username'] = connected_user.username
+
+        # Rebrand the blast room header as "Announcements" so the chat detail
+        # view matches the chat-list label.
+        from chat.wit_admin import is_wit_admin
+        display_username = connected_user.username
+        chat_room = get_chat_room(request.user, connected_user)
+        if chat_room and chat_room.is_wit_admin_blast_room and is_wit_admin(connected_user):
+            display_username = 'Announcements'
+        response.data['username'] = display_username
         response.data['oldest_unread_page'] = self.oldest_unread_page
 
         paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)

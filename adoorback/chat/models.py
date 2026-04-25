@@ -236,6 +236,14 @@ def create_message_notification(created, instance, **kwargs):
     if not created:
         return
 
+    # Suppress notifications for the original (non-mirror) message in WIT Admin
+    # proxy rooms. The mirror in the user's User↔WIT_Admin chat fires its own
+    # notification as `wit_admin`, which is the one the regular user should
+    # see. Without this guard the user gets a duplicate "op_jaewon sent you a
+    # message" push that links to a chat hidden from them (404).
+    if instance.chat_room.is_wit_admin_proxy and not instance.is_wit_admin_mirror:
+        return
+
     receiver_user = instance.receiver
     sender = instance.sender
 

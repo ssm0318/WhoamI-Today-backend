@@ -693,3 +693,94 @@ class SystemConnectionsTests(TestCase):
         call_command('seed_wit_admin_chats')
         # No wit_bot in the test DB → expect 6 pairs
         self.assertEqual(Connection.objects.count(), 6)
+
+
+class AnnouncementsAndUXFixesTests(TestCase):
+    """Covers: blast room rebrand to 'Announcements', empty-proxy visibility
+    for operators, suppressed-duplicate-notifications, are_friends override."""
+
+    def setUp(self):
+        from django.core.management import call_command
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        self.bob = User.objects.create_user(username='bob', email='b@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _list(self, user):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from chat.views import ChatRoomList
+        factory = APIRequestFactory()
+        req = factory.get('/api/chat/rooms/')
+        force_authenticate(req, user=user)
+        return ChatRoomList.as_view()(req).data.get('results', [])
+
+    def test_blast_room_displays_as_announcements(self):
+        results = self._list(self.jaewon)
+        announcements = [r for r in results if r.get('opponent', {}).get('username') == 'Announcements']
+        self.assertEqual(len(announcements), 1)
+        # Avatar still belongs to wit_admin (we don't override the image).
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        self.assertEqual(announcements[0]['opponent']['id'], wit.id)
+
+    def test_operator_sees_all_proxy_rooms_even_empty(self):
+        # No messages have been sent yet — alice's proxy chat with jaewon still
+        # has no last_message_time, but we want it to show up in jaewon's list.
+        results = self._list(self.jaewon)
+        room_ids = {r['id'] for r in results}
+        u1, u2 = (self.alice, self.jaewon) if self.alice.id < self.jaewon.id else (self.jaewon, self.alice)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        self.assertIn(proxy.id, room_ids,
+                      "Empty proxy rooms should appear in operator's chat list")
+
+    def test_proxy_original_message_does_not_notify_user(self):
+        from notification.models import Notification
+        from django.contrib.contenttypes.models import ContentType
+        u1, u2 = (self.alice, self.jaewon) if self.alice.id < self.jaewon.id else (self.jaewon, self.alice)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        Message.objects.create(chat_room=proxy, sender=self.jaewon, receiver=self.alice, content='reply')
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        user_ct = ContentType.objects.get_for_model(User)
+        notis = Notification.objects.filter(user=self.alice, origin_type=user_ct)
+        sender_ids = {n.origin_id for n in notis}
+        self.assertNotIn(self.jaewon.id, sender_ids,
+                         "Original proxy message should not produce a notification from op_jaewon")
+        self.assertIn(wit.id, sender_ids,
+                      "Mirror should still notify alice as wit_admin")
+
+    def test_inbound_user_message_still_notifies_operators(self):
+        from notification.models import Notification
+        from django.contrib.contenttypes.models import ContentType
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
+        alice_wit = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+        Message.objects.create(chat_room=alice_wit, sender=self.alice, receiver=wit, content='help')
+        user_ct = ContentType.objects.get_for_model(User)
+        notis = Notification.objects.filter(
+            user=self.jaewon, origin_type=user_ct, origin_id=self.alice.id,
+        )
+        self.assertGreaterEqual(notis.count(), 1)
+
+    def _are_friends_value(self, viewer, subject):
+        """Invoke `get_are_friends` with a minimal request stub."""
+        from account.serializers import UserProfileSerializer
+
+        class _Req:
+            def __init__(self, user):
+                self.user = user
+
+        return UserProfileSerializer(
+            subject, context={'request': _Req(viewer)},
+        ).get_are_friends(subject)
+
+    def test_are_friends_override_for_operator_viewer(self):
+        self.assertTrue(self._are_friends_value(self.jaewon, self.alice),
+                        "Operator viewing a regular user should see are_friends=True")
+
+    def test_are_friends_unchanged_for_regular_viewer(self):
+        self.assertFalse(self._are_friends_value(self.alice, self.bob),
+                         "Regular user viewing a non-friend should still see are_friends=False")
