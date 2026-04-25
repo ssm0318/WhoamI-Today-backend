@@ -73,13 +73,23 @@ class WitAdminHelpersTests(TestCase):
         self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
         self.bob = User.objects.create_user(username='b', email='b@e.com', password='x')
 
-    def test_ensure_wit_admin_user_creates_inactive(self):
+    def test_ensure_wit_admin_user_creates_with_canonical_identity(self):
         from chat.wit_admin import ensure_wit_admin_user
         wit = ensure_wit_admin_user()
         self.assertEqual(wit.username, 'wit_admin')
         self.assertEqual(wit.email, 'zeoni.res@gmail.com')
-        self.assertFalse(wit.is_active)
-        self.assertFalse(wit.has_usable_password())
+
+    def test_ensure_wit_admin_user_preserves_manual_auth_state(self):
+        """Operators may sign in as wit_admin; the helper must not clobber
+        is_active or password set externally."""
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        wit.is_active = True
+        wit.set_password('secret123!')
+        wit.save()
+        wit2 = ensure_wit_admin_user()
+        self.assertTrue(wit2.is_active)
+        self.assertTrue(wit2.check_password('secret123!'))
 
     def test_ensure_wit_admin_user_idempotent(self):
         from chat.wit_admin import ensure_wit_admin_user

@@ -20,32 +20,21 @@ ALL_OPERATOR_EMAILS = (OPERATOR_REPLIER_EMAIL,) + OPERATOR_OBSERVER_EMAILS
 def ensure_wit_admin_user():
     """Get-or-create the WIT Admin user. Idempotent.
 
-    Re-asserts critical attributes (email, is_active) on pre-existing rows
-    to recover from manual edits or stale data.
+    WIT Admin is intentionally login-able — operators may sign in to it for
+    direct UI access to the support inbox. The helper only ensures the row
+    exists with the canonical username/email; it does NOT touch is_active or
+    the password. Initial creation leaves the password unset (login impossible
+    until an operator sets one via shell or admin), and any subsequent manual
+    password / is_active changes are preserved across re-runs.
     """
     User = get_user_model()
     user, created = User.objects.get_or_create(
         username=WIT_ADMIN_USERNAME,
-        defaults={
-            'email': WIT_ADMIN_EMAIL,
-            'is_active': False,
-        },
+        defaults={'email': WIT_ADMIN_EMAIL},
     )
-    if created:
-        user.set_unusable_password()
-        user.save(update_fields=['password'])
-        return user
-
-    # Reassert critical attributes if the row pre-existed with drift
-    changed = False
     if user.email != WIT_ADMIN_EMAIL:
         user.email = WIT_ADMIN_EMAIL
-        changed = True
-    if user.is_active:
-        user.is_active = False
-        changed = True
-    if changed:
-        user.save(update_fields=['email', 'is_active'])
+        user.save(update_fields=['email'])
     return user
 
 
