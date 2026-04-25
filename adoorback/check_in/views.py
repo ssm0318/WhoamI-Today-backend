@@ -352,6 +352,82 @@ class ArchiveEntryDelete(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class ArchiveLiveComponent(APIView):
+    """PATCH /api/check_in/components/<component>/archive/
+
+    Archive the user's currently-live entry for `component` without
+    replacing it with new content. The component's value on the active
+    CheckIn is cleared (or, for `song`, the active Song row is
+    deactivated), which routes through the existing CheckIn.save /
+    Song post_save diff logic and stamps `superseded_at` on the live
+    CheckInComponentEntry. Friend cards immediately show the empty
+    placeholder for that component, and the archived entry surfaces
+    under "Today" in the owner's archive feed (eligible for pinning).
+
+    Idempotent at the entry level: a 404 is returned when the
+    component has no live value to archive.
+    """
+    permission_classes = [IsAuthenticated]
+    ALLOWED = ('battery', 'mood', 'thought', 'song')
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, component):
+        if component not in self.ALLOWED:
+            return Response(
+                {'detail': f'component must be one of {list(self.ALLOWED)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+
+        if component == 'song':
+            active_songs = list(Song.objects.filter(user=user, is_active=True))
+            if not active_songs:
+                return Response(
+                    {'detail': 'No active song to archive.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            for song in active_songs:
+                song.is_active = False
+                song.save()  # post_save signal supersedes the live song entry
+            return Response({'archived': component}, status=status.HTTP_200_OK)
+
+        check_in = CheckIn.objects.filter(user=user, is_active=True).first()
+        if not check_in:
+            return Response(
+                {'detail': 'No active check-in.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if component == 'battery':
+            if not check_in.social_battery:
+                return Response(
+                    {'detail': 'No active battery to archive.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            check_in.social_battery = None
+        elif component == 'mood':
+            if not check_in.mood:
+                return Response(
+                    {'detail': 'No active mood to archive.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            check_in.mood = []
+        elif component == 'thought':
+            if not check_in.thought:
+                return Response(
+                    {'detail': 'No active thought to archive.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            check_in.thought = ''
+
+        check_in.save()  # diff path supersedes the matching live entry
+        return Response({'archived': component}, status=status.HTTP_200_OK)
+
+
 class OwnArchiveEntries(generics.ListAPIView):
     """GET /check_in/entries/?tab=all|pinned&cursor=...
 
