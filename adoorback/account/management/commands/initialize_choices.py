@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from account.models import Interest, Persona, PERSONA_CHOICES
+from account.models import Interest, Persona, PERSONA_CHOICES, CHIPS_BY_CATEGORY
 from django.db import IntegrityError
 
 class Command(BaseCommand):
@@ -16,27 +16,28 @@ class Command(BaseCommand):
                 if created:
                     persona_count += 1
             except IntegrityError:
-                persona = Persona.objects.all_with_deleted().get(content=value)
+                persona = Persona.objects.all_with_deleted().get(content=formatted_content)
                 if persona.deleted:
                     persona.undelete()
                     persona_count += 1
-        
+
         self.stdout.write(self.style.SUCCESS(f'Successfully initialized {persona_count} Persona instances.'))
 
-        # Initialize Interest
-        from account.models import INTEREST_CHOICES_BASE
-        interests = INTEREST_CHOICES_BASE
-        
+        # Initialize Interest from CHIPS_BY_CATEGORY
         interest_count = 0
-        for content in interests:
-            try:
-                interest, created = Interest.objects.get_or_create(content=content)
-                if created:
-                    interest_count += 1
-            except IntegrityError:
-                interest = Interest.objects.all_with_deleted().get(content=content)
-                if interest.deleted:
-                    interest.undelete()
-                    interest_count += 1
-        
+        for category, chips in CHIPS_BY_CATEGORY.items():
+            for content in chips:
+                try:
+                    interest, created = Interest.objects.get_or_create(
+                        content=content,
+                        category=category,
+                    )
+                    if created:
+                        interest_count += 1
+                except IntegrityError:
+                    interest = Interest.objects.all_with_deleted().get(content=content, category=category)
+                    if interest.deleted:
+                        interest.undelete()
+                        interest_count += 1
+
         self.stdout.write(self.style.SUCCESS(f'Successfully initialized {interest_count} Interest instances.'))
