@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from chat.wit_admin import (
     ensure_wit_admin_user,
     ensure_blast_rooms,
+    ensure_system_connections,
     provision_user_rooms,
     regular_recipients,
     resolve_operators,
@@ -23,6 +24,7 @@ class Command(BaseCommand):
             raise CommandError(str(e)) from e
 
         ensure_blast_rooms()
+        ensure_system_connections()
 
         users = regular_recipients()
         total = users.count()

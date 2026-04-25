@@ -645,3 +645,51 @@ class RequestStatusSerializerTests(TestCase):
         proxy_room = next((r for r in results if r['id'] == proxy.id), None)
         self.assertIsNotNone(proxy_room)
         self.assertEqual(proxy_room['request_status'], 'friends')
+
+
+class SystemConnectionsTests(TestCase):
+    """The 5 system users (wit_admin + wit_bot + 3 operators) should be friends
+    with each other so chat-request UI never fires between them."""
+
+    def setUp(self):
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+
+    def test_creates_six_pairs_when_wit_bot_absent(self):
+        from chat.wit_admin import ensure_system_connections
+        from account.models import Connection
+        ensure_system_connections()
+        # 4 system users (wit_admin + 3 operators) → C(4,2)=6 pairs
+        self.assertEqual(Connection.objects.count(), 6)
+
+    def test_creates_ten_pairs_with_wit_bot(self):
+        User.objects.create_user(username='wit_bot', email='whoami.today.official@gmail.com', password='x')
+        from chat.wit_admin import ensure_system_connections
+        from account.models import Connection
+        ensure_system_connections()
+        # 5 system users → C(5,2)=10 pairs
+        self.assertEqual(Connection.objects.count(), 10)
+
+    def test_idempotent(self):
+        from chat.wit_admin import ensure_system_connections
+        from account.models import Connection
+        ensure_system_connections()
+        first = Connection.objects.count()
+        ensure_system_connections()
+        self.assertEqual(Connection.objects.count(), first)
+
+    def test_is_connected_returns_true_for_system_pair(self):
+        from chat.wit_admin import ensure_system_connections, ensure_wit_admin_user
+        ensure_system_connections()
+        wit = ensure_wit_admin_user()
+        self.assertTrue(self.jaewon.is_connected(wit))
+        self.assertTrue(wit.is_connected(self.jaewon))
+        self.assertTrue(self.jaewon.is_connected(self.koyrkr))
+
+    def test_seed_wires_system_connections(self):
+        from django.core.management import call_command
+        from account.models import Connection
+        call_command('seed_wit_admin_chats')
+        # No wit_bot in the test DB → expect 6 pairs
+        self.assertEqual(Connection.objects.count(), 6)

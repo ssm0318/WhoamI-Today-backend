@@ -107,6 +107,42 @@ def ensure_blast_rooms():
             room.save(update_fields=['is_wit_admin_blast_room'])
 
 
+SYSTEM_BOT_USERNAME = 'wit_bot'
+
+
+@transaction.atomic
+def ensure_system_connections():
+    """Connect all 5 system accounts (wit_admin, wit_bot, jaewon, koyrkr, njs)
+    as friends with each other.
+
+    Without these connections the chat-request UI fires when one signs in and
+    opens a chat with another. Idempotent — `get_or_create` skips existing
+    pairs.
+
+    `wit_bot` is treated as optional: if it doesn't exist yet the helper
+    connects the other 4 only.
+    """
+    from account.models import Connection
+
+    User = get_user_model()
+    wit = ensure_wit_admin_user()
+    operators = resolve_operators()
+    system_users = [wit, *operators]
+
+    bot = User.objects.filter(username=SYSTEM_BOT_USERNAME).first()
+    if bot is not None:
+        system_users.append(bot)
+
+    # Pairwise — every unordered pair gets a Connection if missing.
+    for i, a in enumerate(system_users):
+        for b in system_users[i + 1:]:
+            u1, u2 = _ordered_pair(a, b)
+            Connection.objects.get_or_create(
+                user1=u1, user2=u2,
+                defaults={'user1_choice': 'friend', 'user2_choice': 'friend'},
+            )
+
+
 def regular_recipients():
     """Active, non-deleted users excluding WIT Admin and the 3 operators."""
     User = get_user_model()
