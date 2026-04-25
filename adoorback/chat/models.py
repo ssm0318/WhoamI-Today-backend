@@ -307,3 +307,63 @@ def create_chat_request_noti(created, instance, **kwargs):
             redirect_url=f'/users/{requestee.id}/chat',
         )
         NotificationActor.objects.create(user=requestee, notification=noti)
+
+
+@transaction.atomic
+@receiver(post_save, sender=Message)
+def fanout_wit_admin_messages(created, instance, **kwargs):
+    """WIT Admin hotfix fan-out / fan-in / blast handler.
+
+    Branches:
+      1. Inbound user → WIT Admin     → mirror to 3 operator proxy rooms.
+      2. Jaewon reply → user proxy    → mirror to user's WIT Admin room as WIT Admin.
+      3. Jaewon blast → blast room    → fan out to all users + 2 observer logs.
+
+    See docs/superpowers/specs/2026-04-25-wit-admin-chat-hotfix-design.md.
+    """
+    if not created:
+        return
+    if instance.is_wit_admin_mirror:
+        return  # loop guard
+
+    # Lazy import to avoid circular module load
+    from chat.wit_admin import (
+        ensure_wit_admin_user, resolve_operators, _copy_message_fields,
+        is_wit_admin, is_replier,
+    )
+
+    room = instance.chat_room
+    sender = instance.sender
+
+    # Branch 1 — inbound user → WIT Admin
+    is_user_to_wit_admin_room = (
+        not room.is_group
+        and not room.is_wit_admin_proxy
+        and not room.is_wit_admin_blast_room
+        and (is_wit_admin(room.user1) or is_wit_admin(room.user2))
+        and not is_wit_admin(sender)
+    )
+    if is_user_to_wit_admin_room:
+        try:
+            operators = resolve_operators()
+        except LookupError:
+            return
+        user = sender  # the regular user
+        for op in operators:
+            u1, u2 = (user, op) if user.id < op.id else (op, user)
+            proxy_room = ChatRoom.objects.filter(
+                user1=u1, user2=u2, is_wit_admin_proxy=True,
+            ).first()
+            if proxy_room is None:
+                # Auto-heal: provision then re-fetch
+                from chat.wit_admin import provision_user_rooms
+                provision_user_rooms(user)
+                proxy_room = ChatRoom.objects.get(
+                    user1=u1, user2=u2, is_wit_admin_proxy=True,
+                )
+            Message.objects.create(
+                chat_room=proxy_room,
+                sender=user,
+                receiver=op,
+                **_copy_message_fields(instance),
+            )

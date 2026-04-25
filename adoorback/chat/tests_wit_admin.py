@@ -206,3 +206,45 @@ class AutoSignupProvisioningTests(TestCase):
         # Exactly one room — the blast room — must be flagged as such.
         self.assertEqual(rooms.count(), 1)
         self.assertTrue(rooms.first().is_wit_admin_blast_room)
+
+
+class InboundFanOutTests(TestCase):
+    def setUp(self):
+        from django.core.management import call_command
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _wit_admin(self):
+        from chat.wit_admin import ensure_wit_admin_user
+        return ensure_wit_admin_user()
+
+    def _alice_wit_room(self):
+        wit = self._wit_admin()
+        u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
+        return ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+
+    def test_user_message_fans_out_to_three_proxy_rooms(self):
+        room = self._alice_wit_room()
+        Message.objects.create(
+            chat_room=room, sender=self.alice, receiver=self._wit_admin(), content='hello',
+        )
+        # Original counts as 1; expect 3 mirrors in the 3 proxy rooms
+        mirrors = Message.objects.filter(is_wit_admin_mirror=True)
+        self.assertEqual(mirrors.count(), 3)
+        self.assertEqual({m.receiver.email for m in mirrors}, {
+            'jaewonkim628@gmail.com', 'koyrkr@gmail.com', 'njs03332@gmail.com',
+        })
+        for m in mirrors:
+            self.assertEqual(m.sender, self.alice)
+            self.assertEqual(m.content, 'hello')
+            self.assertTrue(m.chat_room.is_wit_admin_proxy)
+
+    def test_wit_admin_sender_does_not_fanout_inbound(self):
+        room = self._alice_wit_room()
+        wit = self._wit_admin()
+        Message.objects.create(chat_room=room, sender=wit, receiver=self.alice, content='from-admin')
+        # No inbound mirrors for outbound message direction
+        self.assertEqual(Message.objects.filter(is_wit_admin_mirror=True, sender=wit).count(), 0)

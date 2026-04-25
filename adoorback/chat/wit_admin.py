@@ -131,3 +131,15 @@ def is_wit_admin(user):
 
 def is_replier(user):
     return user is not None and user.email == OPERATOR_REPLIER_EMAIL
+
+
+def _copy_message_fields(source):
+    """Return kwargs for Message.objects.create() that mirror `source`'s payload."""
+    return {
+        'content': source.content,
+        'emoji': source.emoji,
+        'image': source.image,
+        'shared_content_type': source.shared_content_type,
+        'shared_object_id': source.shared_object_id,
+        'is_wit_admin_mirror': True,
+    }
