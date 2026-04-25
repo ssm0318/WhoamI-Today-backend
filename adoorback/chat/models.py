@@ -398,3 +398,51 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
             **_copy_message_fields(instance),
         )
         return
+
+    # Branch 3 — jaewon blast in his blast room → fan out to all users + 2 observer logs
+    if room.is_wit_admin_blast_room and is_replier(sender):
+        from chat.wit_admin import (
+            regular_recipients, OPERATOR_OBSERVER_EMAILS,
+        )
+        wit = ensure_wit_admin_user()
+
+        # 3a — every regular user's WIT Admin room
+        for user in regular_recipients():
+            u1, u2 = (user, wit) if user.id < wit.id else (wit, user)
+            wit_room = ChatRoom.objects.filter(
+                user1=u1, user2=u2, is_wit_admin_proxy=False,
+            ).first()
+            if wit_room is None:
+                from chat.wit_admin import provision_user_rooms
+                provision_user_rooms(user)
+                wit_room = ChatRoom.objects.filter(
+                    user1=u1, user2=u2, is_wit_admin_proxy=False,
+                ).first()
+                if wit_room is None:
+                    continue
+            Message.objects.create(
+                chat_room=wit_room,
+                sender=wit,
+                receiver=user,
+                **_copy_message_fields(instance),
+            )
+
+        # 3b — observer (koyrkr, njs) blast logs
+        UserModel = get_user_model()
+        for email in OPERATOR_OBSERVER_EMAILS:
+            observer = UserModel.objects.filter(email=email).first()
+            if observer is None:
+                continue
+            u1, u2 = (wit, observer) if wit.id < observer.id else (observer, wit)
+            log_room = ChatRoom.objects.filter(
+                user1=u1, user2=u2, is_wit_admin_blast_room=True,
+            ).first()
+            if log_room is None:
+                continue
+            Message.objects.create(
+                chat_room=log_room,
+                sender=wit,
+                receiver=observer,
+                **_copy_message_fields(instance),
+            )
+        return

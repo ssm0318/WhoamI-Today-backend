@@ -299,3 +299,63 @@ class JaewonReplyFanInTests(TestCase):
         Message.objects.create(chat_room=proxy, sender=self.njs, receiver=self.alice, content='nope')
         wit_room = self._alice_wit_room()
         self.assertEqual(Message.objects.filter(chat_room=wit_room).count(), 0)
+
+
+class JaewonBlastTests(TestCase):
+    def setUp(self):
+        from django.core.management import call_command
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        self.bob = User.objects.create_user(username='bob', email='b@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _wit(self):
+        from chat.wit_admin import ensure_wit_admin_user
+        return ensure_wit_admin_user()
+
+    def _jaewon_blast_room(self):
+        wit = self._wit()
+        u1, u2 = (self.jaewon, wit) if self.jaewon.id < wit.id else (wit, self.jaewon)
+        return ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_blast_room=True)
+
+    def test_jaewon_blast_reaches_all_users(self):
+        blast = self._jaewon_blast_room()
+        Message.objects.create(
+            chat_room=blast, sender=self.jaewon, receiver=self._wit(),
+            content='announcement',
+        )
+        # Mirror to alice's and bob's WIT Admin rooms (sender=wit)
+        wit = self._wit()
+        for user in (self.alice, self.bob):
+            u1, u2 = (user, wit) if user.id < wit.id else (wit, user)
+            wit_room = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+            user_msgs = Message.objects.filter(
+                chat_room=wit_room, is_wit_admin_mirror=True, sender=wit,
+            )
+            self.assertEqual(user_msgs.count(), 1, f"Missing blast for {user.username}")
+            self.assertEqual(user_msgs.first().content, 'announcement')
+
+    def test_jaewon_blast_mirrors_into_observer_logs(self):
+        blast = self._jaewon_blast_room()
+        Message.objects.create(
+            chat_room=blast, sender=self.jaewon, receiver=self._wit(),
+            content='announcement',
+        )
+        wit = self._wit()
+        for op in (self.koyrkr, self.njs):
+            u1, u2 = (wit, op) if wit.id < op.id else (op, wit)
+            log = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_blast_room=True)
+            mirrors = Message.objects.filter(
+                chat_room=log, is_wit_admin_mirror=True, sender=wit,
+            )
+            self.assertEqual(mirrors.count(), 1, f"Missing log entry for {op.username}")
+
+    def test_koyrkr_typing_in_own_blast_log_does_nothing(self):
+        wit = self._wit()
+        u1, u2 = (wit, self.koyrkr) if wit.id < self.koyrkr.id else (self.koyrkr, wit)
+        log = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_blast_room=True)
+        Message.objects.create(chat_room=log, sender=self.koyrkr, receiver=wit, content='leak')
+        # No fan-out: no messages anywhere except the original in koyrkr's log
+        self.assertEqual(Message.objects.exclude(chat_room=log).count(), 0)
