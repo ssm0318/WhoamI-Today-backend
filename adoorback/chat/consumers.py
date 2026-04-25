@@ -104,6 +104,10 @@ class ChatConsumer(WebsocketConsumer):
             self.close()
             return
 
+        if other_user_id in user.user_report_blocked_ids:
+            self.close()
+            return
+
         self.room_group_id = f"chat_{ids[0]}_{ids[1]}"
 
         async_to_sync(self.channel_layer.group_add)(

@@ -189,9 +189,17 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         super().save(*args, **kwargs)
 
         # 콘텐츠 변경 시 readers 초기화 (author만 유지)
-        if content_changed:
-            self.readers.clear()
-            self.readers.add(self.user)
+        # outer transaction 밖에서 실행해 readers M2M 의 동시 INSERT 와의 deadlock 회피
+        if content_changed and not is_new:
+            ci_pk = self.pk
+            author_id = self.user_id
+            Through = type(self).readers.through
+
+            def _reset_readers():
+                Through.objects.filter(checkin_id=ci_pk).exclude(user_id=author_id).delete()
+                Through.objects.get_or_create(checkin_id=ci_pk, user_id=author_id)
+
+            transaction.on_commit(_reset_readers)
 
         # Replay component diffs into the entry table.
         if pending_entry_ops:
@@ -565,6 +573,17 @@ def write_song_component_entry(instance, created, **kwargs):
             user=instance.user, is_active=True
         ).first()
         visibility = active_ci.song_visibility if active_ci else 'public'
+
+        if active_ci:
+            ci_pk = active_ci.pk
+            author_id = instance.user_id
+            Through = CheckIn.readers.through
+
+            def _reset_readers():
+                Through.objects.filter(checkin_id=ci_pk).exclude(user_id=author_id).delete()
+                Through.objects.get_or_create(checkin_id=ci_pk, user_id=author_id)
+
+            transaction.on_commit(_reset_readers)
 
         data = {'track_id': instance.track_id}
         oembed = _fetch_spotify_oembed(instance.track_id)

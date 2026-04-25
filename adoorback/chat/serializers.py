@@ -112,11 +112,36 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
     def get_last_message(self, obj):
         if hasattr(obj, 'last_message_content'):
-            return obj.last_message_content or obj.last_message_emoji
-        last_msg = obj.messages.last()
+            if obj.last_message_content:
+                return obj.last_message_content
+            if obj.last_message_emoji:
+                return obj.last_message_emoji
+            if obj.last_message_image:
+                return self._image_preview_text()
+            if obj.last_message_shared_type:
+                return self._shared_content_preview_text()
+            return None
+        last_msg = obj.messages.first()  # ordering=['-created_at'] so first=newest
         if last_msg:
-            return last_msg.content or last_msg.emoji
+            if last_msg.content:
+                return last_msg.content
+            if last_msg.emoji:
+                return last_msg.emoji
+            if last_msg.image:
+                return self._image_preview_text()
+            if last_msg.shared_object_id:
+                return self._shared_content_preview_text()
         return None
+
+    def _get_lang(self):
+        from django.utils.translation import get_language
+        return (get_language() or 'en')[:2]
+
+    def _image_preview_text(self):
+        return '📷 사진' if self._get_lang() == 'ko' else '📷 Photo'
+
+    def _shared_content_preview_text(self):
+        return '📎 공유된 게시글' if self._get_lang() == 'ko' else '📎 Shared post'
 
     def get_last_message_time(self, obj):
         if hasattr(obj, 'last_message_time'):

@@ -53,6 +53,8 @@ urlpatterns = [
     path('<str:username>/check_in/pinned/', views.UserPinnedCheckInEntries.as_view(), name='user-check-in-pinned'),
     path('mark-all-notes-as-read/', views.UserMarkAllNotesAsRead.as_view(), name='user-mark-all-notes-as-read'),
     path('mark-all-responses-as-read/', views.UserMarkAllResponsesAsRead.as_view(), name='user-mark-all-responses-as-read'),
+    path('friends/mark-all-checkins-as-read/', views.FriendsMarkAllCheckInsAsRead.as_view(), name='friends-mark-all-checkins-as-read'),
+    path('friends/mark-all-posts-as-read/', views.FriendsMarkAllPostsAsRead.as_view(), name='friends-mark-all-posts-as-read'),
 
     # Friend List related
     path('friends/', views.FriendList.as_view(), name='friend-list'),

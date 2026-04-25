@@ -171,18 +171,6 @@ PERSONA_CHOICES = [
     ('active_listener', 'Active Listener'),
     ('thoughtful_responder', 'Thoughtful Responder'),
 ]
-INTEREST_CHOICES_BASE = [
-    'Gaming', 'Minecraft', 'Roblox', 'Fortnite', 'Valorant', 'Anime', 'Kpop', 'HipHop', 
-    'PopMusic', 'MusicProduction', 'Podcast', 'YouTube', 'Streaming', 'Movies', 'TVShows', 
-    'Tech&Gadgets', 'Coding', 'AppDesign', 'UXDesign', 'AI', 'DigitalArt', 'GraphicDesign', 
-    'VideoEditing', 'Photography', 'SocialMedia', 'Basketball', 'Soccer', 'Volleyball', 
-    'Tennis', 'Gym&Lifting', 'Running', 'Cycling', 'Climbing', 'Skateboarding', 'Surfing', 
-    'Snowboarding', 'Drawing', 'Painting', 'Fashion', 'Thrifting', 'Makeup', 'NailArt', 
-    'DIY', 'Journaling', 'Aesthetic', 'Reading', 'ClosedBook', 'Studying', 'SelfCare', 
-    'MentalHealth', 'Motivation', 'Productivity', 'NightOwl', 'EarlyBird', 'Dogs', 'Cats', 
-    'Pets', 'Nature', 'Hiking', 'Traveling', 'Foodie', 'Baking', 'Cooking'
-]
-
 
 class OverwriteStorage(FileSystemStorage):
     base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
@@ -734,7 +722,7 @@ class Subscription(AdoorTimestampedModel, SafeDeleteModel):
 
 class Interest(AdoorTimestampedModel, SafeDeleteModel):
     """Stores all chip selections across all 7 categories."""
-    content = models.CharField(max_length=100, unique=True)
+    content = models.CharField(max_length=100)
     category = models.CharField(max_length=50, choices=CHIP_CATEGORY_CHOICES, default='hobbies_activities', blank=True)
     users = models.ManyToManyField(get_user_model(), related_name='user_interests', blank=True)
 
@@ -744,6 +732,13 @@ class Interest(AdoorTimestampedModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['content']),
             models.Index(fields=['category']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['content', 'category'],
+                condition=Q(deleted__isnull=True),
+                name='unique_interest_per_category',
+            ),
         ]
 
     def __str__(self):

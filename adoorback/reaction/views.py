@@ -39,7 +39,8 @@ class ReactionList(generics.ListCreateAPIView):
         target, content_type_id, object_id = self.validate_target()
         if target.author != self.request.user:
             return Reaction.objects.filter(object_id=object_id, content_type_id=content_type_id, user=self.request.user).order_by('-created_at')
-        return Reaction.objects.filter(object_id=object_id, content_type_id=content_type_id).order_by('-created_at')
+        blocked_ids = self.request.user.user_report_blocked_ids
+        return Reaction.objects.filter(object_id=object_id, content_type_id=content_type_id).exclude(user_id__in=blocked_ids).order_by('-created_at')
 
     @transaction.atomic
     def perform_create(self, serializer):

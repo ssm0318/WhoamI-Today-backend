@@ -8,15 +8,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-
-class ChatRoomListPagination(PageNumberPagination):
-    """Chat rooms per user are bounded (one per peer, plus operator/admin
-    surfaces) so a single page covers virtually every realistic case. The
-    frontend chat list does not implement infinite scroll, so a too-small
-    page size silently hides rooms past the first 10."""
-    page_size = 200
-    max_page_size = 500
-
+from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.validators import adoor_exception_handler
 from django.contrib.contenttypes.models import ContentType
 from .models import Message, ChatRoom, ChatRequest, MessageReaction, GroupReadCursor, MAX_GROUP_MEMBERS, get_or_create_chat_room, get_chat_room
@@ -29,9 +21,29 @@ from .serializers import (
 User = get_user_model()
 
 
+class ChatRoomListPagination(PageNumberPagination):
+    """Chat rooms per user are bounded (one per peer, plus operator/admin
+    surfaces) so a single page covers virtually every realistic case. The
+    frontend chat list does not implement infinite scroll, so a too-small
+    page size silently hides rooms past the first 10."""
+    page_size = 200
+    max_page_size = 500
+
+
 def _get_chat_group_name(user_id_1, user_id_2):
     ids = sorted([user_id_1, user_id_2])
     return f"chat_{ids[0]}_{ids[1]}"
+
+
+def _get_message_preview_text(response_data):
+    """Extract a preview string from serialized message data for chat list display."""
+    content = response_data.get('content') or response_data.get('emoji') or ''
+    if not content:
+        if response_data.get('image'):
+            content = '📷 Photo'
+        elif response_data.get('shared_content_preview'):
+            content = '📎 Shared post'
+    return content
 
 
 def broadcast_message_for_room(message):
@@ -107,6 +119,7 @@ class ChatRoomList(generics.ListAPIView):
         from chat.wit_admin import WIT_ADMIN_USERNAME, ALL_OPERATOR_EMAILS
 
         user = self.request.user
+        blocked_ids = user.user_report_blocked_ids
 
         latest_msg = Message.objects.filter(
             chat_room=OuterRef('pk')
@@ -125,6 +138,14 @@ class ChatRoomList(generics.ListAPIView):
             Q(user1=user) | Q(user2=user) | Q(members=user)
         ).distinct()
 
+        if blocked_ids:
+            qs = qs.exclude(
+                Q(is_group=False) & (
+                    (Q(user1=user) & Q(user2_id__in=blocked_ids)) |
+                    (Q(user2=user) & Q(user1_id__in=blocked_ids))
+                )
+            )
+
         # Hide WIT Admin proxy rooms from non-operator viewers. From a regular
         # user's perspective the operator-side proxy chat shouldn't appear in
         # their chat list — they only see their User↔WIT_Admin chat.
@@ -135,6 +156,8 @@ class ChatRoomList(generics.ListAPIView):
             last_message_time=Subquery(latest_msg.values('created_at')[:1]),
             last_message_content=Subquery(latest_msg.values('content')[:1]),
             last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
+            last_message_image=Subquery(latest_msg.values('image')[:1]),
+            last_message_shared_type=Subquery(latest_msg.values('shared_content_type')[:1]),
             unread_cnt=Count(
                 'messages',
                 filter=Q(messages__receiver=user, messages__is_read=False)
@@ -173,6 +196,9 @@ class MessageList(generics.ListCreateAPIView):
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
+
+        if connected_user.id in user.user_report_blocked_ids:
+            raise exceptions.PermissionDenied("This user is blocked.")
 
         chat_room = get_chat_room(connected_user, user)
         if not chat_room:
@@ -216,7 +242,25 @@ class MessageList(generics.ListCreateAPIView):
         paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)
         if paginated_queryset:
             msg_ids = [msg.id for msg in paginated_queryset]
-            Message.objects.filter(id__in=msg_ids, receiver=request.user, is_read=False).update(is_read=True)
+            marked = Message.objects.filter(id__in=msg_ids, receiver=request.user, is_read=False).update(is_read=True)
+            if marked > 0:
+                chat_room = get_chat_room(request.user, connected_user)
+                if chat_room:
+                    remaining = chat_room.messages.filter(receiver=request.user, is_read=False).count()
+                    channel_layer = get_channel_layer()
+                    try:
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{request.user.id}_chat_list",
+                            {
+                                "type": "chat.list.update",
+                                "data": {
+                                    "opponent_id": connected_user.id,
+                                    "unread_count": remaining,
+                                },
+                            },
+                        )
+                    except Exception:
+                        pass
 
         return response
 
@@ -228,6 +272,9 @@ class MessageList(generics.ListCreateAPIView):
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
+
+        if connected_user.id in user.user_report_blocked_ids:
+            raise exceptions.PermissionDenied("This user is blocked.")
 
         # Skip the ChatRequest gate for WIT-Admin-related chats. The support
         # persona, the per-user operator proxy chats, and the operator blast
@@ -295,14 +342,21 @@ class MessageList(generics.ListCreateAPIView):
         # Broadcast via WebSocket to the chat room
         group_name = _get_chat_group_name(user.id, connected_user.id)
         channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {"type": "chat.message", "data": response.data},
-        )
+        try:
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {"type": "chat.message", "data": response.data},
+            )
+        except Exception as e:
+            print(f"[CHAT BROADCAST ERROR] room={group_name}: {e}")
+            send_msg_to_slack(
+                text=f"*💬 Chat broadcast failed*\nRoom: `{group_name}`\nSender: {user.username} (ID: {user.id}) → Receiver: {connected_user.username} (ID: {connected_user.id})\n```{e}```",
+                level="ERROR",
+            )
 
         # Broadcast to both users' chat list so the list page updates
         print(f"[CHAT] Broadcasting chat list update for room between {user.id} and {connected_user.id}")
-        content = response.data.get('content') or response.data.get('emoji') or ''
+        content = _get_message_preview_text(response.data)
         timestamp = response.data.get('created_at', '')
         receiver_unread = chat_room.messages.filter(receiver=connected_user, is_read=False).count()
         for target_user, unread in [(connected_user, receiver_unread), (user, 0)]:
@@ -341,6 +395,21 @@ class MarkMessagesRead(generics.GenericAPIView):
         chat_room = get_chat_room(user, connected_user)
         if chat_room:
             count = chat_room.messages.filter(receiver=user, is_read=False).update(is_read=True)
+            if count > 0:
+                channel_layer = get_channel_layer()
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.id}_chat_list",
+                        {
+                            "type": "chat.list.update",
+                            "data": {
+                                "opponent_id": connected_user.id,
+                                "unread_count": 0,
+                            },
+                        },
+                    )
+                except Exception:
+                    pass
             return Response({'marked_read': count})
         return Response({'marked_read': 0})
 
@@ -578,11 +647,17 @@ class MessageSearch(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        blocked_ids = user.user_report_blocked_ids
         query = self.request.query_params.get('q', '').strip()
         if not query:
             return Message.objects.none()
 
         user_rooms = ChatRoom.objects.filter(Q(user1=user) | Q(user2=user))
+        if blocked_ids:
+            user_rooms = user_rooms.exclude(
+                (Q(user1=user) & Q(user2_id__in=blocked_ids)) |
+                (Q(user2=user) & Q(user1_id__in=blocked_ids))
+            )
         return Message.objects.filter(
             chat_room__in=user_rooms,
             content__icontains=query,
@@ -768,7 +843,7 @@ class GroupMessageList(generics.ListCreateAPIView):
         )
 
         # Broadcast to all members' chat list (per-user unread count)
-        content = response.data.get('content') or response.data.get('emoji') or ''
+        content = _get_message_preview_text(response.data)
         timestamp = response.data.get('created_at', '')
         for member in room.members.exclude(id=request.user.id):
             cursor = GroupReadCursor.objects.filter(user=member, chat_room=room).first()

@@ -254,15 +254,27 @@ def create_message_notification(created, instance, **kwargs):
     if receiver_user.id in sender.user_report_blocked_ids:
         return
 
+    # Determine notification text based on message type
+    if instance.image:
+        noti_ko = f"{sender.username}님이 사진을 보냈습니다!"
+        noti_en = f"{sender.username} sent you a photo!"
+    elif instance.shared_object_id:
+        noti_ko = f"{sender.username}님이 게시글을 보냈습니다!"
+        noti_en = f"{sender.username} sent you a post!"
+    else:
+        noti_ko = f"{sender.username}님이 메시지를 보냈습니다!"
+        noti_en = f"{sender.username} sent you a message!"
+
     recent_noti = Notification.objects.find_recent_message(receiver_user, sender)
 
     if recent_noti:
         current_count = 1
-        if "메시지를" in recent_noti.message_ko:
-            try:
-                current_count = int(recent_noti.message_ko.split("님이 ")[1].split("메시지를")[0][0])
-            except (IndexError, ValueError):
-                pass
+        try:
+            part = recent_noti.message_ko.split("님이 ")[1]
+            if "개의" in part:
+                current_count = int(part.split("개의")[0])
+        except (IndexError, ValueError):
+            pass
 
         new_count = current_count + 1
         recent_noti.message_ko = f"{sender.username}님이 {new_count}개의 메시지를 보냈습니다!"
@@ -276,8 +288,8 @@ def create_message_notification(created, instance, **kwargs):
             user=receiver_user,
             origin=sender,
             target=instance,
-            message_ko=f"{sender.username}님이 메시지를 보냈습니다!",
-            message_en=f"{sender.username} sent you a message!",
+            message_ko=noti_ko,
+            message_en=noti_en,
             redirect_url=f"/users/{sender.id}/chat",
         )
         NotificationActor.objects.create(user=sender, notification=noti)

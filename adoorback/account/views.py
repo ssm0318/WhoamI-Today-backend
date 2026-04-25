@@ -37,6 +37,7 @@ from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
 from .models import Subscription, Connection, AppSession, DiscoverFeed, DiscoverFeedMusic, Persona, Interest
+from custom_fcm.models import CustomFCMDevice
 from account.models import FriendRequest, BlockRec, CustomChip
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -60,7 +61,7 @@ from qna.models import ResponseRequest
 from qna.models import Question, Response as _Response
 from qna.serializers import ResponseSerializer, DailyQuestionSerializer
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
-from account.models import INTEREST_CHOICES_BASE, CHIP_CATEGORY_CHOICES, CHIP_CATEGORY_DESCRIPTIONS, CHIPS_BY_CATEGORY, ALL_CHIP_NAMES
+from account.models import CHIP_CATEGORY_CHOICES, CHIP_CATEGORY_DESCRIPTIONS, CHIPS_BY_CATEGORY, ALL_CHIP_NAMES
 from tracking.utils import clean_session_key
 import random
 
@@ -82,10 +83,13 @@ def parse_hashtags_or_list(data):
     # Fallback: space-separated strings without #
     return [t.strip() for t in data.split() if t.strip()]
 
-def get_or_create_normalized_tag(model, raw_tag):
+def get_or_create_normalized_tag(model, raw_tag, category=None):
     normalized_input = normalize_tag(raw_tag)
     # Fetch all in-memory for matching (optimized for small-medium scale)
-    all_instances = list(model.objects.all_with_deleted())
+    qs = model.objects.all_with_deleted()
+    if category:
+        qs = qs.filter(category=category)
+    all_instances = list(qs)
     for instance in all_instances:
         if normalize_tag(instance.content) == normalized_input:
             if instance.deleted:
@@ -93,7 +97,10 @@ def get_or_create_normalized_tag(model, raw_tag):
             return instance
     # Not found, create new PascalCase version
     pascal_content = ''.join(word.capitalize() for word in re.split(r'[-_]', raw_tag))
-    return model.objects.create(content=pascal_content)
+    kwargs = {'content': pascal_content}
+    if category:
+        kwargs['category'] = category
+    return model.objects.create(**kwargs)
 
 def update_user_personas_logic(user, persona_keys):
     # This function now expects a list of KEYS from PERSONA_CHOICES
@@ -151,10 +158,7 @@ def update_user_interests_logic(user, interest_labels):
         all_new_interests = []
         for category, labels in interest_labels.items():
             for label in labels:
-                interest = get_or_create_normalized_tag(Interest, label)
-                if interest.category != category:
-                    interest.category = category
-                    interest.save()
+                interest = get_or_create_normalized_tag(Interest, label, category=category)
                 all_new_interests.append(interest)
         current_interests = list(user.user_interests.all())
         user.user_interests.set(all_new_interests)
@@ -166,8 +170,8 @@ def update_user_interests_logic(user, interest_labels):
         return
 
     # Flat list fallback (backward compatible)
-    from account.models import INTEREST_CHOICES_BASE
-    all_choice_interests_normalized = {normalize_tag(label) for label in INTEREST_CHOICES_BASE}
+    from account.models import ALL_CHIP_NAMES
+    all_choice_interests_normalized = {normalize_tag(label) for label in ALL_CHIP_NAMES}
     current_interests = list(user.user_interests.all())
     custom_interests = [i for i in current_interests if normalize_tag(i.content) not in all_choice_interests_normalized]
     new_choice_interests = [get_or_create_normalized_tag(Interest, label) for label in interest_labels]
@@ -240,7 +244,16 @@ class UserLogout(APIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def get(self, request):
+    def post(self, request):
+        user = request.user
+        registration_id = request.data.get('registration_id')
+
+        if registration_id and user.is_authenticated:
+            CustomFCMDevice.objects.filter(
+                user=user,
+                registration_id=registration_id,
+            ).update(active=False)
+
         logout(request)
         response = Response(data={"message": "Logout successful"}, content_type="application/json")
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
@@ -1002,14 +1015,11 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                     for tag in interest_tags:
                         # Handle SafeDelete: check all_with_deleted to avoid unique constraint issues
                         try:
-                            interest = Interest.objects.all_with_deleted().get(content=tag)
+                            interest = Interest.objects.all_with_deleted().get(content=tag, category=interest_category)
                             if interest.deleted:
                                 interest.undelete()
                         except Interest.DoesNotExist:
                             interest = Interest.objects.create(content=tag, category=interest_category)
-                        if interest.category != interest_category:
-                            interest.category = interest_category
-                            interest.save()
                         updated_user.user_interests.add(interest)
                 else:
                     # Full replacement (backward compatible)
@@ -2081,6 +2091,150 @@ class BlockRecCreate(generics.CreateAPIView):
                             blocked_user_id=self.request.data['blocked_user_id'])
         except IntegrityError:
             pass
+
+
+def _build_audience_ctx(user, friend_ids, content_type_ids):
+    from content_report.models import ContentReport
+
+    conns = Connection.objects.filter(
+        Q(user1=user, user2_id__in=friend_ids) | Q(user2=user, user1_id__in=friend_ids)
+    )
+    connection_by_friend_id = {}
+    for c in conns:
+        other_id = c.user2_id if c.user1_id == user.id else c.user1_id
+        connection_by_friend_id[other_id] = c
+
+    user_report_blocked_ids = set(user.user_report_blocked_ids)
+    content_report_keys = set(
+        ContentReport.objects.filter(
+            user=user, content_type_id__in=content_type_ids,
+        ).values_list('content_type_id', 'object_id')
+    )
+    return connection_by_friend_id, user_report_blocked_ids, content_report_keys
+
+
+def _check_audience(user, author_id, visibility, pk, ct_id, created_at,
+                    connection_by_friend_id, content_report_keys, user_report_blocked_ids):
+    if (ct_id, pk) in content_report_keys:
+        return False
+    if author_id in user_report_blocked_ids:
+        return False
+    if author_id == user.id:
+        return True
+    if 'public' in visibility:
+        return True
+    if 'friends' in visibility:
+        return True
+    if 'close_friends' in visibility:
+        conn = connection_by_friend_id.get(author_id)
+        if not conn:
+            return False
+        author_choice = conn.user1_choice if conn.user1_id == author_id else conn.user2_choice
+        if author_choice != 'close_friend':
+            return False
+        if author_id == conn.user1_id:
+            update_past = conn.user1_update_past_posts
+            upgrade_time = conn.user1_upgrade_time
+        else:
+            update_past = conn.user2_update_past_posts
+            upgrade_time = conn.user2_upgrade_time
+        return update_past or upgrade_time is None or created_at > upgrade_time
+    return False
+
+
+class FriendsMarkAllCheckInsAsRead(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request):
+        from check_in.models import CheckIn
+
+        user = request.user
+        friend_ids = list(user.connected_users.values_list('id', flat=True))
+        if not friend_ids:
+            return Response({'success': True, 'count': 0}, status=status.HTTP_200_OK)
+
+        ct_ci = ContentType.objects.get_for_model(CheckIn)
+        connection_by_friend_id, user_report_blocked_ids, content_report_keys = (
+            _build_audience_ctx(user, friend_ids, [ct_ci.id])
+        )
+
+        check_ins = (CheckIn.objects.filter(user_id__in=friend_ids, is_active=True)
+                     .exclude(readers=user))
+        eligible_ids = [
+            ci.pk for ci in check_ins
+            if _check_audience(user, ci.user_id, ci.visibility, ci.pk, ct_ci.id,
+                               ci.created_at, connection_by_friend_id,
+                               content_report_keys, user_report_blocked_ids)
+        ]
+
+        if eligible_ids:
+            Through = CheckIn.readers.through
+            Through.objects.bulk_create(
+                [Through(checkin_id=ci_id, user_id=user.id) for ci_id in eligible_ids],
+                ignore_conflicts=True,
+            )
+
+        return Response({'success': True, 'count': len(eligible_ids)},
+                        status=status.HTTP_200_OK)
+
+
+class FriendsMarkAllPostsAsRead(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request):
+        user = request.user
+        friend_ids = list(user.connected_users.values_list('id', flat=True))
+        if not friend_ids:
+            return Response({'success': True, 'note_count': 0, 'response_count': 0},
+                            status=status.HTTP_200_OK)
+
+        ct_note = ContentType.objects.get_for_model(Note)
+        ct_resp = ContentType.objects.get_for_model(_Response)
+        connection_by_friend_id, user_report_blocked_ids, content_report_keys = (
+            _build_audience_ctx(user, friend_ids, [ct_note.id, ct_resp.id])
+        )
+
+        notes = (Note.objects.filter(author_id__in=friend_ids)
+                 .exclude(readers=user)
+                 .exclude(author__is_superuser=True))
+        eligible_note_ids = [
+            n.pk for n in notes
+            if _check_audience(user, n.author_id, n.visibility, n.pk, ct_note.id,
+                               n.created_at, connection_by_friend_id,
+                               content_report_keys, user_report_blocked_ids)
+        ]
+        if eligible_note_ids:
+            NoteThrough = Note.readers.through
+            NoteThrough.objects.bulk_create(
+                [NoteThrough(note_id=n_id, user_id=user.id) for n_id in eligible_note_ids],
+                ignore_conflicts=True,
+            )
+
+        responses = (_Response.objects.filter(author_id__in=friend_ids)
+                     .exclude(readers=user))
+        eligible_resp_ids = [
+            r.pk for r in responses
+            if _check_audience(user, r.author_id, r.visibility, r.pk, ct_resp.id,
+                               r.created_at, connection_by_friend_id,
+                               content_report_keys, user_report_blocked_ids)
+        ]
+        if eligible_resp_ids:
+            RespThrough = _Response.readers.through
+            RespThrough.objects.bulk_create(
+                [RespThrough(response_id=r_id, user_id=user.id) for r_id in eligible_resp_ids],
+                ignore_conflicts=True,
+            )
+
+        return Response({'success': True,
+                         'note_count': len(eligible_note_ids),
+                         'response_count': len(eligible_resp_ids)},
+                        status=status.HTTP_200_OK)
 
 
 class UserMarkAllNotesAsRead(APIView):

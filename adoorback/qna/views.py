@@ -129,11 +129,12 @@ class ResponseInteractions(generics.ListAPIView):
         if not response.is_audience(self.request.user):
             raise PermissionDenied("You do not have permission to view likes on this response.")
 
-        likes = Like.objects.filter(content_type__model='response', object_id=response_id).annotate(
+        blocked_ids = self.request.user.user_report_blocked_ids
+        likes = Like.objects.filter(content_type__model='response', object_id=response_id).exclude(user_id__in=blocked_ids).annotate(
             reaction=Value(None, output_field=CharField())
         )
 
-        reactions = Reaction.objects.filter(content_type__model='response', object_id=response_id).annotate(
+        reactions = Reaction.objects.filter(content_type__model='response', object_id=response_id).exclude(user_id__in=blocked_ids).annotate(
             reaction=F('emoji')
         )
 
