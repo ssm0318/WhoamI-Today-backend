@@ -37,6 +37,9 @@ def _get_chat_group_name(user_id_1, user_id_2):
 
 def _get_message_preview_text(response_data):
     """Extract a preview string from serialized message data for chat list display."""
+    event_type = response_data.get('event_type')
+    if event_type:
+        return _get_system_event_preview_text(event_type)
     content = response_data.get('content') or response_data.get('emoji') or ''
     if not content:
         if response_data.get('image'):
@@ -44,6 +47,66 @@ def _get_message_preview_text(response_data):
         elif response_data.get('shared_content_preview'):
             content = '📎 Shared post'
     return content
+
+
+def _get_system_event_preview_text(event_type):
+    """English fallback preview text for system events. Frontend re-localizes
+    via the API response on next refresh."""
+    if event_type == 'member_added':
+        return 'A member was added'
+    if event_type == 'member_left':
+        return 'A member left'
+    return ''
+
+
+def _broadcast_system_message(room, message, chat_list_recipients=None):
+    """Broadcast a system event Message via the existing chat.message channel
+    and update each recipient's chat list. Reuses the regular group message
+    broadcast pattern so the frontend doesn't need a new socket event type.
+
+    chat_list_recipients defaults to current room members. Pass an explicit list
+    to avoid sending chat.list.update to a user who just left.
+    """
+    serialized = MessageSerializer(message).data
+    channel_layer = get_channel_layer()
+    try:
+        async_to_sync(channel_layer.group_send)(
+            f"chat_group_{room.id}",
+            {"type": "chat.message", "data": serialized},
+        )
+    except Exception:
+        pass
+
+    preview = _get_system_event_preview_text(message.event_type)
+    timestamp = serialized.get('created_at', '')
+    if chat_list_recipients is None:
+        chat_list_recipients = list(room.members.all())
+
+    for member in chat_list_recipients:
+        cursor = GroupReadCursor.objects.filter(user=member, chat_room=room).first()
+        if cursor and cursor.last_read_message:
+            unread = room.messages.exclude(sender=member).filter(
+                created_at__gt=cursor.last_read_message.created_at
+            ).count()
+        else:
+            unread = room.messages.exclude(sender=member).count()
+        try:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{member.id}_chat_list",
+                {
+                    "type": "chat.list.update",
+                    "data": {
+                        "room_id": int(room.id),
+                        "is_group": True,
+                        "group_name": room.name,
+                        "last_message": preview,
+                        "last_message_time": timestamp,
+                        "unread_count": unread,
+                    },
+                },
+            )
+        except Exception:
+            pass
 
 
 def broadcast_message_for_room(message):
@@ -158,6 +221,7 @@ class ChatRoomList(generics.ListAPIView):
             last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
             last_message_image=Subquery(latest_msg.values('image')[:1]),
             last_message_shared_type=Subquery(latest_msg.values('shared_content_type')[:1]),
+            last_message_event_type=Subquery(latest_msg.values('event_type')[:1]),
             unread_cnt=Count(
                 'messages',
                 filter=Q(messages__receiver=user, messages__is_read=False)
@@ -753,13 +817,28 @@ class GroupChatUpdate(generics.GenericAPIView):
             current_count = room.members.count()
             if current_count + len(add_ids) > MAX_GROUP_MEMBERS:
                 raise exceptions.ValidationError(f"Group cannot exceed {MAX_GROUP_MEMBERS} members.")
-            new_members = User.objects.filter(id__in=add_ids)
+            new_members = list(User.objects.filter(id__in=add_ids))
             room.members.add(*new_members)
+            if new_members:
+                added_msg = Message.objects.create(
+                    chat_room=room, sender=user, receiver=None,
+                    event_type='member_added',
+                )
+                added_msg.event_target_users.set(new_members)
+                _broadcast_system_message(room, added_msg)
 
         # Remove members
         remove_ids = request.data.get('remove_member_ids', [])
         if remove_ids:
-            room.members.remove(*User.objects.filter(id__in=remove_ids))
+            removed_members = list(User.objects.filter(id__in=remove_ids))
+            room.members.remove(*removed_members)
+            if removed_members:
+                removed_msg = Message.objects.create(
+                    chat_room=room, sender=user, receiver=None,
+                    event_type='member_left',
+                )
+                removed_msg.event_target_users.set(removed_members)
+                _broadcast_system_message(room, removed_msg)
 
         serializer = ChatRoomSerializer(room, context={'request': request})
         return Response(serializer.data)
@@ -782,12 +861,23 @@ class GroupChatLeave(generics.GenericAPIView):
         if not room.members.filter(id=user.id).exists():
             raise exceptions.PermissionDenied("You are not a member of this group.")
 
+        leave_msg = Message.objects.create(
+            chat_room=room, sender=user, receiver=None,
+            event_type='member_left',
+        )
+        leave_msg.event_target_users.set([user])
+
+        remaining_members = list(room.members.exclude(id=user.id))
         room.members.remove(user)
 
-        # Delete group if no members left
-        if room.members.count() == 0:
-            room.delete()
+        if remaining_members:
+            _broadcast_system_message(room, leave_msg, chat_list_recipients=remaining_members)
+            return Response({'status': 'left'})
 
+        # No members left — clean up room and the system message we just created
+        # (the room is going away, so the message has no audience).
+        leave_msg.delete()
+        room.delete()
         return Response({'status': 'left'})
 
 

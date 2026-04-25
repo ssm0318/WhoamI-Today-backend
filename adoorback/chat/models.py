@@ -84,6 +84,12 @@ MESSAGE_EMOJI_CHOICES = (
     ('laugh', '🤣'),
 )
 
+MESSAGE_EVENT_CHOICES = (
+    ('', 'Message'),
+    ('member_added', 'Member Added'),
+    ('member_left', 'Member Left'),
+)
+
 
 class Message(AdoorTimestampedModel, SafeDeleteModel):
     chat_room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')
@@ -95,6 +101,12 @@ class Message(AdoorTimestampedModel, SafeDeleteModel):
     is_read = models.BooleanField(default=False)
     # WIT Admin hotfix loop guard
     is_wit_admin_mirror = models.BooleanField(default=False)
+    event_type = models.CharField(
+        max_length=32, blank=True, default='', choices=MESSAGE_EVENT_CHOICES,
+    )
+    event_target_users = models.ManyToManyField(
+        get_user_model(), blank=True, related_name='+',
+    )
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
 
     # Shared content (Note, Response, Question, etc.)
@@ -121,6 +133,9 @@ class Message(AdoorTimestampedModel, SafeDeleteModel):
         return self.__class__.__name__
 
     def clean(self):
+        if self.event_type:
+            return
+
         if not self.emoji and not self.content and not self.shared_object_id and not self.image:
             raise ValidationError("Either an emoji, content, image, or shared content must be provided.")
 

@@ -20,6 +20,7 @@ class MessageSerializer(serializers.ModelSerializer):
     reactions = serializers.SerializerMethodField()
     parent_preview = serializers.SerializerMethodField()
     shared_content_preview = serializers.SerializerMethodField()
+    event_target_users = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -27,7 +28,13 @@ class MessageSerializer(serializers.ModelSerializer):
             'id', 'sender', 'emoji', 'content', 'image', 'is_read', 'created_at',
             'parent', 'reactions', 'parent_preview',
             'shared_content_type', 'shared_object_id', 'shared_content_preview',
+            'event_type', 'event_target_users',
         ]
+
+    def get_event_target_users(self, obj):
+        if not obj.event_type:
+            return []
+        return UserMinimalSerializer(obj.event_target_users.all(), many=True).data
 
     def get_reactions(self, obj):
         reactions_qs = obj.reactions.all() if hasattr(obj, '_prefetched_objects_cache') and 'reactions' in obj._prefetched_objects_cache else obj.reactions.all()
@@ -112,6 +119,8 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
     def get_last_message(self, obj):
         if hasattr(obj, 'last_message_content'):
+            if getattr(obj, 'last_message_event_type', ''):
+                return self._system_event_preview_text(obj.last_message_event_type)
             if obj.last_message_content:
                 return obj.last_message_content
             if obj.last_message_emoji:
@@ -123,6 +132,8 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             return None
         last_msg = obj.messages.first()  # ordering=['-created_at'] so first=newest
         if last_msg:
+            if last_msg.event_type:
+                return self._system_event_preview_text(last_msg.event_type)
             if last_msg.content:
                 return last_msg.content
             if last_msg.emoji:
@@ -142,6 +153,14 @@ class ChatRoomSerializer(serializers.ModelSerializer):
 
     def _shared_content_preview_text(self):
         return '📎 공유된 게시글' if self._get_lang() == 'ko' else '📎 Shared post'
+
+    def _system_event_preview_text(self, event_type):
+        is_ko = self._get_lang() == 'ko'
+        if event_type == 'member_added':
+            return '멤버가 추가되었어요' if is_ko else 'A member was added'
+        if event_type == 'member_left':
+            return '멤버가 나갔어요' if is_ko else 'A member left'
+        return None
 
     def get_last_message_time(self, obj):
         if hasattr(obj, 'last_message_time'):
