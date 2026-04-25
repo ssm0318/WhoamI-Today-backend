@@ -3,9 +3,6 @@
 # DB migration
 python manage.py migrate
 
-# Initialize Interest and Persona choices
-python manage.py initialize_choices
-
 # Create superuser (using environment variables)
 if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_EMAIL" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
   echo "Creating superuser..."

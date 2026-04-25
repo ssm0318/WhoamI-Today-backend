@@ -99,13 +99,14 @@ class NoteSerializer(BaseNoteSerializer):
         return [{"id": reaction.id, "emoji": reaction.emoji} for reaction in reactions]
 
     def get_like_reaction_user_sample(self, obj):
-        likes = obj.note_likes.annotate(
+        blocked_ids = self.context['request'].user.user_report_blocked_ids
+        likes = obj.note_likes.exclude(user_id__in=blocked_ids).annotate(
             created=F('created_at'),
             like=Value(True, output_field=BooleanField()),
             reaction=Value(None, output_field=CharField())
         ).values('user', 'created', 'like', 'reaction')
 
-        reactions = obj.reactions.annotate(
+        reactions = obj.reactions.exclude(user_id__in=blocked_ids).annotate(
             created=F('created_at'),
             like=Value(False, output_field=BooleanField()),
             reaction=F('emoji')
