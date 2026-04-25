@@ -99,6 +99,9 @@ urlpatterns = [
     path('friends/check-in-subscribe/', views.CheckInSubscribeAdd.as_view(), name='check-in-subscribe-add'),
     path('friends/<int:pk>/check-in-subscribe/', views.CheckInSubscribeDestroy.as_view(), name='check-in-subscribe-destroy'),
 
+    # Per-friend multi-type subscriptions (Ver.W 7 types / Ver.Q 2 types)
+    path('friends/<int:pk>/subscriptions/', views.FriendSubscriptions.as_view(), name='friend-subscriptions'),
+
     # TMI Placeholder
     path('tmi-placeholder/', views.TmiPlaceholder.as_view(), name='tmi-placeholder'),
 

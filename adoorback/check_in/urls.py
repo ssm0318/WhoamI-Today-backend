@@ -24,4 +24,10 @@ urlpatterns = [
     path('poke/', views.PokeCreate.as_view(), name='poke-create'),
     path('poke/sent/', views.PokeSent.as_view(), name='poke-sent'),
     path('poke/<int:pk>/', views.PokeDelete.as_view(), name='poke-delete'),
+
+    # Ver.Q image+text "check-in" posts
+    path('posts/', views.CheckInPostFeed.as_view(), name='check-in-post-feed'),
+    path('posts/stories/', views.CheckInPostStories.as_view(), name='check-in-post-stories'),
+    path('posts/<int:pk>/', views.CheckInPostDetail.as_view(), name='check-in-post-detail'),
+    path('posts/by-user/<int:pk>/', views.UserCheckInPosts.as_view(), name='check-in-posts-by-user'),
 ]

@@ -2395,6 +2395,88 @@ class CheckInSubscribeDestroy(generics.DestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+VER_W_SUBSCRIPTION_TYPES = (
+    'battery', 'mood', 'thought', 'song',
+    'mission_of_the_day', 'question_of_the_day', 'photo_of_the_day',
+)
+VER_Q_SUBSCRIPTION_TYPES = ('check_in', 'post')
+
+
+def _allowed_subscription_types(user):
+    if user.current_ver == 'version_q':
+        return VER_Q_SUBSCRIPTION_TYPES
+    return VER_W_SUBSCRIPTION_TYPES
+
+
+class FriendSubscriptions(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get(self, request, pk):
+        friend = get_object_or_404(User, id=pk)
+        if not request.user.is_connected(friend):
+            return Response({'error': 'User is not your friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        allowed = _allowed_subscription_types(request.user)
+        types = list(Subscription.objects.filter(
+            subscriber=request.user,
+            subscribed_to=friend,
+            subscription_type__in=allowed,
+            deleted__isnull=True,
+        ).values_list('subscription_type', flat=True))
+        return Response({'types': types}, status=status.HTTP_200_OK)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        friend = get_object_or_404(User, id=pk)
+        if not request.user.is_connected(friend):
+            return Response({'error': 'User is not your friend.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        allowed = set(_allowed_subscription_types(request.user))
+        requested = request.data.get('types', [])
+        if not isinstance(requested, list):
+            return Response({'error': 'types must be a list.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        invalid = [t for t in requested if t not in allowed]
+        if invalid:
+            return Response(
+                {'error': f'Invalid subscription types for current version: {invalid}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from adoorback.utils.content_types import get_check_in_type
+        check_in_ct = get_check_in_type()
+
+        desired = set(requested)
+        existing_qs = Subscription.objects.filter(
+            subscriber=request.user,
+            subscribed_to=friend,
+            subscription_type__in=allowed,
+            deleted__isnull=True,
+        )
+        existing = set(existing_qs.values_list('subscription_type', flat=True))
+
+        to_remove = existing - desired
+        if to_remove:
+            for sub in existing_qs.filter(subscription_type__in=to_remove):
+                sub.delete()
+
+        to_add = desired - existing
+        Subscription.objects.bulk_create([
+            Subscription(
+                subscriber=request.user,
+                subscribed_to=friend,
+                content_type=check_in_ct,
+                subscription_type=stype,
+            )
+            for stype in to_add
+        ])
+
+        return Response({'types': sorted(desired)}, status=status.HTTP_200_OK)
+
+
 class FriendFeed(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 

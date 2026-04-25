@@ -1,10 +1,12 @@
 from datetime import timedelta
 
+from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from rest_framework import serializers
 
 from account.serializers import UserMinimalSerializer
-from check_in.models import CheckIn, CheckInComponentEntry, Song, Poke
+from check_in.models import CheckIn, CheckInComponentEntry, CheckInPost, Song, Poke
+from like.models import Like
 
 CHECKIN_AUTO_ARCHIVE_HOURS = 12
 
@@ -261,3 +263,84 @@ class PokeSerializer(serializers.ModelSerializer):
 
 class TrackSerializer(serializers.Serializer):
     track_ids = serializers.ListField(child=serializers.CharField())
+
+
+class CheckInPostSerializer(serializers.ModelSerializer):
+    type = serializers.SerializerMethodField(read_only=True)
+    author_detail = UserMinimalSerializer(source='author', read_only=True)
+    image_url = serializers.SerializerMethodField(read_only=True)
+    image = serializers.ImageField(write_only=True, required=True)
+    visibility = serializers.ChoiceField(
+        choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
+        default='friends',
+    )
+    like_count = serializers.SerializerMethodField(read_only=True)
+    current_user_like_id = serializers.SerializerMethodField(read_only=True)
+    current_user_read = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = CheckInPost
+        fields = [
+            'id', 'type',
+            'author_detail',
+            'image', 'image_url',
+            'caption',
+            'visibility',
+            'created_at',
+            'like_count', 'current_user_like_id',
+            'current_user_read',
+        ]
+        read_only_fields = ['id', 'type', 'author_detail', 'image_url', 'created_at',
+                            'like_count', 'current_user_like_id', 'current_user_read']
+
+    def get_type(self, obj):
+        return 'CheckInPost'
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
+
+    def get_like_count(self, obj):
+        request = self.context.get('request')
+        if request is None or obj.author != request.user:
+            return None
+        blocked_user_ids = request.user.user_report_blocked_ids
+        return obj.check_in_post_likes.exclude(user_id__in=blocked_user_ids).count()
+
+    def get_current_user_like_id(self, obj):
+        request = self.context.get('request')
+        if request is None or not request.user.is_authenticated:
+            return None
+        ct = ContentType.objects.get_for_model(CheckInPost)
+        like = Like.objects.filter(
+            user_id=request.user.id, content_type_id=ct.id, object_id=obj.id,
+        ).first()
+        return like.id if like else None
+
+    def get_current_user_read(self, obj):
+        request = self.context.get('request')
+        if request is None or not request.user.is_authenticated:
+            return False
+        return obj.readers.filter(id=request.user.id).exists()
+
+
+class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
+    """Compact serializer for the friend's stories strip — id + author + thumbnail."""
+    author_detail = UserMinimalSerializer(source='author', read_only=True)
+    image_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = CheckInPost
+        fields = ['id', 'author_detail', 'image_url', 'visibility', 'created_at']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
