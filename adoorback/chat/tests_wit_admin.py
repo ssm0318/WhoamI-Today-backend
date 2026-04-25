@@ -589,3 +589,59 @@ class ChatRequestBypassTests(TestCase):
         resp = self._post(self.alice, bob.id, 'hey bob')
         self.assertEqual(resp.status_code, 201, resp.data)
         self.assertEqual(self.ChatRequest.objects.count(), 1)
+
+
+class RequestStatusSerializerTests(TestCase):
+    """ChatRoomSerializer must report 'friends' for WIT-Admin surfaces so the
+    frontend renders a normal chat composer instead of the request flow."""
+
+    def setUp(self):
+        from django.core.management import call_command
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _list(self, user):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from chat.views import ChatRoomList
+        factory = APIRequestFactory()
+        req = factory.get('/api/chat/rooms/')
+        force_authenticate(req, user=user)
+        resp = ChatRoomList.as_view()(req)
+        return resp.data.get('results', resp.data)
+
+    def test_user_sees_wit_admin_chat_as_friends(self):
+        results = self._list(self.alice)
+        wit_room = next((r for r in results if r['opponent']['username'] == 'wit_admin'), None)
+        self.assertIsNotNone(wit_room, "alice should see her wit_admin chat")
+        self.assertEqual(wit_room['request_status'], 'friends')
+
+    def test_operator_sees_blast_room_as_friends(self):
+        # Send something so the blast room has a last_message_time and surfaces.
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        u1, u2 = (self.jaewon, wit) if self.jaewon.id < wit.id else (wit, self.jaewon)
+        blast = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_blast_room=True)
+        Message.objects.create(chat_room=blast, sender=self.jaewon, receiver=wit, content='hi')
+
+        results = self._list(self.jaewon)
+        blast_room = next((r for r in results if r['id'] == blast.id), None)
+        self.assertIsNotNone(blast_room)
+        self.assertEqual(blast_room['request_status'], 'friends')
+
+    def test_operator_sees_proxy_room_as_friends(self):
+        # Trigger a message so the proxy room surfaces in jaewon's list.
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
+        alice_wit = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+        Message.objects.create(chat_room=alice_wit, sender=self.alice, receiver=wit, content='ping')
+
+        results = self._list(self.jaewon)
+        u1, u2 = (self.alice, self.jaewon) if self.alice.id < self.jaewon.id else (self.jaewon, self.alice)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        proxy_room = next((r for r in results if r['id'] == proxy.id), None)
+        self.assertIsNotNone(proxy_room)
+        self.assertEqual(proxy_room['request_status'], 'friends')
