@@ -116,7 +116,25 @@ class MessageList(generics.ListCreateAPIView):
         paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)
         if paginated_queryset:
             msg_ids = [msg.id for msg in paginated_queryset]
-            Message.objects.filter(id__in=msg_ids, receiver=request.user, is_read=False).update(is_read=True)
+            marked = Message.objects.filter(id__in=msg_ids, receiver=request.user, is_read=False).update(is_read=True)
+            if marked > 0:
+                chat_room = get_chat_room(request.user, connected_user)
+                if chat_room:
+                    remaining = chat_room.messages.filter(receiver=request.user, is_read=False).count()
+                    channel_layer = get_channel_layer()
+                    try:
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{request.user.id}_chat_list",
+                            {
+                                "type": "chat.list.update",
+                                "data": {
+                                    "opponent_id": connected_user.id,
+                                    "unread_count": remaining,
+                                },
+                            },
+                        )
+                    except Exception:
+                        pass
 
         return response
 
@@ -235,6 +253,21 @@ class MarkMessagesRead(generics.GenericAPIView):
         chat_room = get_chat_room(user, connected_user)
         if chat_room:
             count = chat_room.messages.filter(receiver=user, is_read=False).update(is_read=True)
+            if count > 0:
+                channel_layer = get_channel_layer()
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{user.id}_chat_list",
+                        {
+                            "type": "chat.list.update",
+                            "data": {
+                                "opponent_id": connected_user.id,
+                                "unread_count": 0,
+                            },
+                        },
+                    )
+                except Exception:
+                    pass
             return Response({'marked_read': count})
         return Response({'marked_read': 0})
 
