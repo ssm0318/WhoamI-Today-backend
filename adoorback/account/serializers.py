@@ -461,6 +461,7 @@ class FriendListSerializer(UserMinimalSerializer):
     is_hidden = serializers.SerializerMethodField(read_only=True)
     connection_status = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
+    current_user_read_check_in = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     unread_post_cnt = serializers.SerializerMethodField(read_only=True)
     recent_posts = serializers.SerializerMethodField(read_only=True)
@@ -553,6 +554,13 @@ class FriendListSerializer(UserMinimalSerializer):
         if ci and viewer_id not in {u.id for u in ci.readers.all()}:
             return False
         return True
+
+    def get_current_user_read_check_in(self, obj):
+        ci = self.check_in(obj)
+        if ci is None:
+            return True
+        viewer_id = self.context['request'].user.id
+        return viewer_id in {u.id for u in ci.readers.all()}
 
     def get_unread_post_cnt(self, obj):
         return (self.context.get('unread_note_count_by_author', {}).get(obj.id, 0)
@@ -654,6 +662,7 @@ class FriendListSerializer(UserMinimalSerializer):
     class Meta(UserMinimalSerializer.Meta):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
+                                                      'current_user_read_check_in',
                                                       'unread_cnt', 'unread_post_cnt', 'recent_posts',
                                                       'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',

@@ -2083,6 +2083,150 @@ class BlockRecCreate(generics.CreateAPIView):
             pass
 
 
+def _build_audience_ctx(user, friend_ids, content_type_ids):
+    from content_report.models import ContentReport
+
+    conns = Connection.objects.filter(
+        Q(user1=user, user2_id__in=friend_ids) | Q(user2=user, user1_id__in=friend_ids)
+    )
+    connection_by_friend_id = {}
+    for c in conns:
+        other_id = c.user2_id if c.user1_id == user.id else c.user1_id
+        connection_by_friend_id[other_id] = c
+
+    user_report_blocked_ids = set(user.user_report_blocked_ids)
+    content_report_keys = set(
+        ContentReport.objects.filter(
+            user=user, content_type_id__in=content_type_ids,
+        ).values_list('content_type_id', 'object_id')
+    )
+    return connection_by_friend_id, user_report_blocked_ids, content_report_keys
+
+
+def _check_audience(user, author_id, visibility, pk, ct_id, created_at,
+                    connection_by_friend_id, content_report_keys, user_report_blocked_ids):
+    if (ct_id, pk) in content_report_keys:
+        return False
+    if author_id in user_report_blocked_ids:
+        return False
+    if author_id == user.id:
+        return True
+    if 'public' in visibility:
+        return True
+    if 'friends' in visibility:
+        return True
+    if 'close_friends' in visibility:
+        conn = connection_by_friend_id.get(author_id)
+        if not conn:
+            return False
+        author_choice = conn.user1_choice if conn.user1_id == author_id else conn.user2_choice
+        if author_choice != 'close_friend':
+            return False
+        if author_id == conn.user1_id:
+            update_past = conn.user1_update_past_posts
+            upgrade_time = conn.user1_upgrade_time
+        else:
+            update_past = conn.user2_update_past_posts
+            upgrade_time = conn.user2_upgrade_time
+        return update_past or upgrade_time is None or created_at > upgrade_time
+    return False
+
+
+class FriendsMarkAllCheckInsAsRead(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request):
+        from check_in.models import CheckIn
+
+        user = request.user
+        friend_ids = list(user.connected_users.values_list('id', flat=True))
+        if not friend_ids:
+            return Response({'success': True, 'count': 0}, status=status.HTTP_200_OK)
+
+        ct_ci = ContentType.objects.get_for_model(CheckIn)
+        connection_by_friend_id, user_report_blocked_ids, content_report_keys = (
+            _build_audience_ctx(user, friend_ids, [ct_ci.id])
+        )
+
+        check_ins = (CheckIn.objects.filter(user_id__in=friend_ids, is_active=True)
+                     .exclude(readers=user))
+        eligible_ids = [
+            ci.pk for ci in check_ins
+            if _check_audience(user, ci.user_id, ci.visibility, ci.pk, ct_ci.id,
+                               ci.created_at, connection_by_friend_id,
+                               content_report_keys, user_report_blocked_ids)
+        ]
+
+        if eligible_ids:
+            Through = CheckIn.readers.through
+            Through.objects.bulk_create(
+                [Through(checkin_id=ci_id, user_id=user.id) for ci_id in eligible_ids],
+                ignore_conflicts=True,
+            )
+
+        return Response({'success': True, 'count': len(eligible_ids)},
+                        status=status.HTTP_200_OK)
+
+
+class FriendsMarkAllPostsAsRead(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request):
+        user = request.user
+        friend_ids = list(user.connected_users.values_list('id', flat=True))
+        if not friend_ids:
+            return Response({'success': True, 'note_count': 0, 'response_count': 0},
+                            status=status.HTTP_200_OK)
+
+        ct_note = ContentType.objects.get_for_model(Note)
+        ct_resp = ContentType.objects.get_for_model(_Response)
+        connection_by_friend_id, user_report_blocked_ids, content_report_keys = (
+            _build_audience_ctx(user, friend_ids, [ct_note.id, ct_resp.id])
+        )
+
+        notes = (Note.objects.filter(author_id__in=friend_ids)
+                 .exclude(readers=user)
+                 .exclude(author__is_superuser=True))
+        eligible_note_ids = [
+            n.pk for n in notes
+            if _check_audience(user, n.author_id, n.visibility, n.pk, ct_note.id,
+                               n.created_at, connection_by_friend_id,
+                               content_report_keys, user_report_blocked_ids)
+        ]
+        if eligible_note_ids:
+            NoteThrough = Note.readers.through
+            NoteThrough.objects.bulk_create(
+                [NoteThrough(note_id=n_id, user_id=user.id) for n_id in eligible_note_ids],
+                ignore_conflicts=True,
+            )
+
+        responses = (_Response.objects.filter(author_id__in=friend_ids)
+                     .exclude(readers=user))
+        eligible_resp_ids = [
+            r.pk for r in responses
+            if _check_audience(user, r.author_id, r.visibility, r.pk, ct_resp.id,
+                               r.created_at, connection_by_friend_id,
+                               content_report_keys, user_report_blocked_ids)
+        ]
+        if eligible_resp_ids:
+            RespThrough = _Response.readers.through
+            RespThrough.objects.bulk_create(
+                [RespThrough(response_id=r_id, user_id=user.id) for r_id in eligible_resp_ids],
+                ignore_conflicts=True,
+            )
+
+        return Response({'success': True,
+                         'note_count': len(eligible_note_ids),
+                         'response_count': len(eligible_resp_ids)},
+                        status=status.HTTP_200_OK)
+
+
 class UserMarkAllNotesAsRead(APIView):
     permission_classes = [IsAuthenticated]
 
