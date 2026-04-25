@@ -2,7 +2,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models import OuterRef, Subquery, Count, Q
+from django.db.models import F, OuterRef, Subquery, Count, Q
 from rest_framework import generics, exceptions, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -154,7 +154,10 @@ class ChatRoomList(generics.ListAPIView):
         else:
             visibility = Q(last_message_time__isnull=False) | Q(is_pinned_top=True)
 
-        return annotated.filter(visibility).order_by('-is_pinned_top', '-last_message_time')
+        return annotated.filter(visibility).order_by(
+            '-is_pinned_top',
+            F('last_message_time').desc(nulls_last=True),
+        )
 
 
 class MessageList(generics.ListCreateAPIView):
