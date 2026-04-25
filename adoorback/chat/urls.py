@@ -19,4 +19,5 @@ urlpatterns = [
     path('requests/', views.ChatRequestCreate.as_view(), name='chat-request-create'),
     path('requests/sent/', views.ChatRequestSentList.as_view(), name='chat-request-sent-list'),
     path('requests/<int:pk>/respond/', views.ChatRequestUpdate.as_view(), name='chat-request-update'),
+    path('requests/to/<int:requestee_id>/cancel/', views.ChatRequestCancel.as_view(), name='chat-request-cancel'),
 ]

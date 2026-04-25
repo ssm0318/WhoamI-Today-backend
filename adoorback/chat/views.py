@@ -702,6 +702,24 @@ class ChatRequestUpdate(generics.UpdateAPIView):
             get_or_create_chat_room(instance.requester, instance.requestee)
 
 
+class ChatRequestCancel(generics.DestroyAPIView):
+    serializer_class = ChatRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        try:
+            return ChatRequest.objects.get(
+                requester=self.request.user,
+                requestee_id=self.kwargs.get('requestee_id'),
+                accepted__isnull=True,
+            )
+        except ChatRequest.DoesNotExist:
+            raise exceptions.NotFound("Pending chat request not found.")
+
+
 class MessageSearch(generics.ListAPIView):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
