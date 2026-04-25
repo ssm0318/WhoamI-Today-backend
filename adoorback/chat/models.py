@@ -373,3 +373,28 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
                 receiver=op,
                 **_copy_message_fields(instance),
             )
+
+    # Branch 2 — jaewon reply in proxy room → mirror to user's WIT Admin room
+    if room.is_wit_admin_proxy and is_replier(sender):
+        # Identify the regular user as the non-jaewon participant
+        user = room.user2 if room.user1_id == sender.id else room.user1
+        wit = ensure_wit_admin_user()
+        u1, u2 = (user, wit) if user.id < wit.id else (wit, user)
+        wit_room = ChatRoom.objects.filter(
+            user1=u1, user2=u2, is_wit_admin_proxy=False,
+        ).first()
+        if wit_room is None:
+            from chat.wit_admin import provision_user_rooms
+            provision_user_rooms(user)
+            wit_room = ChatRoom.objects.filter(
+                user1=u1, user2=u2, is_wit_admin_proxy=False,
+            ).first()
+            if wit_room is None:
+                return
+        Message.objects.create(
+            chat_room=wit_room,
+            sender=wit,
+            receiver=user,
+            **_copy_message_fields(instance),
+        )
+        return

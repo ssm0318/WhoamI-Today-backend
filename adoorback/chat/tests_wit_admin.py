@@ -248,3 +248,54 @@ class InboundFanOutTests(TestCase):
         Message.objects.create(chat_room=room, sender=wit, receiver=self.alice, content='from-admin')
         # No inbound mirrors at all — branch 1 must not match outbound direction.
         self.assertEqual(Message.objects.filter(is_wit_admin_mirror=True).count(), 0)
+
+
+class JaewonReplyFanInTests(TestCase):
+    def setUp(self):
+        from django.core.management import call_command
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _wit(self):
+        from chat.wit_admin import ensure_wit_admin_user
+        return ensure_wit_admin_user()
+
+    def _alice_jaewon_proxy(self):
+        u1, u2 = (self.alice, self.jaewon) if self.alice.id < self.jaewon.id else (self.jaewon, self.alice)
+        return ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+
+    def _alice_wit_room(self):
+        wit = self._wit()
+        u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
+        return ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+
+    def test_jaewon_reply_in_proxy_mirrors_to_user_wit_room(self):
+        proxy = self._alice_jaewon_proxy()
+        Message.objects.create(
+            chat_room=proxy, sender=self.jaewon, receiver=self.alice, content='reply',
+        )
+        wit_room = self._alice_wit_room()
+        mirrors = Message.objects.filter(
+            chat_room=wit_room, is_wit_admin_mirror=True, sender=self._wit(),
+        )
+        self.assertEqual(mirrors.count(), 1)
+        self.assertEqual(mirrors.first().content, 'reply')
+        self.assertEqual(mirrors.first().receiver, self.alice)
+
+    def test_koyrkr_reply_does_not_fanin(self):
+        u1, u2 = (self.alice, self.koyrkr) if self.alice.id < self.koyrkr.id else (self.koyrkr, self.alice)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        Message.objects.create(chat_room=proxy, sender=self.koyrkr, receiver=self.alice, content='nope')
+        # No mirror should appear in the WIT Admin room
+        wit_room = self._alice_wit_room()
+        self.assertEqual(Message.objects.filter(chat_room=wit_room).count(), 0)
+
+    def test_njs_reply_does_not_fanin(self):
+        u1, u2 = (self.alice, self.njs) if self.alice.id < self.njs.id else (self.njs, self.alice)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        Message.objects.create(chat_room=proxy, sender=self.njs, receiver=self.alice, content='nope')
+        wit_room = self._alice_wit_room()
+        self.assertEqual(Message.objects.filter(chat_room=wit_room).count(), 0)
