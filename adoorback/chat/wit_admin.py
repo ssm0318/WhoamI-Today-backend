@@ -9,7 +9,7 @@ from chat.models import ChatRoom
 
 
 WIT_ADMIN_USERNAME = 'wit_admin'
-WIT_ADMIN_EMAIL = 'whoami.today.official@gmail.com'
+WIT_ADMIN_EMAIL = 'zeoni.res@gmail.com'
 WIT_ADMIN_DISPLAY_NAME = 'WIT Admin'
 
 OPERATOR_REPLIER_EMAIL = 'jaewonkim628@gmail.com'

@@ -77,7 +77,7 @@ class WitAdminHelpersTests(TestCase):
         from chat.wit_admin import ensure_wit_admin_user
         wit = ensure_wit_admin_user()
         self.assertEqual(wit.username, 'wit_admin')
-        self.assertEqual(wit.email, 'whoami.today.official@gmail.com')
+        self.assertEqual(wit.email, 'zeoni.res@gmail.com')
         self.assertFalse(wit.is_active)
         self.assertFalse(wit.has_usable_password())
 
@@ -135,7 +135,7 @@ class WitAdminHelpersTests(TestCase):
         self.assertNotIn('jaewonkim628@gmail.com', emails)
         self.assertNotIn('koyrkr@gmail.com', emails)
         self.assertNotIn('njs03332@gmail.com', emails)
-        self.assertNotIn('whoami.today.official@gmail.com', emails)
+        self.assertNotIn('zeoni.res@gmail.com', emails)
         self.assertNotIn('d@e.com', emails)
 
 

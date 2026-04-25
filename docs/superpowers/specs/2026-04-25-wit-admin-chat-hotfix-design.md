@@ -106,7 +106,7 @@ Mirror copies the meaningful payload fields: `content`, `image`, `message_type`/
 
 `python manage.py seed_wit_admin_chats`
 
-1. Idempotently create the WIT Admin user: `username='wit_admin'`, email `whoami.today.official@gmail.com`, display name "WIT Admin", `is_active=False` so it can never log in, password set via `set_unusable_password()`.
+1. Idempotently create the WIT Admin user: `username='wit_admin'`, email `zeoni.res@gmail.com`, display name "WIT Admin", `is_active=False` so it can never log in, password set via `set_unusable_password()`. (A separate `wit_bot` superuser owns `whoami.today.official@gmail.com` and authors all daily questions; that account is provisioned operationally, not by this hotfix.)
 2. Resolve the three operator users by email; abort with a clear error if any is missing.
 3. Idempotently create the three operator blast rooms (`is_wit_admin_blast_room=True`).
 4. For every active, non-deleted regular user (excluding WIT Admin and the three operators):
