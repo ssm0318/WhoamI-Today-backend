@@ -20,13 +20,13 @@ class Command(BaseCommand):
         try:
             resolve_operators()
         except LookupError as e:
-            raise CommandError(str(e))
+            raise CommandError(str(e)) from e
 
         ensure_blast_rooms()
 
         users = regular_recipients()
         total = users.count()
-        for i, user in enumerate(users, 1):
+        for i, user in enumerate(users.iterator(chunk_size=500), 1):
             provision_user_rooms(user)
             if i % 100 == 0:
                 self.stdout.write(f"  ... provisioned {i}/{total}")
