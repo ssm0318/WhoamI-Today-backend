@@ -7,6 +7,7 @@ from rest_framework import generics, exceptions, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
+from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.validators import adoor_exception_handler
 from django.contrib.contenttypes.models import ContentType
 from .models import Message, ChatRoom, ChatRequest, MessageReaction, GroupReadCursor, MAX_GROUP_MEMBERS, get_or_create_chat_room, get_chat_room
@@ -181,10 +182,17 @@ class MessageList(generics.ListCreateAPIView):
         # Broadcast via WebSocket to the chat room
         group_name = _get_chat_group_name(user.id, connected_user.id)
         channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {"type": "chat.message", "data": response.data},
-        )
+        try:
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {"type": "chat.message", "data": response.data},
+            )
+        except Exception as e:
+            print(f"[CHAT BROADCAST ERROR] room={group_name}: {e}")
+            send_msg_to_slack(
+                text=f"*💬 Chat broadcast failed*\nRoom: `{group_name}`\nSender: {user.username} (ID: {user.id}) → Receiver: {connected_user.username} (ID: {connected_user.id})\n```{e}```",
+                level="ERROR",
+            )
 
         # Broadcast to both users' chat list so the list page updates
         print(f"[CHAT] Broadcasting chat list update for room between {user.id} and {connected_user.id}")
