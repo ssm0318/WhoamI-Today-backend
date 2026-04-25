@@ -1023,32 +1023,3 @@ def delete_old_profile_image(sender, instance, **kwargs):
                 image_hash = image_name.split('_')[-1].split('.')[0]
                 if image_hash != current_hash:
                     os.remove(image_path)  # Delete files with different hash values
-
-
-@transaction.atomic
-@receiver(post_save, sender=User)
-def provision_wit_admin_rooms(created, instance, **kwargs):
-    """On user signup, create the WIT Admin chat + 3 operator proxy rooms.
-
-    See docs/superpowers/specs/2026-04-25-wit-admin-chat-hotfix-design.md.
-    """
-    if not created:
-        return
-    if instance.deleted:
-        return
-    if not instance.is_active:
-        return
-
-    # Lazy import to avoid circular: chat.wit_admin imports chat.models which can
-    # transitively reach account.models.
-    from chat.wit_admin import provision_user_rooms, ALL_OPERATOR_EMAILS, WIT_ADMIN_EMAIL
-
-    if instance.email in ALL_OPERATOR_EMAILS or instance.email == WIT_ADMIN_EMAIL:
-        return
-
-    try:
-        provision_user_rooms(instance)
-    except LookupError:
-        # Operator users not yet seeded — silently skip; the management command
-        # will catch this user up on the next run.
-        return
