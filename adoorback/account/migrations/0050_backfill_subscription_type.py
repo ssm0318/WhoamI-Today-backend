@@ -70,7 +70,7 @@ def collapse_check_in_subscriptions(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('account', '0048_subscription_subscription_type'),
+        ('account', '0049_subscription_subscription_type'),
     ]
 
     operations = [

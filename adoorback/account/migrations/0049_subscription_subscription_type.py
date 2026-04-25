@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('account', '0047_backfill_per_category_friends_only'),
+        ('account', '0048_interest_unique_per_category'),
     ]
 
     operations = [
