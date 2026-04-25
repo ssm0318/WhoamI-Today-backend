@@ -431,3 +431,50 @@ class ChatListPinTests(TestCase):
         data = self._list(self.alice)
         results = data.get('results', data)
         self.assertGreaterEqual(len(results), 1)
+
+
+class WebSocketBroadcastTests(TestCase):
+    def setUp(self):
+        from django.core.management import call_command
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _wit(self):
+        from chat.wit_admin import ensure_wit_admin_user
+        return ensure_wit_admin_user()
+
+    def _alice_wit_room(self):
+        wit = self._wit()
+        u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
+        return ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+
+    def test_inbound_fanout_broadcasts_for_each_mirror(self):
+        from unittest.mock import patch
+        room = self._alice_wit_room()
+        with patch('chat.views.async_to_sync') as mock_ats:
+            # async_to_sync wraps group_send; we count its invocations
+            mock_ats.return_value = lambda *a, **kw: None
+            Message.objects.create(
+                chat_room=room, sender=self.alice, receiver=self._wit(), content='hello',
+            )
+        # Each mirror produces:
+        #   1 chat.message + 2 chat.list.update = 3 group_sends
+        # x 3 mirrors = 9 invocations.
+        self.assertEqual(mock_ats.call_count, 9)
+
+    def test_jaewon_blast_broadcasts_for_each_recipient_and_observer(self):
+        from unittest.mock import patch
+        wit = self._wit()
+        u1, u2 = (self.jaewon, wit) if self.jaewon.id < wit.id else (wit, self.jaewon)
+        blast = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_blast_room=True)
+        with patch('chat.views.async_to_sync') as mock_ats:
+            mock_ats.return_value = lambda *a, **kw: None
+            Message.objects.create(
+                chat_room=blast, sender=self.jaewon, receiver=wit, content='announcement',
+            )
+        # 1 user (alice) + 2 observers (koyrkr, njs) = 3 mirrors,
+        # each with 3 sends = 9 invocations.
+        self.assertEqual(mock_ats.call_count, 9)

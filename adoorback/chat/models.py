@@ -333,6 +333,7 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
         ensure_wit_admin_user, resolve_operators, _copy_message_fields,
         is_wit_admin, is_replier,
     )
+    from chat.views import broadcast_message_for_room
 
     room = instance.chat_room
     sender = instance.sender
@@ -367,12 +368,13 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
                 ).first()
                 if proxy_room is None:
                     continue
-            Message.objects.create(
+            mirror = Message.objects.create(
                 chat_room=proxy_room,
                 sender=user,
                 receiver=op,
                 **_copy_message_fields(instance),
             )
+            broadcast_message_for_room(mirror)
 
     # Branch 2 — jaewon reply in proxy room → mirror to user's WIT Admin room
     if room.is_wit_admin_proxy and is_replier(sender):
@@ -391,12 +393,13 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
             ).first()
             if wit_room is None:
                 return
-        Message.objects.create(
+        mirror = Message.objects.create(
             chat_room=wit_room,
             sender=wit,
             receiver=user,
             **_copy_message_fields(instance),
         )
+        broadcast_message_for_room(mirror)
         return
 
     # Branch 3 — jaewon blast in his blast room → fan out to all users + 2 observer logs
@@ -420,12 +423,13 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
                 ).first()
                 if wit_room is None:
                     continue
-            Message.objects.create(
+            mirror = Message.objects.create(
                 chat_room=wit_room,
                 sender=wit,
                 receiver=user,
                 **_copy_message_fields(instance),
             )
+            broadcast_message_for_room(mirror)
 
         # 3b — observer (koyrkr, njs) blast logs
         UserModel = get_user_model()
@@ -439,10 +443,11 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
             ).first()
             if log_room is None:
                 continue
-            Message.objects.create(
+            mirror = Message.objects.create(
                 chat_room=log_room,
                 sender=wit,
                 receiver=observer,
                 **_copy_message_fields(instance),
             )
+            broadcast_message_for_room(mirror)
         return

@@ -24,6 +24,66 @@ def _get_chat_group_name(user_id_1, user_id_2):
     return f"chat_{ids[0]}_{ids[1]}"
 
 
+def broadcast_message_for_room(message):
+    """Broadcast a 1:1 Message to its chat room WebSocket group and update both
+    participants' chat lists.
+
+    Used by:
+    - `MessageList.create` (via inline code; could be refactored later).
+    - `fanout_wit_admin_messages` signal (mirror message broadcast).
+
+    Silently skips group rooms (not supported here) and best-effort on WS errors.
+    """
+    chat_room = message.chat_room
+    if chat_room.is_group:
+        return
+    if chat_room.user1_id is None or chat_room.user2_id is None:
+        return
+
+    serialized = MessageSerializer(message).data
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+
+    group_name = _get_chat_group_name(chat_room.user1_id, chat_room.user2_id)
+    try:
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {"type": "chat.message", "data": serialized},
+        )
+    except Exception as e:
+        print(f"[CHAT BROADCAST ERROR] room={chat_room.id}: {e}")
+
+    content = serialized.get('content') or serialized.get('emoji') or ''
+    timestamp = serialized.get('created_at', '')
+
+    sender_id = message.sender_id
+    receiver_id = message.receiver_id
+    if receiver_id is None:
+        return
+
+    receiver_unread = chat_room.messages.filter(receiver_id=receiver_id, is_read=False).count()
+
+    for target_id, opponent_id, unread in (
+        (receiver_id, sender_id, receiver_unread),
+        (sender_id, receiver_id, 0),
+    ):
+        if target_id is None:
+            continue
+        try:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{target_id}_chat_list",
+                {"type": "chat.list.update", "data": {
+                    "opponent_id": opponent_id,
+                    "last_message": content,
+                    "last_message_time": timestamp,
+                    "unread_count": unread,
+                }},
+            )
+        except Exception as e:
+            print(f"[CHAT LIST BROADCAST ERROR] user={target_id}: {e}")
+
+
 class ChatRoomList(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
