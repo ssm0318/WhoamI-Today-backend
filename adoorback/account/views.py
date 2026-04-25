@@ -37,6 +37,7 @@ from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
 from .models import Subscription, Connection, AppSession, DiscoverFeed, DiscoverFeedMusic, Persona, Interest
+from custom_fcm.models import CustomFCMDevice
 from account.models import FriendRequest, BlockRec, CustomChip
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
@@ -243,7 +244,16 @@ class UserLogout(APIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def get(self, request):
+    def post(self, request):
+        user = request.user
+        registration_id = request.data.get('registration_id')
+
+        if registration_id and user.is_authenticated:
+            CustomFCMDevice.objects.filter(
+                user=user,
+                registration_id=registration_id,
+            ).update(active=False)
+
         logout(request)
         response = Response(data={"message": "Logout successful"}, content_type="application/json")
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
