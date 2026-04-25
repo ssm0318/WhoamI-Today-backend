@@ -37,3 +37,20 @@ class WitAdminFlagsBackfillTests(TestCase):
         for room in ChatRoom.objects.all():
             self.assertIsNotNone(room.is_wit_admin_proxy)
             self.assertIsNotNone(room.is_wit_admin_blast_room)
+
+
+class WitAdminFlagsNotNullTests(TestCase):
+    def test_proxy_field_rejects_null(self):
+        from django.db import IntegrityError
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        u1 = User.objects.create_user(username='nx1', email='nx1@example.com', password='x')
+        u2 = User.objects.create_user(username='nx2', email='nx2@example.com', password='x')
+        room = ChatRoom.objects.create(user1=u1, user2=u2)
+        from django.db import connection
+        with connection.cursor() as cur:
+            with self.assertRaises(IntegrityError):
+                cur.execute(
+                    "UPDATE chat_chatroom SET is_wit_admin_proxy = NULL WHERE id = %s",
+                    [room.id],
+                )

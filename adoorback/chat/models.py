@@ -34,8 +34,8 @@ class ChatRoom(AdoorTimestampedModel, SafeDeleteModel):
     members = models.ManyToManyField(get_user_model(), related_name='group_chat_rooms', blank=True)
 
     # WIT Admin hotfix — see docs/superpowers/specs/2026-04-25-wit-admin-chat-hotfix-design.md
-    is_wit_admin_proxy = models.BooleanField(null=True, blank=True, default=False)
-    is_wit_admin_blast_room = models.BooleanField(null=True, blank=True, default=False)
+    is_wit_admin_proxy = models.BooleanField(default=False)
+    is_wit_admin_blast_room = models.BooleanField(default=False)
 
     _safedelete_policy = SOFT_DELETE_CASCADE
 
@@ -94,7 +94,7 @@ class Message(AdoorTimestampedModel, SafeDeleteModel):
     image = models.ImageField(upload_to='chat_images/', blank=True, null=True)
     is_read = models.BooleanField(default=False)
     # WIT Admin hotfix loop guard
-    is_wit_admin_mirror = models.BooleanField(null=True, blank=True, default=False)
+    is_wit_admin_mirror = models.BooleanField(default=False)
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
 
     # Shared content (Note, Response, Question, etc.)
