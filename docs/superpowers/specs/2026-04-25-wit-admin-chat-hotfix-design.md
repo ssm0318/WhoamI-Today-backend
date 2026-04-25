@@ -106,7 +106,7 @@ Mirror copies the meaningful payload fields: `content`, `image`, `message_type`/
 
 `python manage.py seed_wit_admin_chats`
 
-1. Idempotently create the WIT Admin user (`username='wit_admin'`, display name "WIT Admin", inactive login, password unusable). Email value to be confirmed during implementation (suggested: `wit-admin@whoami.local`).
+1. Idempotently create the WIT Admin user: `username='wit_admin'`, email `whoami.today.official@gmail.com`, display name "WIT Admin", `is_active=False` so it can never log in, password set via `set_unusable_password()`.
 2. Resolve the three operator users by email; abort with a clear error if any is missing.
 3. Idempotently create the three operator blast rooms (`is_wit_admin_blast_room=True`).
 4. For every active, non-deleted regular user (excluding WIT Admin and the three operators):
@@ -118,24 +118,57 @@ Re-running the command is safe: rooms are looked up by participants, flags re-as
 
 ## Auto-create on signup
 
-`post_save` signal on `User`:
+`post_save` signal on `User` (registered in `account/signals.py` and wired through `account/apps.py`):
 - Skip if the new user is WIT Admin or one of the three operators.
-- Run the same per-user creation step as the seed (1 WIT Admin chat + 3 proxy rooms).
+- Skip if `is_active=False` or soft-deleted.
+- Run the same per-user creation step as the seed (1 `User ↔ WIT_Admin` chat + 3 `is_wit_admin_proxy=True` rooms).
+- Wrapped in `@transaction.atomic` per the project's signal convention.
 
 This keeps the system self-healing for new signups without re-running the management command.
+
+## Pinning the WIT Admin chat
+
+The chat list view (`chat/views.py:ChatRoomList.get_queryset`) currently orders by `-last_message_time`. To pin the WIT Admin chat (and, for operator accounts, their blast room with WIT Admin) at the top:
+
+- Add an annotation `is_pinned_top` that is `True` when either room participant is the WIT Admin user.
+- Order by `-is_pinned_top, -last_message_time`.
+- This pins the room even before any message exists in it, *but* the existing `.filter(last_message_time__isnull=False)` would hide an empty room. Drop that filter for pinned rooms specifically — i.e. allow the WIT Admin chat to appear without messages, while non-pinned rooms keep the existing "must have messages" filter.
+
+Effect by account:
+- Regular user A: `A ↔ WIT_Admin` is always at the top of their chat list.
+- Operator (jaewon/koyrkr/njs): their `*_↔ WIT_Admin` blast room is at the top; per-user proxy chats sort below normally.
+- WIT Admin: never logs in; no UI concern.
+
+The pin is implicit (driven by participant identity), not a user-controlled flag — so no per-user pin state to migrate. Verify during implementation whether the WebSocket-driven chat list (`ChatListConsumer`) reuses this queryset or builds its own ordering; if separate, mirror the change.
 
 ## Files touched
 
 Backend only:
 
 - `adoorback/chat/models.py` — add the two `ChatRoom` flags and one `Message` flag.
-- `adoorback/chat/migrations/00XX_wit_admin_proxy.py` — auto-generated.
+- `adoorback/chat/migrations/` — three migrations per the project's 3-step migration safety pattern (`MIGRATION_GUIDELINES.md`). See "Migration plan" below.
+- `adoorback/chat/views.py` — extend `ChatRoomList.get_queryset` to annotate `is_pinned_top` and reorder.
 - `adoorback/chat/signals.py` — new file (or extend existing) with the `post_save` handler. Register in `adoorback/chat/apps.py` `ready()`.
 - `adoorback/chat/management/commands/seed_wit_admin_chats.py` — new command.
 - `adoorback/account/signals.py` (or wherever the `User` post_save lives) — auto-create rooms on signup.
 - `adoorback/chat/tests.py` (or new test module) — coverage as listed below.
 
 Frontend: none. WIT Admin appears as a normal 1:1 counterparty; mirror chats appear as normal 1:1 chats in operator accounts.
+
+## Migration plan
+
+Per `MIGRATION_GUIDELINES.md`, every new column is added in three migrations:
+
+**Step 1 — Add nullable columns:**
+- `ChatRoom.is_wit_admin_proxy = BooleanField(null=True, blank=True, default=False)`
+- `ChatRoom.is_wit_admin_blast_room = BooleanField(null=True, blank=True, default=False)`
+- `Message.is_wit_admin_mirror = BooleanField(null=True, blank=True, default=False)`
+
+**Step 2 — `RunPython` backfill:** set every existing row's three flags to `False`. Reverse function sets them back to `None` (no-op semantically since they all start `False`). Verify counts before/after.
+
+**Step 3 — Apply NOT NULL constraint:** `AlterField` to `BooleanField(default=False)` (no longer nullable).
+
+Each step is its own migration file. `python manage.py sqlmigrate chat <num>` should be inspected before applying.
 
 ## Edge cases
 
@@ -157,6 +190,7 @@ Django `TestCase` with these scenarios:
 5. **Blast** — message in `jaewon ↔ WIT_Admin` produces N mirror messages (one per regular user, sender=WIT_Admin) plus 2 mirrors in koyrkr's and njs's blast logs.
 6. **Loop guard** — mirror messages do not retrigger the handler (assert handler call count or final message count).
 7. **Auto-signup** — creating a new `User` produces 1 + 3 rooms automatically; soft-deleted/inactive users do not.
+8. **Pin** — `ChatRoomList` returns the WIT Admin chat first regardless of `last_message_time` (including when empty), and operator accounts get their blast room first.
 
 ## Out of scope (YAGNI)
 
