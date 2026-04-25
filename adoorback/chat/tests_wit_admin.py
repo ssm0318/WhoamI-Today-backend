@@ -137,3 +137,34 @@ class WitAdminHelpersTests(TestCase):
         self.assertNotIn('njs03332@gmail.com', emails)
         self.assertNotIn('whoami.today.official@gmail.com', emails)
         self.assertNotIn('d@e.com', emails)
+
+
+class SeedWitAdminChatsCommandTests(TestCase):
+    def setUp(self):
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        self.bob = User.objects.create_user(username='bob', email='b@e.com', password='x')
+
+    def test_command_creates_expected_rooms(self):
+        from django.core.management import call_command
+        call_command('seed_wit_admin_chats')
+        # 2 regular users * (1 wit_admin + 3 proxy) = 8, plus 3 blast rooms = 11
+        self.assertEqual(ChatRoom.objects.count(), 11)
+        self.assertEqual(ChatRoom.objects.filter(is_wit_admin_proxy=True).count(), 6)
+        self.assertEqual(ChatRoom.objects.filter(is_wit_admin_blast_room=True).count(), 3)
+
+    def test_command_is_idempotent(self):
+        from django.core.management import call_command
+        call_command('seed_wit_admin_chats')
+        first = ChatRoom.objects.count()
+        call_command('seed_wit_admin_chats')
+        self.assertEqual(ChatRoom.objects.count(), first)
+
+    def test_command_aborts_when_operator_missing(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        self.koyrkr.delete()
+        with self.assertRaises(CommandError):
+            call_command('seed_wit_admin_chats')
