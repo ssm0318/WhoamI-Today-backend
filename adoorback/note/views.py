@@ -130,11 +130,12 @@ class NoteInteractions(generics.ListAPIView):
         if not note.is_audience(self.request.user):
             raise PermissionDenied("You do not have permission to view likes on this note.")
 
-        likes = Like.objects.filter(content_type__model='note', object_id=note_id).annotate(
+        blocked_ids = self.request.user.user_report_blocked_ids
+        likes = Like.objects.filter(content_type__model='note', object_id=note_id).exclude(user_id__in=blocked_ids).annotate(
             reaction=Value(None, output_field=CharField())
         )
 
-        reactions = Reaction.objects.filter(content_type__model='note', object_id=note_id).annotate(
+        reactions = Reaction.objects.filter(content_type__model='note', object_id=note_id).exclude(user_id__in=blocked_ids).annotate(
             reaction=F('emoji')
         )
 
@@ -263,11 +264,12 @@ class NoticeInteractions(generics.ListAPIView):
 
         note_id = self.kwargs['pk']
 
-        likes = Like.objects.filter(content_type__model='note', object_id=note_id).annotate(
+        blocked_ids = self.request.user.user_report_blocked_ids
+        likes = Like.objects.filter(content_type__model='note', object_id=note_id).exclude(user_id__in=blocked_ids).annotate(
             reaction=Value(None, output_field=CharField())
         )
 
-        reactions = Reaction.objects.filter(content_type__model='note', object_id=note_id).annotate(
+        reactions = Reaction.objects.filter(content_type__model='note', object_id=note_id).exclude(user_id__in=blocked_ids).annotate(
             reaction=F('emoji')
         )
 

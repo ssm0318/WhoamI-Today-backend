@@ -33,14 +33,25 @@ class ChatRoomList(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        blocked_ids = user.user_report_blocked_ids
 
         latest_msg = Message.objects.filter(
             chat_room=OuterRef('pk')
         ).order_by('-created_at')
 
-        return ChatRoom.objects.filter(
+        qs = ChatRoom.objects.filter(
             Q(user1=user) | Q(user2=user) | Q(members=user)
-        ).distinct().annotate(
+        ).distinct()
+
+        if blocked_ids:
+            qs = qs.exclude(
+                Q(is_group=False) & (
+                    (Q(user1=user) & Q(user2_id__in=blocked_ids)) |
+                    (Q(user2=user) & Q(user1_id__in=blocked_ids))
+                )
+            )
+
+        return qs.annotate(
             last_message_time=Subquery(latest_msg.values('created_at')[:1]),
             last_message_content=Subquery(latest_msg.values('content')[:1]),
             last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
@@ -66,6 +77,9 @@ class MessageList(generics.ListCreateAPIView):
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
+
+        if connected_user.id in user.user_report_blocked_ids:
+            raise exceptions.PermissionDenied("This user is blocked.")
 
         chat_room = get_chat_room(connected_user, user)
         if not chat_room:
@@ -111,6 +125,9 @@ class MessageList(generics.ListCreateAPIView):
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
+
+        if connected_user.id in user.user_report_blocked_ids:
+            raise exceptions.PermissionDenied("This user is blocked.")
 
         if not user.is_connected(connected_user):
             req = ChatRequest.objects.filter(
@@ -447,11 +464,17 @@ class MessageSearch(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        blocked_ids = user.user_report_blocked_ids
         query = self.request.query_params.get('q', '').strip()
         if not query:
             return Message.objects.none()
 
         user_rooms = ChatRoom.objects.filter(Q(user1=user) | Q(user2=user))
+        if blocked_ids:
+            user_rooms = user_rooms.exclude(
+                (Q(user1=user) & Q(user2_id__in=blocked_ids)) |
+                (Q(user2=user) & Q(user1_id__in=blocked_ids))
+            )
         return Message.objects.filter(
             chat_room__in=user_rooms,
             content__icontains=query,

@@ -756,7 +756,8 @@ class CheckInReactions(generics.ListAPIView):
             raise exceptions.PermissionDenied("You cannot access reactions for this check-in.")
 
         content_type = ContentType.objects.get_for_model(CheckIn)
+        blocked_ids = self.request.user.user_report_blocked_ids
         return Reaction.objects.filter(
             content_type=content_type,
             object_id=pk,
-        ).order_by('-created_at')
+        ).exclude(user_id__in=blocked_ids).order_by('-created_at')
