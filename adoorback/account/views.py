@@ -60,7 +60,7 @@ from qna.models import ResponseRequest
 from qna.models import Question, Response as _Response
 from qna.serializers import ResponseSerializer, DailyQuestionSerializer
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
-from account.models import INTEREST_CHOICES_BASE, CHIP_CATEGORY_CHOICES, CHIP_CATEGORY_DESCRIPTIONS, CHIPS_BY_CATEGORY, ALL_CHIP_NAMES
+from account.models import CHIP_CATEGORY_CHOICES, CHIP_CATEGORY_DESCRIPTIONS, CHIPS_BY_CATEGORY, ALL_CHIP_NAMES
 from tracking.utils import clean_session_key
 import random
 
@@ -82,10 +82,13 @@ def parse_hashtags_or_list(data):
     # Fallback: space-separated strings without #
     return [t.strip() for t in data.split() if t.strip()]
 
-def get_or_create_normalized_tag(model, raw_tag):
+def get_or_create_normalized_tag(model, raw_tag, category=None):
     normalized_input = normalize_tag(raw_tag)
     # Fetch all in-memory for matching (optimized for small-medium scale)
-    all_instances = list(model.objects.all_with_deleted())
+    qs = model.objects.all_with_deleted()
+    if category:
+        qs = qs.filter(category=category)
+    all_instances = list(qs)
     for instance in all_instances:
         if normalize_tag(instance.content) == normalized_input:
             if instance.deleted:
@@ -93,7 +96,10 @@ def get_or_create_normalized_tag(model, raw_tag):
             return instance
     # Not found, create new PascalCase version
     pascal_content = ''.join(word.capitalize() for word in re.split(r'[-_]', raw_tag))
-    return model.objects.create(content=pascal_content)
+    kwargs = {'content': pascal_content}
+    if category:
+        kwargs['category'] = category
+    return model.objects.create(**kwargs)
 
 def update_user_personas_logic(user, persona_keys):
     # This function now expects a list of KEYS from PERSONA_CHOICES
@@ -151,10 +157,7 @@ def update_user_interests_logic(user, interest_labels):
         all_new_interests = []
         for category, labels in interest_labels.items():
             for label in labels:
-                interest = get_or_create_normalized_tag(Interest, label)
-                if interest.category != category:
-                    interest.category = category
-                    interest.save()
+                interest = get_or_create_normalized_tag(Interest, label, category=category)
                 all_new_interests.append(interest)
         current_interests = list(user.user_interests.all())
         user.user_interests.set(all_new_interests)
@@ -166,8 +169,8 @@ def update_user_interests_logic(user, interest_labels):
         return
 
     # Flat list fallback (backward compatible)
-    from account.models import INTEREST_CHOICES_BASE
-    all_choice_interests_normalized = {normalize_tag(label) for label in INTEREST_CHOICES_BASE}
+    from account.models import ALL_CHIP_NAMES
+    all_choice_interests_normalized = {normalize_tag(label) for label in ALL_CHIP_NAMES}
     current_interests = list(user.user_interests.all())
     custom_interests = [i for i in current_interests if normalize_tag(i.content) not in all_choice_interests_normalized]
     new_choice_interests = [get_or_create_normalized_tag(Interest, label) for label in interest_labels]
@@ -1002,14 +1005,11 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                     for tag in interest_tags:
                         # Handle SafeDelete: check all_with_deleted to avoid unique constraint issues
                         try:
-                            interest = Interest.objects.all_with_deleted().get(content=tag)
+                            interest = Interest.objects.all_with_deleted().get(content=tag, category=interest_category)
                             if interest.deleted:
                                 interest.undelete()
                         except Interest.DoesNotExist:
                             interest = Interest.objects.create(content=tag, category=interest_category)
-                        if interest.category != interest_category:
-                            interest.category = interest_category
-                            interest.save()
                         updated_user.user_interests.add(interest)
                 else:
                     # Full replacement (backward compatible)
