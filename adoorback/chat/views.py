@@ -2,8 +2,9 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models import OuterRef, Subquery, Count, Q
+from django.db.models import F, OuterRef, Subquery, Count, Q
 from rest_framework import generics, exceptions, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
@@ -18,6 +19,15 @@ from .serializers import (
 )
 
 User = get_user_model()
+
+
+class ChatRoomListPagination(PageNumberPagination):
+    """Chat rooms per user are bounded (one per peer, plus operator/admin
+    surfaces) so a single page covers virtually every realistic case. The
+    frontend chat list does not implement infinite scroll, so a too-small
+    page size silently hides rooms past the first 10."""
+    page_size = 200
+    max_page_size = 500
 
 
 def _get_chat_group_name(user_id_1, user_id_2):
@@ -36,20 +46,93 @@ def _get_message_preview_text(response_data):
     return content
 
 
+def broadcast_message_for_room(message):
+    """Broadcast a 1:1 Message to its chat room WebSocket group and update both
+    participants' chat lists.
+
+    Used by:
+    - `MessageList.create` (via inline code; could be refactored later).
+    - `fanout_wit_admin_messages` signal (mirror message broadcast).
+
+    Silently skips group rooms (not supported here) and best-effort on WS errors.
+    """
+    chat_room = message.chat_room
+    if chat_room.is_group:
+        return
+    if chat_room.user1_id is None or chat_room.user2_id is None:
+        return
+
+    serialized = MessageSerializer(message).data
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        return
+
+    group_name = _get_chat_group_name(chat_room.user1_id, chat_room.user2_id)
+    try:
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            {"type": "chat.message", "data": serialized},
+        )
+    except Exception as e:
+        print(f"[CHAT BROADCAST ERROR] room={chat_room.id}: {e}")
+
+    content = serialized.get('content') or serialized.get('emoji') or ''
+    timestamp = serialized.get('created_at', '')
+
+    sender_id = message.sender_id
+    receiver_id = message.receiver_id
+    if receiver_id is None:
+        return
+
+    receiver_unread = chat_room.messages.filter(receiver_id=receiver_id, is_read=False).count()
+
+    for target_id, opponent_id, unread in (
+        (receiver_id, sender_id, receiver_unread),
+        (sender_id, receiver_id, 0),
+    ):
+        if target_id is None:
+            continue
+        try:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{target_id}_chat_list",
+                {"type": "chat.list.update", "data": {
+                    "opponent_id": opponent_id,
+                    "last_message": content,
+                    "last_message_time": timestamp,
+                    "unread_count": unread,
+                }},
+            )
+        except Exception as e:
+            print(f"[CHAT LIST BROADCAST ERROR] user={target_id}: {e}")
+
+
 class ChatRoomList(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = ChatRoomListPagination
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     def get_queryset(self):
+        from django.db.models import Case, When, Value, BooleanField
+        from chat.wit_admin import WIT_ADMIN_USERNAME, ALL_OPERATOR_EMAILS
+
         user = self.request.user
         blocked_ids = user.user_report_blocked_ids
 
         latest_msg = Message.objects.filter(
             chat_room=OuterRef('pk')
         ).order_by('-created_at')
+
+        is_pinned_top = Case(
+            When(
+                Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME),
+                then=Value(True),
+            ),
+            default=Value(False),
+            output_field=BooleanField(),
+        )
 
         qs = ChatRoom.objects.filter(
             Q(user1=user) | Q(user2=user) | Q(members=user)
@@ -63,7 +146,13 @@ class ChatRoomList(generics.ListAPIView):
                 )
             )
 
-        return qs.annotate(
+        # Hide WIT Admin proxy rooms from non-operator viewers. From a regular
+        # user's perspective the operator-side proxy chat shouldn't appear in
+        # their chat list — they only see their User↔WIT_Admin chat.
+        if user.email not in ALL_OPERATOR_EMAILS:
+            qs = qs.exclude(is_wit_admin_proxy=True)
+
+        annotated = qs.annotate(
             last_message_time=Subquery(latest_msg.values('created_at')[:1]),
             last_message_content=Subquery(latest_msg.values('content')[:1]),
             last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
@@ -72,10 +161,26 @@ class ChatRoomList(generics.ListAPIView):
             unread_cnt=Count(
                 'messages',
                 filter=Q(messages__receiver=user, messages__is_read=False)
+            ),
+            is_pinned_top=is_pinned_top,
+        )
+
+        # Surface every WIT Admin proxy room in operators' chat lists, even
+        # before the user has messaged in (so jaewon's inbox shows all 11 user
+        # chats from day 1, not just the ones with traffic).
+        if user.email in ALL_OPERATOR_EMAILS:
+            visibility = (
+                Q(last_message_time__isnull=False)
+                | Q(is_pinned_top=True)
+                | Q(is_wit_admin_proxy=True)
             )
-        ).filter(
-            last_message_time__isnull=False
-        ).order_by('-last_message_time')
+        else:
+            visibility = Q(last_message_time__isnull=False) | Q(is_pinned_top=True)
+
+        return annotated.filter(visibility).order_by(
+            '-is_pinned_top',
+            F('last_message_time').desc(nulls_last=True),
+        )
 
 
 class MessageList(generics.ListCreateAPIView):
@@ -123,7 +228,15 @@ class MessageList(generics.ListCreateAPIView):
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
-        response.data['username'] = connected_user.username
+
+        # Rebrand the blast room header as "Announcements" so the chat detail
+        # view matches the chat-list label.
+        from chat.wit_admin import is_wit_admin
+        display_username = connected_user.username
+        chat_room = get_chat_room(request.user, connected_user)
+        if chat_room and chat_room.is_wit_admin_blast_room and is_wit_admin(connected_user):
+            display_username = 'Announcements'
+        response.data['username'] = display_username
         response.data['oldest_unread_page'] = self.oldest_unread_page
 
         paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)
@@ -152,6 +265,8 @@ class MessageList(generics.ListCreateAPIView):
         return response
 
     def perform_create(self, serializer):
+        from chat.wit_admin import is_wit_admin
+
         user = self.request.user
         try:
             connected_user = User.objects.get(id=self.kwargs.get('pk'))
@@ -161,7 +276,21 @@ class MessageList(generics.ListCreateAPIView):
         if connected_user.id in user.user_report_blocked_ids:
             raise exceptions.PermissionDenied("This user is blocked.")
 
-        if not user.is_connected(connected_user):
+        # Skip the ChatRequest gate for WIT-Admin-related chats. The support
+        # persona, the per-user operator proxy chats, and the operator blast
+        # rooms are all known operational surfaces — friend-consent rules don't
+        # apply. See docs/superpowers/specs/2026-04-25-wit-admin-chat-hotfix-design.md.
+        is_wit_admin_surface = (
+            is_wit_admin(user)
+            or is_wit_admin(connected_user)
+            or ChatRoom.objects.filter(
+                (Q(user1=user, user2=connected_user) | Q(user1=connected_user, user2=user)),
+            ).filter(
+                Q(is_wit_admin_proxy=True) | Q(is_wit_admin_blast_room=True)
+            ).exists()
+        )
+
+        if not is_wit_admin_surface and not user.is_connected(connected_user):
             req = ChatRequest.objects.filter(
                 Q(requester=user, requestee=connected_user) |
                 Q(requester=connected_user, requestee=user)

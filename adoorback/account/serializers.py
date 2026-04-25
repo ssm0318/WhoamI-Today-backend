@@ -354,8 +354,15 @@ class UserProfileSerializer(UserMinimalSerializer):
         user = self.context.get('request', None).user
         if user == obj:
             return None
+        # WIT-Admin operators are admins of the support channel; for THEIR view,
+        # treat every regular user as already-connected so the chat-request
+        # gating UX doesn't fire on the operator side. Regular users' view of
+        # operators is unchanged (no asymmetric leak in the user-facing UI).
+        from chat.wit_admin import ALL_OPERATOR_EMAILS
+        if user.email in ALL_OPERATOR_EMAILS:
+            return True
         return user.is_connected(obj)
-    
+
     def get_connection_status(self, obj):  # what user has set obj as
         user = self.context.get('request', None).user
         if user == obj:
@@ -812,6 +819,11 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
         user = self.context.get('request', None).user
         if user == obj:
             return None
+        # See note in UserProfileSerializer.get_are_friends — operators see all
+        # users as connected for chat-UI purposes.
+        from chat.wit_admin import ALL_OPERATOR_EMAILS
+        if user.email in ALL_OPERATOR_EMAILS:
+            return True
         return user.is_connected(obj)
 
     def get_chat_room_id(self, obj):
