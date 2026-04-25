@@ -703,21 +703,46 @@ class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
         return self.__class__.__name__
 
 
+SUBSCRIPTION_TYPE_CHOICES = (
+    # Ver. W — granular check-in components
+    ('battery', 'Battery'),
+    ('mood', 'Mood'),
+    ('thought', 'Thought'),
+    ('song', 'Song'),
+    ('mission_of_the_day', 'Mission of the day'),
+    ('question_of_the_day', 'Question of the day'),
+    ('photo_of_the_day', 'Photo of the day'),
+    # Ver. Q — image+text post-style entities
+    ('check_in', 'Check-in (Ver.Q)'),
+    ('post', 'Post (Ver.Q)'),
+)
+
+
 class Subscription(AdoorTimestampedModel, SafeDeleteModel):
     subscriber = models.ForeignKey(get_user_model(), related_name='subscriptions', on_delete=models.CASCADE)
     subscribed_to = models.ForeignKey(get_user_model(), related_name='subscribed_by', on_delete=models.CASCADE)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    subscription_type = models.CharField(max_length=32, choices=SUBSCRIPTION_TYPE_CHOICES, null=True, blank=True)
 
     _safedelete_policy = SOFT_DELETE_CASCADE
-    
+
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['subscriber', 'subscribed_to', 'content_type'], condition=Q(deleted__isnull=True),
-                                    name='unique_subscription'),
+            models.UniqueConstraint(
+                fields=['subscriber', 'subscribed_to', 'subscription_type'],
+                condition=Q(deleted__isnull=True, subscription_type__isnull=False),
+                name='unique_subscription_by_type',
+            ),
+            models.UniqueConstraint(
+                fields=['subscriber', 'subscribed_to', 'content_type'],
+                condition=Q(deleted__isnull=True, subscription_type__isnull=True),
+                name='unique_subscription',
+            ),
         ]
 
     def __str__(self):
-        return f'{self.subscriber} subscribed to {self.content_type} of {self.subscribed_to}'
+        label = self.subscription_type or self.content_type
+        return f'{self.subscriber} subscribed to {label} of {self.subscribed_to}'
 
 
 class Interest(AdoorTimestampedModel, SafeDeleteModel):

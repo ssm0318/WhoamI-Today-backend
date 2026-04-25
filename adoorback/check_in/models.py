@@ -10,9 +10,12 @@ from django.utils import timezone
 from adoorback.models import AdoorTimestampedModel
 
 from safedelete.models import SafeDeleteModel
-from safedelete.models import SOFT_DELETE_CASCADE
+from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 
 from content_report.models import ContentReport
+from comment.models import Comment
+from like.models import Like
+from notification.models import Notification
 
 User = get_user_model()
 
@@ -618,3 +621,93 @@ def write_song_component_entry(instance, created, **kwargs):
             CheckInComponentEntry.objects.filter(pk=current_live.pk).update(
                 superseded_at=now
             )
+
+
+# ---------------------------------------------------------------------------
+# CheckInPost (Ver.Q image+text "check-in" — Instagram-style story entity)
+# ---------------------------------------------------------------------------
+
+import urllib
+import uuid
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
+
+
+class CheckInPostStorage(FileSystemStorage):
+    base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
+
+    def get_available_name(self, name, max_length=None):
+        if self.exists(name):
+            self.delete(name)
+        return name
+
+
+def check_in_post_image_path(instance, filename):
+    unique_id = str(uuid.uuid4())[:8]
+    return f'check_in_post_images/{instance.author_id}/{unique_id}_{filename}'
+
+
+class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
+    VISIBILITY_CHOICES = [
+        ('friends', 'Friends'),
+        ('close_friends', 'Close Friends'),
+    ]
+
+    author = models.ForeignKey(User, related_name='check_in_post_set', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to=check_in_post_image_path, storage=CheckInPostStorage())
+    caption = models.TextField(blank=True, default='')
+    visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+
+    check_in_post_comments = GenericRelation(Comment)
+    check_in_post_likes = GenericRelation(Like)
+    readers = models.ManyToManyField(User, related_name='read_check_in_posts', blank=True)
+
+    check_in_post_targetted_notis = GenericRelation(
+        Notification,
+        content_type_field='target_type',
+        object_id_field='target_id',
+    )
+    check_in_post_originated_notis = GenericRelation(
+        Notification,
+        content_type_field='origin_type',
+        object_id_field='origin_id',
+    )
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['author', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'CheckInPost #{self.pk} by {self.author_id} ({self.visibility})'
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+    def is_audience(self, user):
+        """Visibility check, mirrors Note.is_audience for friends/close_friends only."""
+        content_type = ContentType.objects.get_for_model(self)
+        if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():
+            return False
+        if self.author.id in user.user_report_blocked_ids:
+            return False
+        if self.author == user:
+            return True
+
+        if self.visibility == 'friends':
+            return user.is_connected(self.author)
+        if self.visibility == 'close_friends':
+            return user.is_close_friend(self.author)
+        return False
+
+
+@receiver(post_save, sender=CheckInPost)
+def add_author_to_check_in_post_readers(instance, created, **kwargs):
+    if not created:
+        return
+    instance.readers.add(instance.author)

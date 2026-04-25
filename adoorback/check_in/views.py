@@ -16,7 +16,7 @@ from adoorback.utils.validators import adoor_exception_handler
 
 from account.serializers import serialize_check_in_base_for_viewer
 
-from check_in.models import CheckIn, CheckInComponentEntry, Song, Poke
+from check_in.models import CheckIn, CheckInComponentEntry, CheckInPost, Song, Poke
 from reaction.models import Reaction
 from reaction.serializers import ReactionSerializer
 import check_in.serializers as cs
@@ -761,3 +761,142 @@ class CheckInReactions(generics.ListAPIView):
             content_type=content_type,
             object_id=pk,
         ).exclude(user_id__in=blocked_ids).order_by('-created_at')
+
+
+# ---------------------------------------------------------------------------
+# CheckInPost (Ver.Q image+text "check-in") views
+# ---------------------------------------------------------------------------
+
+
+class CheckInPostFeedPagination(pagination.PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
+
+def _authors_who_marked_user_close_friend(user):
+    """Authors who have marked the given user as close_friend (one-directional).
+
+    Used to filter close_friends-visibility posts: an author's CLOSE_FRIENDS
+    post is visible to the viewer iff the author has the viewer in their
+    close_friend list.
+    """
+    from account.models import Connection
+    user1_authors = Connection.objects.filter(
+        user2=user, user1_choice='close_friend',
+    ).values_list('user1_id', flat=True)
+    user2_authors = Connection.objects.filter(
+        user1=user, user2_choice='close_friend',
+    ).values_list('user2_id', flat=True)
+    return list(user1_authors) + list(user2_authors)
+
+
+class CheckInPostFeed(generics.ListCreateAPIView):
+    """Feed of CheckInPosts — GET returns viewer-visible posts from connected users
+    in latest-first order. POST creates a new post for the current user.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = cs.CheckInPostSerializer
+    pagination_class = CheckInPostFeedPagination
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        connected_ids = list(user.connected_user_ids)
+        close_visible_author_ids = _authors_who_marked_user_close_friend(user)
+        blocked_ids = user.user_report_blocked_ids
+
+        qs = CheckInPost.objects.filter(
+            author_id__in=connected_ids + [user.id],
+        ).exclude(author_id__in=blocked_ids)
+
+        return qs.filter(
+            Q(visibility='friends') |
+            Q(visibility='close_friends', author_id__in=close_visible_author_ids) |
+            Q(author=user)
+        ).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+
+class CheckInPostDetail(generics.RetrieveDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = cs.CheckInPostSerializer
+    queryset = CheckInPost.objects.all()
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_object(self):
+        obj = get_object_or_404(CheckInPost, pk=self.kwargs.get('pk'))
+        if not obj.is_audience(self.request.user):
+            raise exceptions.PermissionDenied("You cannot view this check-in.")
+        return obj
+
+    def perform_destroy(self, instance):
+        if instance.author != self.request.user:
+            raise exceptions.PermissionDenied("You can only delete your own check-in.")
+        instance.delete()
+
+
+class UserCheckInPosts(generics.ListAPIView):
+    """List a single user's CheckInPosts visible to the viewer."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = cs.CheckInPostFriendStorySerializer
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        viewer = self.request.user
+        target = get_object_or_404(User, id=self.kwargs.get('pk'))
+
+        if target.id in viewer.user_report_blocked_ids:
+            return CheckInPost.objects.none()
+
+        qs = CheckInPost.objects.filter(author=target)
+        if target == viewer:
+            return qs.order_by('-created_at')
+
+        if not viewer.is_connected(target):
+            return CheckInPost.objects.none()
+
+        if hasattr(viewer, 'is_close_friend') and viewer.is_close_friend(target):
+            return qs.order_by('-created_at')
+
+        return qs.filter(visibility='friends').order_by('-created_at')
+
+
+class CheckInPostStories(generics.ListAPIView):
+    """Compact stories strip — one row per friend with at least one viewer-visible
+    CheckInPost, ordered by recent activity. Returns latest post per author."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = cs.CheckInPostFriendStorySerializer
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        user = self.request.user
+        connected_ids = list(user.connected_user_ids)
+        close_visible_author_ids = _authors_who_marked_user_close_friend(user)
+        blocked_ids = user.user_report_blocked_ids
+
+        author_ids = [uid for uid in connected_ids + [user.id] if uid not in blocked_ids]
+
+        qs = CheckInPost.objects.filter(author_id__in=author_ids).filter(
+            Q(visibility='friends') |
+            Q(visibility='close_friends', author_id__in=close_visible_author_ids) |
+            Q(author=user)
+        )
+
+        # Latest post per author
+        latest_ids = (
+            qs.order_by('author_id', '-created_at')
+              .distinct('author_id')
+              .values_list('id', flat=True)
+        )
+        return CheckInPost.objects.filter(id__in=list(latest_ids)).order_by('-created_at')
