@@ -478,3 +478,51 @@ class WebSocketBroadcastTests(TestCase):
         # 1 user (alice) + 2 observers (koyrkr, njs) = 3 mirrors,
         # each with 3 sends = 9 invocations.
         self.assertEqual(mock_ats.call_count, 9)
+
+
+class ProxyVisibilityTests(TestCase):
+    """Regular users must NOT see WIT Admin proxy rooms in their chat list.
+    Operators MUST see their own per-user proxy rooms."""
+
+    def setUp(self):
+        from django.core.management import call_command
+        self.jaewon = User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        self.koyrkr = User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        self.njs = User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        call_command('seed_wit_admin_chats')
+
+    def _list(self, user):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from chat.views import ChatRoomList
+        factory = APIRequestFactory()
+        req = factory.get('/api/chat/rooms/')
+        force_authenticate(req, user=user)
+        return ChatRoomList.as_view()(req).data
+
+    def test_regular_user_does_not_see_proxy_rooms(self):
+        data = self._list(self.alice)
+        results = data.get('results', data)
+        room_ids = {r['id'] for r in results}
+        proxy_ids = set(ChatRoom.objects.filter(
+            Q(user1=self.alice) | Q(user2=self.alice),
+            is_wit_admin_proxy=True,
+        ).values_list('id', flat=True))
+        self.assertEqual(proxy_ids & room_ids, set(),
+                         "Regular user should not see proxy rooms in chat list")
+
+    def test_operator_sees_active_proxy_rooms(self):
+        # Trigger a message from alice → wit_admin so per-operator proxy rooms get a mirror.
+        from chat.wit_admin import ensure_wit_admin_user
+        wit = ensure_wit_admin_user()
+        u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
+        alice_wit = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+        Message.objects.create(chat_room=alice_wit, sender=self.alice, receiver=wit, content='ping')
+
+        data = self._list(self.jaewon)
+        results = data.get('results', data)
+        room_ids = {r['id'] for r in results}
+        u1, u2 = (self.alice, self.jaewon) if self.alice.id < self.jaewon.id else (self.jaewon, self.alice)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        self.assertIn(proxy.id, room_ids,
+                      "Operator must see proxy rooms with messages in their chat list")

@@ -93,7 +93,7 @@ class ChatRoomList(generics.ListAPIView):
 
     def get_queryset(self):
         from django.db.models import Case, When, Value, BooleanField
-        from chat.wit_admin import WIT_ADMIN_USERNAME
+        from chat.wit_admin import WIT_ADMIN_USERNAME, ALL_OPERATOR_EMAILS
 
         user = self.request.user
 
@@ -110,9 +110,17 @@ class ChatRoomList(generics.ListAPIView):
             output_field=BooleanField(),
         )
 
-        return ChatRoom.objects.filter(
+        qs = ChatRoom.objects.filter(
             Q(user1=user) | Q(user2=user) | Q(members=user)
-        ).distinct().annotate(
+        ).distinct()
+
+        # Hide WIT Admin proxy rooms from non-operator viewers. From a regular
+        # user's perspective the operator-side proxy chat shouldn't appear in
+        # their chat list — they only see their User↔WIT_Admin chat.
+        if user.email not in ALL_OPERATOR_EMAILS:
+            qs = qs.exclude(is_wit_admin_proxy=True)
+
+        return qs.annotate(
             last_message_time=Subquery(latest_msg.values('created_at')[:1]),
             last_message_content=Subquery(latest_msg.values('content')[:1]),
             last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
