@@ -50,12 +50,12 @@ jobs:
               echo "백업 완료: $BACKUP_FILE ($(du -h $BACKUP_FILE 2>/dev/null | cut -f1 || echo 'unknown size'))"
             fi
 
-            echo "🧹 사전 디스크 정리 — build cache(>72h), dangling images, unused images(>168h)"
-            echo "    (volume은 절대 건드리지 않음 — DB 데이터 보존)"
+            echo "🧹 사전 디스크 정리 (volume은 절대 건드리지 않음 — DB 데이터 보존)"
             df -h / | tail -1
-            docker builder prune -f --filter "until=72h" || true
+            docker builder prune -af || true
             docker image prune -f || true
-            docker image prune -af --filter "until=168h" || true
+            docker image prune -af --filter "until=72h" || true
+            docker container prune -f || true
             echo "    정리 후 디스크:"
             df -h / | tail -1
 
