@@ -4,8 +4,18 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import OuterRef, Subquery, Count, Q
 from rest_framework import generics, exceptions, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+
+
+class ChatRoomListPagination(PageNumberPagination):
+    """Chat rooms per user are bounded (one per peer, plus operator/admin
+    surfaces) so a single page covers virtually every realistic case. The
+    frontend chat list does not implement infinite scroll, so a too-small
+    page size silently hides rooms past the first 10."""
+    page_size = 200
+    max_page_size = 500
 
 from adoorback.utils.validators import adoor_exception_handler
 from django.contrib.contenttypes.models import ContentType
@@ -87,6 +97,7 @@ def broadcast_message_for_room(message):
 class ChatRoomList(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = ChatRoomListPagination
 
     def get_exception_handler(self):
         return adoor_exception_handler
