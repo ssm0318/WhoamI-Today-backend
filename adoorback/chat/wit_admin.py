@@ -18,7 +18,11 @@ ALL_OPERATOR_EMAILS = (OPERATOR_REPLIER_EMAIL,) + OPERATOR_OBSERVER_EMAILS
 
 
 def ensure_wit_admin_user():
-    """Get-or-create the WIT Admin user. Idempotent."""
+    """Get-or-create the WIT Admin user. Idempotent.
+
+    Re-asserts critical attributes (email, is_active) on pre-existing rows
+    to recover from manual edits or stale data.
+    """
     User = get_user_model()
     user, created = User.objects.get_or_create(
         username=WIT_ADMIN_USERNAME,
@@ -30,6 +34,8 @@ def ensure_wit_admin_user():
     if created:
         user.set_unusable_password()
         user.save(update_fields=['password'])
+        return user
+
     # Reassert critical attributes if the row pre-existed with drift
     changed = False
     if user.email != WIT_ADMIN_EMAIL:
@@ -76,7 +82,11 @@ def provision_user_rooms(user):
     operators = resolve_operators()
 
     # Skip if `user` is WIT Admin or an operator
-    if user.id == wit.id or user.email in ALL_OPERATOR_EMAILS:
+    if (
+        user.id == wit.id
+        or user.email == WIT_ADMIN_EMAIL
+        or user.email in ALL_OPERATOR_EMAILS
+    ):
         return
 
     u1, u2 = _ordered_pair(user, wit)
@@ -84,8 +94,11 @@ def provision_user_rooms(user):
 
     for op in operators:
         u1, u2 = _ordered_pair(user, op)
-        room, _ = ChatRoom.objects.get_or_create(user1=u1, user2=u2)
-        if not room.is_wit_admin_proxy:
+        room, created = ChatRoom.objects.get_or_create(
+            user1=u1, user2=u2,
+            defaults={'is_wit_admin_proxy': True},
+        )
+        if not created and not room.is_wit_admin_proxy:
             room.is_wit_admin_proxy = True
             room.save(update_fields=['is_wit_admin_proxy'])
 
@@ -96,8 +109,11 @@ def ensure_blast_rooms():
     wit = ensure_wit_admin_user()
     for op in resolve_operators():
         u1, u2 = _ordered_pair(wit, op)
-        room, _ = ChatRoom.objects.get_or_create(user1=u1, user2=u2)
-        if not room.is_wit_admin_blast_room:
+        room, created = ChatRoom.objects.get_or_create(
+            user1=u1, user2=u2,
+            defaults={'is_wit_admin_blast_room': True},
+        )
+        if not created and not room.is_wit_admin_blast_room:
             room.is_wit_admin_blast_room = True
             room.save(update_fields=['is_wit_admin_blast_room'])
 
