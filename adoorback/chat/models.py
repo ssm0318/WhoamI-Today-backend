@@ -407,7 +407,7 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
         wit = ensure_wit_admin_user()
 
         # 3a — every regular user's WIT Admin room
-        for user in regular_recipients():
+        for user in regular_recipients().iterator(chunk_size=500):
             u1, u2 = (user, wit) if user.id < wit.id else (wit, user)
             wit_room = ChatRoom.objects.filter(
                 user1=u1, user2=u2, is_wit_admin_proxy=False,
