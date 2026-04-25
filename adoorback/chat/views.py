@@ -25,6 +25,17 @@ def _get_chat_group_name(user_id_1, user_id_2):
     return f"chat_{ids[0]}_{ids[1]}"
 
 
+def _get_message_preview_text(response_data):
+    """Extract a preview string from serialized message data for chat list display."""
+    content = response_data.get('content') or response_data.get('emoji') or ''
+    if not content:
+        if response_data.get('image'):
+            content = '📷 Photo'
+        elif response_data.get('shared_content_preview'):
+            content = '📎 Shared post'
+    return content
+
+
 class ChatRoomList(generics.ListAPIView):
     serializer_class = ChatRoomSerializer
     permission_classes = [IsAuthenticated]
@@ -56,6 +67,8 @@ class ChatRoomList(generics.ListAPIView):
             last_message_time=Subquery(latest_msg.values('created_at')[:1]),
             last_message_content=Subquery(latest_msg.values('content')[:1]),
             last_message_emoji=Subquery(latest_msg.values('emoji')[:1]),
+            last_message_image=Subquery(latest_msg.values('image')[:1]),
+            last_message_shared_type=Subquery(latest_msg.values('shared_content_type')[:1]),
             unread_cnt=Count(
                 'messages',
                 filter=Q(messages__receiver=user, messages__is_read=False)
@@ -214,7 +227,7 @@ class MessageList(generics.ListCreateAPIView):
 
         # Broadcast to both users' chat list so the list page updates
         print(f"[CHAT] Broadcasting chat list update for room between {user.id} and {connected_user.id}")
-        content = response.data.get('content') or response.data.get('emoji') or ''
+        content = _get_message_preview_text(response.data)
         timestamp = response.data.get('created_at', '')
         receiver_unread = chat_room.messages.filter(receiver=connected_user, is_read=False).count()
         for target_user, unread in [(connected_user, receiver_unread), (user, 0)]:
@@ -701,7 +714,7 @@ class GroupMessageList(generics.ListCreateAPIView):
         )
 
         # Broadcast to all members' chat list (per-user unread count)
-        content = response.data.get('content') or response.data.get('emoji') or ''
+        content = _get_message_preview_text(response.data)
         timestamp = response.data.get('created_at', '')
         for member in room.members.exclude(id=request.user.id):
             cursor = GroupReadCursor.objects.filter(user=member, chat_room=room).first()
