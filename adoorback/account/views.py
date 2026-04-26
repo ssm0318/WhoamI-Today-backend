@@ -659,7 +659,7 @@ class UserProfile(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         view_as = parse_view_as(request)  # raises 400 if invalid
         instance = self.get_object()
-        serializer = self.get_serializer(instance)
+        serializer = self.get_serializer(instance, context={**self.get_serializer_context(), 'view_as': view_as})
         data = dict(serializer.data)
         if view_as is not None and instance == request.user:
             apply_profile_view_as(data, instance, view_as)
@@ -1251,7 +1251,7 @@ class CurrentUserProfile(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         view_as = parse_view_as(request)  # raises 400 if invalid
         instance = self.get_object()
-        serializer = self.get_serializer(instance)
+        serializer = self.get_serializer(instance, context={**self.get_serializer_context(), 'view_as': view_as})
         data = dict(serializer.data)
         if view_as is not None and instance == request.user:
             apply_profile_view_as(data, instance, view_as)

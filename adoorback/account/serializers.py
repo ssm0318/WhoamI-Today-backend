@@ -431,12 +431,17 @@ class UserProfileSerializer(UserMinimalSerializer):
         ret = super().to_representation(instance)
         request = self.context.get('request')
         user = request.user if request else None
+        view_as = self.context.get('view_as')
 
         # Check if the requester should see private fields
         can_see_private = False
         if user and user.is_authenticated:
-             if user == instance or user.is_connected(instance):
-                 can_see_private = True
+            if view_as is not None and user == instance:
+                # Owner is previewing as a specific audience tier:
+                # 'public' is treated as a non-friend; 'friends' and 'close_friends' are friends.
+                can_see_private = view_as in ('friends', 'close_friends')
+            elif user == instance or user.is_connected(instance):
+                can_see_private = True
 
         if not can_see_private:
             hidden_categories = {

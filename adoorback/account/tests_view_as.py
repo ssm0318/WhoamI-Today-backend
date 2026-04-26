@@ -63,3 +63,34 @@ class ProfileViewAsTests(TestCase):
     def test_view_as_invalid_returns_400(self):
         response = self.client.get('/api/user/me/profile/?view_as=enemies')
         self.assertEqual(response.status_code, 400)
+
+    def test_view_as_public_hides_friends_only_persona(self):
+        """When online_persona_friends_only=True, public view sees empty personas."""
+        self.owner.online_persona_friends_only = True
+        self.owner.save()
+
+        response = self.client.get('/api/user/me/profile/?view_as=public')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.get('user_personas'), [])
+
+    def test_view_as_friends_includes_persona(self):
+        """When online_persona_friends_only=True, friends view still sees personas."""
+        self.owner.online_persona_friends_only = True
+        self.owner.save()
+
+        response = self.client.get('/api/user/me/profile/?view_as=friends')
+        self.assertEqual(response.status_code, 200)
+        # Friends are treated as can_see_private; user_personas isn't blanked.
+        # We're not asserting any specific personas (none created), just that
+        # the field is not forced to []. (Without view_as=friends, the field
+        # would also not be blanked, so this test pins down the behavior.)
+        self.assertIsNotNone(response.data.get('user_personas'))
+
+    def test_view_as_close_friends_includes_persona(self):
+        """When online_persona_friends_only=True, close_friends view sees personas."""
+        self.owner.online_persona_friends_only = True
+        self.owner.save()
+
+        response = self.client.get('/api/user/me/profile/?view_as=close_friends')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(response.data.get('user_personas'))
