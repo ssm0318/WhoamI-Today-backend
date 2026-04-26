@@ -50,6 +50,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserMinimalSerializer, \
                                  UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
                                  InterestSerializer, PersonaSerializer, viewer_sees_check_in_component)
+from account.view_as import apply_profile_view_as, parse_view_as, resolve_public_proxy_viewer, resolve_shadow_viewer
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -655,6 +656,27 @@ class UserProfile(generics.RetrieveAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    def retrieve(self, request, *args, **kwargs):
+        view_as = parse_view_as(request)  # raises 400 if invalid
+        instance = self.get_object()
+        shadow_viewer = resolve_shadow_viewer(request, instance)
+        # When the owner previews as 'public' (no specific friend chosen),
+        # use the configured non-friend proxy user as the shadow viewer so
+        # friendship-derived fields render as a real non-friend would see them.
+        if shadow_viewer is None and view_as == 'public' and request.user == instance:
+            shadow_viewer = resolve_public_proxy_viewer(instance)
+        serializer = self.get_serializer(
+            instance,
+            context={**self.get_serializer_context(), 'view_as': view_as, 'shadow_viewer': shadow_viewer},
+        )
+        data = dict(serializer.data)
+        # Tier-mode field masking applies only when no shadow viewer was resolved.
+        # If a shadow_viewer is in play (real friend OR proxy), the serializer's
+        # _get_viewer-based masking already handled bio/pronouns/etc. correctly.
+        if view_as is not None and instance == request.user and shadow_viewer is None:
+            apply_profile_view_as(data, instance, view_as)
+        return Response(data)
+
 
 class UserNoteList(generics.ListAPIView):
     serializer_class = NoteSerializer
@@ -1237,6 +1259,27 @@ class CurrentUserProfile(generics.RetrieveAPIView):
             return user
         else:
             raise PermissionDenied("User is not authenticated")
+
+    def retrieve(self, request, *args, **kwargs):
+        view_as = parse_view_as(request)  # raises 400 if invalid
+        instance = self.get_object()
+        shadow_viewer = resolve_shadow_viewer(request, instance)
+        # When the owner previews as 'public' (no specific friend chosen),
+        # use the configured non-friend proxy user as the shadow viewer so
+        # friendship-derived fields render as a real non-friend would see them.
+        if shadow_viewer is None and view_as == 'public' and request.user == instance:
+            shadow_viewer = resolve_public_proxy_viewer(instance)
+        serializer = self.get_serializer(
+            instance,
+            context={**self.get_serializer_context(), 'view_as': view_as, 'shadow_viewer': shadow_viewer},
+        )
+        data = dict(serializer.data)
+        # Tier-mode field masking applies only when no shadow viewer was resolved.
+        # If a shadow_viewer is in play (real friend OR proxy), the serializer's
+        # _get_viewer-based masking already handled bio/pronouns/etc. correctly.
+        if view_as is not None and instance == request.user and shadow_viewer is None:
+            apply_profile_view_as(data, instance, view_as)
+        return Response(data)
 
 
 class CurrentUserNoteList(generics.ListAPIView):

@@ -297,13 +297,27 @@ class UserProfileSerializer(UserMinimalSerializer):
     is_check_in_subscribed = serializers.SerializerMethodField(read_only=True)
     is_subscribed = serializers.SerializerMethodField(read_only=True)
 
-    def get_is_check_in_subscribed(self, obj):
+    def _get_viewer(self):
+        """Return the effective viewer for this serialization pass.
+
+        When `shadow_viewer` is set in context (View As feature), use it.
+        Otherwise fall back to the actual request user.
+        """
+        shadow = self.context.get('shadow_viewer')
+        if shadow is not None:
+            return shadow
         request = self.context.get('request')
-        if request and request.user.is_authenticated and request.user.current_ver == 'version_w':
+        if request is None or not request.user.is_authenticated:
+            return None
+        return request.user
+
+    def get_is_check_in_subscribed(self, obj):
+        viewer = self._get_viewer()
+        if viewer is not None and viewer.current_ver == 'version_w':
             from adoorback.utils.content_types import get_check_in_type
             from account.models import Subscription
             return Subscription.objects.filter(
-                subscriber=request.user, subscribed_to=obj, content_type=get_check_in_type()
+                subscriber=viewer, subscribed_to=obj, content_type=get_check_in_type()
             ).exists()
         return False
 
@@ -317,24 +331,24 @@ class UserProfileSerializer(UserMinimalSerializer):
         return False
 
     def get_is_favorite(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            return obj in request.user.favorites.all()
+        viewer = self._get_viewer()
+        if viewer is not None:
+            return obj in viewer.favorites.all()
         return False
 
     def get_check_in(self, obj):
-        user = self.context.get('request', None).user
+        viewer = self._get_viewer()
         check_in = obj.check_in_set.filter(is_active=True).first()
-        if check_in and CheckIn.is_audience(check_in, user):
+        if check_in and viewer is not None and CheckIn.is_audience(check_in, viewer):
             return serialize_check_in_base_for_viewer(
                 check_in, self.context.get('request'), self.context
             )
         return {}
 
     def get_mutuals(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            current_user_connections = set(request.user.connected_user_ids)
+        viewer = self._get_viewer()
+        if viewer is not None:
+            current_user_connections = set(viewer.connected_user_ids)
             obj_user_connections = set(obj.connected_user_ids)
 
             mutual_connections = current_user_connections & obj_user_connections
@@ -343,82 +357,95 @@ class UserProfileSerializer(UserMinimalSerializer):
         return {}
 
     def get_mutual_personas(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            current_user_personas = set(request.user.user_personas.all())
+        viewer = self._get_viewer()
+        if viewer is not None:
+            current_user_personas = set(viewer.user_personas.all())
             obj_personas = set(obj.user_personas.all())
             mutual_personas = current_user_personas & obj_personas
             return PersonaSerializer(mutual_personas, many=True).data
         return []
 
     def get_mutual_interests(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            current_user_interests = set(request.user.user_interests.all())
+        viewer = self._get_viewer()
+        if viewer is not None:
+            current_user_interests = set(viewer.user_interests.all())
             obj_interests = set(obj.user_interests.all())
             mutual_interests = current_user_interests & obj_interests
             return InterestSerializer(mutual_interests, many=True).data
         return []
 
     def get_are_friends(self, obj):  # does not mean 'friend' in friend & close friend, it means connection
-        user = self.context.get('request', None).user
-        if user == obj:
+        viewer = self._get_viewer()
+        if viewer is None:
+            return None
+        if viewer == obj:
             return None
         # WIT-Admin operators are admins of the support channel; for THEIR view,
         # treat every regular user as already-connected so the chat-request
         # gating UX doesn't fire on the operator side. Regular users' view of
         # operators is unchanged (no asymmetric leak in the user-facing UI).
         from chat.wit_admin import ALL_OPERATOR_EMAILS
-        if user.email in ALL_OPERATOR_EMAILS:
+        if viewer.email in ALL_OPERATOR_EMAILS:
             return True
-        return user.is_connected(obj)
+        return viewer.is_connected(obj)
 
     def get_connection_status(self, obj):  # what user has set obj as
-        user = self.context.get('request', None).user
-        if user == obj:
+        viewer = self._get_viewer()
+        if viewer is None:
             return None
-        if user.is_connected(obj):
-            if obj.is_close_friend(user):
+        if viewer == obj:
+            return None
+        if viewer.is_connected(obj):
+            if obj.is_close_friend(viewer):
                 return 'close_friend'
-            if obj.is_friend(user):
+            if obj.is_friend(viewer):
                 return 'friend'
         return None
 
     def get_received_friend_request_from(self, obj):
-        user = self.context.get('request').user
-        return user.id in obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True)
+        viewer = self._get_viewer()
+        if viewer is None:
+            return False
+        return viewer.id in obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True)
 
     def get_sent_friend_request_to(self, obj):
-        user = self.context.get('request').user
-        return user.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
+        viewer = self._get_viewer()
+        if viewer is None:
+            return False
+        return viewer.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
 
     def get_sent_chat_request_to(self, obj):
-        user = self.context.get('request').user
-        return obj.received_chat_requests.filter(requester=user, accepted__isnull=True).exists()
+        viewer = self._get_viewer()
+        if viewer is None:
+            return False
+        return obj.received_chat_requests.filter(requester=viewer, accepted__isnull=True).exists()
 
     def get_received_chat_request_from(self, obj):
-        user = self.context.get('request').user
-        req = obj.sent_chat_requests.filter(requestee=user, accepted__isnull=True).first()
+        viewer = self._get_viewer()
+        if viewer is None:
+            return None
+        req = obj.sent_chat_requests.filter(requestee=viewer, accepted__isnull=True).first()
         return req.id if req else None
 
     def get_unread_chat_count(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            user = request.user
-            if user == obj:
+        viewer = self._get_viewer()
+        if viewer is not None:
+            if viewer == obj:
                 return 0
-            chat_room = get_chat_room(user, obj)
+            chat_room = get_chat_room(viewer, obj)
             if chat_room:
-                return chat_room.messages.filter(receiver=user, is_read=False).count()
+                return chat_room.messages.filter(receiver=viewer, is_read=False).count()
         return 0
-    
+
     def get_friendship_level(self, obj):
-        user = self.context.get('request', None).user
-        if user == obj:
+        viewer = self._get_viewer()
+        if viewer is None:
+            return '3rd+'
+        if viewer == obj:
             return None
-        if user.is_connected(obj):
+        if viewer.is_connected(obj):
             return '1st'
-        current_user_connections = set(user.connected_user_ids)
+        current_user_connections = set(viewer.connected_user_ids)
         obj_connections = set(obj.connected_user_ids)
         if current_user_connections & obj_connections:
             return '2nd'
@@ -429,14 +456,20 @@ class UserProfileSerializer(UserMinimalSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        request = self.context.get('request')
-        user = request.user if request else None
+        user = self._get_viewer()
+        view_as = self.context.get('view_as')
 
         # Check if the requester should see private fields
         can_see_private = False
-        if user and user.is_authenticated:
-             if user == instance or user.is_connected(instance):
-                 can_see_private = True
+        if user is not None:
+            request = self.context.get('request')
+            actual_requester = request.user if request else None
+            if view_as is not None and actual_requester == instance and self.context.get('shadow_viewer') is None:
+                # Owner is previewing as a specific audience tier (no shadow viewer set):
+                # 'public' is treated as a non-friend; 'friends' and 'close_friends' are friends.
+                can_see_private = view_as in ('friends', 'close_friends')
+            elif user == instance or user.is_connected(instance):
+                can_see_private = True
 
         if not can_see_private:
             hidden_categories = {
