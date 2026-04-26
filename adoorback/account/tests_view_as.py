@@ -261,3 +261,93 @@ class ShadowViewerProfileTests(TestCase):
         self.assertEqual(response.status_code, 200)
         # The response is from stranger's perspective, NOT alice's. So bio (friends_only) is hidden.
         self.assertIn(response.data.get('bio'), (None, ''))
+
+
+class PublicProxyViewerTests(TestCase):
+    """Tests for the public-proxy resolution: ?view_as=public uses wit_bot as shadow viewer."""
+
+    def setUp(self):
+        from account.models import Connection
+        self.owner = User.objects.create_user(
+            username='owner_pp', email='owner_pp@example.com', password='pw',
+        )
+        self.owner.bio = 'Owner bio'
+        self.owner.bio_friends_only = True
+        self.owner.save()
+        self.proxy = User.objects.create_user(
+            username='wit_bot', email='wit_bot@example.com', password='pw',
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.owner)
+
+    def test_view_as_public_uses_wit_bot_as_shadow_viewer(self):
+        """When the proxy exists and isn't a friend, ?view_as=public renders from its perspective."""
+        response = self.client.get('/api/user/me/profile/?view_as=public')
+        self.assertEqual(response.status_code, 200)
+        # bio is friends_only and proxy is not a friend → bio should be hidden
+        self.assertIn(response.data.get('bio'), (None, ''))
+        # are_friends should reflect proxy<->owner relationship (false)
+        self.assertFalse(response.data.get('are_friends', True))
+
+    def test_view_as_public_falls_back_when_proxy_does_not_exist(self):
+        """If proxy user doesn't exist, fall back to tier-mode masking."""
+        self.proxy.delete()
+        response = self.client.get('/api/user/me/profile/?view_as=public')
+        self.assertEqual(response.status_code, 200)
+        # Tier-mode masking still hides bio
+        self.assertIn(response.data.get('bio'), (None, ''))
+
+    def test_view_as_public_falls_back_when_proxy_is_friend(self):
+        """If proxy user has somehow become a friend of owner, fall back to tier-mode."""
+        from account.models import Connection
+        Connection.objects.create(
+            user1=self.owner, user2=self.proxy,
+            user1_choice='friend', user2_choice='friend',
+        )
+        response = self.client.get('/api/user/me/profile/?view_as=public')
+        self.assertEqual(response.status_code, 200)
+        # bio is still hidden (tier-mode), but the rendering is no longer "from proxy's perspective"
+        self.assertIn(response.data.get('bio'), (None, ''))
+
+
+class ResolvePublicProxyViewerUnitTests(TestCase):
+    """Direct unit tests for resolve_public_proxy_viewer."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username='unit_owner', email='unit_owner@example.com', password='pw',
+        )
+
+    def test_returns_none_when_proxy_missing(self):
+        from account.view_as import resolve_public_proxy_viewer
+        # Don't create the proxy user
+        self.assertIsNone(resolve_public_proxy_viewer(self.owner))
+
+    def test_returns_proxy_when_present_and_not_friend(self):
+        from account.view_as import resolve_public_proxy_viewer
+        proxy = User.objects.create_user(
+            username='wit_bot', email='wit_bot_unit@example.com', password='pw',
+        )
+        result = resolve_public_proxy_viewer(self.owner)
+        self.assertEqual(result, proxy)
+
+    def test_returns_none_when_proxy_is_friend(self):
+        from account.view_as import resolve_public_proxy_viewer
+        from account.models import Connection
+        proxy = User.objects.create_user(
+            username='wit_bot', email='wit_bot_unit2@example.com', password='pw',
+        )
+        Connection.objects.create(
+            user1=self.owner, user2=proxy,
+            user1_choice='friend', user2_choice='friend',
+        )
+        self.assertIsNone(resolve_public_proxy_viewer(self.owner))
+
+    def test_returns_none_when_proxy_is_owner(self):
+        """Edge case: if the proxy username happens to match the owner's, return None."""
+        from account.view_as import resolve_public_proxy_viewer
+        # Create a user whose username is the proxy's
+        weird_owner = User.objects.create_user(
+            username='wit_bot', email='wit_bot_owner@example.com', password='pw',
+        )
+        self.assertIsNone(resolve_public_proxy_viewer(weird_owner))

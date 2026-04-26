@@ -84,3 +84,38 @@ def resolve_shadow_viewer(request, target_owner):
     if candidate == target_owner:
         return None
     return candidate
+
+
+# Username of the user that stands in as the "public non-friend" viewer for
+# View As preview (when ?view_as=public is sent). Configurable via
+# settings.VIEW_AS_PUBLIC_PROXY_USERNAME if defined; otherwise defaults below.
+DEFAULT_NON_FRIEND_PROXY_USERNAME = 'wit_bot'
+
+
+def _get_proxy_username() -> str:
+    from django.conf import settings
+    return getattr(settings, 'VIEW_AS_PUBLIC_PROXY_USERNAME', DEFAULT_NON_FRIEND_PROXY_USERNAME)
+
+
+def resolve_public_proxy_viewer(target_owner):
+    """Resolve the configured non-friend proxy user for `?view_as=public`.
+
+    Returns the proxy User instance only when:
+      - The proxy user exists
+      - The proxy user is NOT the owner themselves
+      - The proxy user is NOT connected to the owner (must actually be a non-friend
+        for the preview to be representative of the public non-friend view)
+
+    Returns None if any of the above fails. Callers should fall back to the
+    existing tier-mode masking (via apply_profile_view_as) when None is returned.
+    """
+    User = get_user_model()
+    try:
+        proxy = User.objects.get(username=_get_proxy_username())
+    except User.DoesNotExist:
+        return None
+    if proxy == target_owner:
+        return None
+    if target_owner.is_connected(proxy):
+        return None
+    return proxy
