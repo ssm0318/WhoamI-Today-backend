@@ -49,7 +49,8 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  AppSessionSerializer, FriendFriendListSerializer, \
                                  UserMinimalSerializer, \
                                  UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
-                                 InterestSerializer, PersonaSerializer, viewer_sees_check_in_component)
+                                 InterestSerializer, PersonaSerializer, viewer_sees_check_in_component,
+                                 RECENT_POST_WINDOW)
 from account.view_as import apply_profile_view_as, parse_view_as, resolve_public_proxy_viewer, resolve_shadow_viewer
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
@@ -1582,16 +1583,6 @@ class FriendList(generics.ListAPIView):
             s.user_id: s for s in Song.objects.filter(user_id__in=friend_ids, is_active=True)
         }
 
-        # 7. Unread note / response counts (GROUP BY author)
-        unread_note_rows = (Note.objects.filter(author_id__in=friend_ids)
-                            .exclude(readers=user)
-                            .values('author_id').annotate(c=Count('id')))
-        ctx['unread_note_count_by_author'] = {r['author_id']: r['c'] for r in unread_note_rows}
-        unread_resp_rows = (QnaResponse.objects.filter(author_id__in=friend_ids)
-                            .exclude(readers=user)
-                            .values('author_id').annotate(c=Count('id')))
-        ctx['unread_response_count_by_author'] = {r['author_id']: r['c'] for r in unread_resp_rows}
-
         # 8. Chat rooms + unread counts (read-only; no writes)
         rooms = list(ChatRoom.objects.filter(is_group=False).filter(
             Q(user1=user, user2_id__in=friend_ids) | Q(user2=user, user1_id__in=friend_ids)
@@ -1630,6 +1621,30 @@ class FriendList(generics.ListAPIView):
                 visible_resps_by_author[r.author_id].append(r)
         ctx['visible_notes_by_author'] = visible_notes_by_author
         ctx['visible_resps_by_author'] = visible_resps_by_author
+
+        # 7. Unread note / response counts — derived from the audience-filtered
+        # visible_*_by_author dicts so badge stays in sync with `recent_posts` and
+        # `FriendsMarkAllPostsAsRead`. Same window as recent_posts (24h), and same
+        # superuser exclusion as mark-as-read for notes.
+        recent_cutoff = timezone.now() - RECENT_POST_WINDOW
+        unread_note_count_by_author = {}
+        for author_id, notes in visible_notes_by_author.items():
+            c = sum(1 for n in notes
+                    if n.created_at >= recent_cutoff
+                    and not n.author.is_superuser
+                    and user.id not in {r.id for r in n.readers.all()})
+            if c:
+                unread_note_count_by_author[author_id] = c
+        ctx['unread_note_count_by_author'] = unread_note_count_by_author
+
+        unread_response_count_by_author = {}
+        for author_id, resps in visible_resps_by_author.items():
+            c = sum(1 for r in resps
+                    if r.created_at >= recent_cutoff
+                    and user.id not in {rd.id for rd in r.readers.all()})
+            if c:
+                unread_response_count_by_author[author_id] = c
+        ctx['unread_response_count_by_author'] = unread_response_count_by_author
 
         # 10. Pokes (preserved from prior implementation)
         today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)

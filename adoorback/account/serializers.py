@@ -28,6 +28,7 @@ from django_countries.serializers import CountryFieldMixin
 User = get_user_model()
 
 CHECKIN_AUTO_ARCHIVE_HOURS = 12
+RECENT_POST_WINDOW = timedelta(hours=24)
 
 
 def viewer_sees_check_in_component(check_in, profile_user, viewer, visibility_field, updated_at_field):
@@ -624,7 +625,7 @@ class FriendListSerializer(UserMinimalSerializer):
         from itertools import chain
         from note.serializers import NoteSerializer
         from qna.serializers import ResponseSerializer
-        cutoff = timezone.now() - timedelta(hours=48)
+        cutoff = timezone.now() - RECENT_POST_WINDOW
         notes = [n for n in self.context.get('visible_notes_by_author', {}).get(obj.id, [])
                  if n.created_at >= cutoff]
         resps = [r for r in self.context.get('visible_resps_by_author', {}).get(obj.id, [])
