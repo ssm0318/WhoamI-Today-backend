@@ -4,8 +4,10 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from note.models import Note
 from notification.models import Notification
 from notification.serializers import NotificationSerializer
+from qna.models import Response as QnaResponse
 
 from adoorback.utils.permissions import IsOwnerOrReadOnly
 from adoorback.utils.validators import adoor_exception_handler
@@ -27,7 +29,54 @@ class NotificationList(generics.ListAPIView):
         if user.ver_changed_at:
             notifications = notifications.filter(created_at__gte=user.ver_changed_at)
 
-        return notifications
+        notifications = list(notifications)
+
+        # Collect referenced post IDs from redirect_urls
+        note_ids = set()
+        response_ids = set()
+        for noti in notifications:
+            try:
+                parts = noti.redirect_url.strip('/').split('/')
+                if parts[0] == 'notes':
+                    note_ids.add(int(parts[1]))
+                elif parts[0] == 'responses':
+                    response_ids.add(int(parts[1]))
+            except (ValueError, IndexError):
+                pass
+
+        # Batch-fetch referenced posts (SafeDeleteManager excludes soft-deleted)
+        notes_map = {n.id: n for n in Note.objects.filter(id__in=note_ids)} if note_ids else {}
+        responses_map = {r.id: r for r in QnaResponse.objects.filter(id__in=response_ids)} if response_ids else {}
+
+        # Filter out notifications whose target post is deleted or user is no longer in audience
+        audience_cache = {}
+        result = []
+        for noti in notifications:
+            try:
+                parts = noti.redirect_url.strip('/').split('/')
+                if parts[0] == 'notes':
+                    note_id = int(parts[1])
+                    key = ('note', note_id)
+                    if key not in audience_cache:
+                        note = notes_map.get(note_id)
+                        audience_cache[key] = note.is_audience(user) if note else False
+                    if audience_cache[key]:
+                        result.append(noti)
+                    continue
+                elif parts[0] == 'responses':
+                    response_id = int(parts[1])
+                    key = ('response', response_id)
+                    if key not in audience_cache:
+                        resp = responses_map.get(response_id)
+                        audience_cache[key] = resp.is_audience(user) if resp else False
+                    if audience_cache[key]:
+                        result.append(noti)
+                    continue
+            except (ValueError, IndexError):
+                pass
+            result.append(noti)
+
+        return result
 
 
 class FriendRequestNotiList(generics.ListAPIView):

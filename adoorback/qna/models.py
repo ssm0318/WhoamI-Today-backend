@@ -108,10 +108,13 @@ class Response(AdoorModel, SafeDeleteModel):
         ]
 
     def save(self, *args, **kwargs):
+        self._visibility_changed = False
         if self.pk is not None:  # not when created
             original = Response.objects.get(pk=self.pk)
             if original.content != self.content:
                 self.is_edited = True
+            if list(original.visibility) != list(self.visibility):
+                self._visibility_changed = True
         super().save(*args, **kwargs)
 
     @property
@@ -302,3 +305,28 @@ def send_notifications_to_subscribers(sender, instance, created, **kwargs):
             redirect_url=f'/responses/{instance.id}'
         )
         NotificationActor.objects.create(user=author, notification=noti)
+
+
+@receiver(post_save, sender=Response)
+def hide_notifications_on_response_update(sender, instance, created, **kwargs):
+    """Hide notifications when a Response is deleted or its visibility narrows."""
+    if created:
+        return
+
+    if instance.deleted:
+        Notification.objects.filter(
+            redirect_url=f'/responses/{instance.id}',
+            is_visible=True
+        ).update(is_visible=False)
+        return
+
+    if getattr(instance, '_visibility_changed', False):
+        notis = Notification.objects.filter(
+            redirect_url=f'/responses/{instance.id}',
+            is_visible=True
+        ).exclude(user=instance.author).select_related('user')
+
+        noti_ids_to_hide = [noti.id for noti in notis if not instance.is_audience(noti.user)]
+
+        if noti_ids_to_hide:
+            Notification.objects.filter(id__in=noti_ids_to_hide).update(is_visible=False)
