@@ -4,8 +4,12 @@ from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from rest_framework import serializers
 
+from django.db.models import Q
+
 from account.serializers import UserMinimalSerializer
 from check_in.models import CheckIn, CheckInComponentEntry, CheckInPost, Song, Poke
+from comment.models import Comment
+from content_report.models import ContentReport
 from like.models import Like
 
 CHECKIN_AUTO_ARCHIVE_HOURS = 12
@@ -276,6 +280,7 @@ class CheckInPostSerializer(serializers.ModelSerializer):
     )
     like_count = serializers.SerializerMethodField(read_only=True)
     current_user_like_id = serializers.SerializerMethodField(read_only=True)
+    comment_count = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -289,11 +294,14 @@ class CheckInPostSerializer(serializers.ModelSerializer):
             'is_pinned', 'pin_visibility',
             'created_at',
             'like_count', 'current_user_like_id',
+            'comment_count',
             'current_user_read',
         ]
         read_only_fields = ['id', 'type', 'author_detail', 'image_url', 'created_at',
                             'is_pinned', 'pin_visibility',
-                            'like_count', 'current_user_like_id', 'current_user_read']
+                            'like_count', 'current_user_like_id',
+                            'comment_count',
+                            'current_user_read']
 
     def get_type(self, obj):
         return 'CheckInPost'
@@ -322,6 +330,26 @@ class CheckInPostSerializer(serializers.ModelSerializer):
             user_id=request.user.id, content_type_id=ct.id, object_id=obj.id,
         ).first()
         return like.id if like else None
+
+    def get_comment_count(self, obj):
+        request = self.context.get('request')
+        if request is None or not request.user.is_authenticated:
+            return 0
+        current_user = request.user
+        blocked_user_ids = current_user.user_report_blocked_ids
+        comment_ct = ContentType.objects.get_for_model(Comment)
+        blocked_comment_ids = ContentReport.objects.filter(
+            user=current_user, content_type=comment_ct,
+        ).values_list('object_id', flat=True)
+
+        def _filter(qs):
+            return qs.exclude(
+                Q(id__in=blocked_comment_ids) | Q(author_id__in=blocked_user_ids)
+            )
+
+        comments = _filter(obj.check_in_post_comments.all())
+        replies = sum(_filter(c.replies.all()).count() for c in comments)
+        return comments.count() + replies
 
     def get_current_user_read(self, obj):
         request = self.context.get('request')

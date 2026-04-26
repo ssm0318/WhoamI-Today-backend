@@ -937,6 +937,41 @@ class CheckInPostStories(generics.ListAPIView):
         return CheckInPost.objects.filter(id__in=list(latest_ids)).order_by('-created_at')
 
 
+class CheckInPostComments(generics.ListAPIView):
+    """GET /api/check_in/posts/<pk>/comments/
+
+    List visible comments on a CheckInPost. Mirrors NoteComments — viewer
+    must be in the post's audience, and comments authored by blocked users
+    or comments the viewer reported are filtered out.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_serializer_class(self):
+        from comment.serializers import CommentFriendSerializer
+        return CommentFriendSerializer
+
+    def get_queryset(self):
+        from comment.models import Comment
+        from content_report.models import ContentReport
+
+        current_user = self.request.user
+        post = get_object_or_404(CheckInPost, id=self.kwargs.get('pk'))
+        if not post.is_audience(current_user):
+            raise exceptions.PermissionDenied("You cannot view comments on this post.")
+
+        blocked_comment_ids = ContentReport.objects.filter(
+            user=current_user,
+            content_type=ContentType.objects.get_for_model(Comment),
+        ).values_list('object_id', flat=True)
+
+        return post.check_in_post_comments.exclude(
+            Q(id__in=blocked_comment_ids) | Q(author_id__in=current_user.user_report_blocked_ids)
+        ).order_by('created_at')
+
+
 class CheckInPostPinToggle(APIView):
     """PATCH /api/check_in/posts/<pk>/pin/
 

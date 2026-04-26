@@ -704,6 +704,10 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
     def is_expired(self):
         return timezone.now() - self.created_at > timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
 
+    @property
+    def participants(self):
+        return self.check_in_post_comments.values_list('author_id', flat=True).distinct()
+
     def is_audience(self, user):
         """Visibility check, mirrors Note.is_audience for friends/close_friends only.
 
