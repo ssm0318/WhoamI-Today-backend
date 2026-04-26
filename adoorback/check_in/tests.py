@@ -32,7 +32,6 @@ class CheckInVisibilityTests(APITestCase):
         return CheckIn.objects.create(
             user=self.author,
             is_active=True,
-            description="Test CheckIn",
             visibility=visibility
         )
 
@@ -57,15 +56,14 @@ class CheckInVisibilityTests(APITestCase):
 
     def test_visibility_validation(self):
         from check_in.serializers import MyCheckInSerializer
-        # Test empty visibility (NOW VALID - defaults to previous or default list)
+        # Test empty visibility (valid - validate_visibility allows empty list)
         data = {
             'is_active': True,
             'visibility': [],
-            'description': 'test'
         }
         serializer = MyCheckInSerializer(data=data)
         self.assertTrue(serializer.is_valid())
-        
+
         # Test valid visibility
         data['visibility'] = ['public']
         serializer = MyCheckInSerializer(data=data)
@@ -73,43 +71,39 @@ class CheckInVisibilityTests(APITestCase):
 
     def test_missing_visibility_key(self):
         from check_in.serializers import MyCheckInSerializer
-        # Test completely missing visibility key (NOW VALID)
+        # visibility is required, so missing key should be invalid
         data = {
             'is_active': True,
-            'description': 'test no visibility'
         }
         serializer = MyCheckInSerializer(data=data)
-        self.assertTrue(serializer.is_valid())
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('visibility', serializer.errors)
 
-    def test_create_default_visibility_initial(self):
+    def test_create_with_explicit_visibility(self):
         # Ensure no previous check-ins
         CheckIn.objects.filter(user=self.author).delete()
-        
+
         url = reverse('current-check-in')
         data = {
-            'description': 'Initial check-in',
-            'visibility': []
+            'visibility': ['public'],
         }
         self.client.force_authenticate(user=self.author)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        
+
         check_in = CheckIn.objects.get(id=response.data['id'])
         self.assertEqual(check_in.visibility, ['public'])
 
-    def test_create_default_visibility_subsequent(self):
-        # Create a previous check-in with specific visibility
-        CheckIn.objects.create(user=self.author, visibility=['friends'], description="Previous")
-        
+    def test_create_with_friends_visibility(self):
+        # Create a check-in with friends visibility
         url = reverse('current-check-in')
         data = {
-            'description': 'Subsequent check-in',
-            'visibility': []
+            'visibility': ['friends'],
         }
         self.client.force_authenticate(user=self.author)
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        
+
         check_in = CheckIn.objects.get(id=response.data['id'])
         self.assertEqual(check_in.visibility, ['friends'])
 
