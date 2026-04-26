@@ -319,6 +319,7 @@ class MessageList(generics.ListCreateAPIView):
             msg_ids = [msg.id for msg in paginated_queryset]
             marked = Message.objects.filter(id__in=msg_ids, receiver=request.user, is_read=False).update(is_read=True)
             if marked > 0:
+                print(f"[MARK READ - list] user={request.user.id} ({request.user.username}) marked {marked} msgs as read in chat with user {connected_user.id} ({connected_user.username})")
                 chat_room = get_chat_room(request.user, connected_user)
                 if chat_room:
                     remaining = chat_room.messages.filter(receiver=request.user, is_read=False).count()
@@ -474,6 +475,7 @@ class MarkMessagesRead(generics.GenericAPIView):
         chat_room = get_chat_room(user, connected_user)
         if chat_room:
             count = chat_room.messages.filter(receiver=user, is_read=False).update(is_read=True)
+            print(f"[MARK READ - markRead] user={user.id} ({user.username}) marked {count} msgs as read in chat with user {connected_user.id} ({connected_user.username})")
             if count > 0:
                 channel_layer = get_channel_layer()
                 try:
