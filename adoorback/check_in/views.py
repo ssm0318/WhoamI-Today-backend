@@ -16,7 +16,14 @@ from adoorback.utils.validators import adoor_exception_handler
 
 from account.serializers import serialize_check_in_base_for_viewer
 
-from check_in.models import CheckIn, CheckInComponentEntry, CheckInPost, Song, Poke
+from check_in.models import (
+    CHECK_IN_POST_EXPIRY_HOURS,
+    CheckIn,
+    CheckInComponentEntry,
+    CheckInPost,
+    Song,
+    Poke,
+)
 from reaction.models import Reaction
 from reaction.serializers import ReactionSerializer
 import check_in.serializers as cs
@@ -791,6 +798,42 @@ def _authors_who_marked_user_close_friend(user):
     return list(user1_authors) + list(user2_authors)
 
 
+def _check_in_post_visible_filter(user):
+    """Q-filter expressing what a viewer can see across all CheckInPosts.
+
+    Three disjoint slices:
+      - LIVE: created within 24h, governed by `visibility`
+      - PINNED ARCHIVE: older than 24h but pinned, governed by `pin_visibility`
+        (independent of original visibility — author can change after pinning)
+      - SELF ARCHIVE: viewer is the author, always visible regardless of age
+    """
+    threshold = timezone.now() - timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
+    close_visible_author_ids = _authors_who_marked_user_close_friend(user)
+
+    visible_live = Q(created_at__gte=threshold) & (
+        Q(visibility='friends') |
+        Q(visibility='close_friends', author_id__in=close_visible_author_ids)
+    )
+    visible_pinned = Q(created_at__lt=threshold, is_pinned=True) & (
+        Q(pin_visibility='friends') |
+        Q(pin_visibility='close_friends', author_id__in=close_visible_author_ids)
+    )
+    visible_self = Q(author=user)
+    return visible_live | visible_pinned | visible_self
+
+
+def _get_own_post_or_404(user, pk):
+    """Fetch a CheckInPost scoped to the current user.
+
+    Other users' posts (and soft-deleted rows) come back as 404 rather than
+    403 so the endpoint does not leak the existence of foreign rows.
+    """
+    try:
+        return CheckInPost.objects.get(pk=pk, author=user)
+    except CheckInPost.DoesNotExist:
+        raise exceptions.NotFound("Post not found.")
+
+
 class CheckInPostFeed(generics.ListCreateAPIView):
     """Feed of CheckInPosts — GET returns viewer-visible posts from connected users
     in latest-first order. POST creates a new post for the current user.
@@ -805,18 +848,13 @@ class CheckInPostFeed(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         connected_ids = list(user.connected_user_ids)
-        close_visible_author_ids = _authors_who_marked_user_close_friend(user)
         blocked_ids = user.user_report_blocked_ids
 
         qs = CheckInPost.objects.filter(
             author_id__in=connected_ids + [user.id],
         ).exclude(author_id__in=blocked_ids)
 
-        return qs.filter(
-            Q(visibility='friends') |
-            Q(visibility='close_friends', author_id__in=close_visible_author_ids) |
-            Q(author=user)
-        ).order_by('-created_at')
+        return qs.filter(_check_in_post_visible_filter(user)).order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -864,10 +902,7 @@ class UserCheckInPosts(generics.ListAPIView):
         if not viewer.is_connected(target):
             return CheckInPost.objects.none()
 
-        if hasattr(viewer, 'is_close_friend') and viewer.is_close_friend(target):
-            return qs.order_by('-created_at')
-
-        return qs.filter(visibility='friends').order_by('-created_at')
+        return qs.filter(_check_in_post_visible_filter(viewer)).order_by('-created_at')
 
 
 class CheckInPostStories(generics.ListAPIView):
@@ -880,17 +915,17 @@ class CheckInPostStories(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
+        # Friend-only strip: own posts surface in /my via UserCheckInPosts,
+        # so excluding the viewer here keeps the feed strip purely about
+        # friends without breaking the author's own archive UX.
         user = self.request.user
         connected_ids = list(user.connected_user_ids)
-        close_visible_author_ids = _authors_who_marked_user_close_friend(user)
         blocked_ids = user.user_report_blocked_ids
 
-        author_ids = [uid for uid in connected_ids + [user.id] if uid not in blocked_ids]
+        author_ids = [uid for uid in connected_ids if uid not in blocked_ids]
 
         qs = CheckInPost.objects.filter(author_id__in=author_ids).filter(
-            Q(visibility='friends') |
-            Q(visibility='close_friends', author_id__in=close_visible_author_ids) |
-            Q(author=user)
+            _check_in_post_visible_filter(user)
         )
 
         # Latest post per author
@@ -900,3 +935,73 @@ class CheckInPostStories(generics.ListAPIView):
               .values_list('id', flat=True)
         )
         return CheckInPost.objects.filter(id__in=list(latest_ids)).order_by('-created_at')
+
+
+class CheckInPostPinToggle(APIView):
+    """PATCH /api/check_in/posts/<pk>/pin/
+
+    Toggles pin state on the author's own post. When turning the pin ON,
+    the post's current `visibility` is copied into `pin_visibility` as the
+    default highlight visibility (the author can later narrow it via
+    CheckInPostPinVisibility). When turning OFF, `pin_visibility` is cleared.
+
+    Mirrors ArchiveEntryPinToggle for CheckInComponentEntry.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        post = _get_own_post_or_404(request.user, pk)
+        if post.is_pinned:
+            post.is_pinned = False
+            post.pin_visibility = None
+        else:
+            post.is_pinned = True
+            post.pin_visibility = post.visibility
+        post.save(update_fields=['is_pinned', 'pin_visibility', 'updated_at'])
+        return Response(
+            cs.CheckInPostSerializer(post, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class CheckInPostPinVisibility(APIView):
+    """PATCH /api/check_in/posts/<pk>/pin_visibility/
+
+    Body: {"pin_visibility": "friends|close_friends"}
+
+    Updates only the pin's independent visibility. Posts must already be
+    pinned; otherwise 400 so clients can't silently set a value that has
+    no effect. Note: CheckInPost only supports friends/close_friends —
+    `public` and `only_me` are not valid here (unlike ArchiveEntry).
+    """
+    permission_classes = [IsAuthenticated]
+
+    ALLOWED = {'friends', 'close_friends'}
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        post = _get_own_post_or_404(request.user, pk)
+        if not post.is_pinned:
+            return Response(
+                {'detail': 'Post is not pinned.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        value = request.data.get('pin_visibility')
+        if value not in self.ALLOWED:
+            return Response(
+                {'detail': f'pin_visibility must be one of {sorted(self.ALLOWED)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        post.pin_visibility = value
+        post.save(update_fields=['pin_visibility', 'updated_at'])
+        return Response(
+            cs.CheckInPostSerializer(post, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )

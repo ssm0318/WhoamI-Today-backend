@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
@@ -647,6 +649,9 @@ def check_in_post_image_path(instance, filename):
     return f'check_in_post_images/{instance.author_id}/{unique_id}_{filename}'
 
 
+CHECK_IN_POST_EXPIRY_HOURS = 24
+
+
 class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
     VISIBILITY_CHOICES = [
         ('friends', 'Friends'),
@@ -657,6 +662,11 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
     image = models.ImageField(upload_to=check_in_post_image_path, storage=CheckInPostStorage())
     caption = models.TextField(blank=True, default='')
     visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
+
+    is_pinned = models.BooleanField(default=False)
+    pin_visibility = models.CharField(
+        max_length=20, choices=VISIBILITY_CHOICES, null=True, blank=True,
+    )
 
     check_in_post_comments = GenericRelation(Comment)
     check_in_post_likes = GenericRelation(Like)
@@ -680,6 +690,7 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
         indexes = [
             models.Index(fields=['-created_at']),
             models.Index(fields=['author', '-created_at']),
+            models.Index(fields=['author', 'is_pinned'], name='check_in_ch_author_pinned_idx'),
         ]
 
     def __str__(self):
@@ -689,8 +700,16 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
     def type(self):
         return self.__class__.__name__
 
+    @property
+    def is_expired(self):
+        return timezone.now() - self.created_at > timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
+
     def is_audience(self, user):
-        """Visibility check, mirrors Note.is_audience for friends/close_friends only."""
+        """Visibility check, mirrors Note.is_audience for friends/close_friends only.
+
+        Expired (>24h) posts are visible only to the author unless pinned; when pinned,
+        the post's `pin_visibility` (set independently by the author) governs access.
+        """
         content_type = ContentType.objects.get_for_model(self)
         if ContentReport.objects.filter(user=user, content_type=content_type, object_id=self.pk).exists():
             return False
@@ -699,9 +718,16 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
         if self.author == user:
             return True
 
-        if self.visibility == 'friends':
+        if self.is_expired:
+            if not self.is_pinned:
+                return False
+            visibility = self.pin_visibility
+        else:
+            visibility = self.visibility
+
+        if visibility == 'friends':
             return user.is_connected(self.author)
-        if self.visibility == 'close_friends':
+        if visibility == 'close_friends':
             return user.is_close_friend(self.author)
         return False
 

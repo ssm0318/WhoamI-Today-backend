@@ -286,11 +286,13 @@ class CheckInPostSerializer(serializers.ModelSerializer):
             'image', 'image_url',
             'caption',
             'visibility',
+            'is_pinned', 'pin_visibility',
             'created_at',
             'like_count', 'current_user_like_id',
             'current_user_read',
         ]
         read_only_fields = ['id', 'type', 'author_detail', 'image_url', 'created_at',
+                            'is_pinned', 'pin_visibility',
                             'like_count', 'current_user_like_id', 'current_user_read']
 
     def get_type(self, obj):
@@ -335,7 +337,8 @@ class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CheckInPost
-        fields = ['id', 'author_detail', 'image_url', 'visibility', 'created_at']
+        fields = ['id', 'author_detail', 'image_url', 'caption', 'visibility',
+                  'is_pinned', 'pin_visibility', 'created_at']
 
     def get_image_url(self, obj):
         if not obj.image:
