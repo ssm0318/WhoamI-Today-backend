@@ -607,6 +607,10 @@ class PokeCreate(generics.CreateAPIView):
         if sender == receiver:
             raise exceptions.ValidationError("You cannot poke yourself.")
 
+        # Version isolation
+        if sender.current_ver != receiver.current_ver:
+            raise exceptions.PermissionDenied("Cannot poke a user on a different version.")
+
         # Check daily poke limit
         today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         sent_today = Poke.objects.filter(sender=sender, created_at__gte=today_start).count()
@@ -697,6 +701,10 @@ class CheckInReact(APIView):
             check_in = CheckIn.objects.get(id=pk)
         except CheckIn.DoesNotExist:
             raise exceptions.NotFound("Check-in not found.")
+
+        # Version isolation
+        if check_in.user.current_ver != request.user.current_ver:
+            raise exceptions.PermissionDenied("Cannot interact with a check-in from a user on a different version.")
 
         if not check_in.is_active:
             raise exceptions.PermissionDenied("This check-in is no longer active.")
@@ -847,7 +855,10 @@ class CheckInPostFeed(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        connected_ids = list(user.connected_user_ids)
+        # Filter connected users to same version
+        connected_ids = list(User.objects.filter(
+            id__in=user.connected_user_ids, current_ver=user.current_ver
+        ).values_list('id', flat=True))
         blocked_ids = user.user_report_blocked_ids
 
         qs = CheckInPost.objects.filter(
@@ -919,7 +930,10 @@ class CheckInPostStories(generics.ListAPIView):
         # so excluding the viewer here keeps the feed strip purely about
         # friends without breaking the author's own archive UX.
         user = self.request.user
-        connected_ids = list(user.connected_user_ids)
+        # Filter connected users to same version
+        connected_ids = list(User.objects.filter(
+            id__in=user.connected_user_ids, current_ver=user.current_ver
+        ).values_list('id', flat=True))
         blocked_ids = user.user_report_blocked_ids
 
         author_ids = [uid for uid in connected_ids if uid not in blocked_ids]

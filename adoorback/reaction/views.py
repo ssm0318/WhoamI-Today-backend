@@ -1,5 +1,6 @@
 from django.db import transaction, IntegrityError
 from rest_framework import generics
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 
 from reaction.models import Reaction
@@ -45,6 +46,11 @@ class ReactionList(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         target, content_type_id, object_id = self.validate_target()
+
+        # Version isolation: block reacting to content from users on a different version
+        target_author = getattr(target, 'author', None) or getattr(target, 'user', None)
+        if target_author and target_author.current_ver != self.request.user.current_ver:
+            raise PermissionDenied("Cannot interact with content from a user on a different version.")
 
         try:
             serializer.save(user=self.request.user,
