@@ -50,6 +50,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserMinimalSerializer, \
                                  UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
                                  InterestSerializer, PersonaSerializer, viewer_sees_check_in_component)
+from account.view_as import apply_profile_view_as, parse_view_as
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -655,6 +656,15 @@ class UserProfile(generics.RetrieveAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    def retrieve(self, request, *args, **kwargs):
+        view_as = parse_view_as(request)  # raises 400 if invalid
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = dict(serializer.data)
+        if view_as is not None and instance == request.user:
+            apply_profile_view_as(data, instance, view_as)
+        return Response(data)
+
 
 class UserNoteList(generics.ListAPIView):
     serializer_class = NoteSerializer
@@ -1237,6 +1247,15 @@ class CurrentUserProfile(generics.RetrieveAPIView):
             return user
         else:
             raise PermissionDenied("User is not authenticated")
+
+    def retrieve(self, request, *args, **kwargs):
+        view_as = parse_view_as(request)  # raises 400 if invalid
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = dict(serializer.data)
+        if view_as is not None and instance == request.user:
+            apply_profile_view_as(data, instance, view_as)
+        return Response(data)
 
 
 class CurrentUserNoteList(generics.ListAPIView):
