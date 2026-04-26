@@ -1645,6 +1645,13 @@ class FriendList(generics.ListAPIView):
         else:
             ctx['check_in_subscription_ids'] = set()
 
+        # 12. Any-type subscriptions (모든 subscription_type 통합)
+        ctx['subscription_ids'] = set(
+            Subscription.objects.filter(subscriber=user)
+            .values_list('subscribed_to_id', flat=True)
+            .distinct()
+        )
+
 
 class FriendListUpdate(generics.UpdateAPIView):
     serializer_class = UserFriendsUpdateSerializer

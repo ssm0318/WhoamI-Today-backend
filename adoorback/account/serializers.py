@@ -295,6 +295,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     mutual_interests = serializers.SerializerMethodField(read_only=True)
     friendship_level = serializers.SerializerMethodField(read_only=True)
     is_check_in_subscribed = serializers.SerializerMethodField(read_only=True)
+    is_subscribed = serializers.SerializerMethodField(read_only=True)
 
     def get_is_check_in_subscribed(self, obj):
         request = self.context.get('request')
@@ -303,6 +304,15 @@ class UserProfileSerializer(UserMinimalSerializer):
             from account.models import Subscription
             return Subscription.objects.filter(
                 subscriber=request.user, subscribed_to=obj, content_type=get_check_in_type()
+            ).exists()
+        return False
+
+    def get_is_subscribed(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            from account.models import Subscription
+            return Subscription.objects.filter(
+                subscriber=request.user, subscribed_to=obj
             ).exists()
         return False
 
@@ -459,7 +469,7 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'unread_chat_count', 'unread_message_cnt', 'connection_status',
                                                       'friend_count', 'email_verified',
                                                       'mutual_personas', 'mutual_interests',
-                                                      'friendship_level', 'is_check_in_subscribed']
+                                                      'friendship_level', 'is_check_in_subscribed', 'is_subscribed']
 
 
 class FriendListSerializer(UserMinimalSerializer):
@@ -484,6 +494,7 @@ class FriendListSerializer(UserMinimalSerializer):
     thought_visibility = serializers.SerializerMethodField(read_only=True)
     sent_pokes = serializers.SerializerMethodField(read_only=True)
     is_check_in_subscribed = serializers.SerializerMethodField(read_only=True)
+    is_subscribed = serializers.SerializerMethodField(read_only=True)
     last_updated_field = serializers.SerializerMethodField(read_only=True)
     pinned_count = serializers.SerializerMethodField(read_only=True)
 
@@ -498,6 +509,9 @@ class FriendListSerializer(UserMinimalSerializer):
 
     def get_is_check_in_subscribed(self, obj):
         return obj.id in self.context.get('check_in_subscription_ids', set())
+
+    def get_is_subscribed(self, obj):
+        return obj.id in self.context.get('subscription_ids', set())
 
     def get_last_updated_field(self, obj):
         check_in = self.check_in(obj)
@@ -674,8 +688,8 @@ class FriendListSerializer(UserMinimalSerializer):
                                                       'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
-                                                      'sent_pokes', 'is_check_in_subscribed', 'last_updated_field',
-                                                      'pinned_count']
+                                                      'sent_pokes', 'is_check_in_subscribed', 'is_subscribed',
+                                                      'last_updated_field', 'pinned_count']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
