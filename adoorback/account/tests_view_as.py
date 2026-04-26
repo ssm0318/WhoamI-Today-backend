@@ -191,3 +191,73 @@ class ResolveShadowViewerTests(TestCase):
         request.user = self.owner
         # Owner viewing their own profile through their own eyes is identity → no shadow
         self.assertIsNone(resolve_shadow_viewer(request, self.owner))
+
+
+class ShadowViewerProfileTests(TestCase):
+    """Integration tests: ?view_as_user=<username> behaves as if that user were the viewer.
+
+    The owner has `bio_friends_only=True`. When the owner previews their profile
+    AS alice (a friend), bio is visible (alice is a friend → can see). When the
+    owner previews AS a non-friend (synthetic public stranger), bio is hidden.
+    """
+
+    def setUp(self):
+        from account.models import Connection
+        self.owner = User.objects.create_user(
+            username='owner_sv', email='owner_sv@example.com', password='pw',
+        )
+        self.owner.bio = 'Hi, I am the owner.'
+        self.owner.bio_friends_only = True
+        self.owner.save()
+
+        self.alice = User.objects.create_user(
+            username='alice_sv', email='alice_sv@example.com', password='pw',
+        )
+        # alice is friends with owner
+        Connection.objects.create(
+            user1=self.owner, user2=self.alice,
+            user1_choice='friend', user2_choice='friend',
+        )
+
+        self.stranger = User.objects.create_user(
+            username='stranger_sv', email='stranger_sv@example.com', password='pw',
+        )
+        # No connection with owner
+
+        self.client = APIClient()
+
+    def test_owner_views_as_friend_sees_bio(self):
+        """Owner previews as alice (friend) → bio is visible because alice can see it."""
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get('/api/user/me/profile/?view_as_user=alice_sv')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.get('bio'), 'Hi, I am the owner.')
+
+    def test_owner_views_as_stranger_hides_bio(self):
+        """Owner previews as stranger (no connection) → bio is hidden."""
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get('/api/user/me/profile/?view_as_user=stranger_sv')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(response.data.get('bio'), (None, ''))
+
+    def test_owner_views_as_returns_friendship_derived_fields_from_shadow_perspective(self):
+        """Friend-status fields reflect the shadow viewer's relationship, not the owner's."""
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get('/api/user/me/profile/?view_as_user=alice_sv')
+        self.assertEqual(response.status_code, 200)
+        # are_friends should reflect the alice<->owner relationship (true), not owner<->owner (n/a)
+        self.assertTrue(response.data.get('are_friends', False))
+
+    def test_owner_views_as_stranger_returns_not_friends(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get('/api/user/me/profile/?view_as_user=stranger_sv')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data.get('are_friends', True))
+
+    def test_non_owner_view_as_user_is_silently_ignored(self):
+        """Non-owner sending view_as_user is ignored (returns response based on actual viewer)."""
+        self.client.force_authenticate(user=self.stranger)
+        response = self.client.get(f'/api/user/{self.owner.username}/profile/?view_as_user=alice_sv')
+        self.assertEqual(response.status_code, 200)
+        # The response is from stranger's perspective, NOT alice's. So bio (friends_only) is hidden.
+        self.assertIn(response.data.get('bio'), (None, ''))

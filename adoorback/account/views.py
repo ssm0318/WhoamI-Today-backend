@@ -50,7 +50,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserMinimalSerializer, \
                                  UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
                                  InterestSerializer, PersonaSerializer, viewer_sees_check_in_component)
-from account.view_as import apply_profile_view_as, parse_view_as
+from account.view_as import apply_profile_view_as, parse_view_as, resolve_shadow_viewer
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
@@ -659,7 +659,11 @@ class UserProfile(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         view_as = parse_view_as(request)  # raises 400 if invalid
         instance = self.get_object()
-        serializer = self.get_serializer(instance, context={**self.get_serializer_context(), 'view_as': view_as})
+        shadow_viewer = resolve_shadow_viewer(request, instance)
+        serializer = self.get_serializer(
+            instance,
+            context={**self.get_serializer_context(), 'view_as': view_as, 'shadow_viewer': shadow_viewer},
+        )
         data = dict(serializer.data)
         if view_as is not None and instance == request.user:
             apply_profile_view_as(data, instance, view_as)
@@ -1251,7 +1255,11 @@ class CurrentUserProfile(generics.RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         view_as = parse_view_as(request)  # raises 400 if invalid
         instance = self.get_object()
-        serializer = self.get_serializer(instance, context={**self.get_serializer_context(), 'view_as': view_as})
+        shadow_viewer = resolve_shadow_viewer(request, instance)
+        serializer = self.get_serializer(
+            instance,
+            context={**self.get_serializer_context(), 'view_as': view_as, 'shadow_viewer': shadow_viewer},
+        )
         data = dict(serializer.data)
         if view_as is not None and instance == request.user:
             apply_profile_view_as(data, instance, view_as)
