@@ -22,7 +22,19 @@ class LikeCreate(generics.CreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        content_type_id = get_generic_relation_type(self.request.data['target_type']).id
+        content_type = get_generic_relation_type(self.request.data['target_type'])
+        content_type_id = content_type.id
+
+        # Version isolation: block liking content from users on a different version
+        target_model = content_type.model_class()
+        try:
+            target_obj = target_model.objects.get(id=self.request.data['target_id'])
+            target_author = getattr(target_obj, 'author', None) or getattr(target_obj, 'user', None)
+            if target_author and target_author.current_ver != self.request.user.current_ver:
+                raise ValidationError("Cannot interact with content from a user on a different version.")
+        except target_model.DoesNotExist:
+            pass
+
         try:
             instance = serializer.save(
                 user=self.request.user,

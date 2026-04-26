@@ -215,6 +215,17 @@ class ChatRoomList(generics.ListAPIView):
         if user.email not in ALL_OPERATOR_EMAILS:
             qs = qs.exclude(is_wit_admin_proxy=True)
 
+        # Version isolation: hide 1-on-1 rooms where the other user is on a different version
+        # (exclude WIT Admin rooms which are pinned and version-agnostic)
+        qs = qs.exclude(
+            Q(is_group=False) & ~Q(
+                Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME)
+            ) & (
+                (Q(user1=user) & ~Q(user2__current_ver=user.current_ver)) |
+                (Q(user2=user) & ~Q(user1__current_ver=user.current_ver))
+            )
+        )
+
         annotated = qs.annotate(
             last_message_time=Subquery(latest_msg.values('created_at')[:1]),
             last_message_content=Subquery(latest_msg.values('content')[:1]),
@@ -353,6 +364,10 @@ class MessageList(generics.ListCreateAPIView):
                 Q(is_wit_admin_proxy=True) | Q(is_wit_admin_blast_room=True)
             ).exists()
         )
+
+        # Version isolation: block messaging across different versions
+        if not is_wit_admin_surface and user.current_ver != connected_user.current_ver:
+            raise exceptions.PermissionDenied("Cannot message users on a different version.")
 
         if not is_wit_admin_surface and not user.is_connected(connected_user):
             req = ChatRequest.objects.filter(
@@ -633,6 +648,10 @@ class ChatRequestCreate(generics.ListCreateAPIView):
         requestee_id = serializer.validated_data['requestee_id']
         requestee = User.objects.get(id=requestee_id)
 
+        # Version isolation
+        if user.current_ver != requestee.current_ver:
+            raise exceptions.PermissionDenied("Cannot send chat request to a user on a different version.")
+
         if user.is_connected(requestee):
             raise exceptions.ValidationError("You are already friends. No request needed.")
 
@@ -786,6 +805,10 @@ class GroupChatCreate(generics.CreateAPIView):
         if members.count() != len(all_member_ids):
             raise exceptions.NotFound("One or more users not found.")
 
+        # Version isolation: all members must be on the same version
+        if members.exclude(current_ver=user.current_ver).exists():
+            raise exceptions.ValidationError("Cannot create a group with members on a different version.")
+
         room = ChatRoom.objects.create(is_group=True, name=name)
         room.members.set(members)
 
@@ -836,6 +859,10 @@ class GroupChatUpdate(generics.GenericAPIView):
             if current_count + len(add_ids) > MAX_GROUP_MEMBERS:
                 raise exceptions.ValidationError(f"Group cannot exceed {MAX_GROUP_MEMBERS} members.")
             new_members = list(User.objects.filter(id__in=add_ids))
+            # Version isolation: new members must be on the same version
+            diff_ver = [m for m in new_members if m.current_ver != user.current_ver]
+            if diff_ver:
+                raise exceptions.ValidationError("Cannot add members on a different version.")
             room.members.add(*new_members)
             if new_members:
                 added_msg = Message.objects.create(
@@ -929,6 +956,10 @@ class GroupMessageList(generics.ListCreateAPIView):
 
         if not room.members.filter(id=user.id).exists():
             raise exceptions.PermissionDenied("You are not a member of this group.")
+
+        # Version isolation: block if group has members on different versions
+        if room.members.exclude(current_ver=user.current_ver).exists():
+            raise exceptions.PermissionDenied("Cannot send messages in a group with members on different versions.")
 
         parent_id = self.request.data.get('parent')
         parent = None

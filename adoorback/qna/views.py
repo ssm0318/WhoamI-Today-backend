@@ -285,6 +285,9 @@ class ResponseRequestCreate(generics.CreateAPIView):
             raise PermissionDenied("requester가 본인이 아닙니다.")
         if not requestee.is_connected(current_user):
             raise PermissionDenied("친구에게만 response request를 보낼 수 있습니다.")
+        # Version isolation
+        if requester.current_ver != requestee.current_ver:
+            raise PermissionDenied("Cannot send response requests to users on a different version.")
         
         # Do nothing if request already exists
         exists = ResponseRequest.objects.filter(

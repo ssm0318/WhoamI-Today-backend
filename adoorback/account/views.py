@@ -597,13 +597,13 @@ class UserSearch(generics.ListAPIView):
         qs = User.objects.none()
         if query:
             # username starts with query
-            start_users = User.objects.filter(username__startswith=query, is_superuser=False) \
+            start_users = User.objects.filter(username__startswith=query, is_superuser=False, current_ver=user.current_ver) \
                 .order_by('username').exclude(id=user_id).exclude(id__in=user_block_rec_ids)
             friend_start_ids = list(start_users.filter(id__in=friend_ids).values_list('id', flat=True))
             nonfriend_start_ids = list(start_users.exclude(id__in=friend_ids).values_list('id', flat=True))
 
             # username contains query
-            contain_users = User.objects.filter(username__icontains=query, is_superuser=False) \
+            contain_users = User.objects.filter(username__icontains=query, is_superuser=False, current_ver=user.current_ver) \
                 .order_by('username').exclude(id=user_id).exclude(id__in=user_block_rec_ids)
             friend_contain_ids = list(contain_users.filter(id__in=friend_ids).values_list('id', flat=True))
             nonfriend_contain_ids = list(contain_users.exclude(id__in=friend_ids).values_list('id', flat=True))
@@ -1421,7 +1421,7 @@ class FriendList(generics.ListAPIView):
             return self._qs
 
         user = self.request.user
-        friends = user.connected_users
+        friends = user.connected_users.filter(current_ver=user.current_ver)
 
         query_type = self.request.query_params.get('type')
 
@@ -2551,7 +2551,10 @@ class FriendFeed(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
 
-        connected_user_ids = user.connected_user_ids
+        # Filter connected users to same version
+        connected_user_ids = list(User.objects.filter(
+            id__in=user.connected_user_ids, current_ver=user.current_ver
+        ).values_list('id', flat=True))
         blocked_user_ids = user.user_report_blocked_ids
 
         notes = Note.objects.filter(
@@ -2608,7 +2611,10 @@ class FullFriendFeed(generics.ListAPIView):
 
     def get_combined_feed_items(self):
         user = self.request.user
-        connected_user_ids = user.connected_user_ids
+        # Filter connected users to same version
+        connected_user_ids = list(User.objects.filter(
+            id__in=user.connected_user_ids, current_ver=user.current_ver
+        ).values_list('id', flat=True))
         blocked_user_ids = user.user_report_blocked_ids
 
         # 1. Notes
@@ -2771,8 +2777,8 @@ class DiscoverFeedView(generics.ListAPIView):
 
         # 1, 2, 3. Collect candidates for Mutual Friends, Mutual Traits, and Strangers
 
-        # Mutual Friends Candidates
-        user_friends = user.connected_users
+        # Mutual Friends Candidates (same version only)
+        user_friends = user.connected_users.filter(current_ver=user.current_ver)
         user_friend_ids = set(user_friends.values_list('id', flat=True))
         mutual_friend_potential_ids = set()
         for friend in user_friends:
@@ -2786,13 +2792,16 @@ class DiscoverFeedView(generics.ListAPIView):
         user_interests = set(user.user_interests.values_list('id', flat=True))
         user_personas = set(user.user_personas.values_list('id', flat=True))
         trait_ids = set(User.objects.filter(
-            Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas)
+            Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas),
+            current_ver=user.current_ver
         ).exclude(id__in=exclude_ids).values_list('id', flat=True))
 
         trait_candidates = get_candidates(trait_ids, limit=20)
 
         # Strangers (No Mutual) Candidates
-        stranger_ids = set(User.objects.exclude(
+        stranger_ids = set(User.objects.filter(
+            current_ver=user.current_ver
+        ).exclude(
             id__in=exclude_ids | mutual_friend_potential_ids | trait_ids
         ).exclude(is_superuser=True).values_list('id', flat=True))
         
@@ -2837,14 +2846,16 @@ class DiscoverFeedView(generics.ListAPIView):
         if len(feed_items) < 10:
             # Random Response — only public
             random_responses = list(_Response.objects.filter(
-                visibility__contains=['public']
+                visibility__contains=['public'],
+                author__current_ver=user.current_ver
             ).exclude(
                 author_id__in=exclude_ids
             ).exclude(readers=user).order_by('-created_at')[:50])
 
             # Random Note — only public
             random_notes = list(Note.objects.filter(
-                visibility__contains=['public']
+                visibility__contains=['public'],
+                author__current_ver=user.current_ver
             ).exclude(
                 author_id__in=exclude_ids
             ).exclude(readers=user).order_by('-created_at')[:50])
@@ -2880,6 +2891,7 @@ class DiscoverFeedView(generics.ListAPIView):
         from check_in.models import Song, CheckIn as CheckInModel
         music_candidates = Song.objects.filter(
             is_active=True,
+            user__current_ver=user.current_ver,
         ).exclude(
             user_id__in=exclude_ids
         ).select_related('user').order_by('-created_at')[:40]
