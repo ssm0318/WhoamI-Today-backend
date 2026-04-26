@@ -1,6 +1,6 @@
 from django.test import RequestFactory, TestCase
 from rest_framework.exceptions import ValidationError
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APIRequestFactory
 from account.models import User
 from account.view_as import parse_view_as, VIEW_AS_TIERS
 
@@ -112,3 +112,82 @@ class ProfileViewAsTests(TestCase):
         # bio is friends_only and `other` is not a friend → bio must be hidden
         # regardless of view_as=close_friends
         self.assertIn(response.data.get('bio'), (None, ''))
+
+
+class ParseViewAsUserTests(TestCase):
+    """Tests for the parse_view_as_user query-param parser."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_returns_none_when_param_missing(self):
+        from account.view_as import parse_view_as_user
+        request = self.factory.get('/api/user/me/profile/')
+        self.assertIsNone(parse_view_as_user(request))
+
+    def test_returns_username_when_present(self):
+        from account.view_as import parse_view_as_user
+        request = self.factory.get('/api/user/me/profile/?view_as_user=alice')
+        self.assertEqual(parse_view_as_user(request), 'alice')
+
+    def test_returns_none_when_empty_string(self):
+        from account.view_as import parse_view_as_user
+        request = self.factory.get('/api/user/me/profile/?view_as_user=')
+        self.assertIsNone(parse_view_as_user(request))
+
+
+class ResolveShadowViewerTests(TestCase):
+    """Tests for the resolve_shadow_viewer helper.
+
+    The helper takes a request, the target profile owner, and returns either
+    a User instance to use as the effective viewer OR None if the param is
+    missing / unauthorized / invalid.
+
+    Owner-only: only the target's owner is allowed to use shadow_viewer.
+    """
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.owner = User.objects.create_user(
+            username='owner', email='owner@example.com', password='pw',
+        )
+        self.alice = User.objects.create_user(
+            username='alice', email='alice@example.com', password='pw',
+        )
+        self.bob = User.objects.create_user(
+            username='bob', email='bob@example.com', password='pw',
+        )
+
+    def test_returns_none_when_param_missing(self):
+        from account.view_as import resolve_shadow_viewer
+        request = self.factory.get('/api/user/me/profile/')
+        request.user = self.owner
+        self.assertIsNone(resolve_shadow_viewer(request, self.owner))
+
+    def test_returns_user_when_owner_requests_valid_username(self):
+        from account.view_as import resolve_shadow_viewer
+        request = self.factory.get('/api/user/me/profile/?view_as_user=alice')
+        request.user = self.owner
+        result = resolve_shadow_viewer(request, self.owner)
+        self.assertEqual(result, self.alice)
+
+    def test_returns_none_when_non_owner_tries(self):
+        """A non-owner sending view_as_user is ignored (not an abuse vector)."""
+        from account.view_as import resolve_shadow_viewer
+        request = self.factory.get('/api/user/owner/profile/?view_as_user=alice')
+        request.user = self.bob  # not the owner
+        self.assertIsNone(resolve_shadow_viewer(request, self.owner))
+
+    def test_returns_none_when_username_does_not_exist(self):
+        from account.view_as import resolve_shadow_viewer
+        request = self.factory.get('/api/user/me/profile/?view_as_user=nonexistent')
+        request.user = self.owner
+        self.assertIsNone(resolve_shadow_viewer(request, self.owner))
+
+    def test_returns_none_when_owner_picks_themselves(self):
+        """Owner picking themselves as shadow viewer is a no-op (treat as unset)."""
+        from account.view_as import resolve_shadow_viewer
+        request = self.factory.get('/api/user/me/profile/?view_as_user=owner')
+        request.user = self.owner
+        # Owner viewing their own profile through their own eyes is identity → no shadow
+        self.assertIsNone(resolve_shadow_viewer(request, self.owner))
