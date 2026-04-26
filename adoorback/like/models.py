@@ -75,7 +75,10 @@ def create_like_noti(instance, created, **kwargs):
     if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
 
-    content = wrap_content(origin.content)
+    raw_content = getattr(origin, 'content', None)
+    if raw_content is None:
+        raw_content = getattr(origin, 'caption', '') or ''
+    content = wrap_content(raw_content)
 
     if origin.type == 'Comment' and origin.target.type == 'Comment':  # if is reply
         redirect_url = f'/{origin.target.target.type.lower()}s/' \
@@ -101,6 +104,12 @@ def create_like_noti(instance, created, **kwargs):
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_note_noti",
+                                                           redirect_url=redirect_url,
+                                                           content_en=content, content_ko=content)
+    elif origin.type == 'CheckInPost':
+        redirect_url = f'/check-in-posts/{origin.id}'
+        Notification.objects.create_or_update_notification(user=user, actor=actor,
+                                                           origin=origin, target=target, noti_type="like_check_in_post_noti",
                                                            redirect_url=redirect_url,
                                                            content_en=content, content_ko=content)
 
@@ -152,16 +161,21 @@ def update_like_noti_after_delete(instance, **kwargs):
         noti_type = "like_response_noti"
     elif origin.type == 'Note':
         noti_type = "like_note_noti"
+    elif origin.type == 'CheckInPost':
+        noti_type = "like_check_in_post_noti"
 
     if noti_type is None:
         return
-    
+
     noti = find_like_noti(user, origin, noti_type)
 
     if not noti:  # noti was already deleted because instance.user was the only actor
         return
 
-    content = wrap_content(origin.content)
+    raw_content = getattr(origin, 'content', None)
+    if raw_content is None:
+        raw_content = getattr(origin, 'caption', '') or ''
+    content = wrap_content(raw_content)
 
     # 3. Call method to modify notification content.
     # (eliminate this actor from the original notification)

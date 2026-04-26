@@ -3,7 +3,7 @@ import re
 from django.core.exceptions import ValidationError
 
 from adoorback.utils.content_types import get_comment_type, get_like_type, get_response_type, get_reaction_type, \
-    get_note_type
+    get_note_type, get_check_in_post_type
 
 
 
@@ -25,6 +25,8 @@ def find_like_noti(user, origin, noti_type):
         existing_notifications = existing_notifications.filter(origin_type=get_response_type())
     elif noti_type == "like_note_noti":
         existing_notifications = existing_notifications.filter(origin_type=get_note_type())
+    elif noti_type == "like_check_in_post_noti":
+        existing_notifications = existing_notifications.filter(origin_type=get_check_in_post_type())
 
     if existing_notifications.count() > 1:
         raise ValidationError("There are more than one notifications that satisfy this condition.")
@@ -63,6 +65,16 @@ def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, 
         else:
             return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 게시글을 좋아합니다: {content_ko}', \
                 f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your post: {content_en}'
+    elif noti_type == "like_check_in_post_noti":
+        if N == 1:
+            return f'{user_a_ko}이 회원님의 데일리 스니펫을 좋아합니다: {content_ko}', \
+                f'{user_a_en} liked your daily snippet: {content_en}'
+        elif N == 2:
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 데일리 스니펫을 좋아합니다: {content_ko}', \
+                f'{user_a_en} and {user_b_en} liked your daily snippet: {content_en}'
+        else:
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 데일리 스니펫을 좋아합니다: {content_ko}', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your daily snippet: {content_en}'
     elif noti_type == "response_request_noti":
         if N == 1:
             return f'똑똑똑! {user_a_ko}으로부터 질문이 왔어요: {content_ko}', \

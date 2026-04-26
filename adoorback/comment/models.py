@@ -149,10 +149,18 @@ def create_noti(instance, created, **kwargs):
 
     # if not reply
     else:
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-        # send a notification to the author of the origin qna
-        origin_target_name_ko = '게시글' if origin.type == 'Note' else '답변'
-        origin_target_name_en = 'post' if origin.type == 'Note' else 'response'
+        if origin.type == 'CheckInPost':
+            redirect_url = f'/check-in-posts/{origin.id}'
+            origin_target_name_ko = '데일리 스니펫'
+            origin_target_name_en = 'daily snippet'
+        elif origin.type == 'Note':
+            redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+            origin_target_name_ko = '게시글'
+            origin_target_name_en = 'post'
+        else:
+            redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+            origin_target_name_ko = '답변'
+            origin_target_name_en = 'response'
         if origin_author == actor:
             pass
         elif actor.id in origin_author.user_report_blocked_ids:
