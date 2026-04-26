@@ -1204,10 +1204,10 @@ class CustomChipListCreate(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         category = serializer.validated_data.get('category')
-        # Enforce max 5 per category
+        # Enforce max 15 per category
         count = CustomChip.objects.filter(user=user, category=category).count()
-        if count >= 5:
-            raise serializers.ValidationError("Maximum 5 custom chips per category")
+        if count >= 15:
+            raise serializers.ValidationError("Maximum 15 custom chips per category")
         serializer.save(user=user)
 
     def delete(self, request, *args, **kwargs):
