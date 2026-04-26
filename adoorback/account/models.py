@@ -492,10 +492,26 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     @property
     def unread_message_cnt(self):
         from chat.models import ChatRoom, Message, GroupReadCursor
+        from chat.wit_admin import WIT_ADMIN_USERNAME
         from django.db.models import Q
 
-        # 1-on-1 unread
+        blocked_ids = self.user_report_blocked_ids
+
+        # 1-on-1 unread (apply same filters as ChatRoomList)
         dm_rooms = ChatRoom.objects.filter(Q(user1=self) | Q(user2=self), is_group=False)
+        # Exclude blocked users
+        if blocked_ids:
+            dm_rooms = dm_rooms.exclude(
+                (Q(user1=self) & Q(user2_id__in=blocked_ids)) |
+                (Q(user2=self) & Q(user1_id__in=blocked_ids))
+            )
+        # Version isolation (exclude WIT Admin rooms which are version-agnostic)
+        dm_rooms = dm_rooms.exclude(
+            ~Q(Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME)) & (
+                (Q(user1=self) & ~Q(user2__current_ver=self.current_ver)) |
+                (Q(user2=self) & ~Q(user1__current_ver=self.current_ver))
+            )
+        )
         dm_unread = Message.objects.filter(chat_room__in=dm_rooms, receiver=self, is_read=False).count()
 
         # Group unread (using read cursors)
