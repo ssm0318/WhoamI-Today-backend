@@ -591,7 +591,9 @@ class UserSearch(generics.ListAPIView):
         query = self.request.GET.get('query')
         user = self.request.user
         user_id = user.id
-        friend_ids = user.connected_user_ids
+        friend_ids = list(User.objects.filter(
+            id__in=user.connected_user_ids, current_ver=user.current_ver
+        ).values_list('id', flat=True))
         user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
 
         qs = User.objects.none()
@@ -635,7 +637,7 @@ class CurrentUserFriendSearch(generics.ListAPIView):
     def get_queryset(self):
         query = self.request.GET.get('query', '').replace(" ", "").lower()
         user = self.request.user
-        friends = user.connected_users.annotate(lower_username=Lower('username'))
+        friends = user.connected_users.filter(current_ver=user.current_ver).annotate(lower_username=Lower('username'))
 
         if query:
             start_friends = friends.filter(lower_username__startswith=query).order_by('username')
@@ -1739,8 +1741,8 @@ class FriendUpdateList(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        friends = user.connected_users.exclude(hidden=True)
-        
+        friends = user.connected_users.filter(current_ver=user.current_ver).exclude(hidden=True)
+
         friends_with_updates = [
             friend for friend in friends if not User.user_read(user, friend)
         ]
@@ -1887,7 +1889,7 @@ class FriendFriendList(generics.ListAPIView):
         if not self.request.user == user and not self.request.user.is_connected(user):
             raise PermissionDenied("You do not have permission to view this user's friends.")
 
-        return user.connected_users.order_by(Lower('username'))
+        return user.connected_users.filter(current_ver=self.request.user.current_ver).order_by(Lower('username'))
 
 
 class UserFriendDestroy(generics.DestroyAPIView):
@@ -2078,7 +2080,7 @@ class UserRecommendedFriendsList(generics.ListAPIView):
     def get_queryset(self):
         user_id = self.request.user.id
         user = get_object_or_404(User, id=user_id)
-        user_friends = user.connected_users
+        user_friends = user.connected_users.filter(current_ver=user.current_ver)
 
         user_friend_ids = user_friends.values_list('id', flat=True)
         user_block_rec_ids = user.block_recs.all().values_list('blocked_user', flat=True)
@@ -2217,7 +2219,9 @@ class FriendsMarkAllCheckInsAsRead(APIView):
         from check_in.models import CheckIn
 
         user = request.user
-        friend_ids = list(user.connected_users.values_list('id', flat=True))
+        friend_ids = list(user.connected_users.filter(
+            current_ver=user.current_ver
+        ).values_list('id', flat=True))
         if not friend_ids:
             return Response({'success': True, 'count': 0}, status=status.HTTP_200_OK)
 
@@ -2254,7 +2258,9 @@ class FriendsMarkAllPostsAsRead(APIView):
 
     def patch(self, request):
         user = request.user
-        friend_ids = list(user.connected_users.values_list('id', flat=True))
+        friend_ids = list(user.connected_users.filter(
+            current_ver=user.current_ver
+        ).values_list('id', flat=True))
         if not friend_ids:
             return Response({'success': True, 'note_count': 0, 'response_count': 0},
                             status=status.HTTP_200_OK)
@@ -2731,6 +2737,13 @@ class DiscoverFeedView(generics.ListAPIView):
             created_at=latest_timestamp
         ).select_related('response', 'response__author', 'response__question', 'note', 'note__author')
 
+        # Version isolation: exclude items whose author is on a different version
+        queryset = queryset.exclude(
+            Q(response__isnull=False) & ~Q(response__author__current_ver=user.current_ver)
+        ).exclude(
+            Q(note__isnull=False) & ~Q(note__author__current_ver=user.current_ver)
+        )
+
         queryset = queryset.order_by('id')
 
         return queryset
@@ -2782,7 +2795,9 @@ class DiscoverFeedView(generics.ListAPIView):
         user_friend_ids = set(user_friends.values_list('id', flat=True))
         mutual_friend_potential_ids = set()
         for friend in user_friends:
-            friend_of_friend_ids = set(friend.connected_users.values_list('id', flat=True))
+            friend_of_friend_ids = set(friend.connected_users.filter(
+                current_ver=user.current_ver
+            ).values_list('id', flat=True))
             mutual_friend_potential_ids.update(friend_of_friend_ids)
         mf_ids = mutual_friend_potential_ids - user_friend_ids - exclude_ids
 
@@ -3107,6 +3122,7 @@ class DiscoverFeedView(generics.ListAPIView):
                 music_items = DiscoverFeedMusic.objects.filter(
                     user=request.user,
                     created_at=latest_music.created_at,
+                    song__user__current_ver=request.user.current_ver,
                 ).select_related('song', 'song__user').order_by('sort_order')
 
                 for item in music_items:

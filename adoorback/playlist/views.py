@@ -68,6 +68,7 @@ class SongList(generics.ListAPIView):
         return PlaylistFeed.objects.filter(
             user=user,
             feed_id=latest_feed_entry.feed_id,
+            song__user__current_ver=user.current_ver,
         ).select_related('song', 'song__user').order_by('sort_order')
 
     def generate_new_feed(self, user, base_qs):
@@ -77,12 +78,14 @@ class SongList(generics.ListAPIView):
         # Exclude IDs
         exclude_ids = set(user.friend_ids + user.close_friend_ids + user.user_report_blocked_ids + [user.id])
 
-        # 1. Mutual Friends
-        user_friends = user.connected_users
+        # 1. Mutual Friends (same version only)
+        user_friends = user.connected_users.filter(current_ver=user.current_ver)
         user_friend_ids = set(user_friends.values_list('id', flat=True))
         mutual_friend_potential_ids = set()
         for friend in user_friends:
-            friend_of_friend_ids = set(friend.connected_users.values_list('id', flat=True))
+            friend_of_friend_ids = set(friend.connected_users.filter(
+                current_ver=user.current_ver
+            ).values_list('id', flat=True))
             mutual_friend_potential_ids.update(friend_of_friend_ids)
         
         mf_ids = mutual_friend_potential_ids - user_friend_ids - exclude_ids
@@ -92,12 +95,15 @@ class SongList(generics.ListAPIView):
         user_personas = set(user.user_personas.values_list('id', flat=True))
         
         trait_users_qs = User.objects.filter(
-            Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas)
+            Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas),
+            current_ver=user.current_ver
         ).exclude(id__in=exclude_ids)
         trait_ids = set(trait_users_qs.values_list('id', flat=True))
 
         # 3. Anonymous (Strangers)
-        stranger_users_qs = User.objects.exclude(
+        stranger_users_qs = User.objects.filter(
+            current_ver=user.current_ver
+        ).exclude(
             id__in=exclude_ids | mf_ids | trait_ids
         ).exclude(is_superuser=True)
         stranger_ids = set(stranger_users_qs.values_list('id', flat=True))
