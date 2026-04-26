@@ -94,3 +94,21 @@ class ProfileViewAsTests(TestCase):
         response = self.client.get('/api/user/me/profile/?view_as=close_friends')
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(response.data.get('user_personas'))
+
+    def test_non_owner_cannot_use_view_as_to_mask_someone_else_profile(self):
+        """Non-owner sending view_as on someone else's profile sees the friend-view filtered.
+
+        The owner has bio_friends_only=True. `other` is unrelated to owner (no Connection).
+        Even when `other` sends view_as=close_friends (trying to coerce a higher tier than
+        they actually have), the response should still hide the bio because the masking
+        helper and serializer gate on `user == instance` — view_as is a no-op for non-owners.
+        """
+        other = User.objects.create_user(
+            username='other', email='other@example.com', password='pw',
+        )
+        self.client.force_authenticate(user=other)
+        response = self.client.get(f'/api/user/{self.owner.username}/profile/?view_as=close_friends')
+        self.assertEqual(response.status_code, 200)
+        # bio is friends_only and `other` is not a friend → bio must be hidden
+        # regardless of view_as=close_friends
+        self.assertIn(response.data.get('bio'), (None, ''))
