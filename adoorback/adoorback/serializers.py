@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from rest_framework import serializers
 
+from adoorback.models import Mission
 from adoorback.utils.content_types import get_generic_relation_type
 from comment.models import Comment
 from content_report.models import ContentReport
@@ -78,3 +79,9 @@ class AdoorBaseSerializer(serializers.ModelSerializer):
         fields = ['id', 'type', 'content', 'comment_count' ,'like_count', 'current_user_like_id', 'created_at',
                   'updated_at']
         validators = []
+
+
+class MissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Mission
+        fields = ['id', 'prompt', 'type']
