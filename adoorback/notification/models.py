@@ -189,8 +189,18 @@ class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
         return f"actor {self.user} of notification \"{self.notification.message}\" (id: {self.notification.id})"
 
 
+def get_notification_tag(instance):
+    """Chat message notifications use sender-based tags so they collapse into one push."""
+    if instance.target_type and instance.target_type.model == 'message':
+        first_actor = instance.actors.first()
+        if first_actor:
+            return f"chat_message_{first_actor.id}"
+    return str(instance.id)
+
+
 def notify_firebase(instance):
     devices = CustomFCMDevice.objects.filter(user_id=instance.user.id, active=True)
+    tag = get_notification_tag(instance)
     for device in devices:
         body = instance.message_ko if device.language == 'ko' else instance.message_en
         message = Message(
@@ -202,7 +212,7 @@ def notify_firebase(instance):
                 'message_en': instance.message_en,
                 'message_ko': instance.message_ko,
                 'url': instance.redirect_url,
-                'tag': str(instance.id),
+                'tag': tag,
                 'type': 'new',
                 'content-available': '1',  # for ios silent notification
                 'priority': 'high',  # for android
@@ -238,11 +248,12 @@ def cancel_firebase_notification(sender, instance, **kwargs):
     if not instance.deleted:
         return
 
+    tag = get_notification_tag(instance)
     message = Message(
         data={
             'body': '삭제된 알림입니다.',
             'url': '/home',
-            'tag': str(instance.id),
+            'tag': tag,
             'type': 'cancel',
         }
     )
