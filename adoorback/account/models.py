@@ -278,6 +278,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     invited_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, 
                                      related_name="invited_users")
     
+    is_public = models.BooleanField(default=True)
     has_changed_pw = models.BooleanField(default=False)
     username_history = ArrayField(
         base_field=models.CharField(max_length=50),
