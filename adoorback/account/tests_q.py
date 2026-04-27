@@ -207,6 +207,182 @@ class CrossVersionFriendRequestTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
+class QDiscoverFeedTests(APITestCase):
+    """Test Version Q /api/q/user/discover/ endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser', email='test@test.com', password='password',
+            current_ver='version_q', user_group='group_q_first'
+        )
+        self.friend = User.objects.create_user(
+            username='friend', email='friend@test.com', password='password',
+            current_ver='version_q'
+        )
+        self.stranger = User.objects.create_user(
+            username='stranger', email='stranger@test.com', password='password',
+            current_ver='version_q'
+        )
+        self.stranger2 = User.objects.create_user(
+            username='stranger2', email='stranger2@test.com', password='password',
+            current_ver='version_q'
+        )
+        self.user_w = User.objects.create_user(
+            username='user_w', email='w@test.com', password='password',
+            current_ver='version_w'
+        )
+        self.blocked_user = User.objects.create_user(
+            username='blocked', email='blocked@test.com', password='password',
+            current_ver='version_q'
+        )
+        self.admin = User.objects.create_superuser(
+            username='admin', email='admin@test.com', password='password'
+        )
+
+        # Create friendship
+        Connection.objects.create(
+            user1=self.user, user2=self.friend,
+            user1_choice='friend', user2_choice='friend'
+        )
+
+        # Create block
+        from user_report.models import UserReport
+        UserReport.objects.create(user=self.user, reported_user=self.blocked_user)
+
+        # Create a question for responses
+        self.question = Question.objects.create(
+            author=self.admin, content='Test question?'
+        )
+
+        # Public posts from stranger (should appear)
+        self.stranger_note = Note.objects.create(
+            author=self.stranger, content='Stranger public note',
+            visibility=['public']
+        )
+        self.stranger_response = Response.objects.create(
+            author=self.stranger, question=self.question,
+            content='Stranger public response', visibility=['public']
+        )
+
+        # Public post from friend (should NOT appear)
+        Note.objects.create(
+            author=self.friend, content='Friend public note',
+            visibility=['public']
+        )
+
+        # Non-public post from stranger (should NOT appear)
+        Note.objects.create(
+            author=self.stranger, content='Stranger private note',
+            visibility=['friends']
+        )
+
+        # Public post from blocked user (should NOT appear)
+        Note.objects.create(
+            author=self.blocked_user, content='Blocked user note',
+            visibility=['public']
+        )
+
+        # Public post from ver.w user (should NOT appear)
+        Note.objects.create(
+            author=self.user_w, content='Other version note',
+            visibility=['public']
+        )
+
+        # Public post from superuser (should NOT appear)
+        Note.objects.create(
+            author=self.admin, content='Admin note',
+            visibility=['public']
+        )
+
+        self.client.force_authenticate(user=self.user)
+        self.url = reverse('q-discover-feed')
+
+    def test_returns_public_posts_from_non_friends(self):
+        """Discover should return public posts from non-friends only."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data.get('results', response.data)
+        authors = [item['body']['author_detail']['username'] for item in results]
+        self.assertIn('stranger', authors)
+        self.assertNotIn('friend', authors)
+
+    def test_excludes_blocked_users(self):
+        """Discover should exclude posts from blocked users."""
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        authors = [item['body']['author_detail']['username'] for item in results]
+        self.assertNotIn('blocked', authors)
+
+    def test_excludes_other_version(self):
+        """Discover should exclude posts from users on different version."""
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        authors = [item['body']['author_detail']['username'] for item in results]
+        self.assertNotIn('user_w', authors)
+
+    def test_excludes_superusers(self):
+        """Discover should exclude posts from superusers."""
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        authors = [item['body']['author_detail']['username'] for item in results]
+        self.assertNotIn('admin', authors)
+
+    def test_excludes_non_public_posts(self):
+        """Discover should only return posts with public visibility."""
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        contents = [item['body']['content'] for item in results]
+        self.assertNotIn('Stranger private note', contents)
+
+    def test_returns_both_notes_and_responses(self):
+        """Discover should return both Note and Response types."""
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        types = [item['type'] for item in results]
+        self.assertIn('Note', types)
+        self.assertIn('Response', types)
+
+    def test_wrapper_format(self):
+        """Each item should have type and body keys."""
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        for item in results:
+            self.assertIn('type', item)
+            self.assertIn('body', item)
+            self.assertIn(item['type'], ['Note', 'Response'])
+
+    def test_reverse_chronological_order(self):
+        """Posts should be ordered newest first."""
+        # Create a newer post from stranger2
+        Note.objects.create(
+            author=self.stranger2, content='Newer note',
+            visibility=['public']
+        )
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        timestamps = [item['body']['created_at'] for item in results]
+        self.assertEqual(timestamps, sorted(timestamps, reverse=True))
+
+    def test_marks_as_read(self):
+        """Fetching discover should mark posts as read."""
+        self.assertFalse(self.user.read_notes.filter(id=self.stranger_note.id).exists())
+        self.assertFalse(self.user.read_responses.filter(id=self.stranger_response.id).exists())
+
+        self.client.get(self.url)
+
+        self.assertTrue(self.user.read_notes.filter(id=self.stranger_note.id).exists())
+        self.assertTrue(self.user.read_responses.filter(id=self.stranger_response.id).exists())
+
+    def test_uses_q_serializers(self):
+        """Discover should use Q serializers (no share_type, no reactions)."""
+        response = self.client.get(self.url)
+        results = response.data.get('results', response.data)
+        for item in results:
+            self.assertNotIn('share_type', item['body'])
+            self.assertNotIn('current_user_reaction_id_list', item['body'])
+            self.assertIn('like_count', item['body'])
+
+
 class RemovedDefaultEndpointTests(APITestCase):
     """Test that old /default/ endpoints are gone."""
 

@@ -14,4 +14,7 @@ urlpatterns = [
 
     # Feed (Q: notes only with Q serializer)
     path('feed/', views_q.QFriendFeed.as_view(), name='q-friend-feed'),
+
+    # Discover (Q: public posts from non-friends, reverse chronological)
+    path('discover/', views_q.QDiscoverFeed.as_view(), name='q-discover-feed'),
 ]
