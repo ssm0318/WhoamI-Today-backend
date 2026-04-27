@@ -34,7 +34,7 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
     song_visibility = serializers.SerializerMethodField(read_only=True)
     thought_visibility = serializers.SerializerMethodField(read_only=True)
 
-    # Updated-at fields sourced from the live entry's created_at.
+    # Updated-at fields sourced from the live entry's updated_at.
     battery_updated_at = serializers.SerializerMethodField(read_only=True)
     mood_updated_at = serializers.SerializerMethodField(read_only=True)
     song_updated_at = serializers.SerializerMethodField(read_only=True)
@@ -73,7 +73,7 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
     def _is_archived(entry):
         if entry is None:
             return True
-        age = timezone.now() - entry.created_at
+        age = timezone.now() - entry.updated_at
         return age > timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
 
     # ------ data fields ------
@@ -120,19 +120,19 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
 
     def get_battery_updated_at(self, obj):
         entry = self._live_entry(obj, 'battery')
-        return entry.created_at if entry else None
+        return entry.updated_at if entry else None
 
     def get_mood_updated_at(self, obj):
         entry = self._live_entry(obj, 'mood')
-        return entry.created_at if entry else None
+        return entry.updated_at if entry else None
 
     def get_song_updated_at(self, obj):
         entry = self._live_entry(obj, 'song')
-        return entry.created_at if entry else None
+        return entry.updated_at if entry else None
 
     def get_thought_updated_at(self, obj):
         entry = self._live_entry(obj, 'thought')
-        return entry.created_at if entry else None
+        return entry.updated_at if entry else None
 
     # ------ misc ------
 

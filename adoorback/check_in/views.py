@@ -264,7 +264,7 @@ def _is_live_entry(entry):
     """True when the entry is still the live component value for its owner."""
     if entry.superseded_at is not None:
         return False
-    return timezone.now() - entry.created_at <= timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
+    return timezone.now() - entry.updated_at <= timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
 
 
 class ArchiveEntryPinToggle(APIView):
@@ -695,6 +695,8 @@ class CheckInReact(APIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    VALID_COMPONENTS = {'battery', 'mood', 'thought', 'song'}
+
     @transaction.atomic
     def post(self, request, pk):
         try:
@@ -716,6 +718,10 @@ class CheckInReact(APIView):
         if not emoji:
             raise exceptions.ValidationError("emoji is required.")
 
+        component = request.data.get('component')
+        if not component or component not in self.VALID_COMPONENTS:
+            raise exceptions.ValidationError("component is required and must be one of: battery, mood, thought, song.")
+
         content_type = ContentType.objects.get_for_model(CheckIn)
 
         existing = Reaction.objects.filter(
@@ -723,6 +729,7 @@ class CheckInReact(APIView):
             emoji=emoji,
             content_type=content_type,
             object_id=pk,
+            component=component,
         ).first()
 
         if existing:
@@ -741,6 +748,7 @@ class CheckInReact(APIView):
                 emoji=emoji,
                 content_type=content_type,
                 object_id=pk,
+                component=component,
             )
             serializer = ReactionSerializer(reaction, context={'request': request})
             return Response({**serializer.data, 'toggled': 'on'}, status=status.HTTP_201_CREATED)
@@ -772,10 +780,16 @@ class CheckInReactions(generics.ListAPIView):
 
         content_type = ContentType.objects.get_for_model(CheckIn)
         blocked_ids = self.request.user.user_report_blocked_ids
-        return Reaction.objects.filter(
+        qs = Reaction.objects.filter(
             content_type=content_type,
             object_id=pk,
-        ).exclude(user_id__in=blocked_ids).order_by('-created_at')
+        ).exclude(user_id__in=blocked_ids)
+
+        component = self.request.query_params.get('component')
+        if component:
+            qs = qs.filter(component=component)
+
+        return qs.order_by('-created_at')
 
 
 # ---------------------------------------------------------------------------
