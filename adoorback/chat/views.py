@@ -525,26 +525,14 @@ class MessageReactionCreate(generics.CreateAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def perform_create(self, serializer):
-        user = self.request.user
-        message = Message.objects.get(id=self.kwargs.get('message_id'))
-
-        chat_room = message.chat_room
+    def _check_participant(self, user, chat_room):
         if chat_room.is_group:
             if not chat_room.members.filter(id=user.id).exists():
                 raise exceptions.PermissionDenied("You are not a participant in this chat.")
         elif user != chat_room.user1 and user != chat_room.user2:
             raise exceptions.PermissionDenied("You are not a participant in this chat.")
 
-        serializer.save(user=user, message=message)
-
-    def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
-
-        message = Message.objects.get(id=self.kwargs.get('message_id'))
-        chat_room = message.chat_room
-
-        # Broadcast reaction via WebSocket
+    def _broadcast_reactions(self, request, message, chat_room):
         serializer = MessageSerializer(message, context={'request': request})
         channel_layer = get_channel_layer()
 
@@ -566,7 +554,26 @@ class MessageReactionCreate(generics.CreateAPIView):
             },
         )
 
-        return response
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        message = Message.objects.get(id=self.kwargs.get('message_id'))
+        chat_room = message.chat_room
+        emoji = request.data.get('emoji', '')
+
+        self._check_participant(user, chat_room)
+
+        # Idempotent create: if reaction already exists, just return it
+        _, created = MessageReaction.objects.get_or_create(
+            user=user, message=message, emoji=emoji,
+        )
+
+        self._broadcast_reactions(request, message, chat_room)
+
+        reactions_serializer = MessageSerializer(message, context={'request': request})
+        return Response(
+            {'reactions': reactions_serializer.data['reactions']},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class MessageReactionDestroy(generics.DestroyAPIView):
