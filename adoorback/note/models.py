@@ -1,3 +1,4 @@
+import os
 import urllib
 import uuid
 
@@ -38,6 +39,17 @@ class OverwriteStorage(FileSystemStorage):
 def note_image_path(instance, filename):
     unique_id = str(uuid.uuid4())[:8]
     return f'note_images/{instance.note.author_id}/{instance.note.id}/{unique_id}_{filename}'
+
+
+def note_video_path(instance, filename):
+    unique_id = str(uuid.uuid4())[:8]
+    ext = os.path.splitext(filename)[1].lower() or '.mp4'
+    return f'note_videos/{instance.note.author_id}/{instance.note.id}/{unique_id}{ext}'
+
+
+def note_video_thumbnail_path(instance, filename):
+    unique_id = str(uuid.uuid4())[:8]
+    return f'note_video_thumbnails/{instance.note.author_id}/{instance.note.id}/{unique_id}.jpg'
 
 
 class ShareType(models.TextChoices):
@@ -167,6 +179,25 @@ class NoteImage(SafeDeleteModel):
         ordering = ['-created_at']
 
 
+class NoteVideo(SafeDeleteModel):
+    note = models.ForeignKey('Note', related_name='videos', on_delete=models.CASCADE)
+    video = models.FileField(upload_to=note_video_path, storage=OverwriteStorage())
+    thumbnail = models.ImageField(
+        upload_to=note_video_thumbnail_path, storage=OverwriteStorage(),
+        null=True, blank=True,
+    )
+    duration_seconds = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+    _safedelete_policy = HARD_DELETE
+
+    def __str__(self):
+        return f'video id {self.id} of {self.note}'
+
+    class Meta:
+        ordering = ['-created_at']
+
+
 @transaction.atomic
 @receiver(post_save, sender=Note)
 def add_author_to_readers(instance, created, **kwargs):
@@ -180,6 +211,13 @@ def add_author_to_readers(instance, created, **kwargs):
 def delete_image_file(sender, instance, **kwargs):
     # Ensure the file itself is deleted from storage
     instance.image.delete(save=False)
+
+
+@receiver(post_delete, sender=NoteVideo)
+def delete_video_files(sender, instance, **kwargs):
+    instance.video.delete(save=False)
+    if instance.thumbnail:
+        instance.thumbnail.delete(save=False)
 
 
 @receiver(post_save, sender=Note)

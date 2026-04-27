@@ -11,10 +11,12 @@ from django.utils import translation, timezone
 from rest_framework import generics, exceptions, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response as DjangoResponse
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
 from adoorback.utils.exceptions import ExistingResponseRequest, NoSuchQuestion, DeletedQuestion
+from adoorback.utils.video import validate_video_file, generate_video_thumbnail
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
@@ -28,13 +30,30 @@ User = get_user_model()
 class ResponseCreate(generics.CreateAPIView):
     serializer_class = qs.ResponseSerializer
     permission_classes = [IsAuthenticated, IsNotBlocked]
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
     @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        video_file = self.request.FILES.get('video')
+        image_file = self.request.FILES.get('image')
+
+        if video_file:
+            duration = validate_video_file(video_file)
+            thumbnail = generate_video_thumbnail(video_file)
+            instance = serializer.save(
+                author=self.request.user,
+                video=video_file,
+                video_duration_seconds=duration,
+            )
+            if thumbnail:
+                instance.video_thumbnail.save('thumbnail.jpg', thumbnail, save=True)
+        elif image_file:
+            serializer.save(author=self.request.user, image=image_file)
+        else:
+            serializer.save(author=self.request.user)
 
 
 class ResponseDetail(generics.RetrieveUpdateDestroyAPIView):

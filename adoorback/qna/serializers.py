@@ -45,6 +45,8 @@ class ResponseSerializer(AdoorBaseSerializer):
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     question = QuestionMinimumSerializer(read_only=True)
     question_id = serializers.IntegerField(write_only=True)
+    image = serializers.SerializerMethodField(read_only=True)
+    video = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
@@ -56,6 +58,31 @@ class ResponseSerializer(AdoorBaseSerializer):
         if len(value) != 1:
             raise serializers.ValidationError(_("Please select exactly one visibility option."))
         return list(value)
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
+
+    def get_video(self, obj):
+        if not obj.video:
+            return None
+        try:
+            video_url = obj.video.url
+        except Exception:
+            return None
+        try:
+            thumbnail_url = obj.video_thumbnail.url if obj.video_thumbnail else None
+        except Exception:
+            thumbnail_url = None
+        return {
+            'url': video_url,
+            'thumbnail_url': thumbnail_url,
+            'duration_seconds': obj.video_duration_seconds,
+        }
 
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
@@ -102,7 +129,7 @@ class ResponseSerializer(AdoorBaseSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Response
         fields = AdoorBaseSerializer.Meta.fields + ['id', 'type', 'author', 'author_detail', 'content', 'current_user_like_id',
-                  'question', 'question_id', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited', 'visibility']
+                  'question', 'question_id', 'image', 'video', 'created_at', 'current_user_read', 'like_reaction_user_sample', 'current_user_reaction_id_list', 'is_edited', 'visibility']
         
 
 class DailyQuestionSerializer(QuestionBaseSerializer):

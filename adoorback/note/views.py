@@ -16,7 +16,8 @@ from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShar
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
 from like.serializers import InteractionSerializer
-from note.models import Note, NoteImage
+from adoorback.utils.video import validate_video_file, generate_video_thumbnail
+from note.models import Note, NoteImage, NoteVideo
 from note.serializers import NoteSerializer
 
 
@@ -32,9 +33,23 @@ class NoteCreate(generics.CreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         images = self.request.FILES.getlist('images')
+        video = self.request.FILES.get('video')
+
         note_instance = serializer.save(author=self.request.user)
+
         for image in images:
             NoteImage.objects.create(note=note_instance, image=image)
+
+        if video:
+            duration = validate_video_file(video)
+            thumbnail = generate_video_thumbnail(video)
+            note_video = NoteVideo.objects.create(
+                note=note_instance,
+                video=video,
+                duration_seconds=duration,
+            )
+            if thumbnail:
+                note_video.thumbnail.save('thumbnail.jpg', thumbnail, save=True)
 
 
 class NoteComments(generics.ListAPIView):

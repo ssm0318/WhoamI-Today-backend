@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from adoorback.utils.validators import adoor_exception_handler
+from adoorback.utils.video import validate_video_file, generate_video_thumbnail
 
 from account.serializers import serialize_check_in_base_for_viewer
 
@@ -881,8 +882,21 @@ class CheckInPostFeed(generics.ListCreateAPIView):
 
         return qs.filter(_check_in_post_visible_filter(user)).order_by('-created_at')
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        video_file = self.request.FILES.get('video')
+        extra_kwargs = {}
+
+        if video_file:
+            duration = validate_video_file(video_file)
+            thumbnail = generate_video_thumbnail(video_file)
+            extra_kwargs['video'] = video_file
+            extra_kwargs['video_duration_seconds'] = duration
+            instance = serializer.save(author=self.request.user, **extra_kwargs)
+            if thumbnail:
+                instance.video_thumbnail.save('thumbnail.jpg', thumbnail, save=True)
+        else:
+            serializer.save(author=self.request.user)
 
 
 class CheckInPostDetail(generics.RetrieveDestroyAPIView):

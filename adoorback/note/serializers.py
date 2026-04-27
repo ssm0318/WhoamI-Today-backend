@@ -21,6 +21,7 @@ class BaseNoteSerializer(AdoorBaseSerializer):
     )
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     images = serializers.SerializerMethodField()
+    video = serializers.SerializerMethodField()
     current_user_read = serializers.SerializerMethodField(read_only=True)
 
     def get_current_user_read(self, obj):
@@ -29,9 +30,31 @@ class BaseNoteSerializer(AdoorBaseSerializer):
     def get_images(self, obj):
         return [image.image.url for image in obj.images.all().order_by('created_at')]
 
+    def get_video(self, obj):
+        try:
+            note_video = obj.videos.first()
+        except Exception:
+            return None
+        if note_video:
+            try:
+                video_url = note_video.video.url if note_video.video else None
+            except Exception:
+                video_url = None
+            try:
+                thumbnail_url = note_video.thumbnail.url if note_video.thumbnail else None
+            except Exception:
+                thumbnail_url = None
+            if video_url:
+                return {
+                    'url': video_url,
+                    'thumbnail_url': thumbnail_url,
+                    'duration_seconds': note_video.duration_seconds,
+                }
+        return None
+
     class Meta(AdoorBaseSerializer.Meta):
         model = Note
-        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'current_user_read', 'is_edited']
+        fields = AdoorBaseSerializer.Meta.fields + ['author', 'author_detail', 'images', 'video', 'current_user_read', 'is_edited']
 
 
 class VisibilityField(serializers.MultipleChoiceField):
@@ -82,13 +105,14 @@ class NoteSerializer(BaseNoteSerializer):
         content = (attrs.get('content') or '').strip()
         request = self.context.get('request')
         has_images = bool(request.FILES.getlist('images')) if request else False
+        has_video = bool(request.FILES.get('video')) if request else False
 
         if share_type == ShareType.PHOTO_OF_THE_DAY:
             if not has_images:
                 raise serializers.ValidationError({'images': 'Photo of the Day는 이미지가 필요합니다.'})
         else:
-            if not content and not has_images:
-                raise serializers.ValidationError('텍스트 또는 이미지 중 하나 이상을 포함해야 합니다.')
+            if not content and not has_images and not has_video:
+                raise serializers.ValidationError('텍스트, 이미지, 또는 동영상 중 하나 이상을 포함해야 합니다.')
 
         return attrs
 

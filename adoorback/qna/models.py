@@ -1,7 +1,12 @@
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import urllib
+import uuid
+
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.db import models, transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericRelation
@@ -77,6 +82,34 @@ class Question(AdoorModel, SafeDeleteModel):
         ordering = ['-id']
 
 
+class OverwriteStorage(FileSystemStorage):
+    base_url = urllib.parse.urljoin(settings.BASE_URL, settings.MEDIA_URL)
+
+    def get_available_name(self, name, max_length=None):
+        if self.exists(name):
+            self.delete(name)
+        return name
+
+
+def response_image_path(instance, filename):
+    import os as _os
+    unique_id = str(uuid.uuid4())[:8]
+    ext = _os.path.splitext(filename)[1].lower() or '.jpg'
+    return f'response_images/{instance.author_id}/{unique_id}{ext}'
+
+
+def response_video_path(instance, filename):
+    import os as _os
+    unique_id = str(uuid.uuid4())[:8]
+    ext = _os.path.splitext(filename)[1].lower() or '.mp4'
+    return f'response_videos/{instance.author_id}/{unique_id}{ext}'
+
+
+def response_video_thumbnail_path(instance, filename):
+    unique_id = str(uuid.uuid4())[:8]
+    return f'response_video_thumbnails/{instance.author_id}/{unique_id}.jpg'
+
+
 class Response(AdoorModel, SafeDeleteModel):
     author = models.ForeignKey(User, related_name='response_set', on_delete=models.CASCADE)
     question = models.ForeignKey(Question, related_name='response_set', on_delete=models.CASCADE)
@@ -85,6 +118,19 @@ class Response(AdoorModel, SafeDeleteModel):
         blank=True,
         default=list
     )
+    image = models.ImageField(
+        upload_to=response_image_path, storage=OverwriteStorage(),
+        null=True, blank=True,
+    )
+    video = models.FileField(
+        upload_to=response_video_path, storage=OverwriteStorage(),
+        null=True, blank=True,
+    )
+    video_thumbnail = models.ImageField(
+        upload_to=response_video_thumbnail_path, storage=OverwriteStorage(),
+        null=True, blank=True,
+    )
+    video_duration_seconds = models.FloatField(null=True, blank=True)
 
     response_comments = GenericRelation(Comment)
     # to be deleted
@@ -237,6 +283,16 @@ def create_response_request_noti(instance, created, **kwargs):
     Notification.objects.create_or_update_notification(user=requestee, actor=requester,
                                                        origin=origin, target=target, noti_type="response_request_noti",
                                                        redirect_url=redirect_url, content_en=content_en, content_ko=content_ko)
+
+
+@receiver(post_delete, sender=Response)
+def delete_response_media_files(sender, instance, **kwargs):
+    if instance.image:
+        instance.image.delete(save=False)
+    if instance.video:
+        instance.video.delete(save=False)
+    if instance.video_thumbnail:
+        instance.video_thumbnail.delete(save=False)
 
 
 @transaction.atomic

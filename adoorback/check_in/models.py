@@ -4,7 +4,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -649,6 +649,18 @@ def check_in_post_image_path(instance, filename):
     return f'check_in_post_images/{instance.author_id}/{unique_id}_{filename}'
 
 
+def check_in_post_video_path(instance, filename):
+    import os as _os
+    unique_id = str(uuid.uuid4())[:8]
+    ext = _os.path.splitext(filename)[1].lower() or '.mp4'
+    return f'check_in_post_videos/{instance.author_id}/{unique_id}{ext}'
+
+
+def check_in_post_video_thumbnail_path(instance, filename):
+    unique_id = str(uuid.uuid4())[:8]
+    return f'check_in_post_video_thumbnails/{instance.author_id}/{unique_id}.jpg'
+
+
 CHECK_IN_POST_EXPIRY_HOURS = 24
 
 
@@ -659,8 +671,17 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
     ]
 
     author = models.ForeignKey(User, related_name='check_in_post_set', on_delete=models.CASCADE)
-    image = models.ImageField(upload_to=check_in_post_image_path, storage=CheckInPostStorage())
+    image = models.ImageField(upload_to=check_in_post_image_path, storage=CheckInPostStorage(), null=True, blank=True)
     caption = models.TextField(blank=True, default='')
+    video = models.FileField(
+        upload_to=check_in_post_video_path, storage=CheckInPostStorage(),
+        null=True, blank=True,
+    )
+    video_thumbnail = models.ImageField(
+        upload_to=check_in_post_video_thumbnail_path, storage=CheckInPostStorage(),
+        null=True, blank=True,
+    )
+    video_duration_seconds = models.FloatField(null=True, blank=True)
     visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
 
     is_pinned = models.BooleanField(default=False)
@@ -734,6 +755,16 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
         if visibility == 'close_friends':
             return user.is_close_friend(self.author)
         return False
+
+
+@receiver(post_delete, sender=CheckInPost)
+def delete_check_in_post_files(sender, instance, **kwargs):
+    if instance.image:
+        instance.image.delete(save=False)
+    if instance.video:
+        instance.video.delete(save=False)
+    if instance.video_thumbnail:
+        instance.video_thumbnail.delete(save=False)
 
 
 @receiver(post_save, sender=CheckInPost)

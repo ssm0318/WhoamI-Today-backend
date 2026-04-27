@@ -273,7 +273,11 @@ class CheckInPostSerializer(serializers.ModelSerializer):
     type = serializers.SerializerMethodField(read_only=True)
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     image_url = serializers.SerializerMethodField(read_only=True)
-    image = serializers.ImageField(write_only=True, required=True)
+    image = serializers.ImageField(write_only=True, required=False)
+    video = serializers.FileField(write_only=True, required=False)
+    video_url = serializers.SerializerMethodField(read_only=True)
+    video_thumbnail_url = serializers.SerializerMethodField(read_only=True)
+    video_duration_seconds = serializers.FloatField(read_only=True)
     visibility = serializers.ChoiceField(
         choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
         default='friends',
@@ -289,6 +293,7 @@ class CheckInPostSerializer(serializers.ModelSerializer):
             'id', 'type',
             'author_detail',
             'image', 'image_url',
+            'video', 'video_url', 'video_thumbnail_url', 'video_duration_seconds',
             'caption',
             'visibility',
             'is_pinned', 'pin_visibility',
@@ -299,9 +304,17 @@ class CheckInPostSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'type', 'author_detail', 'image_url', 'created_at',
                             'is_pinned', 'pin_visibility',
+                            'video_url', 'video_thumbnail_url', 'video_duration_seconds',
                             'like_count', 'current_user_like_id',
                             'comment_count',
                             'current_user_read']
+
+    def validate(self, attrs):
+        has_image = bool(attrs.get('image'))
+        has_video = bool(attrs.get('video'))
+        if not has_image and not has_video:
+            raise serializers.ValidationError('이미지 또는 동영상 중 하나를 포함해야 합니다.')
+        return attrs
 
     def get_type(self, obj):
         return 'CheckInPost'
@@ -311,6 +324,22 @@ class CheckInPostSerializer(serializers.ModelSerializer):
             return None
         try:
             return obj.image.url
+        except Exception:
+            return None
+
+    def get_video_url(self, obj):
+        if not obj.video:
+            return None
+        try:
+            return obj.video.url
+        except Exception:
+            return None
+
+    def get_video_thumbnail_url(self, obj):
+        if not obj.video_thumbnail:
+            return None
+        try:
+            return obj.video_thumbnail.url
         except Exception:
             return None
 
@@ -362,10 +391,14 @@ class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
     """Compact serializer for the friend's stories strip — id + author + thumbnail."""
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     image_url = serializers.SerializerMethodField(read_only=True)
+    video_url = serializers.SerializerMethodField(read_only=True)
+    video_thumbnail_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CheckInPost
-        fields = ['id', 'author_detail', 'image_url', 'caption', 'visibility',
+        fields = ['id', 'author_detail', 'image_url',
+                  'video_url', 'video_thumbnail_url',
+                  'caption', 'visibility',
                   'is_pinned', 'pin_visibility', 'created_at']
 
     def get_image_url(self, obj):
@@ -373,5 +406,21 @@ class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
             return None
         try:
             return obj.image.url
+        except Exception:
+            return None
+
+    def get_video_url(self, obj):
+        if not obj.video:
+            return None
+        try:
+            return obj.video.url
+        except Exception:
+            return None
+
+    def get_video_thumbnail_url(self, obj):
+        if not obj.video_thumbnail:
+            return None
+        try:
+            return obj.video_thumbnail.url
         except Exception:
             return None
