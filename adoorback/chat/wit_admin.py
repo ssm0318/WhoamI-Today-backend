@@ -3,7 +3,7 @@
 See docs/superpowers/specs/2026-04-25-wit-admin-chat-hotfix-design.md.
 """
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from chat.models import ChatRoom
 
@@ -26,15 +26,35 @@ def ensure_wit_admin_user():
     the password. Initial creation leaves the password unset (login impossible
     until an operator sets one via shell or admin), and any subsequent manual
     password / is_active changes are preserved across re-runs.
+
+    Uses all_objects to also find soft-deleted users, and handles email
+    collisions gracefully.
     """
     User = get_user_model()
-    user, created = User.objects.get_or_create(
+
+    # Check all_objects (including soft-deleted) to avoid invisible-row conflicts.
+    user = User.all_objects.filter(username=WIT_ADMIN_USERNAME).first()
+    if user is not None:
+        if user.deleted:
+            user.deleted = None
+            user.save(update_fields=['deleted'])
+        if user.email != WIT_ADMIN_EMAIL:
+            user.email = WIT_ADMIN_EMAIL
+            user.save(update_fields=['email'])
+        return user
+
+    # Create new — but the target email might already belong to another user.
+    if User.all_objects.filter(email=WIT_ADMIN_EMAIL).exists():
+        raise IntegrityError(
+            f"Cannot create wit_admin: email {WIT_ADMIN_EMAIL} is already "
+            f"registered to another user. Free the email first or change "
+            f"WIT_ADMIN_EMAIL."
+        )
+
+    user = User.objects.create(
         username=WIT_ADMIN_USERNAME,
-        defaults={'email': WIT_ADMIN_EMAIL},
+        email=WIT_ADMIN_EMAIL,
     )
-    if user.email != WIT_ADMIN_EMAIL:
-        user.email = WIT_ADMIN_EMAIL
-        user.save(update_fields=['email'])
     return user
 
 

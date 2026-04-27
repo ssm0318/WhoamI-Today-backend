@@ -1143,7 +1143,9 @@ def provision_wit_admin_rooms(created, instance, **kwargs):
 
     try:
         provision_user_rooms(instance)
-    except LookupError:
-        # Operator users not yet seeded — silently skip; the management command
-        # will catch this user up on the next run.
+    except (LookupError, IntegrityError):
+        # LookupError: Operator users not yet seeded.
+        # IntegrityError: wit_admin email collision or other DB constraint.
+        # Either way, silently skip; the management command
+        # (seed_wit_admin_chats) will catch this user up on the next run.
         return
