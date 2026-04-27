@@ -12,6 +12,7 @@ from django.contrib.auth.models import AbstractUser, UserManager
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.files.storage import FileSystemStorage
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -714,6 +715,58 @@ class BlockRec(AdoorTimestampedModel, SafeDeleteModel):
 
     def __str__(self):
         return f'{self.user} blocked recommendation of {self.blocked_user}'
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+
+RELATIONSHIP_TYPE_CHOICES = (
+    ('school_friend', 'School Friend'),
+    ('coworker', 'Coworker'),
+    ('family', 'Family'),
+    ('online_friend', 'Online Friend'),
+    ('club_community', 'Club/Community'),
+    ('other', 'Other'),
+)
+
+EVALUATION_CONTEXT_CHOICES = (
+    ('request', 'Friend Request Sent'),
+    ('accept', 'Friend Request Accepted'),
+)
+
+
+class FriendEvaluation(AdoorTimestampedModel, SafeDeleteModel):
+    evaluator = models.ForeignKey(
+        get_user_model(), related_name='friend_evaluations_given', on_delete=models.CASCADE)
+    evaluated_user = models.ForeignKey(
+        get_user_model(), related_name='friend_evaluations_received', on_delete=models.CASCADE)
+    friend_request = models.ForeignKey(
+        FriendRequest, related_name='evaluations', on_delete=models.CASCADE, null=True, blank=True)
+    context = models.CharField(max_length=10, choices=EVALUATION_CONTEXT_CHOICES)
+    closeness = models.IntegerField(
+        null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
+    relationship_type = models.CharField(
+        max_length=20, choices=RELATIONSHIP_TYPE_CHOICES, null=True, blank=True)
+    relationship_type_detail = models.CharField(max_length=50, null=True, blank=True)
+    skipped = models.BooleanField(default=False)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['evaluator', 'evaluated_user', 'friend_request'],
+                condition=Q(deleted__isnull=True),
+                name='unique_friend_evaluation',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['evaluator', 'skipped']),
+        ]
+
+    def __str__(self):
+        return f'{self.evaluator} evaluated {self.evaluated_user} ({self.context})'
 
     @property
     def type(self):

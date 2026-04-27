@@ -15,7 +15,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
-    VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona, CustomChip, CHIP_CATEGORY_CHOICES
+    VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona, CustomChip, CHIP_CATEGORY_CHOICES, \
+    FriendEvaluation, RELATIONSHIP_TYPE_CHOICES
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -787,12 +788,21 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
     requester_choice = serializers.CharField(required=False)
     requester_update_past_posts = serializers.BooleanField(required=False, default=False)
 
+    # Evaluation fields
+    evaluation_closeness = serializers.IntegerField(
+        required=False, min_value=1, max_value=5, write_only=True)
+    evaluation_relationship_type = serializers.ChoiceField(
+        choices=RELATIONSHIP_TYPE_CHOICES, required=False, write_only=True)
+    evaluation_relationship_type_detail = serializers.CharField(
+        required=False, max_length=50, allow_blank=True, write_only=True)
+    evaluation_skipped = serializers.BooleanField(required=False, default=False, write_only=True)
+
     def get_requester_detail(self, obj):
         return UserMinimalSerializer(User.objects.get(id=obj.requester_id)).data
 
     def validate(self, data):
         data = super().validate(data)
-        
+
         try:
             requester = User.objects.get(id=data['requester_id'])
             requestee = User.objects.get(id=data['requestee_id'])
@@ -811,11 +821,26 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
         if not self.context.get("default_api") and "requester_choice" not in data:
             raise serializers.ValidationError({"requester_choice": "This field is required."})
 
+        # Evaluation validation
+        if not data.get('evaluation_skipped'):
+            if 'evaluation_closeness' in data or 'evaluation_relationship_type' in data:
+                if 'evaluation_closeness' not in data:
+                    raise serializers.ValidationError({"evaluation_closeness": "This field is required when not skipping."})
+                if 'evaluation_relationship_type' not in data:
+                    raise serializers.ValidationError({"evaluation_relationship_type": "This field is required when not skipping."})
+            if data.get('evaluation_relationship_type') == 'other' and not data.get('evaluation_relationship_type_detail'):
+                raise serializers.ValidationError({"evaluation_relationship_type_detail": "This field is required when relationship type is 'other'."})
+
         return data
 
     class Meta:
         model = FriendRequest
-        fields = ['requester_id', 'requestee_id', 'accepted', 'requester_detail', 'requester_choice', 'requester_update_past_posts']
+        fields = [
+            'requester_id', 'requestee_id', 'accepted', 'requester_detail',
+            'requester_choice', 'requester_update_past_posts',
+            'evaluation_closeness', 'evaluation_relationship_type',
+            'evaluation_relationship_type_detail', 'evaluation_skipped',
+        ]
 
 
 class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
@@ -825,27 +850,48 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
     requestee_choice = serializers.CharField(required=False)
     requestee_update_past_posts = serializers.BooleanField(required=False, default=False)
 
+    # Evaluation fields
+    evaluation_closeness = serializers.IntegerField(
+        required=False, min_value=1, max_value=5, write_only=True)
+    evaluation_relationship_type = serializers.ChoiceField(
+        choices=RELATIONSHIP_TYPE_CHOICES, required=False, write_only=True)
+    evaluation_relationship_type_detail = serializers.CharField(
+        required=False, max_length=50, allow_blank=True, write_only=True)
+    evaluation_skipped = serializers.BooleanField(required=False, default=False, write_only=True)
+
     def validate(self, data):
         unknown = set(self.initial_data) - set(self.fields)
         if unknown:
             raise serializers.ValidationError("Unknown field: {}".format(", ".join(unknown)))
         if self.instance.accepted is not None:
             raise serializers.ValidationError("You have already responded to this connection request.")
-        
+
         if data.get("accepted") is True:
             if not self.context.get("default_api") and "requestee_choice" not in self.initial_data:
                 raise serializers.ValidationError({"requestee_choice": "This field is required."})
+
+            # Evaluation validation for acceptance
+            if not data.get('evaluation_skipped'):
+                if 'evaluation_closeness' in data or 'evaluation_relationship_type' in data:
+                    if 'evaluation_closeness' not in data:
+                        raise serializers.ValidationError({"evaluation_closeness": "This field is required when not skipping."})
+                    if 'evaluation_relationship_type' not in data:
+                        raise serializers.ValidationError({"evaluation_relationship_type": "This field is required when not skipping."})
+                if data.get('evaluation_relationship_type') == 'other' and not data.get('evaluation_relationship_type_detail'):
+                    raise serializers.ValidationError({"evaluation_relationship_type_detail": "This field is required when relationship type is 'other'."})
 
         return data
 
     class Meta:
         model = FriendRequest
         fields = [
-            'requester_id', 
-            'requestee_id', 
-            'accepted', 
-            'requestee_choice', 
-            'requestee_update_past_posts'
+            'requester_id',
+            'requestee_id',
+            'accepted',
+            'requestee_choice',
+            'requestee_update_past_posts',
+            'evaluation_closeness', 'evaluation_relationship_type',
+            'evaluation_relationship_type_detail', 'evaluation_skipped',
         ]
 
 

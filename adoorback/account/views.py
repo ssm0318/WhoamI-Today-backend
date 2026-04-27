@@ -38,7 +38,7 @@ from safedelete.models import SOFT_DELETE_CASCADE
 from .email import email_manager
 from .models import Subscription, Connection, AppSession, DiscoverFeed, DiscoverFeedMusic, Persona, Interest
 from custom_fcm.models import CustomFCMDevice
-from account.models import FriendRequest, BlockRec, CustomChip
+from account.models import FriendRequest, BlockRec, CustomChip, FriendEvaluation
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
@@ -1945,7 +1945,26 @@ class UserFriendRequest(generics.ListCreateAPIView):
             raise PermissionDenied("The requester must be yourself.")
         try:
             requester_update_past_posts = self.request.data.get('requester_update_past_posts', False)
-            serializer.save(accepted=None, requester_update_past_posts=requester_update_past_posts)
+            # Extract evaluation data before saving (not part of FriendRequest model)
+            evaluation_data = {
+                'closeness': serializer.validated_data.pop('evaluation_closeness', None),
+                'relationship_type': serializer.validated_data.pop('evaluation_relationship_type', None),
+                'relationship_type_detail': serializer.validated_data.pop('evaluation_relationship_type_detail', None),
+                'skipped': serializer.validated_data.pop('evaluation_skipped', False),
+            }
+            friend_request = serializer.save(accepted=None, requester_update_past_posts=requester_update_past_posts)
+
+            # Create FriendEvaluation for the requester
+            FriendEvaluation.objects.create(
+                evaluator=friend_request.requester,
+                evaluated_user=friend_request.requestee,
+                friend_request=friend_request,
+                context='request',
+                closeness=evaluation_data['closeness'],
+                relationship_type=evaluation_data['relationship_type'],
+                relationship_type_detail=evaluation_data['relationship_type_detail'] or None,
+                skipped=evaluation_data['skipped'],
+            )
         except serializers.ValidationError as e:
             if 'error' in e.detail and "different versions" in str(e.detail['error']):
                 raise PermissionDenied("Users belong to different groups, so a friend request cannot be sent.")
@@ -2037,10 +2056,32 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
         requester = User.objects.get(id=friend_request.requester_id)
         requestee = User.objects.get(id=friend_request.requestee_id)
 
+        # Extract evaluation data before saving (not part of FriendRequest model)
+        evaluation_data = {
+            'closeness': serializer.validated_data.pop('evaluation_closeness', None),
+            'relationship_type': serializer.validated_data.pop('evaluation_relationship_type', None),
+            'relationship_type_detail': serializer.validated_data.pop('evaluation_relationship_type_detail', None),
+            'skipped': serializer.validated_data.pop('evaluation_skipped', False),
+        }
+        accepted = serializer.validated_data.get('accepted')
+
         if self.default_api:
             serializer.save(requestee_choice='friend')
         else:
             serializer.save()
+
+        # Create FriendEvaluation for the requestee on acceptance
+        if accepted:
+            FriendEvaluation.objects.create(
+                evaluator=requestee,
+                evaluated_user=requester,
+                friend_request=friend_request,
+                context='accept',
+                closeness=evaluation_data['closeness'],
+                relationship_type=evaluation_data['relationship_type'],
+                relationship_type_detail=evaluation_data['relationship_type_detail'] or None,
+                skipped=evaluation_data['skipped'],
+            )
 
         send_users = []
         if len(requester.connected_user_ids) == 1:
