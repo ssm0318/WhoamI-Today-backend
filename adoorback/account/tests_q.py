@@ -40,13 +40,18 @@ class QCurrentUserTests(APITestCase):
         self.assertIn('chips_by_category', response.data)
         self.assertIn('custom_chips', response.data)
 
-    def test_q_me_includes_privacy_fields(self):
-        """Q me should still include privacy fields (same as W)."""
+    def test_q_me_excludes_friends_only_fields(self):
+        """Q me should NOT include per-item *_friends_only fields (Q uses is_public)."""
         url = reverse('q-current-user-detail')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('interests_friends_only', response.data)
-        self.assertIn('persona_friends_only', response.data)
+        self.assertNotIn('interests_friends_only', response.data)
+        self.assertNotIn('persona_friends_only', response.data)
+        self.assertNotIn('pronouns_friends_only', response.data)
+        self.assertNotIn('bio_friends_only', response.data)
+        self.assertNotIn('music_entertainment_friends_only', response.data)
+        # is_public should still be present
+        self.assertIn('is_public', response.data)
 
     def test_q_me_still_has_interests_and_personas(self):
         """Q me should have user_interests and user_personas as flat lists."""
@@ -55,6 +60,66 @@ class QCurrentUserTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('user_interests', response.data)
         self.assertIn('user_personas', response.data)
+
+
+class QPublicPrivateProfileTests(APITestCase):
+    """Test is_public-based profile visibility for Ver.Q."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='viewer', email='viewer@test.com', password='password',
+            current_ver='version_q'
+        )
+        self.target = User.objects.create_user(
+            username='target', email='target@test.com', password='password',
+            current_ver='version_q', bio='My bio', pronouns='they/them'
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_public_account_shows_bio_to_non_friends(self):
+        self.target.is_public = True
+        self.target.save()
+        url = reverse('q-user-detail', kwargs={'username': 'target'})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get('bio'), 'My bio')
+        self.assertEqual(response.data.get('pronouns'), 'they/them')
+
+    def test_private_account_hides_bio_from_non_friends(self):
+        self.target.is_public = False
+        self.target.save()
+        url = reverse('q-user-detail', kwargs={'username': 'target'})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data.get('bio'))
+        self.assertIsNone(response.data.get('pronouns'))
+        self.assertEqual(response.data.get('user_interests'), [])
+        self.assertEqual(response.data.get('user_personas'), [])
+
+    def test_private_account_shows_bio_to_friends(self):
+        self.target.is_public = False
+        self.target.save()
+        Connection.objects.create(
+            user1=self.user, user2=self.target,
+            user1_choice='friend', user2_choice='friend'
+        )
+        url = reverse('q-user-detail', kwargs={'username': 'target'})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get('bio'), 'My bio')
+        self.assertEqual(response.data.get('pronouns'), 'they/them')
+
+    def test_public_account_ignores_stale_friends_only_flags(self):
+        """Even if stale *_friends_only flags are True, public Q account shows everything."""
+        self.target.is_public = True
+        self.target.bio_friends_only = True
+        self.target.pronouns_friends_only = True
+        self.target.save()
+        url = reverse('q-user-detail', kwargs={'username': 'target'})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get('bio'), 'My bio')
+        self.assertEqual(response.data.get('pronouns'), 'they/them')
 
 
 class QUserProfileTests(APITestCase):
