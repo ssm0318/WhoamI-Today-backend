@@ -35,7 +35,7 @@ class NotificationManager(SafeDeleteManager):
         return self.filter(actors__in=admin_users, **kwargs)
 
     def create_or_update_notification(self, actor, user, origin, target, noti_type, redirect_url, content_en, content_ko,
-                                      emoji=None):
+                                      emoji=None, component=None):
         noti_to_update = None
 
         if target.type == "Like":
@@ -78,7 +78,7 @@ class NotificationManager(SafeDeleteManager):
                                                 target_type=ContentType.objects.get_for_model(target))
             if notis.count() > 0:
                 for noti in notis:
-                    if noti.target.emoji == emoji:
+                    if noti.target.emoji == emoji and noti.target.component == component:
                         noti_to_update = noti
                         break
 
@@ -94,7 +94,8 @@ class NotificationManager(SafeDeleteManager):
                                                                        N + 1,
                                                                        content_en,
                                                                        content_ko,
-                                                                       emoji)
+                                                                       emoji,
+                                                                       component)
 
             noti_to_update.message_ko = updated_message_ko
             noti_to_update.message_en = updated_message_en
@@ -105,7 +106,7 @@ class NotificationManager(SafeDeleteManager):
             noti_to_update.save()
         else:
             message_ko, message_en = construct_message(noti_type, actor.username + "님", None,
-                                                       actor.username, None, 1, content_en, content_ko, emoji)
+                                                       actor.username, None, 1, content_en, content_ko, emoji, component)
             noti = Notification.objects.create(user=user, origin=origin, target=target, redirect_url=redirect_url,
                                                message_ko=message_ko, message_en=message_en)
             NotificationActor.objects.create(user=actor, notification=noti)

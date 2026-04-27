@@ -34,7 +34,21 @@ def find_like_noti(user, origin, noti_type):
     return existing_notifications.first()
 
 
-def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, content_en, content_ko, emoji=None):
+COMPONENT_LABELS_KO = {
+    'battery': '소셜 배터리',
+    'mood': '기분',
+    'thought': '한마디',
+    'song': '노래',
+}
+COMPONENT_LABELS_EN = {
+    'battery': 'social battery',
+    'mood': 'mood',
+    'thought': 'thought snippet',
+    'song': 'song',
+}
+
+
+def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, content_en, content_ko, emoji=None, component=None):
     if noti_type == "like_reply_noti" or noti_type == "like_comment_noti":
         if N == 1:
             return f'{user_a_ko}이 회원님의 댓글을 좋아합니다: {content_ko}', \
@@ -95,3 +109,15 @@ def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, 
         else:
             return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
                 f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) reacted with {emoji} to your response: {content_en}'
+    elif noti_type == "reaction_checkin_noti":
+        comp_ko = COMPONENT_LABELS_KO.get(component, '체크인')
+        comp_en = COMPONENT_LABELS_EN.get(component, 'check-in')
+        if N == 1:
+            return f'{user_a_ko}이 회원님의 {comp_ko}에 {emoji} 반응을 남겼습니다', \
+                f'{user_a_en} reacted with {emoji} to your {comp_en}'
+        elif N == 2:
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 {comp_ko}에 {emoji} 반응을 남겼습니다', \
+                f'{user_a_en} and {user_b_en} reacted with {emoji} to your {comp_en}'
+        else:
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 {comp_ko}에 {emoji} 반응을 남겼습니다', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) reacted with {emoji} to your {comp_en}'

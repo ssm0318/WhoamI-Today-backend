@@ -20,8 +20,21 @@ User = get_user_model()
 
 
 class Reaction(AdoorTimestampedModel, SafeDeleteModel):
+    COMPONENT_CHOICES = [
+        ('battery', 'Battery'),
+        ('mood', 'Mood'),
+        ('thought', 'Thought'),
+        ('song', 'Song'),
+    ]
+
     user = models.ForeignKey(User, related_name='reaction_set', on_delete=models.CASCADE)
     emoji = models.CharField(blank=False, null=False, max_length=20)
+    component = models.CharField(
+        max_length=20,
+        choices=COMPONENT_CHOICES,
+        null=True,
+        blank=True,
+    )
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.IntegerField()
@@ -33,8 +46,16 @@ class Reaction(AdoorTimestampedModel, SafeDeleteModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['user', 'emoji', 'content_type', 'object_id'],
-                                    condition=Q(deleted__isnull=True), name='unique_reaction'),
+            models.UniqueConstraint(
+                fields=['user', 'emoji', 'content_type', 'object_id'],
+                condition=Q(deleted__isnull=True, component__isnull=True),
+                name='unique_reaction_no_component',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'emoji', 'content_type', 'object_id', 'component'],
+                condition=Q(deleted__isnull=True, component__isnull=False),
+                name='unique_reaction_with_component',
+            ),
         ]
         ordering = ['created_at']
 
@@ -67,10 +88,23 @@ def create_reaction_noti(instance, created, **kwargs):
     if actor.id in user.user_report_blocked_ids:  # do not create notification from/for blocked user
         return
 
-    content = wrap_content(origin.content)
-
-    redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-    Notification.objects.create_or_update_notification(user=user, actor=actor,
-                                                       origin=origin, target=target, noti_type="reaction_response_noti",
-                                                       redirect_url=redirect_url, content_en=content, content_ko=content,
-                                                       emoji=target.emoji)
+    if origin.type == 'CheckIn':
+        component = instance.component
+        content = wrap_content(origin.content)
+        redirect_url = '/check-in/'
+        noti_type = 'reaction_checkin_noti'
+        Notification.objects.create_or_update_notification(
+            user=user, actor=actor, origin=origin, target=target,
+            noti_type=noti_type, redirect_url=redirect_url,
+            content_en=content, content_ko=content,
+            emoji=target.emoji, component=component,
+        )
+    else:
+        content = wrap_content(origin.content)
+        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+        Notification.objects.create_or_update_notification(
+            user=user, actor=actor, origin=origin, target=target,
+            noti_type="reaction_response_noti", redirect_url=redirect_url,
+            content_en=content, content_ko=content,
+            emoji=target.emoji,
+        )

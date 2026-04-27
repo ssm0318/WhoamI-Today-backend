@@ -10,7 +10,7 @@ User = get_user_model()
 class ReactionBaseSerializer(serializers.ModelSerializer):
     class Meta(AdoorBaseSerializer.Meta):
         model = Reaction
-        fields = ['id', 'emoji']
+        fields = ['id', 'emoji', 'component']
 
 
 class ReactionMineSerializer(ReactionBaseSerializer):
