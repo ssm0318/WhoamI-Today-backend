@@ -1037,15 +1037,18 @@ def create_connection_noti(created, instance, **kwargs):
         NotificationActor.objects.create(user=requestee, notification=noti)
 
         # make connection
+        # requester_choice can be null for legacy FriendRequests created before validation was added
+        requester_choice = instance.requester_choice or 'friend'
+        requestee_choice = instance.requestee_choice or 'friend'
         Connection.objects.create(
             user1=requester,
             user2=requestee,
-            user1_choice=instance.requester_choice,
-            user2_choice=instance.requestee_choice,
+            user1_choice=requester_choice,
+            user2_choice=requestee_choice,
             user1_update_past_posts=instance.requester_update_past_posts,
             user2_update_past_posts=instance.requestee_update_past_posts,
-            user1_upgrade_time=timezone.now() if instance.requester_choice == 'close_friend' else None,
-            user2_upgrade_time=timezone.now() if instance.requestee_choice == 'close_friend' else None,
+            user1_upgrade_time=timezone.now() if requester_choice == 'close_friend' else None,
+            user2_upgrade_time=timezone.now() if requestee_choice == 'close_friend' else None,
         )
 
         # create chat room for new friends
@@ -1056,11 +1059,11 @@ def create_connection_noti(created, instance, **kwargs):
         if requester.current_ver == 'version_w':
             from adoorback.utils.content_types import get_check_in_type
             check_in_ct = get_check_in_type()
-            if instance.requester_choice == 'close_friend':
+            if requester_choice == 'close_friend':
                 Subscription.objects.create(
                     subscriber=requester, subscribed_to=requestee, content_type=check_in_ct
                 )
-            if instance.requestee_choice == 'close_friend':
+            if requestee_choice == 'close_friend':
                 Subscription.objects.create(
                     subscriber=requestee, subscribed_to=requester, content_type=check_in_ct
                 )
