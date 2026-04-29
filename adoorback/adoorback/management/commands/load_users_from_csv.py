@@ -18,11 +18,10 @@ class Command(BaseCommand):
             header = rows[0]
             data_rows = rows[1:]
 
-            # ✅ Strip and lowercase processing for each column
             all_rows = [
                 {
                     k: (
-                        v.strip().lower() if k in ['email', 'friend-email']
+                        v.strip().lower() if k == 'email'
                         else v.strip()
                     )
                     for k, v in zip(header, row)
@@ -32,132 +31,61 @@ class Command(BaseCommand):
 
         print(f'{len(all_rows) = }')
 
-        email_to_row = {
-            row['email']: row
-            for row in all_rows if 'email' in row and row['email']
-        }
-        created_users = {}
         new_users = []
         skipped_details = []
 
-        def create_user_by_email(email, skipped_details):
-            if User.objects.filter(email=email).exists():
-                reason = "already exists in DB"
-                skipped_details.append((email, reason))
-                print(f"⛔ {email}: {reason}")
-                return None
-
-            if email in created_users:
-                return created_users[email]
-
-            row = email_to_row.get(email)
-            if not row:
-                reason = "row not found in CSV"
-                skipped_details.append((email, reason))
-                print(f"⛔ {email}: {reason}")
-                return None
-
-            created_users[email] = None  # Indicate user creation in progress
-
-            username = row.get('username', '').strip()
-            if not username:
-                reason = "missing username"
-                skipped_details.append((email, reason))
-                print(f"⛔ {email}: {reason}")
-                return None
-
-            user_group = row['user_group']
-            user_country = row['country']
-            current_ver = 'version_w' if user_group == 'group_w_first' else 'version_q'
-
-            # ✅ Set language and timezone based on country
-            if user_country == 'Korea':
-                language = 'ko'
-                timezone = 'Asia/Seoul'
-            elif user_country == 'US':
-                language = 'en'
-                timezone = 'America/Los_Angeles'
-            else:
-                language = 'en'
-                timezone = 'UTC'
-
-            friend_email = row.get('friend-email', '')
-
-            # Create friend first (only if not self)
-            if (
-                friend_email and
-                friend_email != email and
-                friend_email in email_to_row and
-                friend_email not in created_users
-            ):
-                create_user_by_email(friend_email, skipped_details)
-
-            # Validate friend_email
-            if friend_email == email:
-                invited_from = None
-                user_type = 'direct'
-            elif friend_email in created_users and created_users[friend_email]:
-                invited_from = created_users[friend_email]
-                user_type = 'indirect'
-            else:
-                reason = f"friend-email {friend_email} is not created yet or invalid"
-                skipped_details.append((email, reason))
-                print(f"⛔ {email}: {reason}")
-                return None
-
-            try:
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    password=fixed_password,
-                    user_group=user_group,
-                    current_ver=current_ver,
-                    invited_from=invited_from,
-                    user_type=user_type,
-                    language=language,
-                    timezone=timezone
-                )
-            except Exception as e:
-                reason = f"user creation failed: {str(e)}"
-                skipped_details.append((email, reason))
-                print(f"⛔ {email}: {reason}")
-                return None
-
-            created_users[email] = user
-            new_users.append({'email': email, 'user_group': user_group, 'country': user_country})
-            return user
-
-        # Attempt to create all users
         for row in all_rows:
             email = row.get('email', '')
             if not email:
                 skipped_details.append(("(no email)", "missing or blank email"))
                 print(f"⛔ (no email): missing or blank email")
                 continue
-            if email not in created_users and not User.objects.filter(email=email).exists():
-                create_user_by_email(email, skipped_details)
+
+            username = row.get('username', '').strip()
+            if not username:
+                skipped_details.append((email, "missing username"))
+                print(f"⛔ {email}: missing username")
+                continue
+
+            if User.objects.filter(email=email).exists():
+                skipped_details.append((email, "already exists in DB"))
+                print(f"⛔ {email}: already exists in DB")
+                continue
+
+            user_group = row['user_group']
+            current_ver = 'version_w' if user_group == 'group_w_first' else 'version_q'
+
+            try:
+                User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=fixed_password,
+                    user_group=user_group,
+                    current_ver=current_ver,
+                    language='en',
+                    timezone='America/Los_Angeles',
+                )
+            except Exception as e:
+                skipped_details.append((email, f"user creation failed: {str(e)}"))
+                print(f"⛔ {email}: user creation failed: {str(e)}")
+                continue
+
+            new_users.append({'email': email, 'user_group': user_group})
 
         # Record created user information in CSV
         file_exists = os.path.exists(output_file_path)
         with open(output_file_path, 'a', newline='', encoding='utf-8') as outfile:
             writer = csv.writer(outfile)
             if not file_exists:
-                writer.writerow(['email', 'user_group', 'country'])
+                writer.writerow(['email', 'user_group'])
             for user_info in new_users:
-                writer.writerow([user_info['email'], user_info['user_group'], user_info['country']])
+                writer.writerow([user_info['email'], user_info['user_group']])
 
         self.stdout.write(self.style.SUCCESS(f'{len(new_users)} new users created. Info saved to {output_file_path}.'))
 
-        # ✅ Finally output only users that were not created
-        permanently_skipped = [
-            (email, reason)
-            for (email, reason) in skipped_details
-            if created_users.get(email) is None
-        ]
-
-        if permanently_skipped:
-            print(f'\n⛔ 생성되지 않은 유저 {len(permanently_skipped)}명:')
-            for email, reason in permanently_skipped:
+        if skipped_details:
+            print(f'\n⛔ 생성되지 않은 유저 {len(skipped_details)}명:')
+            for email, reason in skipped_details:
                 print(f' - {email}: {reason}')
         else:
             print('\n✅ 모든 유저가 성공적으로 생성되었습니다!')
