@@ -1,7 +1,32 @@
 import csv
+import random
 from django.core.management.base import BaseCommand
 from account.models import User
 import os
+
+ADJECTIVES = [
+    'happy', 'sunny', 'brave', 'calm', 'cool', 'kind', 'warm', 'bold',
+    'swift', 'wise', 'bright', 'gentle', 'lively', 'lucky', 'witty',
+    'jolly', 'merry', 'proud', 'quiet', 'sweet', 'tiny', 'cozy',
+]
+
+NOUNS = [
+    'penguin', 'dolphin', 'panda', 'koala', 'otter', 'fox', 'owl',
+    'bunny', 'tiger', 'eagle', 'mango', 'peach', 'lemon', 'berry',
+    'melon', 'cherry', 'maple', 'olive', 'cedar', 'coral', 'cloud',
+]
+
+
+def generate_unique_username():
+    """Generate a username like 'HappyPenguin3' that doesn't already exist."""
+    for _ in range(500):
+        adj = random.choice(ADJECTIVES).capitalize()
+        noun = random.choice(NOUNS).capitalize()
+        digit = random.randint(0, 9)
+        username = f"{adj}{noun}{digit}"
+        if not User.objects.filter(username=username).exists():
+            return username
+    raise RuntimeError("Failed to generate a unique username after 500 attempts")
 
 
 class Command(BaseCommand):
@@ -10,7 +35,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         input_file_path = 'adoorback/assets/user_list.csv'
         output_file_path = 'adoorback/assets/created_users.csv'
-        fixed_password = 'TempPass123!'
+        fixed_password = '1234'
 
         with open(input_file_path, mode='r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
@@ -41,17 +66,12 @@ class Command(BaseCommand):
                 print(f"⛔ (no email): missing or blank email")
                 continue
 
-            username = row.get('username', '').strip()
-            if not username:
-                skipped_details.append((email, "missing username"))
-                print(f"⛔ {email}: missing username")
-                continue
-
             if User.objects.filter(email=email).exists():
                 skipped_details.append((email, "already exists in DB"))
                 print(f"⛔ {email}: already exists in DB")
                 continue
 
+            username = generate_unique_username()
             user_group = row['user_group']
             current_ver = 'version_w' if user_group == 'group_w_first' else 'version_q'
 
@@ -70,16 +90,16 @@ class Command(BaseCommand):
                 print(f"⛔ {email}: user creation failed: {str(e)}")
                 continue
 
-            new_users.append({'email': email, 'user_group': user_group})
+            new_users.append({'email': email, 'username': username, 'user_group': user_group})
 
         # Record created user information in CSV
         file_exists = os.path.exists(output_file_path)
         with open(output_file_path, 'a', newline='', encoding='utf-8') as outfile:
             writer = csv.writer(outfile)
             if not file_exists:
-                writer.writerow(['email', 'user_group'])
+                writer.writerow(['email', 'username', 'user_group'])
             for user_info in new_users:
-                writer.writerow([user_info['email'], user_info['user_group']])
+                writer.writerow([user_info['email'], user_info['username'], user_info['user_group']])
 
         self.stdout.write(self.style.SUCCESS(f'{len(new_users)} new users created. Info saved to {output_file_path}.'))
 
