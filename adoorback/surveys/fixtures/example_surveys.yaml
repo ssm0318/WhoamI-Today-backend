@@ -1,0 +1,51 @@
+# Example fixture for local dev only. NOT the real scale battery.
+# Run: python manage.py load_surveys adoorback/surveys/fixtures/example_surveys.yaml
+- slug: example_social_platform
+  type: single_choice
+  title:
+    en: "What's your most-used social platform?"
+    ko: "가장 많이 쓰는 소셜 플랫폼은?"
+  description:
+    en: "A quick poll about how you spend your scrolling time."
+    ko: "당신의 스크롤 시간을 알려주세요."
+  interpretation:
+    en: "Most-used platform among your friends shown on results day."
+    ko: "결과 공개일에 친구들 사이의 인기 플랫폼이 표시됩니다."
+  questions:
+    - order: 1
+      prompt:
+        en: "Pick one"
+        ko: "하나 골라주세요"
+      options:
+        - { order: 1, label: { en: "Instagram", ko: "인스타그램" }, value: 1 }
+        - { order: 2, label: { en: "TikTok", ko: "틱톡" }, value: 2 }
+        - { order: 3, label: { en: "X / Twitter", ko: "X (트위터)" }, value: 3 }
+        - { order: 4, label: { en: "YouTube", ko: "유튜브" }, value: 4 }
+        - { order: 5, label: { en: "None / other", ko: "안 함 / 기타" }, value: 5 }
+
+- slug: example_likert_demo
+  type: likert_5
+  title:
+    en: "Are you a morning person?"
+    ko: "당신은 아침형 인간인가요?"
+  description:
+    en: "Demo likert survey for testing aggregation."
+    ko: "집계 테스트용 데모 설문"
+  interpretation:
+    en: "Higher scores = more morning-oriented."
+    ko: "점수가 높을수록 아침형 인간입니다."
+  questions:
+    - order: 1
+      prompt:
+        en: "I feel energized when I wake up."
+        ko: "일어났을 때 에너지가 넘친다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+    - order: 2
+      prompt:
+        en: "I'd rather sleep in than catch a sunrise."
+        ko: "일출을 보느니 늦잠을 자고 싶다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: true
