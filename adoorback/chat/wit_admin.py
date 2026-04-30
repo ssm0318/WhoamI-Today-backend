@@ -90,11 +90,13 @@ def provision_user_rooms(user):
     wit = ensure_wit_admin_user()
     operators = resolve_operators()
 
-    # Skip if `user` is WIT Admin or an operator
+    # Skip if `user` is WIT Admin, an operator, or wit_bot. wit_bot is a peer
+    # system user, not a customer of the WIT Admin support flow.
     if (
         user.id == wit.id
         or user.email == WIT_ADMIN_EMAIL
         or user.email in ALL_OPERATOR_EMAILS
+        or user.username == SYSTEM_BOT_USERNAME
     ):
         return
 
@@ -164,10 +166,15 @@ def ensure_system_connections():
 
 
 def regular_recipients():
-    """Active, non-deleted users excluding WIT Admin and the 3 operators."""
+    """Active, non-deleted users excluding WIT Admin, the 3 operators, and wit_bot."""
     User = get_user_model()
-    excluded = list(ALL_OPERATOR_EMAILS) + [WIT_ADMIN_EMAIL]
-    return User.objects.filter(is_active=True).exclude(email__in=excluded)
+    excluded_emails = list(ALL_OPERATOR_EMAILS) + [WIT_ADMIN_EMAIL]
+    excluded_usernames = [SYSTEM_BOT_USERNAME]
+    return (
+        User.objects.filter(is_active=True)
+        .exclude(email__in=excluded_emails)
+        .exclude(username__in=excluded_usernames)
+    )
 
 
 def is_wit_admin(user):

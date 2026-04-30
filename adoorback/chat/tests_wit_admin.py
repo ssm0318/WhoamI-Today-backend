@@ -111,22 +111,34 @@ class WitAdminHelpersTests(TestCase):
             resolve_operators()
 
     def test_provision_user_rooms_creates_four(self):
-        from chat.wit_admin import provision_user_rooms, ensure_wit_admin_user
+        from chat.wit_admin import provision_user_rooms, ensure_wit_admin_user, WIT_ADMIN_USERNAME
         ensure_wit_admin_user()
         provision_user_rooms(self.alice)
-        # 1 wit_admin chat + 3 proxy rooms = 4
+        # 1 wit_admin chat + 3 proxy rooms = 4 wit_admin-related rooms.
+        # The signup signal independently creates a wit_bot room, which we
+        # filter out here.
         wit_rooms = ChatRoom.objects.filter(
             Q(user1=self.alice) | Q(user2=self.alice)
+        ).filter(
+            Q(user1__username=WIT_ADMIN_USERNAME)
+            | Q(user2__username=WIT_ADMIN_USERNAME)
+            | Q(is_wit_admin_proxy=True)
         )
         self.assertEqual(wit_rooms.count(), 4)
         self.assertEqual(wit_rooms.filter(is_wit_admin_proxy=True).count(), 3)
 
     def test_provision_user_rooms_idempotent(self):
-        from chat.wit_admin import provision_user_rooms, ensure_wit_admin_user
+        from chat.wit_admin import provision_user_rooms, ensure_wit_admin_user, WIT_ADMIN_USERNAME
         ensure_wit_admin_user()
         provision_user_rooms(self.alice)
         provision_user_rooms(self.alice)
-        wit_rooms = ChatRoom.objects.filter(Q(user1=self.alice) | Q(user2=self.alice))
+        wit_rooms = ChatRoom.objects.filter(
+            Q(user1=self.alice) | Q(user2=self.alice)
+        ).filter(
+            Q(user1__username=WIT_ADMIN_USERNAME)
+            | Q(user2__username=WIT_ADMIN_USERNAME)
+            | Q(is_wit_admin_proxy=True)
+        )
         self.assertEqual(wit_rooms.count(), 4)
 
     def test_ensure_blast_rooms_creates_three(self):
@@ -161,7 +173,9 @@ class SeedWitAdminChatsCommandTests(TestCase):
         from django.core.management import call_command
         call_command('seed_wit_admin_chats')
         # 2 regular users * (1 wit_admin + 3 proxy) = 8, plus 3 blast rooms = 11
-        self.assertEqual(ChatRoom.objects.count(), 11)
+        # wit_admin-side. The signup signal also adds 2 wit_bot rooms (one per
+        # regular user), bringing the total to 13.
+        self.assertEqual(ChatRoom.objects.count(), 13)
         self.assertEqual(ChatRoom.objects.filter(is_wit_admin_proxy=True).count(), 6)
         self.assertEqual(ChatRoom.objects.filter(is_wit_admin_blast_room=True).count(), 3)
 
@@ -191,10 +205,16 @@ class AutoSignupProvisioningTests(TestCase):
         ensure_blast_rooms()
 
     def test_new_user_gets_four_rooms_automatically(self):
+        from chat.wit_admin import WIT_ADMIN_USERNAME
         new_user = User.objects.create_user(username='new', email='new@e.com', password='x')
         rooms = ChatRoom.objects.filter(Q(user1=new_user) | Q(user2=new_user))
-        self.assertEqual(rooms.count(), 4)
-        self.assertEqual(rooms.filter(is_wit_admin_proxy=True).count(), 3)
+        wit_admin_rooms = rooms.filter(
+            Q(user1__username=WIT_ADMIN_USERNAME)
+            | Q(user2__username=WIT_ADMIN_USERNAME)
+            | Q(is_wit_admin_proxy=True)
+        )
+        self.assertEqual(wit_admin_rooms.count(), 4)
+        self.assertEqual(wit_admin_rooms.filter(is_wit_admin_proxy=True).count(), 3)
 
     def test_inactive_new_user_skipped(self):
         new_user = User.objects.create_user(
@@ -423,18 +443,22 @@ class ChatListPinTests(TestCase):
         return resp.data
 
     def test_wit_admin_room_appears_first_for_regular_user(self):
-        # Make charlie send alice a message to ensure their non-WIT chat has a last_message_time
+        # Make charlie send alice a message so their non-WIT chat has a last_message_time.
         from chat.models import get_or_create_chat_room
         from chat.wit_admin import ensure_wit_admin_user
         room = get_or_create_chat_room(self.alice, self.charlie)
         Message.objects.create(chat_room=room, sender=self.charlie, receiver=self.alice, content='hi')
         data = self._list(self.alice)
         results = data.get('results', data)  # paginated or not
-        first = results[0]
         wit = ensure_wit_admin_user()
         u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
         wit_room = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
-        self.assertEqual(first['id'], wit_room.id)
+        # Pin order: wit_bot (rank 0) is first, wit_admin (rank 1) is second.
+        # Pre-message charlie chats sit below both. Assert wit_admin precedes
+        # any regular chat (charlie's).
+        result_ids = [r['id'] for r in results]
+        self.assertIn(wit_room.id, result_ids)
+        self.assertLess(result_ids.index(wit_room.id), result_ids.index(room.id))
 
     def test_wit_admin_room_appears_even_when_empty(self):
         # Alice has not messaged WIT Admin, has no other chats
