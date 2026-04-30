@@ -78,25 +78,36 @@ def _has_visible_content(check_in, has_active_song=False):
     )
 
 
-def _subscriber_sees_any_component(check_in, subscriber):
-    """Return True if subscriber can see at least one check-in component."""
-    component_checks = [
-        ('battery_visibility', 'battery_updated_at'),
-        ('mood_visibility', 'mood_updated_at'),
-        ('thought_visibility', 'thought_updated_at'),
-        ('song_visibility', 'song_updated_at'),
-    ]
-    for vis_field, updated_field in component_checks:
+# content field → (visibility_field, updated_at_field)
+CONTENT_TO_VISIBILITY = {
+    'social_battery': ('battery_visibility', 'battery_updated_at'),
+    'mood': ('mood_visibility', 'mood_updated_at'),
+    'thought': ('thought_visibility', 'thought_updated_at'),
+    'song': ('song_visibility', 'song_updated_at'),
+}
+
+
+def _subscriber_sees_changed_component(check_in, subscriber, changed_components):
+    """Return True if subscriber can see at least one of the changed components."""
+    for component in changed_components:
+        vis_field, updated_field = CONTENT_TO_VISIBILITY[component]
         if viewer_sees_check_in_component(check_in, check_in.user, subscriber, vis_field, updated_field):
             return True
     return False
 
 
-def notify_check_in_subscribers(check_in):
-    """Send notifications to check-in subscribers (version_w only, 5-min batching)."""
+def notify_check_in_subscribers(check_in, changed_components=None):
+    """Send notifications to check-in subscribers (version_w only, 5-min batching).
+
+    changed_components: list of component names that changed (e.g. ['mood', 'social_battery']).
+                        If None, treats all components as changed (new check-in).
+    """
     from adoorback.utils.content_types import get_check_in_type
     from notification.models import Notification, NotificationActor
     from account.models import Subscription
+
+    if changed_components is None:
+        changed_components = list(CONTENT_TO_VISIBILITY.keys())
 
     user = check_in.user
     if user.current_ver != 'version_w':
@@ -121,8 +132,8 @@ def notify_check_in_subscribers(check_in):
         if not subscriber:
             continue
 
-        # 구독자가 어떤 컴포넌트도 볼 수 없으면 알림 X
-        if not _subscriber_sees_any_component(check_in, subscriber):
+        # 변경된 컴포넌트 중 구독자가 볼 수 있는 게 없으면 알림 X
+        if not _subscriber_sees_changed_component(check_in, subscriber, changed_components):
             continue
 
         recent_noti = _find_recent_check_in_noti(subscriber_id, user)
@@ -192,9 +203,10 @@ class CurrentCheckIn(generics.ListCreateAPIView):
             # Notify only if content actually changed and result is non-empty
             new_content = {f: getattr(existing_checkin, f) for f in CONTENT_FIELDS}
             if old_content != new_content:
+                changed = [f for f in CONTENT_FIELDS if old_content[f] != new_content[f]]
                 has_song = Song.objects.filter(user=current_user, is_active=True).exists()
                 if _has_visible_content(existing_checkin, has_song):
-                    notify_check_in_subscribers(existing_checkin)
+                    notify_check_in_subscribers(existing_checkin, changed_components=changed)
         else:
             # Create new check-in
             serializer.save(user=current_user, is_active=True)
@@ -545,7 +557,7 @@ class CurrentSong(generics.ListCreateAPIView):
         # Notify check-in subscribers about song change
         active_check_in = CheckIn.objects.filter(user=current_user, is_active=True).first()
         if active_check_in:
-            notify_check_in_subscribers(active_check_in)
+            notify_check_in_subscribers(active_check_in, changed_components=['song'])
 
         return Response(serializer.data)
 
