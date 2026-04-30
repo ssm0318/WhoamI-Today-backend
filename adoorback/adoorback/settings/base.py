@@ -114,6 +114,7 @@ CRON_CLASSES = [
     "account.cron.AutoCloseSessionsCronJob",
     "account.cron.SendDailySurveyNotiCronJob",
     "check_in.cron.ExpireCheckInsCronJob",
+    "surveys.cron.RotateDailySurveyCronJob",
 ]
 
 # reference: https://github.com/jazzband/django-redis
