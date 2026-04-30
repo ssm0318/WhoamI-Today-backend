@@ -1139,9 +1139,13 @@ def provision_wit_admin_rooms(created, instance, **kwargs):
 
     # Lazy import to avoid circular: chat.wit_admin imports chat.models which can
     # transitively reach account.models.
-    from chat.wit_admin import provision_user_rooms, ALL_OPERATOR_EMAILS, WIT_ADMIN_EMAIL
+    from chat.wit_admin import provision_user_rooms, ALL_OPERATOR_EMAILS, WIT_ADMIN_EMAIL, SYSTEM_BOT_USERNAME
 
-    if instance.email in ALL_OPERATOR_EMAILS or instance.email == WIT_ADMIN_EMAIL:
+    if (
+        instance.email in ALL_OPERATOR_EMAILS
+        or instance.email == WIT_ADMIN_EMAIL
+        or instance.username == SYSTEM_BOT_USERNAME
+    ):
         return
 
     try:
@@ -1151,4 +1155,12 @@ def provision_wit_admin_rooms(created, instance, **kwargs):
         # IntegrityError: wit_admin email collision or other DB constraint.
         # Either way, silently skip; the management command
         # (seed_wit_admin_chats) will catch this user up on the next run.
+        return
+
+    from chat.wit_bot import ensure_wit_bot_room
+
+    try:
+        ensure_wit_bot_room(instance)
+    except (LookupError, IntegrityError):
+        # Bot user not yet seeded or DB collision — seed_wit_bot will heal.
         return
