@@ -181,6 +181,10 @@ class QDiscoverFeed(generics.ListAPIView):
         page = self.paginate_queryset(combined)
         objects_to_serialize = page if page is not None else combined
 
+        # Re-validate access: filter out items no longer accessible
+        # (visibility changed, author blocked, or content reported since query)
+        objects_to_serialize = [obj for obj in objects_to_serialize if obj.is_audience(request.user)]
+
         serialized_data = []
         for obj in objects_to_serialize:
             if isinstance(obj, Note):
