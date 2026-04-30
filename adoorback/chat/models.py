@@ -170,6 +170,10 @@ class MessageReaction(AdoorTimestampedModel, SafeDeleteModel):
         ]
         ordering = ['created_at']
 
+    @property
+    def type(self):
+        return self.__class__.__name__
+
     def __str__(self):
         return f"{self.user} reacted {self.emoji} to message {self.message_id}"
 
@@ -306,8 +310,95 @@ def create_message_notification(created, instance, **kwargs):
             message_ko=noti_ko,
             message_en=noti_en,
             redirect_url=f"/users/{sender.id}/chat",
+            is_visible=False,
         )
         NotificationActor.objects.create(user=sender, notification=noti)
+
+
+@transaction.atomic
+@receiver(post_save, sender=MessageReaction)
+def create_message_reaction_notification(created, instance, **kwargs):
+    """Push-only notification when someone reacts to your chat message."""
+    if not created:
+        return
+
+    reactor = instance.user
+    message = instance.message
+    message_author = message.sender
+    chat_room = message.chat_room
+
+    # 자기 메시지에 리액션 → 노티 X
+    if reactor.id == message_author.id:
+        return
+
+    # 차단된 유저 → 노티 X
+    if message_author.id in reactor.user_report_blocked_ids:
+        return
+
+    emoji = instance.emoji
+
+    # 같은 메시지에 대한 기존 리액션 노티 찾기 (24시간 내)
+    message_ct = ContentType.objects.get_for_model(Message)
+    reaction_ct = ContentType.objects.get_for_model(MessageReaction)
+    cutoff = timezone.now() - timezone.timedelta(hours=24)
+
+    recent_noti = Notification.objects.filter(
+        user=message_author,
+        origin_id=message.id,
+        origin_type=message_ct,
+        target_type=reaction_ct,
+        notification_updated_at__gte=cutoff,
+    ).order_by('-notification_updated_at').first()
+
+    if recent_noti:
+        actors = recent_noti.actors.order_by('-notificationactor__created_at')
+        distinct_actor_ids = set(actors.values_list('id', flat=True))
+        distinct_actor_ids.add(reactor.id)
+        N = len(distinct_actor_ids)
+
+        most_recent = actors.first()
+        if most_recent and most_recent.id != reactor.id:
+            second_name = most_recent.username
+        elif actors.count() > 1:
+            second_name = actors[1].username
+        else:
+            second_name = None
+
+        if N == 1:
+            noti_ko = f"{reactor.username}님이 회원님의 메시지에 반응했습니다: {emoji}"
+            noti_en = f"{reactor.username} reacted to your message: {emoji}"
+        elif N == 2:
+            noti_ko = f"{reactor.username}님과 {second_name}님이 회원님의 메시지에 반응했습니다"
+            noti_en = f"{reactor.username} and {second_name} reacted to your message"
+        else:
+            noti_ko = f"{reactor.username}님, {second_name}님, 외 {N - 2}명이 회원님의 메시지에 반응했습니다"
+            noti_en = f"{reactor.username}, {second_name}, and {N - 2} other(s) reacted to your message"
+
+        recent_noti.message_ko = noti_ko
+        recent_noti.message_en = noti_en
+        recent_noti.is_read = False
+        recent_noti.notification_updated_at = timezone.now()
+        recent_noti.save()
+        NotificationActor.objects.create(user=reactor, notification=recent_noti)
+    else:
+        noti_ko = f"{reactor.username}님이 회원님의 메시지에 반응했습니다: {emoji}"
+        noti_en = f"{reactor.username} reacted to your message: {emoji}"
+
+        if chat_room.is_group:
+            redirect_url = f"/chats/group/{chat_room.id}"
+        else:
+            redirect_url = f"/users/{reactor.id}/chat"
+
+        noti = Notification.objects.create(
+            user=message_author,
+            origin=message,
+            target=instance,
+            message_ko=noti_ko,
+            message_en=noti_en,
+            redirect_url=redirect_url,
+            is_visible=False,
+        )
+        NotificationActor.objects.create(user=reactor, notification=noti)
 
 
 @transaction.atomic

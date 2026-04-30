@@ -13,7 +13,7 @@ from adoorback.utils.content_types import get_response_request_type, get_questio
 from adoorback.utils.alerts import send_msg_to_slack
 from notification.helpers import find_like_noti, construct_message
 
-from firebase_admin.messaging import Message
+from firebase_admin.messaging import Message, WebpushConfig, WebpushNotification as WebpushNotif
 from firebase_admin.messaging import Notification as FirebaseNotification
 from firebase_admin._messaging_utils import UnregisteredError
 from custom_fcm.models import CustomFCMDevice
@@ -118,7 +118,6 @@ class NotificationManager(SafeDeleteManager):
             actors__in=[actor],
             target_type__model='message',
             is_read=False,
-            is_visible=True,
             notification_updated_at__gte=cutoff
         ).order_by('-notification_updated_at').first()
 
@@ -195,6 +194,8 @@ def get_notification_tag(instance):
         first_actor = instance.actors.first()
         if first_actor:
             return f"chat_message_{first_actor.id}"
+    if instance.target_type and instance.target_type.model == 'messagereaction':
+        return f"chat_reaction_{instance.origin_id}"
     return str(instance.id)
 
 
@@ -216,7 +217,10 @@ def notify_firebase(instance):
                 'type': 'new',
                 'content-available': '1',  # for ios silent notification
                 'priority': 'high',  # for android
-            }
+            },
+            webpush=WebpushConfig(
+                notification=WebpushNotif(tag=tag)
+            ),
         )
         try:
             device.send_message(message)
@@ -237,10 +241,16 @@ def notify_firebase(instance):
 def send_firebase_notification(sender, instance, created, **kwargs):
     if created:
         notify_firebase(instance)
-    elif instance.is_visible and not instance.is_read:
-        is_any_actor_active = instance.actors.filter(deleted__isnull=True).exists()
-        if is_any_actor_active:
-            notify_firebase(instance)
+    elif not instance.is_read:
+        is_push_only_chat = (
+            not instance.is_visible
+            and instance.target_type
+            and instance.target_type.model in ('message', 'messagereaction')
+        )
+        if instance.is_visible or is_push_only_chat:
+            is_any_actor_active = instance.actors.filter(deleted__isnull=True).exists()
+            if is_any_actor_active:
+                notify_firebase(instance)
 
 
 @receiver(post_save, sender=Notification)
