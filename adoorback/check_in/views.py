@@ -107,7 +107,12 @@ def notify_check_in_subscribers(check_in):
         if recent_noti:
             recent_noti.notification_updated_at = timezone.now()
             recent_noti.target = check_in
-            recent_noti.save()
+            # update_fields로 저장하여 post_save signal이 중복 push를 보내지 않도록 함
+            Notification.objects.filter(pk=recent_noti.pk).update(
+                notification_updated_at=recent_noti.notification_updated_at,
+                target_id=check_in.pk,
+                target_type=ContentType.objects.get_for_model(check_in),
+            )
         else:
             noti = Notification.objects.create(
                 user_id=subscriber_id,
