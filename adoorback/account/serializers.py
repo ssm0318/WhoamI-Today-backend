@@ -386,8 +386,13 @@ class UserProfileSerializer(UserMinimalSerializer):
         # treat every regular user as already-connected so the chat-request
         # gating UX doesn't fire on the operator side. Regular users' view of
         # operators is unchanged (no asymmetric leak in the user-facing UI).
-        from chat.wit_admin import ALL_OPERATOR_EMAILS
+        from chat.wit_admin import ALL_OPERATOR_EMAILS, is_wit_admin
+        from chat.wit_bot import is_wit_bot
         if viewer.email in ALL_OPERATOR_EMAILS:
+            return True
+        # System users (support persona, scripted bot) bypass the chat-request
+        # gate so every user can DM them without a Connection row.
+        if is_wit_admin(obj) or is_wit_bot(obj):
             return True
         return viewer.is_connected(obj)
 
@@ -914,9 +919,13 @@ class UserFriendshipStatusSerializer(UserMinimalSerializer):
         if user == obj:
             return None
         # See note in UserProfileSerializer.get_are_friends — operators see all
-        # users as connected for chat-UI purposes.
-        from chat.wit_admin import ALL_OPERATOR_EMAILS
+        # users as connected, and system users (wit_admin / wit_bot) are
+        # always reachable without a chat request.
+        from chat.wit_admin import ALL_OPERATOR_EMAILS, is_wit_admin
+        from chat.wit_bot import is_wit_bot
         if user.email in ALL_OPERATOR_EMAILS:
+            return True
+        if is_wit_admin(obj) or is_wit_bot(obj):
             return True
         return user.is_connected(obj)
 

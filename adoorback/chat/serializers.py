@@ -194,14 +194,17 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         opponent = obj.user2 if obj.user1 == user else obj.user1
 
-        # WIT-Admin surfaces (support persona, operator proxy chats, operator
-        # blast rooms) don't use the friend/chat-request consent flow. Reporting
-        # 'friends' tells the frontend to render the normal message composer
-        # rather than the "Send chat request" button.
+        # System-user surfaces (wit_admin support persona, wit_bot scripted
+        # chat, operator proxy/blast rooms) don't use the friend/chat-request
+        # consent flow. Reporting 'friends' tells the frontend to render the
+        # normal message composer rather than the "Send chat request" button.
         from chat.wit_admin import is_wit_admin
+        from chat.wit_bot import is_wit_bot
         if (
             is_wit_admin(user)
             or is_wit_admin(opponent)
+            or is_wit_bot(user)
+            or is_wit_bot(opponent)
             or obj.is_wit_admin_proxy
             or obj.is_wit_admin_blast_room
         ):
