@@ -193,6 +193,23 @@ class GroupReadCursor(models.Model):
         return f"{self.user} read up to msg {self.last_read_message_id} in room {self.chat_room_id}"
 
 
+class WitBotConversationState(AdoorTimestampedModel):
+    """Per-user state for the scripted wit_bot conversation engine.
+
+    Tracks the user's current intent/step so multi-turn flows (onboarding,
+    awaiting escalation confirmation) can resume across messages.
+    """
+    user = models.OneToOneField(
+        get_user_model(), on_delete=models.CASCADE, related_name='wit_bot_state',
+    )
+    current_intent = models.CharField(max_length=64, blank=True, default='')
+    step = models.IntegerField(default=0)
+    context = models.JSONField(default=dict, blank=True)
+
+    def __str__(self):
+        return f"wit_bot state for {self.user}: intent={self.current_intent!r} step={self.step}"
+
+
 class ChatRequest(AdoorTimestampedModel, SafeDeleteModel):
     """Chat request for non-friends. Must be accepted before messaging is allowed."""
     requester = models.ForeignKey(
@@ -577,3 +594,31 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
             )
             broadcast_message_for_room(mirror)
         return
+
+
+@receiver(post_save, sender=Message)
+def dispatch_wit_bot_engine(created, instance, **kwargs):
+    """Dispatch user messages in a wit_bot 1-on-1 to the scripted engine.
+
+    Stays out of the way for: existing wit_admin proxy/blast rooms (those
+    rooms aren't wit_bot rooms), system events (member_added/left), bot's
+    own replies, and post-escalation group rooms (engine hands off to humans).
+    """
+    if not created or instance.deleted or instance.event_type:
+        return
+    room = instance.chat_room
+    if room.is_group:
+        return  # post-escalation — humans take over
+    if room.is_wit_admin_proxy or room.is_wit_admin_blast_room:
+        return  # belt-and-suspenders; wit_bot rooms never carry these flags
+    if instance.is_wit_admin_mirror:
+        return  # mirrored wit_admin traffic, never wit_bot input
+
+    from chat.wit_bot import is_wit_bot
+    if not (is_wit_bot(room.user1) or is_wit_bot(room.user2)):
+        return
+    if is_wit_bot(instance.sender):
+        return  # loop guard
+
+    from chat.wit_bot_engine import handle_user_message
+    handle_user_message(instance)
