@@ -3000,6 +3000,11 @@ class DiscoverFeedView(generics.ListAPIView):
             elif item.note:
                 notes.append(item.note)
 
+        # Re-validate access: filter out items no longer accessible
+        # (visibility changed, author blocked, or content reported since feed generation)
+        notes = [n for n in notes if n.is_audience(request.user)]
+        responses = [r for r in responses if r.is_audience(request.user)]
+
         # Mark as read
         if responses:
             request.user.read_responses.add(*responses)
