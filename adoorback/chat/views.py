@@ -194,18 +194,21 @@ class ChatRoomList(generics.ListAPIView):
             chat_room=OuterRef('pk')
         ).order_by('-created_at')
 
-        # Pin tier: wit_bot (0) above wit_admin (1) above everything else (2).
-        # The members__username arm covers the post-escalation promoted group
-        # (still has wit_bot in members but is_group is True).
+        # Pin tier: wit_admin (0) above wit_bot (1) above everything else (2).
+        # The members__username arm on each system user covers post-escalation
+        # promoted groups where the room is_group=True but the original user1/
+        # user2 fields still point at the pre-promotion pair.
         pin_rank = Case(
+            When(
+                Q(user1__username=WIT_ADMIN_USERNAME)
+                | Q(user2__username=WIT_ADMIN_USERNAME)
+                | Q(members__username=WIT_ADMIN_USERNAME),
+                then=Value(0),
+            ),
             When(
                 Q(user1__username=WIT_BOT_USERNAME)
                 | Q(user2__username=WIT_BOT_USERNAME)
                 | Q(members__username=WIT_BOT_USERNAME),
-                then=Value(0),
-            ),
-            When(
-                Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME),
                 then=Value(1),
             ),
             default=Value(2),

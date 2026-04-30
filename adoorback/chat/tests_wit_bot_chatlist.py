@@ -38,15 +38,15 @@ class WitBotChatListTests(TestCase):
         u2 = max(user, self.admin, key=lambda x: x.id)
         return ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
 
-    def test_wit_bot_pinned_first_then_wit_admin(self):
+    def test_wit_admin_pinned_first_then_wit_bot(self):
         results = self._list(self.alice)
-        # Both system rooms must appear; wit_bot strictly precedes wit_admin.
+        # Both system rooms must appear; wit_admin strictly precedes wit_bot.
         bot_room = self._wit_bot_room(self.alice)
         admin_room = self._wit_admin_room(self.alice)
         ids = [r['id'] for r in results]
         self.assertIn(bot_room.id, ids)
         self.assertIn(admin_room.id, ids)
-        self.assertLess(ids.index(bot_room.id), ids.index(admin_room.id))
+        self.assertLess(ids.index(admin_room.id), ids.index(bot_room.id))
 
     def test_wit_bot_appears_even_with_no_messages(self):
         results = self._list(self.alice)
