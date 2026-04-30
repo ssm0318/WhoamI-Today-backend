@@ -46,6 +46,7 @@ urlpatterns = [
     path('api/chat/', include('chat.urls')),
 
     path('api/translate/', include('translate.urls')),
+    path('api/surveys/', include('surveys.urls')),
     path('api/missions/', adoorback_views.MissionList.as_view(), name='mission-list'),
 
     # Version Q endpoints (subset — only where behavior differs from W)
