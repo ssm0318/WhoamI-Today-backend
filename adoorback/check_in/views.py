@@ -364,16 +364,21 @@ class ArchiveLiveComponent(APIView):
     """PATCH /api/check_in/components/<component>/archive/
 
     Archive the user's currently-live entry for `component` without
-    replacing it with new content. The component's value on the active
-    CheckIn is cleared (or, for `song`, the active Song row is
-    deactivated), which routes through the existing CheckIn.save /
-    Song post_save diff logic and stamps `superseded_at` on the live
-    CheckInComponentEntry. Friend cards immediately show the empty
-    placeholder for that component, and the archived entry surfaces
-    under "Today" in the owner's archive feed (eligible for pinning).
+    replacing it with new content. The strategy is to make the live
+    CheckInComponentEntry look like it has crossed the 12h auto-archive
+    cutoff: created_at and updated_at are aged past the threshold while
+    superseded_at stays NULL. This way the existing serializer collapse
+    (visibility → 'only_me' via _is_archived) and archive-feed filter
+    (created_at < threshold) pick up the row, the data field stays
+    visible to the owner, and a refresh keeps showing the archived
+    snippet with the "Only Me (Archived)" badge.
+
+    Live data sources are left untouched: CheckIn.social_battery /
+    mood / thought keep their values and Song.is_active stays True.
+    The entry-level age check is the single source of truth.
 
     Idempotent at the entry level: a 404 is returned when the
-    component has no live value to archive.
+    component has no live entry to archive.
     """
     permission_classes = [IsAuthenticated]
     ALLOWED = ('battery', 'mood', 'thought', 'song')
@@ -391,48 +396,25 @@ class ArchiveLiveComponent(APIView):
 
         user = request.user
 
-        if component == 'song':
-            active_songs = list(Song.objects.filter(user=user, is_active=True))
-            if not active_songs:
-                return Response(
-                    {'detail': 'No active song to archive.'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            for song in active_songs:
-                song.is_active = False
-                song.save()  # post_save signal supersedes the live song entry
-            return Response({'archived': component}, status=status.HTTP_200_OK)
-
-        check_in = CheckIn.objects.filter(user=user, is_active=True).first()
-        if not check_in:
+        live_entry = (
+            CheckInComponentEntry.objects
+            .filter(owner=user, component=component, superseded_at__isnull=True)
+            .order_by('-created_at')
+            .first()
+        )
+        if not live_entry:
             return Response(
-                {'detail': 'No active check-in.'},
+                {'detail': f'No active {component} to archive.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if component == 'battery':
-            if not check_in.social_battery:
-                return Response(
-                    {'detail': 'No active battery to archive.'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            check_in.social_battery = None
-        elif component == 'mood':
-            if not check_in.mood:
-                return Response(
-                    {'detail': 'No active mood to archive.'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            check_in.mood = []
-        elif component == 'thought':
-            if not check_in.thought:
-                return Response(
-                    {'detail': 'No active thought to archive.'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            check_in.thought = ''
-
-        check_in.save()  # diff path supersedes the matching live entry
+        # Age past the 12h auto-archive cutoff. queryset.update() bypasses
+        # AdoorTimestampedModel's auto_now/auto_now_add on save().
+        aged = timezone.now() - timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS, minutes=1)
+        CheckInComponentEntry.objects.filter(pk=live_entry.pk).update(
+            created_at=aged,
+            updated_at=aged,
+        )
         return Response({'archived': component}, status=status.HTTP_200_OK)
 
 
