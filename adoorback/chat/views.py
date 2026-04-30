@@ -183,8 +183,9 @@ class ChatRoomList(generics.ListAPIView):
         return ctx
 
     def get_queryset(self):
-        from django.db.models import Case, When, Value, BooleanField
+        from django.db.models import Case, When, Value, IntegerField
         from chat.wit_admin import WIT_ADMIN_USERNAME, ALL_OPERATOR_EMAILS
+        from chat.wit_bot import WIT_BOT_USERNAME
 
         user = self.request.user
         blocked_ids = user.user_report_blocked_ids
@@ -193,13 +194,22 @@ class ChatRoomList(generics.ListAPIView):
             chat_room=OuterRef('pk')
         ).order_by('-created_at')
 
-        is_pinned_top = Case(
+        # Pin tier: wit_bot (0) above wit_admin (1) above everything else (2).
+        # The members__username arm covers the post-escalation promoted group
+        # (still has wit_bot in members but is_group is True).
+        pin_rank = Case(
+            When(
+                Q(user1__username=WIT_BOT_USERNAME)
+                | Q(user2__username=WIT_BOT_USERNAME)
+                | Q(members__username=WIT_BOT_USERNAME),
+                then=Value(0),
+            ),
             When(
                 Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME),
-                then=Value(True),
+                then=Value(1),
             ),
-            default=Value(False),
-            output_field=BooleanField(),
+            default=Value(2),
+            output_field=IntegerField(),
         )
 
         qs = ChatRoom.objects.filter(
@@ -220,11 +230,12 @@ class ChatRoomList(generics.ListAPIView):
         if user.email not in ALL_OPERATOR_EMAILS:
             qs = qs.exclude(is_wit_admin_proxy=True)
 
-        # Version isolation: hide 1-on-1 rooms where the other user is on a different version
-        # (exclude WIT Admin rooms which are pinned and version-agnostic)
+        # Version isolation: hide 1-on-1 rooms where the other user is on a different version.
+        # System users (wit_admin, wit_bot) are version-agnostic — exempt them.
         qs = qs.exclude(
             Q(is_group=False) & ~Q(
-                Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME)
+                Q(user1__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
+                | Q(user2__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
             ) & (
                 (Q(user1=user) & ~Q(user2__current_ver=user.current_ver)) |
                 (Q(user2=user) & ~Q(user1__current_ver=user.current_ver))
@@ -242,23 +253,22 @@ class ChatRoomList(generics.ListAPIView):
                 'messages',
                 filter=Q(messages__receiver=user, messages__is_read=False)
             ),
-            is_pinned_top=is_pinned_top,
+            pin_rank=pin_rank,
         )
 
-        # Surface every WIT Admin proxy room in operators' chat lists, even
-        # before the user has messaged in (so jaewon's inbox shows all 11 user
-        # chats from day 1, not just the ones with traffic).
+        # Surface system-user rooms (pin_rank < 2) and operator proxy rooms
+        # in the relevant lists even when there's no traffic yet.
         if user.email in ALL_OPERATOR_EMAILS:
             visibility = (
                 Q(last_message_time__isnull=False)
-                | Q(is_pinned_top=True)
+                | Q(pin_rank__lt=2)
                 | Q(is_wit_admin_proxy=True)
             )
         else:
-            visibility = Q(last_message_time__isnull=False) | Q(is_pinned_top=True)
+            visibility = Q(last_message_time__isnull=False) | Q(pin_rank__lt=2)
 
         return annotated.filter(visibility).order_by(
-            '-is_pinned_top',
+            'pin_rank',
             F('last_message_time').desc(nulls_last=True),
         )
 
