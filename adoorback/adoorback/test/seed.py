@@ -591,6 +591,71 @@ def set_seed(n):
                 user.user_interests.add(interest)
     logging.info("Chip category test data created!") if DEBUG else None
 
+    # ===== DISCOVER MUTUAL-TRAITS TEST USER =====
+    # Non-friend user with overlapping interests/personas with adoor_1, plus a
+    # public Note that surfaces in adoor_1's Discover feed. Lets QA exercise
+    # the SharedTraitsBottomSheet end-to-end (the friend-of-friend test users
+    # all share traits with adoor_2, not adoor_1).
+    discover_match_username = 'discover_match'
+    discover_match, dm_created = User.objects.get_or_create(
+        username=discover_match_username,
+        defaults={'email': 'discover_match@example.com'},
+    )
+    if dm_created:
+        discover_match.set_password('Adoor2020:)')
+        discover_match.save()
+
+    # Profile image (orange "DM" tile, mirrors the adoor_X profile generator above)
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        profile_dir = os.path.join(settings.MEDIA_ROOT, 'profile_images')
+        os.makedirs(profile_dir, exist_ok=True)
+        if not discover_match.profile_image:
+            size = 200
+            img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.ellipse([0, 0, size - 1, size - 1], fill=(255, 87, 34))
+            try:
+                font = ImageFont.truetype('/System/Library/Fonts/Helvetica.ttc', 60)
+            except Exception:
+                font = ImageFont.load_default()
+            letter = 'DM'
+            bbox = draw.textbbox((0, 0), letter, font=font)
+            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            draw.text(((size - tw) / 2, (size - th) / 2 - 10), letter,
+                      fill=(255, 255, 255), font=font)
+            img_path = os.path.join(profile_dir, f'{discover_match_username}.png')
+            img.save(img_path, 'PNG')
+            discover_match.profile_image = f'profile_images/{discover_match_username}.png'
+            discover_match.save()
+    except ImportError:
+        pass
+
+    # Shared interests with adoor_1 (Hip-Hop, Anime, Gaming, Coding):
+    # 3 overlap → mutual_interest_count = 3
+    for label in ['Gaming', 'Coding', 'Hip-Hop']:
+        interest = Interest.objects.get(content=label)
+        discover_match.user_interests.add(interest)
+
+    # adoor_1 has no personas in the categorized chip seed (line 580+); give
+    # both adoor_1 and discover_match a shared persona so the SharedTraits
+    # sheet exercises the persona half. Use the spaced "Night Owl" form
+    # because the chip-category system at line 568 keys on that exact label
+    # (normalizeChipText is case-insensitive but whitespace-sensitive).
+    night_owl_persona, _ = Persona.objects.get_or_create(content='Night Owl')
+    night_owl_persona.users.add(user_1)
+    night_owl_persona.users.add(discover_match)
+
+    # Public Note that lands in adoor_1's Discover feed. get_or_create with
+    # the same content keeps re-runs idempotent.
+    Note.objects.get_or_create(
+        author=discover_match,
+        content="Hi I'm new here — same vibes!",
+        defaults={'visibility': ['public']},
+    )
+
+    logging.info("Discover mutual-traits test user created (discover_match)!") if DEBUG else None
+
     # ===== COMPREHENSIVE EDGE CASE TESTING =====
 
     # 1. User with partial check-in (only song, no status/battery)
