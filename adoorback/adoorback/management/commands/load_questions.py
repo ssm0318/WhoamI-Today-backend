@@ -1,11 +1,10 @@
 from django.core.management.base import BaseCommand
 
-from account.models import User
 from qna.load_questions_tsv import bulk_create_questions_from_tsv, questions_tsv_path
 
 
 class Command(BaseCommand):
-    help = "Load questions from questions.tsv and create Question objects (admin author)."
+    help = "Load questions from questions.tsv and create Question objects (authored by wit_bot)."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -17,16 +16,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--skip-duplicates",
             action="store_true",
-            help="Skip rows whose (content_en, content_ko) already exists for this admin.",
+            help="Skip rows whose (content_en, content_ko) already exists for wit_bot.",
         )
 
     def handle(self, *args, **options):
-        admin = User.objects.filter(is_superuser=True).first()
-        if not admin:
-            self.stdout.write(
-                self.style.ERROR("No superuser found. Create a superuser first.")
-            )
-            return
+        from chat.wit_bot import ensure_wit_bot_user
+        admin = ensure_wit_bot_user()
 
         path = options.get("path")
         skip = options.get("skip_duplicates", False)
