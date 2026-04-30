@@ -177,6 +177,11 @@ class ChatRoomList(generics.ListAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['close_friend_ids'] = set(self.request.user.close_friend_ids)
+        return ctx
+
     def get_queryset(self):
         from django.db.models import Case, When, Value, BooleanField
         from chat.wit_admin import WIT_ADMIN_USERNAME, ALL_OPERATOR_EMAILS
