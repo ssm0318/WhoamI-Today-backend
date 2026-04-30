@@ -72,10 +72,19 @@ class SendDailySurveyNotiCronJob(CronJobBase):
     code = 'account.send_daily_survey_noti_cron_job'
 
     def do(self):
+        # Local imports: account should not introduce top-level deps on chat / surveys.
+        from chat.wit_bot import ensure_wit_bot_user
+        from surveys.models import DailySurvey
+
         print('=========================')
         print("Creating daily survey notifications...............")
 
-        admin = User.objects.filter(is_superuser=True).get(email='whoami.today.official@gmail.com')
+        if not DailySurvey.objects.filter(date=timezone.now().date()).exists():
+            print('No DailySurvey scheduled for today — skipping.')
+            print('=========================')
+            return
+
+        bot = ensure_wit_bot_user()
 
         num_notis_before = Notification.objects.admin_only().count()
         all_users = User.objects.all()
@@ -87,12 +96,12 @@ class SendDailySurveyNotiCronJob(CronJobBase):
             time_diff = abs(user_now - noti_time)
             if time_diff <= timedelta(minutes=10):
                 noti = Notification.objects.create(user=user,
-                                                target=admin,
-                                                origin=admin,
+                                                target=bot,
+                                                origin=bot,
                                                 message_ko=f"{user.username}님, 데일리 설문을 작성해주세요!",
                                                 message_en=f"{user.username}, time to fill out the daily survey!",
-                                                redirect_url=f'')
-                NotificationActor.objects.create(user=admin, notification=noti)
+                                                redirect_url='/share')
+                NotificationActor.objects.create(user=bot, notification=noti)
 
         num_notis_after = Notification.objects.admin_only().count()
         print(f'{num_notis_after - num_notis_before} notifications sent!')
