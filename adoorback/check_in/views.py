@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from adoorback.utils.validators import adoor_exception_handler
 from adoorback.utils.video import validate_video_file, generate_video_thumbnail
 
-from account.serializers import serialize_check_in_base_for_viewer
+from account.serializers import serialize_check_in_base_for_viewer, viewer_sees_check_in_component
 
 from check_in.models import (
     CHECK_IN_POST_EXPIRY_HOURS,
@@ -78,6 +78,20 @@ def _has_visible_content(check_in, has_active_song=False):
     )
 
 
+def _subscriber_sees_any_component(check_in, subscriber):
+    """Return True if subscriber can see at least one check-in component."""
+    component_checks = [
+        ('battery_visibility', 'battery_updated_at'),
+        ('mood_visibility', 'mood_updated_at'),
+        ('thought_visibility', 'thought_updated_at'),
+        ('song_visibility', 'song_updated_at'),
+    ]
+    for vis_field, updated_field in component_checks:
+        if viewer_sees_check_in_component(check_in, check_in.user, subscriber, vis_field, updated_field):
+            return True
+    return False
+
+
 def notify_check_in_subscribers(check_in):
     """Send notifications to check-in subscribers (version_w only, 5-min batching)."""
     from adoorback.utils.content_types import get_check_in_type
@@ -97,9 +111,18 @@ def notify_check_in_subscribers(check_in):
         return
 
     blocked_ids = user.user_report_blocked_ids
+    subscribers = User.objects.in_bulk(subscriber_ids)
 
     for subscriber_id in subscriber_ids:
         if subscriber_id in blocked_ids:
+            continue
+
+        subscriber = subscribers.get(subscriber_id)
+        if not subscriber:
+            continue
+
+        # 구독자가 어떤 컴포넌트도 볼 수 없으면 알림 X
+        if not _subscriber_sees_any_component(check_in, subscriber):
             continue
 
         recent_noti = _find_recent_check_in_noti(subscriber_id, user)
@@ -107,12 +130,7 @@ def notify_check_in_subscribers(check_in):
         if recent_noti:
             recent_noti.notification_updated_at = timezone.now()
             recent_noti.target = check_in
-            # update_fields로 저장하여 post_save signal이 중복 push를 보내지 않도록 함
-            Notification.objects.filter(pk=recent_noti.pk).update(
-                notification_updated_at=recent_noti.notification_updated_at,
-                target_id=check_in.pk,
-                target_type=ContentType.objects.get_for_model(check_in),
-            )
+            recent_noti.save()
         else:
             noti = Notification.objects.create(
                 user_id=subscriber_id,
