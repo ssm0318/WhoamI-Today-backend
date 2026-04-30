@@ -945,8 +945,9 @@ class UserCheckInPosts(generics.ListAPIView):
 
 
 class CheckInPostStories(generics.ListAPIView):
-    """Compact stories strip — one row per friend with at least one viewer-visible
-    CheckInPost, ordered by recent activity. Returns latest post per author."""
+    """Compact stories strip — one row per author (viewer + connected friends)
+    with at least one viewer-visible CheckInPost, ordered by recent activity.
+    Returns latest post per author."""
     permission_classes = [IsAuthenticated]
     serializer_class = cs.CheckInPostFriendStorySerializer
 
@@ -954,9 +955,9 @@ class CheckInPostStories(generics.ListAPIView):
         return adoor_exception_handler
 
     def get_queryset(self):
-        # Friend-only strip: own posts surface in /my via UserCheckInPosts,
-        # so excluding the viewer here keeps the feed strip purely about
-        # friends without breaking the author's own archive UX.
+        # Include the viewer's own latest post so the feed strip surfaces it
+        # right after sharing — otherwise users have to navigate to /my to
+        # confirm their post landed.
         user = self.request.user
         # Filter connected users to same version
         connected_ids = list(User.objects.filter(
@@ -965,8 +966,17 @@ class CheckInPostStories(generics.ListAPIView):
         blocked_ids = user.user_report_blocked_ids
 
         author_ids = [uid for uid in connected_ids if uid not in blocked_ids]
+        author_ids.append(user.id)
 
-        qs = CheckInPost.objects.filter(author_id__in=author_ids).filter(
+        # Strip is for "today's" snippets only — anything older than the
+        # expiry window (incl. pinned archive entries and the viewer's own
+        # older posts) is excluded. Older snippets stay reachable via /my and
+        # the friend's profile archive.
+        threshold = timezone.now() - timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
+        qs = CheckInPost.objects.filter(
+            author_id__in=author_ids,
+            created_at__gte=threshold,
+        ).filter(
             _check_in_post_visible_filter(user)
         )
 
