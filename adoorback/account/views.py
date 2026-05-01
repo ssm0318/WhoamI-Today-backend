@@ -1015,7 +1015,13 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     @transaction.atomic
     def perform_update(self, serializer):
         updated_user = self.get_object()
-        
+
+        # Pre-check duplicate username before serializer validation,
+        # otherwise UniqueConstraint surfaces as `{username: [...]}` (status 400).
+        new_username = self.request.data.get('username')
+        if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
+            raise ExistingUsername()
+
         if serializer.is_valid(raise_exception=True):
             if 'username' in self.request.data:
                 new_username = serializer.validated_data.get('username')
@@ -1026,9 +1032,6 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                 # check if username exceeds 20 letters
                 if len(new_username) > 20:
                     raise LongUsername()
-                # check if username exists
-                if new_username and User.objects.filter(username=new_username).exclude(id=self.request.user.id).exists():
-                    raise ExistingUsername()
 
             persona_str = self.request.data.get('persona') or self.request.data.get('user_personas')
             interest_str = self.request.data.get('interest') or self.request.data.get('user_interests') or self.request.data.get('user_interest')
