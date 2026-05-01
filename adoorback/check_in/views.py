@@ -1123,6 +1123,41 @@ class CheckInPostPinToggle(APIView):
         )
 
 
+class CheckInPostVisibility(APIView):
+    """PATCH /api/check_in/posts/<pk>/visibility/
+
+    Body: {"visibility": "friends|close_friends"}
+
+    Updates the post's main visibility. If the post is also pinned,
+    pin_visibility is updated to match.
+    """
+    permission_classes = [IsAuthenticated]
+    ALLOWED = {'friends', 'close_friends'}
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        post = _get_own_post_or_404(request.user, pk)
+        value = request.data.get('visibility')
+        if value not in self.ALLOWED:
+            return Response(
+                {'detail': f'visibility must be one of {sorted(self.ALLOWED)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        post.visibility = value
+        fields = ['visibility', 'updated_at']
+        if post.is_pinned:
+            post.pin_visibility = value
+            fields.append('pin_visibility')
+        post.save(update_fields=fields)
+        return Response(
+            cs.CheckInPostSerializer(post, context={'request': request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
 class CheckInPostPinVisibility(APIView):
     """PATCH /api/check_in/posts/<pk>/pin_visibility/
 
