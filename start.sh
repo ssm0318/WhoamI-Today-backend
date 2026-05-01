@@ -10,5 +10,11 @@ if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_EMAIL" ] && [ 
   echo "Superuser created successfully!"
 fi
 
+# Bootstrap WhoamI system accounts (wit_admin, wit_bot, jaewon, koyrkr, njs)
+# and provision their chat rooms. Idempotent; safe to re-run.
+echo "Bootstrapping system users and chat rooms..."
+python manage.py bootstrap_system_users
+echo "System bootstrap complete!"
+
 # Run as development server (for testing)
 python manage.py runserver 0.0.0.0:8000
