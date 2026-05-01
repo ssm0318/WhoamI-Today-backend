@@ -12,7 +12,9 @@ SurveyResponses skipped if already present for (user, survey).
 With --reset: deletes the target user's SurveyResponses for all surveys (so they can
 take the survey again from the Share tab).
 
-With --today-slug: re-points today's DailySurvey to the named slug.
+With --today-slug: re-points today's daily ScheduledSurvey to the named slug
+(creates a one-off daily ScheduledSurvey if none exists for today, e.g. outside
+the study window).
 """
 from __future__ import annotations
 
@@ -25,7 +27,8 @@ from django.db import transaction
 
 from account.models import Connection
 from surveys.models import (
-    DailySurvey, Survey, SurveyAnswer, SurveyOption, SurveyResponse,
+    CADENCE_DAILY, ScheduledSurvey, Survey, SurveyAnswer, SurveyOption,
+    SurveyResponse,
 )
 
 
@@ -104,7 +107,7 @@ class Command(BaseCommand):
         parser.add_argument('--num-close-friends', type=int, default=6, help='Mock close-friends count.')
         parser.add_argument('--num-strangers', type=int, default=6, help='Non-friend responders count.')
         parser.add_argument('--reset', action='store_true', help="Delete the dev user's responses first.")
-        parser.add_argument('--today-slug', default=None, help='If set, re-point today DailySurvey here.')
+        parser.add_argument('--today-slug', default=None, help="If set, re-point today's daily ScheduledSurvey here.")
         parser.add_argument('--seed', type=int, default=42, help='Random seed for deterministic output.')
 
     def handle(self, *args, **opts):
@@ -125,11 +128,34 @@ class Command(BaseCommand):
                 except Survey.DoesNotExist:
                     raise CommandError(f"No survey with slug {opts['today_slug']!r}")
                 today = _date.today()
-                ds, created = DailySurvey.objects.update_or_create(
-                    date=today, defaults={'survey': target}
+                # Re-point today's daily ScheduledSurvey row at the target survey.
+                # The seed migration creates a daily ScheduledSurvey for every day
+                # of the 4-week study; this just swaps the survey it points at.
+                # Outside the study window (no row for today), create a one-off.
+                ss = (
+                    ScheduledSurvey.objects
+                    .filter(cadence=CADENCE_DAILY, window_start=today)
+                    .first()
                 )
-                action = 'created' if created else 'updated'
-                self.stdout.write(f'  today: {action} DailySurvey({today}) -> {target.slug}')
+                if ss is None:
+                    next_seq = (
+                        ScheduledSurvey.objects.filter(cadence=CADENCE_DAILY)
+                        .order_by('-sequence_index')
+                        .values_list('sequence_index', flat=True)
+                        .first()
+                        or 0
+                    ) + 1
+                    ss = ScheduledSurvey.objects.create(
+                        survey=target, cadence=CADENCE_DAILY,
+                        window_start=today, window_end=today,
+                        allow_late=False, sequence_index=next_seq,
+                    )
+                    action = 'created'
+                else:
+                    ss.survey = target
+                    ss.save(update_fields=['survey', 'updated_at'])
+                    action = 'updated'
+                self.stdout.write(f'  today: {action} ScheduledSurvey({today}, daily) -> {target.slug}')
 
             # Provision mock users
             n_close = opts['num_close_friends']
