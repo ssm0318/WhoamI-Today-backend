@@ -34,7 +34,8 @@ class SchedulingTests(TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.survey, s)
 
-    def test_today_daily_returns_none_when_answered(self):
+    def test_today_daily_returns_survey_even_when_answered(self):
+        """Card stays after answering so the user can see Done / View results."""
         s = self._survey('daily_base')
         ScheduledSurvey.objects.create(
             survey=s, cadence=CADENCE_DAILY,
@@ -42,7 +43,10 @@ class SchedulingTests(TestCase):
             allow_late=False, sequence_index=1,
         )
         SurveyResponse.objects.create(user=self.user, survey=s)
-        self.assertIsNone(get_today_daily(self.user))
+        result = get_today_daily(self.user)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.survey, s)
+        self.assertTrue(result.user_answered)
 
     def test_today_daily_returns_none_when_not_today(self):
         s = self._survey('daily_base')
