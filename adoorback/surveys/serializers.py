@@ -31,6 +31,7 @@ class SurveyQuestionSerializer(serializers.ModelSerializer):
 class SurveyDetailSerializer(serializers.ModelSerializer):
     questions = SurveyQuestionSerializer(many=True, read_only=True)
     user_has_responded = serializers.SerializerMethodField()
+    responder_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Survey
@@ -41,6 +42,7 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             'interpretation_en', 'interpretation_ko',
             'questions',
             'user_has_responded',
+            'responder_count',
         ]
 
     def get_user_has_responded(self, obj):
@@ -48,6 +50,20 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return SurveyResponse.objects.filter(survey=obj, user=request.user).exists()
+
+    def get_responder_count(self, obj):
+        # Total non-system responders for this survey. For today's surveys this is
+        # effectively today's count since past surveys would already have unlocked
+        # results and shouldn't appear on the Share tab.
+        from chat.wit_admin import ALL_OPERATOR_EMAILS, WIT_ADMIN_USERNAME
+        from chat.wit_bot import WIT_BOT_USERNAME
+        return (
+            SurveyResponse.objects
+            .filter(survey=obj)
+            .exclude(user__username__in=[WIT_BOT_USERNAME, WIT_ADMIN_USERNAME])
+            .exclude(user__email__in=ALL_OPERATOR_EMAILS)
+            .count()
+        )
 
 
 class SurveyAnswerInputSerializer(serializers.Serializer):
