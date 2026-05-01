@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'notification.apps.NotificationConfig',
     'user_tag.apps.UserTagConfig',
     'reaction.apps.ReactionConfig',
+    'browse_mode.apps.BrowseModeConfig',
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
     'translate.apps.TranslateConfig',

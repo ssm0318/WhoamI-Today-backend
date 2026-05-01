@@ -37,6 +37,7 @@ urlpatterns = [
     path('api/user/', include('account.urls')),
     path('api/reactions/', include('reaction.urls')),
     path('api/check_in/', include('check_in.urls')),
+    path('api/browse_mode/', include('browse_mode.urls')),
     path('api/notes/', include('note.urls')),
     path('api/playlist/', include('playlist.urls')),
     
