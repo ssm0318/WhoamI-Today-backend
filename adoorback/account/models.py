@@ -73,6 +73,8 @@ CHIP_CATEGORY_CHOICES = [
     ('online_persona', 'Online Persona'),
     ('favorite_platform', 'Favorite Platform'),
     ('least_favorite_platform', 'Least Favorite Platform'),
+    ('basic_identities', 'Basic Identities'),
+    ('values_allyship', 'Values & Allyship'),
 ]
 
 # Mirrors check_in.models.CheckIn.VISIBILITY_CHOICES — kept here to avoid cross-app import.
@@ -91,6 +93,8 @@ CHIP_CATEGORY_DESCRIPTIONS = {
     'online_persona': 'How you behave on the internet — distinct behavioral archetypes.',
     'favorite_platform': 'The platforms you love most.',
     'least_favorite_platform': 'The platforms you could do without.',
+    'basic_identities': 'Life stage, social style, and personal traits.',
+    'values_allyship': 'Values, causes, and allyship you stand for.',
 }
 
 CHIPS_BY_CATEGORY = {
@@ -125,10 +129,29 @@ CHIPS_BY_CATEGORY = {
     'favorite_platform': [
         'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
         'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
+        'WhoamI Today (WIT)',
     ],
     'least_favorite_platform': [
         'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
         'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
+        'WhoamI Today (WIT)',
+    ],
+    'basic_identities': [
+        'In High School', 'In College', 'In Grad School', 'Working',
+        'Gap Year', 'Figuring It Out', 'Taking a Break', 'Busy Most Days',
+        'Introverted', 'Extroverted', 'Ambivert',
+        'Lowkey', 'Chaotic', 'Chill',
+        'Early Bird', 'Night Owl',
+        'New Here', 'Local', 'From Out of State', 'International',
+        'Research Participant', 'Been in Studies Before',
+        'Here to Meet People', 'Just Exploring', 'Down for Whatever',
+    ],
+    'values_allyship': [
+        'Pro-Choice', 'Climate Conscious', 'LGBTQ+ Ally',
+        'BLM Supporter', 'Feminist', 'Mental Health Matters',
+        'Anti-Racist', 'Disability Ally', 'Pro-Immigrant',
+        'Open-Minded', 'Big on Kindness', 'Respect Matters',
+        'Community-Focused', 'Growth-Oriented',
     ],
 }
 
@@ -268,6 +291,8 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     online_persona_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
     favorite_platform_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
     least_favorite_platform_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    basic_identities_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    values_allyship_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
 
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
