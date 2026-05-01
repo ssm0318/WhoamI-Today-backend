@@ -1481,13 +1481,15 @@ class FriendList(generics.ListAPIView):
 
             self._qs = friends.filter(id__in=target_ids).order_by('username')
         elif query_type == 'has_updates':
-            friends = friends.exclude(hidden=True)
+            friends = friends.exclude(id__in=user.hidden.all())
             friends_with_updates = [
                 friend for friend in friends if not User.user_read(user, friend)
             ]
             self._qs = sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
         elif query_type == 'favorites':
             self._qs = user.favorites.all().order_by('username')
+        elif query_type == 'hidden':
+            self._qs = user.hidden.filter(current_ver=user.current_ver).order_by('username')
         else:
             raise Http404("Query parameter 'type' is invalid or not provided.")
 
@@ -1778,7 +1780,7 @@ class FriendUpdateList(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        friends = user.connected_users.filter(current_ver=user.current_ver).exclude(hidden=True)
+        friends = user.connected_users.filter(current_ver=user.current_ver).exclude(id__in=user.hidden.all())
 
         friends_with_updates = [
             friend for friend in friends if not User.user_read(user, friend)
