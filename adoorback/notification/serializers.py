@@ -13,12 +13,14 @@ User = get_user_model()
 class NotificationSerializer(serializers.ModelSerializer):
     is_response_request = serializers.SerializerMethodField(read_only=True)
     is_friend_request = serializers.SerializerMethodField(read_only=True)
+    is_chat_request = serializers.SerializerMethodField(read_only=True)
     question_content = serializers.SerializerMethodField(read_only=True)
     is_read = serializers.BooleanField(required=True)
     recent_actors = serializers.SerializerMethodField(read_only=True)
     notification_type = serializers.SerializerMethodField(read_only=True)
     is_recent = serializers.SerializerMethodField(read_only=True)
     thumbnail_url = serializers.SerializerMethodField(read_only=True)
+    target_id = serializers.SerializerMethodField(read_only=True)
 
     def get_is_response_request(self, obj):
         if obj.target is None:
@@ -29,6 +31,14 @@ class NotificationSerializer(serializers.ModelSerializer):
         if obj.target is None:
             return False
         return obj.target.type == 'FriendRequest'
+
+    def get_is_chat_request(self, obj):
+        if obj.target is None:
+            return False
+        return obj.target.type == 'ChatRequest'
+
+    def get_target_id(self, obj):
+        return obj.target.id if obj.target else None
 
     def get_recent_actors(self, obj):
         from account.serializers import UserMinimalSerializer
@@ -98,6 +108,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification
-        fields = ['id', 'is_response_request', 'is_friend_request', 'recent_actors', 'notification_type',
-                  'is_recent', 'message', 'question_content', 'is_read', 'created_at', 'redirect_url',
-                  'notification_updated_at', 'thumbnail_url']
+        fields = ['id', 'is_response_request', 'is_friend_request', 'is_chat_request',
+                  'recent_actors', 'notification_type', 'is_recent', 'message', 'question_content',
+                  'is_read', 'created_at', 'redirect_url', 'notification_updated_at',
+                  'thumbnail_url', 'target_id']
