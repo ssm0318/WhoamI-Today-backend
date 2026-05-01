@@ -72,7 +72,7 @@ class Survey(AdoorTimestampedModel):
         null=True,
         blank=True,
         db_index=True,
-        help_text='Date this Survey was last scheduled by RotateDailySurveyCronJob.',
+        help_text='Legacy field — written by the now-deleted rotation cron. Unused.',
     )
 
     class Meta:
@@ -145,15 +145,59 @@ class SurveyOption(AdoorTimestampedModel):
         ]
 
 
-class DailySurvey(AdoorTimestampedModel):
-    date = models.DateField(unique=True)
-    survey = models.ForeignKey(Survey, on_delete=models.PROTECT, related_name='scheduled_days')
+# Cadences for the 4-week study schedule. See surveys/scheduling.py for the
+# bucketing rules and surveys/migrations/0004_seed_study_schedule.py for the
+# hardcoded calendar.
+CADENCE_DAILY = 'daily'
+CADENCE_WEEKLY = 'weekly'
+CADENCE_BIWEEKLY = 'biweekly'
+CADENCE_ANYTIME = 'anytime'
+CADENCE_ENDPOINT = 'endpoint'
+CADENCE_CHOICES = (
+    (CADENCE_DAILY, 'Daily'),
+    (CADENCE_WEEKLY, 'Weekly'),
+    (CADENCE_BIWEEKLY, 'Biweekly'),
+    (CADENCE_ANYTIME, 'Anytime'),
+    (CADENCE_ENDPOINT, 'Endpoint'),
+)
+
+
+class ScheduledSurvey(AdoorTimestampedModel):
+    """Schedules a Survey for participants of the 4-week study.
+
+    Cohort-wide absolute dates: every user is on the same calendar.
+    `window_start` and `window_end` define the eligibility window.
+    `window_end=None` means the survey never closes (anytime / endpoint).
+
+    Bucketing rules (see surveys/services/scheduling.get_survey_index):
+      - Available now:     window_start <= today AND
+                           (window_end IS NULL OR today <= window_end) AND
+                           user has not answered.
+      - Late but accepted: window_end < today AND allow_late=True AND
+                           user has not answered.
+      - Completed:         user has answered.
+      - Expired (hidden):  window_end < today AND allow_late=False AND
+                           user has not answered. Only daily falls here —
+                           never returned by the API.
+    """
+    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='schedules')
+    cadence = models.CharField(max_length=16, choices=CADENCE_CHOICES)
+    window_start = models.DateField()
+    window_end = models.DateField(null=True, blank=True)
+    allow_late = models.BooleanField(default=True)
+    sequence_index = models.PositiveSmallIntegerField()
 
     class Meta:
-        ordering = ['-date']
+        ordering = ['window_start', 'sequence_index']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cadence', 'sequence_index'],
+                name='unique_scheduled_survey_cadence_seq',
+            ),
+        ]
 
     def __str__(self):
-        return f'DailySurvey<{self.date}:{self.survey.slug}>'
+        return f'{self.cadence}#{self.sequence_index} → {self.survey.slug} ({self.window_start})'
 
 
 class SurveyResponse(AdoorTimestampedModel):

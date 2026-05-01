@@ -109,9 +109,12 @@ class ResultsViewTests(APITestCase):
             survey=s, order=2, type=FREE_TEXT, prompt_en='Q2', prompt_ko='Q2',
             result_hidden=True,
         )
-        from surveys.models import DailySurvey
-        DailySurvey.objects.create(
-            date=datetime.date.today() - datetime.timedelta(days=1), survey=s,
+        from surveys.models import CADENCE_DAILY, ScheduledSurvey
+        yesterday = datetime.date.today() - datetime.timedelta(days=1)
+        ScheduledSurvey.objects.create(
+            survey=s, cadence=CADENCE_DAILY,
+            window_start=yesterday, window_end=yesterday,
+            allow_late=False, sequence_index=1,
         )
         # 5 responders to clear gate
         for i in range(6):

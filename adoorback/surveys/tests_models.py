@@ -6,7 +6,8 @@ from django.db.utils import IntegrityError
 from django.test import TestCase
 
 from surveys.models import (
-    DailySurvey, Survey, SurveyAnswer, SurveyOption, SurveyQuestion, SurveyResponse,
+    CADENCE_DAILY, ScheduledSurvey, Survey, SurveyAnswer, SurveyOption,
+    SurveyQuestion, SurveyResponse,
 )
 
 
@@ -33,12 +34,18 @@ class SurveyModelTests(TestCase):
         with self.assertRaises(IntegrityError), transaction.atomic():
             SurveyOption.objects.create(question=q, order=1, label_en='B', label_ko='B', value=2)
 
-    def test_daily_survey_date_unique(self):
+    def test_scheduled_survey_cadence_seq_unique(self):
         s = Survey.objects.create(slug='s4', title_en='T', title_ko='T')
         d = datetime.date(2026, 5, 1)
-        DailySurvey.objects.create(date=d, survey=s)
+        ScheduledSurvey.objects.create(
+            survey=s, cadence=CADENCE_DAILY, sequence_index=1,
+            window_start=d, window_end=d, allow_late=False,
+        )
         with self.assertRaises(IntegrityError), transaction.atomic():
-            DailySurvey.objects.create(date=d, survey=s)
+            ScheduledSurvey.objects.create(
+                survey=s, cadence=CADENCE_DAILY, sequence_index=1,
+                window_start=d, window_end=d, allow_late=False,
+            )
 
     def test_response_unique_per_user_per_survey(self):
         s = Survey.objects.create(slug='s5', title_en='T', title_ko='T')

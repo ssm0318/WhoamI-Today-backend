@@ -3,7 +3,7 @@ from datetime import date
 from rest_framework import serializers
 
 from surveys.models import (
-    DailySurvey, Survey, SurveyOption, SurveyQuestion, SurveyResponse,
+    ScheduledSurvey, Survey, SurveyOption, SurveyQuestion, SurveyResponse,
 )
 
 
@@ -26,6 +26,13 @@ class SurveyQuestionSerializer(serializers.ModelSerializer):
             'reverse_scored',
             'options',
         ]
+
+
+class SurveyMinimalSerializer(serializers.ModelSerializer):
+    """Lightweight Survey shape for the bucketed index (no questions)."""
+    class Meta:
+        model = Survey
+        fields = ['slug', 'title_en', 'title_ko']
 
 
 class SurveyDetailSerializer(serializers.ModelSerializer):
@@ -76,12 +83,17 @@ class SurveyResponseInputSerializer(serializers.Serializer):
 
 
 class PastSurveySerializer(serializers.ModelSerializer):
+    """Daily-archive serializer. Wraps a daily ScheduledSurvey row in the same
+    {date, survey, user_answered, results_unlocked} shape that DailySurvey rows
+    used to produce, so the existing daily-archive frontend doesn't change.
+    """
+    date = serializers.DateField(source='window_start', read_only=True)
     survey = SurveyDetailSerializer(read_only=True)
     user_answered = serializers.SerializerMethodField()
     results_unlocked = serializers.SerializerMethodField()
 
     class Meta:
-        model = DailySurvey
+        model = ScheduledSurvey
         fields = ['date', 'survey', 'user_answered', 'results_unlocked']
 
     def get_user_answered(self, obj):
@@ -93,4 +105,35 @@ class PastSurveySerializer(serializers.ModelSerializer):
     def get_results_unlocked(self, obj):
         if not self.get_user_answered(obj):
             return False
-        return obj.date < date.today()
+        return obj.window_start < date.today()
+
+
+class SurveyIndexEntrySerializer(serializers.ModelSerializer):
+    """One ScheduledSurvey row in the bucketed `/api/surveys/index/` payload.
+
+    The view annotates `bucket` ('available_now' | 'late_but_accepted' |
+    'completed') on each instance before serializing. `submitted_at` comes
+    from the queryset annotation `user_submitted_at` (see scheduling.py).
+    """
+    survey = SurveyMinimalSerializer(read_only=True)
+    bucket = serializers.CharField(read_only=True)
+    user_answered = serializers.BooleanField(read_only=True)
+    submitted_at = serializers.DateTimeField(
+        source='user_submitted_at', allow_null=True, read_only=True,
+    )
+    redirect_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ScheduledSurvey
+        fields = [
+            'id', 'cadence', 'sequence_index',
+            'window_start', 'window_end',
+            'survey', 'bucket',
+            'user_answered', 'submitted_at',
+            'redirect_url',
+        ]
+
+    def get_redirect_url(self, obj):
+        if getattr(obj, 'bucket', None) == 'completed':
+            return f'/surveys/{obj.survey.slug}/results'
+        return f'/surveys/{obj.survey.slug}/answer'

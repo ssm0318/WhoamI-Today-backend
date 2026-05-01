@@ -2,10 +2,30 @@ from django.contrib.auth import get_user_model
 
 from account.models import Connection
 from surveys.models import (
-    DailySurvey, FREE_TEXT, LIKERT_5, Survey, SurveyAnswer, SurveyQuestion, SurveyResponse,
+    CADENCE_DAILY, FREE_TEXT, LIKERT_5, ScheduledSurvey, Survey, SurveyAnswer,
+    SurveyQuestion, SurveyResponse,
 )
 
 User = get_user_model()
+
+
+def _schedule_daily(survey, schedule_date):
+    """Create a ScheduledSurvey row for `survey` on `schedule_date` (cadence=daily).
+
+    sequence_index is auto-assigned to keep test setups simple — the
+    (cadence, sequence_index) unique constraint is satisfied as long as each
+    helper call gets a fresh number. allow_late=False matches production
+    daily semantics.
+    """
+    next_seq = ScheduledSurvey.objects.filter(cadence=CADENCE_DAILY).count() + 1
+    return ScheduledSurvey.objects.create(
+        survey=survey,
+        cadence=CADENCE_DAILY,
+        window_start=schedule_date,
+        window_end=schedule_date,
+        allow_late=False,
+        sequence_index=next_seq,
+    )
 
 
 def make_user(name):
@@ -24,7 +44,7 @@ def make_likert_survey(slug='s', n_questions=2, schedule_date=None):
             reverse_scored=(i == 2),
         )
     if schedule_date is not None:
-        DailySurvey.objects.create(date=schedule_date, survey=s)
+        _schedule_daily(s, schedule_date)
     return s
 
 
@@ -46,7 +66,7 @@ def make_mixed_survey(slug='m', n_likert=2, n_free_text=1, schedule_date=None):
         )
         order += 1
     if schedule_date is not None:
-        DailySurvey.objects.create(date=schedule_date, survey=s)
+        _schedule_daily(s, schedule_date)
     return s
 
 

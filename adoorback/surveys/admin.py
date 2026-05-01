@@ -1,7 +1,8 @@
 from django.contrib import admin
 
 from surveys.models import (
-    DailySurvey, Survey, SurveyAnswer, SurveyOption, SurveyQuestion, SurveyResponse,
+    ScheduledSurvey, Survey, SurveyAnswer, SurveyOption, SurveyQuestion,
+    SurveyResponse,
 )
 
 
@@ -30,10 +31,12 @@ class SurveyQuestionAdmin(admin.ModelAdmin):
     inlines = [SurveyOptionInline]
 
 
-@admin.register(DailySurvey)
-class DailySurveyAdmin(admin.ModelAdmin):
-    list_display = ('date', 'survey')
-    date_hierarchy = 'date'
+@admin.register(ScheduledSurvey)
+class ScheduledSurveyAdmin(admin.ModelAdmin):
+    list_display = ('cadence', 'sequence_index', 'survey', 'window_start', 'window_end', 'allow_late')
+    list_filter = ('cadence', 'allow_late')
+    search_fields = ('survey__slug',)
+    ordering = ('window_start', 'sequence_index')
 
 
 @admin.register(SurveyResponse)
