@@ -2967,11 +2967,11 @@ class DiscoverFeedView(generics.ListAPIView):
                     existing_obj_ids.add((type(cand), cand.id))
                     break
 
-        # Step 2: If still less than 10, fill more in round-robin fashion
-        while len(feed_items) < 10:
+        # Step 2: If still less than 7, fill more in round-robin fashion
+        while len(feed_items) < 7:
             added_in_round = False
             for candidates, category_name in category_candidates:
-                if len(feed_items) >= 10:
+                if len(feed_items) >= 7:
                     break
                 
                 while candidates:
@@ -2985,8 +2985,8 @@ class DiscoverFeedView(generics.ListAPIView):
             if not added_in_round:
                 break
 
-        # 5. Fallback: Fill up to 10 random posts (from any non-friends) if still not enough
-        if len(feed_items) < 10:
+        # 5. Fallback: Fill up to 7 random posts (from any non-friends) if still not enough
+        if len(feed_items) < 7:
             # Random Response — only public
             random_responses = list(_Response.objects.filter(
                 visibility__contains=['public'],
@@ -3007,7 +3007,7 @@ class DiscoverFeedView(generics.ListAPIView):
             random.shuffle(random_potentials) # Shuffle candidates for random selection
             
             for obj in random_potentials:
-                if len(feed_items) >= 10:
+                if len(feed_items) >= 7:
                     break
                 if (type(obj), obj.id) not in existing_obj_ids and obj.is_audience(user):
                     feed_items.append((obj, 'random'))
@@ -3041,7 +3041,7 @@ class DiscoverFeedView(generics.ListAPIView):
 
         music_songs = []
         for song in music_candidates:
-            if len(music_songs) >= 10:
+            if len(music_songs) >= 7:
                 break
             author = song.user
             active_check_in = CheckInModel.objects.filter(user=author, is_active=True).first()
@@ -3177,71 +3177,6 @@ class DiscoverFeedView(generics.ListAPIView):
                 q_idx = random.choice([1, 2])
                 results.insert(min(len(results), q_idx), q_card)
         
-        original_count = len(results)
-
-        # Inject Interest (single category, rotating)
-        if original_count >= 5:
-            i_idx = random.choice([5, 6])
-
-            user = request.user
-            user_interests = user.user_interests.all()
-            all_categories = [key for key, _ in CHIP_CATEGORY_CHOICES]
-
-            # Count user's selections per category
-            selection_counts = {}
-            for cat_key in all_categories:
-                selection_counts[cat_key] = user_interests.filter(category=cat_key).count()
-
-            # Sort by fewest selections (ascending), then shuffle ties
-            sorted_cats = sorted(all_categories, key=lambda c: (selection_counts[c], random.random()))
-
-            # Pick first category that differs from last shown; fall back to first if all same
-            last_shown = user.last_interest_card_category
-            chosen_category = sorted_cats[0]
-            if last_shown and len(sorted_cats) > 1:
-                for cat in sorted_cats:
-                    if cat != last_shown:
-                        chosen_category = cat
-                        break
-
-            # Save chosen category for next rotation
-            user.last_interest_card_category = chosen_category
-            user.save(update_fields=['last_interest_card_category'])
-
-            # Build interest list for the chosen category
-            category_label = dict(CHIP_CATEGORY_CHOICES)[chosen_category]
-            category_interests = user_interests.filter(category=chosen_category)
-            user_interest_contents = {i.content for i in category_interests}
-
-            # Use CHIPS_BY_CATEGORY (matching frontend chips.ts)
-            category_chips = CHIPS_BY_CATEGORY.get(chosen_category, [])
-            category_chips_set = set(category_chips)
-
-            interest_list = []
-            for chip_name in category_chips:
-                interest_list.append({
-                    "content": chip_name,
-                    "is_selected": chip_name in user_interest_contents
-                })
-
-            # Add custom interests in this category (user-created, not in predefined chips)
-            for user_interest in category_interests:
-                if user_interest.content not in category_chips_set:
-                    interest_list.append({
-                        "content": user_interest.content,
-                        "is_selected": True
-                    })
-
-            interest_card = {
-                "type": "Interest",
-                "body": {
-                    "category": chosen_category,
-                    "category_label": category_label,
-                    "list": interest_list
-                }
-            }
-            results.insert(min(len(results), i_idx), interest_card)
-
         # Build music_tracks for the first page only
         music_tracks_data = []
         request_page = request.query_params.get('page', '1')
