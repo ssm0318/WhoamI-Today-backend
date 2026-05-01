@@ -270,40 +270,33 @@ def get_chat_room(user1, user2):
     return ChatRoom.objects.filter(user1=user1, user2=user2).first()
 
 
-@transaction.atomic
-@receiver(post_save, sender=Message, dispatch_uid='create_message_notification')
-def create_message_notification(created, instance, **kwargs):
-    if not created:
-        return
-
-    # Suppress notifications for the original (non-mirror) message in WIT Admin
-    # proxy rooms. The mirror in the user's User↔WIT_Admin chat fires its own
-    # notification as `wit_admin`, which is the one the regular user should
-    # see. Without this guard the user gets a duplicate "op_jaewon sent you a
-    # message" push that links to a chat hidden from them (404).
-    if instance.chat_room.is_wit_admin_proxy and not instance.is_wit_admin_mirror:
-        return
-
-    receiver_user = instance.receiver
-    sender = instance.sender
-
-    # Skip notifications for group messages (no single receiver)
-    if receiver_user is None:
-        return
-
+def _send_message_notification(receiver_user, sender, instance, redirect_url, group_name=None):
+    """Create or update a push-only message notification for one receiver."""
     if receiver_user.id in sender.user_report_blocked_ids:
         return
 
     # Determine notification text based on message type
-    if instance.image:
-        noti_ko = f"{sender.username}님이 사진을 보냈습니다!"
-        noti_en = f"{sender.username} sent you a photo!"
-    elif instance.shared_object_id:
-        noti_ko = f"{sender.username}님이 게시글을 보냈습니다!"
-        noti_en = f"{sender.username} sent you a post!"
+    if group_name:
+        truncated = (group_name[:15] + '…') if len(group_name) > 15 else group_name
+        if instance.image:
+            noti_ko = f"{sender.username}님이 {truncated}에 사진을 보냈습니다!"
+            noti_en = f"{sender.username} sent a photo in {truncated}"
+        elif instance.shared_object_id:
+            noti_ko = f"{sender.username}님이 {truncated}에 게시글을 보냈습니다!"
+            noti_en = f"{sender.username} sent a post in {truncated}"
+        else:
+            noti_ko = f"{sender.username}님이 {truncated}에 메시지를 보냈습니다!"
+            noti_en = f"{sender.username} sent a message in {truncated}"
     else:
-        noti_ko = f"{sender.username}님이 메시지를 보냈습니다!"
-        noti_en = f"{sender.username} sent you a message!"
+        if instance.image:
+            noti_ko = f"{sender.username}님이 사진을 보냈습니다!"
+            noti_en = f"{sender.username} sent you a photo!"
+        elif instance.shared_object_id:
+            noti_ko = f"{sender.username}님이 게시글을 보냈습니다!"
+            noti_en = f"{sender.username} sent you a post!"
+        else:
+            noti_ko = f"{sender.username}님이 메시지를 보냈습니다!"
+            noti_en = f"{sender.username} sent you a message!"
 
     recent_noti = Notification.objects.find_recent_message(receiver_user, sender)
 
@@ -317,8 +310,13 @@ def create_message_notification(created, instance, **kwargs):
             pass
 
         new_count = current_count + 1
-        recent_noti.message_ko = f"{sender.username}님이 {new_count}개의 메시지를 보냈습니다!"
-        recent_noti.message_en = f"{sender.username} sent you {new_count} messages!"
+        if group_name:
+            truncated = (group_name[:15] + '…') if len(group_name) > 15 else group_name
+            recent_noti.message_ko = f"{sender.username}님이 {truncated}에 {new_count}개의 메시지를 보냈습니다!"
+            recent_noti.message_en = f"{sender.username} sent {new_count} messages in {truncated}"
+        else:
+            recent_noti.message_ko = f"{sender.username}님이 {new_count}개의 메시지를 보냈습니다!"
+            recent_noti.message_en = f"{sender.username} sent you {new_count} messages!"
         recent_noti.notification_updated_at = timezone.now()
         recent_noti.save()
 
@@ -330,10 +328,41 @@ def create_message_notification(created, instance, **kwargs):
             target=instance,
             message_ko=noti_ko,
             message_en=noti_en,
-            redirect_url=f"/users/{sender.id}/chat",
+            redirect_url=redirect_url,
             is_visible=False,
         )
         NotificationActor.objects.create(user=sender, notification=noti)
+
+
+@transaction.atomic
+@receiver(post_save, sender=Message, dispatch_uid='create_message_notification')
+def create_message_notification(created, instance, **kwargs):
+    if not created:
+        return
+
+    # Suppress notifications for the original (non-mirror) message in WIT Admin
+    # proxy rooms.
+    if instance.chat_room.is_wit_admin_proxy and not instance.is_wit_admin_mirror:
+        return
+
+    sender = instance.sender
+    chat_room = instance.chat_room
+
+    if chat_room.is_group:
+        # 그룹 채팅: sender 제외 모든 멤버에게 알림
+        member_ids = chat_room.members.exclude(id=sender.id).values_list('id', flat=True)
+        members = get_user_model().objects.filter(id__in=member_ids)
+        redirect_url = f"/chats/group/{chat_room.id}"
+        display_name = chat_room.name or 'Group Chat'
+        for member in members:
+            _send_message_notification(member, sender, instance, redirect_url, group_name=display_name)
+    else:
+        # 1:1 채팅
+        receiver_user = instance.receiver
+        if receiver_user is None:
+            return
+        redirect_url = f"/users/{sender.id}/chat"
+        _send_message_notification(receiver_user, sender, instance, redirect_url)
 
 
 @transaction.atomic
