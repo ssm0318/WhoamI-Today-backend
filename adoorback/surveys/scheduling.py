@@ -25,8 +25,12 @@ def _annotate_user_response(qs, user):
 def get_today_daily(user):
     """Return today's daily ScheduledSurvey for `user`, or None.
 
-    Filters on user_answered=False so the SurveyOfTheDay card on /share
-    disappears once the user has answered today's daily.
+    Returns the row regardless of whether the user has answered — the
+    SurveyOfTheDay card on /share renders an answered-state UI ("Done /
+    View results") once user_has_responded flips true. Hiding the card
+    after answering led to confusion ("did I do it? was it submitted?")
+    and a stale-cache window where users could navigate back into the
+    answer form and hit a 409.
     """
     today = date.today()
     return (
@@ -36,7 +40,6 @@ def get_today_daily(user):
             ),
             user,
         )
-        .filter(user_answered=False)
         .select_related('survey')
         .first()
     )
