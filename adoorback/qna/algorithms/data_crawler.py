@@ -12,16 +12,19 @@ NUM_DAILY_QUESTIONS = 1
 
 
 def select_daily_questions(set_date=None):
+    if not set_date:
+        set_date = datetime.date.today() + datetime.timedelta(days=1)
+
+    if Question.objects.filter(selected_dates__contains=[set_date]).count() >= NUM_DAILY_QUESTIONS:
+        return
+
     questions = Question.objects.filter(selected=False).order_by('?')[:NUM_DAILY_QUESTIONS]
-    
+
     # if we run out of questions to select from
     if questions.count() < NUM_DAILY_QUESTIONS:
         Question.objects.update(selected=False)
         questions |= Question.objects.filter(selected=False).order_by('?')[:(NUM_DAILY_QUESTIONS - questions.count())]
 
-    if not set_date:
-        set_date = datetime.date.today() + datetime.timedelta(days=1)
-        
     for question in questions:
         question.selected_dates.append(set_date)
         question.selected = True
