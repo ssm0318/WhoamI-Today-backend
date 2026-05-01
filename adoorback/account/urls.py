@@ -10,6 +10,7 @@ urlpatterns = [
     path('signup/username/', views.UserUsernameCheck.as_view(), name='user-username-check'),
     path('signup/birthdate/', views.UserBirthDateCheck.as_view(), name='user-birthdate-check'),
     path('signup/inviter-birthdate/', views.UserInviterBirthDateCheck.as_view(), name='user-inviter-birthdate-check'),
+    path('signup/inviter-username/', views.UserInviterUsernameCheck.as_view(), name='user-inviter-username-check'),
     path('signup/', views.UserSignup.as_view(), name='user-signup'),
     path('activate/<uidb64>/<str:token>/', views.UserVerifyEmail.as_view(), name='user-verify-email'),
     path('send-reset-password-email/', views.SendResetPasswordEmail.as_view(), name='user-send-reset-password-email'),

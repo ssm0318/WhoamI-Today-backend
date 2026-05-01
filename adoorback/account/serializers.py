@@ -211,21 +211,42 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
 
 
 class CurrentUserSignupSerializer(CurrentUserSerializer):
+    inviter_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+
+    def validate(self, attrs):
+        # inviter_id is not a User model field; pull it out before parent validate
+        # (parent validate constructs User(**attrs) for password validation).
+        inviter_id = attrs.pop('inviter_id', None)
+        validated = super().validate(attrs)
+        if inviter_id:
+            validated['inviter_id'] = inviter_id
+        return validated
+
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop('password')
+        inviter_id = validated_data.pop('inviter_id', None)
 
         user = User(**validated_data)
         user.set_password(password)
         user.save()
 
-        # Assign group/version based on odd/even user ID
-        if user.id % 2 == 1:  # odd
-            user.user_group = 'group_q_first'
-            user.current_ver = 'version_q'
-        else:  # even
-            user.user_group = 'group_w_first'
-            user.current_ver = 'version_w'
+        inviter = None
+        if inviter_id:
+            inviter = User.objects.filter(id=inviter_id).first()
+
+        if inviter:
+            user.invited_from = inviter
+            user.user_group = inviter.user_group
+            user.current_ver = inviter.current_ver
+        else:
+            # Fallback: assign group/version based on odd/even user ID
+            if user.id % 2 == 1:  # odd
+                user.user_group = 'group_q_first'
+                user.current_ver = 'version_q'
+            else:  # even
+                user.user_group = 'group_w_first'
+                user.current_ver = 'version_w'
 
         # Prevent redirect to password change page
         user.has_changed_pw = True
@@ -234,7 +255,7 @@ class CurrentUserSignupSerializer(CurrentUserSerializer):
         return user
 
     class Meta(CurrentUserSerializer.Meta):
-        fields = CurrentUserSerializer.Meta.fields
+        fields = CurrentUserSerializer.Meta.fields + ['inviter_id']
         extra_kwargs = {**CurrentUserSerializer.Meta.extra_kwargs}
 
 
@@ -287,6 +308,10 @@ class UserBirthDateSerializer(serializers.ModelSerializer):
 
 class UserInviterEmailBirthDateSerializer(serializers.Serializer):
     email = serializers.EmailField()
+
+
+class UserInviterUsernameSerializer(serializers.Serializer):
+    username = serializers.CharField()
 
 
 class UserProfileSerializer(UserMinimalSerializer):

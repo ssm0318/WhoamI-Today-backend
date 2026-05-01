@@ -43,7 +43,8 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
                                  UserEmailSerializer, UserUsernameSerializer, UserBirthDateSerializer, \
-                                 UserInviterEmailBirthDateSerializer, FriendListSerializer, \
+                                 UserInviterEmailBirthDateSerializer, UserInviterUsernameSerializer, \
+                                 FriendListSerializer, \
                                  UserFriendsUpdateSerializer, UserMinimumSerializer, BlockRecSerializer, \
                                  UserFriendRequestSerializer, UserPasswordSerializer, UserProfileSerializer, \
                                  AppSessionSerializer, FriendFriendListSerializer, \
@@ -54,7 +55,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
 from account.view_as import apply_profile_view_as, parse_view_as, resolve_public_proxy_viewer, resolve_shadow_viewer
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
-    NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail
+    NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail, InvalidInviterUsername
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
 from note.serializers import NoteSerializer
@@ -390,6 +391,38 @@ class UserInviterBirthDateCheck(generics.CreateAPIView):
             'inviter_id': inviter.id,
             'user_group': user_group,
             'current_ver': current_ver
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+class UserInviterUsernameCheck(generics.CreateAPIView):
+    serializer_class = UserInviterUsernameSerializer
+    parser_classes = (MultiPartParser, FormParser)
+    authentication_classes = []
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def create(self, request, *args, **kwargs):
+        if 'HTTP_ACCEPT_LANGUAGE' in self.request.META:
+            lang = self.request.META['HTTP_ACCEPT_LANGUAGE']
+            translation.activate(lang)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        invited_username = serializer.validated_data.get('username').strip()
+        try:
+            inviter = User.objects.get(username=invited_username)
+        except ObjectDoesNotExist:
+            raise InvalidInviterUsername()
+
+        response_data = {
+            'username': invited_username,
+            'inviter_id': inviter.id,
+            'user_group': inviter.user_group,
+            'current_ver': inviter.current_ver,
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
