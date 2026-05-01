@@ -90,6 +90,10 @@ def _seed_response(user, survey, rng: random.Random) -> None:
             value = rng.sample(opts, k=min(n_pick, len(opts))) if opts else []
         elif qtype == 'free_text':
             value = rng.choice(_FREE_TEXT_SAMPLES)
+        elif qtype == 'slider':
+            lo = question.slider_min_value if question.slider_min_value is not None else 0
+            hi = question.slider_max_value if question.slider_max_value is not None else 100
+            value = rng.randint(lo, hi)
         else:
             value = _random_likert(rng)
         SurveyAnswer.objects.create(response=response, question=question, value=value)
