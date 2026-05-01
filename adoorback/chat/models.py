@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
+from account.models import OverwriteStorage
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.helpers import wrap_content
 from notification.models import Notification, NotificationActor
@@ -100,7 +101,7 @@ class Message(AdoorTimestampedModel, SafeDeleteModel):
     receiver = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='received_messages', null=True, blank=True)
     emoji = models.CharField(max_length=20, choices=MESSAGE_EMOJI_CHOICES, blank=True, null=True)
     content = models.TextField(blank=True, validators=[MaxLengthValidator(10000)])
-    image = models.ImageField(upload_to='chat_images/', blank=True, null=True)
+    image = models.ImageField(upload_to='chat_images/', storage=OverwriteStorage(), blank=True, null=True)
     is_read = models.BooleanField(default=False)
     # WIT Admin hotfix loop guard
     is_wit_admin_mirror = models.BooleanField(default=False)
