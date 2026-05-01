@@ -40,16 +40,15 @@ class QCurrentUserTests(APITestCase):
         self.assertIn('chips_by_category', response.data)
         self.assertIn('custom_chips', response.data)
 
-    def test_q_me_excludes_friends_only_fields(self):
-        """Q me should NOT include per-item *_friends_only fields (Q uses is_public)."""
+    def test_q_me_excludes_visibility_fields(self):
+        """Q me should NOT include per-item *_visibility fields (Q uses is_public)."""
         url = reverse('q-current-user-detail')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotIn('interests_friends_only', response.data)
-        self.assertNotIn('persona_friends_only', response.data)
-        self.assertNotIn('pronouns_friends_only', response.data)
-        self.assertNotIn('bio_friends_only', response.data)
-        self.assertNotIn('music_entertainment_friends_only', response.data)
+        self.assertNotIn('name_visibility', response.data)
+        self.assertNotIn('pronouns_visibility', response.data)
+        self.assertNotIn('bio_visibility', response.data)
+        self.assertNotIn('music_entertainment_visibility', response.data)
         # is_public should still be present
         self.assertIn('is_public', response.data)
 
@@ -109,11 +108,11 @@ class QPublicPrivateProfileTests(APITestCase):
         self.assertEqual(response.data.get('bio'), 'My bio')
         self.assertEqual(response.data.get('pronouns'), 'they/them')
 
-    def test_public_account_ignores_stale_friends_only_flags(self):
-        """Even if stale *_friends_only flags are True, public Q account shows everything."""
+    def test_public_account_ignores_per_field_visibility(self):
+        """Public Q account shows everything regardless of per-field visibility settings."""
         self.target.is_public = True
-        self.target.bio_friends_only = True
-        self.target.pronouns_friends_only = True
+        self.target.bio_visibility = 'friends'
+        self.target.pronouns_visibility = 'friends'
         self.target.save()
         url = reverse('q-user-detail', kwargs={'username': 'target'})
         response = self.client.get(url)

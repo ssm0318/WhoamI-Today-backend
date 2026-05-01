@@ -7,19 +7,19 @@ class QCurrentUserSerializer(CurrentUserSerializer):
     """
     CurrentUser serializer for Version Q.
     - No chips_by_category, no custom_chips (Q uses flat interest/persona lists)
-    - No per-item *_friends_only flags (Q uses account-level is_public)
+    - No per-item *_visibility flags (Q uses account-level is_public)
     """
     class Meta(CurrentUserSerializer.Meta):
         fields = [f for f in CurrentUserSerializer.Meta.fields
                   if f not in ('chips_by_category', 'custom_chips')
-                  and not f.endswith('_friends_only')]
+                  and not f.endswith('_visibility')]
 
 
 class QUserProfileSerializer(UserProfileSerializer):
     """
     UserProfile serializer for Version Q.
     - No chip-related fields
-    - Uses account-level is_public instead of per-item *_friends_only visibility
+    - Uses account-level is_public instead of per-item *_visibility
     """
     class Meta(UserProfileSerializer.Meta):
         fields = [f for f in UserProfileSerializer.Meta.fields
@@ -41,14 +41,14 @@ class QUserProfileSerializer(UserProfileSerializer):
                 can_see_private = True
 
         if not can_see_private:
+            # Q ignores per-field visibility — undo any masking the W parent applied.
+            ret['name'] = instance.name
             if instance.is_public:
-                # Public account: undo any per-item masking from parent
                 ret['pronouns'] = instance.pronouns
                 ret['bio'] = instance.bio
                 ret['user_interests'] = [str(i) for i in instance.user_interests.all()]
                 ret['user_personas'] = [str(p) for p in instance.user_personas.all()]
             else:
-                # Private account: hide everything
                 ret['pronouns'] = None
                 ret['bio'] = None
                 ret['user_interests'] = []

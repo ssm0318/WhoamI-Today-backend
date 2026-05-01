@@ -201,12 +201,12 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
         fields = ['id', 'username', 'email', 'password',
                   'profile_pic', 'question_history', 'url',
                   'profile_image', 'gender', 'date_of_birth',
-                  'ethnicity', 'nationality', 'research_agreement', 'pronouns', 'bio', 'persona',
+                  'ethnicity', 'nationality', 'research_agreement', 'name', 'pronouns', 'bio', 'persona',
                   'user_interests', 'user_personas', 'chips_by_category', 'custom_chips',
-                  'interests_friends_only', 'persona_friends_only', 'pronouns_friends_only', 'bio_friends_only',
-                  'music_entertainment_friends_only', 'hobbies_activities_friends_only',
-                  'on_my_mind_friends_only', 'as_a_friend_friends_only', 'online_persona_friends_only',
-                  'favorite_platform_friends_only', 'least_favorite_platform_friends_only',
+                  'name_visibility', 'pronouns_visibility', 'bio_visibility',
+                  'music_entertainment_visibility', 'hobbies_activities_visibility',
+                  'on_my_mind_visibility', 'as_a_friend_visibility', 'online_persona_visibility',
+                  'favorite_platform_visibility', 'least_favorite_platform_visibility',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
@@ -503,35 +503,56 @@ class UserProfileSerializer(UserMinimalSerializer):
         ret = super().to_representation(instance)
         user = self._get_viewer()
         view_as = self.context.get('view_as')
+        request = self.context.get('request')
+        actual_requester = request.user if request else None
+        is_owner_preview = (
+            view_as is not None
+            and actual_requester == instance
+            and self.context.get('shadow_viewer') is None
+        )
 
-        # Check if the requester should see private fields
-        can_see_private = False
-        if user is not None:
-            request = self.context.get('request')
-            actual_requester = request.user if request else None
-            if view_as is not None and actual_requester == instance and self.context.get('shadow_viewer') is None:
-                # Owner is previewing as a specific audience tier (no shadow viewer set):
-                # 'public' is treated as a non-friend; 'friends' and 'close_friends' are friends.
-                can_see_private = view_as in ('friends', 'close_friends')
-            elif user == instance or user.is_connected(instance):
-                can_see_private = True
+        def can_see(visibility):
+            if visibility == 'public':
+                return True
+            if user is None:
+                return False
+            if user == instance:
+                return True
+            if is_owner_preview:
+                # Owner previewing as a specific audience tier.
+                if visibility == 'only_me':
+                    return False
+                if visibility == 'friends':
+                    return view_as in ('friends', 'close_friends')
+                if visibility == 'close_friends':
+                    return view_as == 'close_friends'
+                return False
+            if visibility == 'only_me':
+                return False
+            if visibility == 'friends':
+                return user.is_connected(instance)
+            if visibility == 'close_friends':
+                return user.is_close_friend(instance)
+            return False
 
-        if not can_see_private:
-            hidden_categories = {
-                cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
-                if getattr(instance, f"{cat_key}_friends_only", False)
-            }
-            if hidden_categories:
-                visible_interests = instance.user_interests.exclude(
-                    category__in=hidden_categories
-                ).values_list('content', flat=True)
-                ret['user_interests'] = list(visible_interests)
-            if instance.online_persona_friends_only:
-                ret['user_personas'] = []
-            if instance.pronouns_friends_only:
-                ret['pronouns'] = None
-            if instance.bio_friends_only:
-                ret['bio'] = None
+        if not can_see(instance.name_visibility):
+            ret['name'] = None
+        if not can_see(instance.pronouns_visibility):
+            ret['pronouns'] = None
+        if not can_see(instance.bio_visibility):
+            ret['bio'] = None
+
+        hidden_categories = {
+            cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
+            if not can_see(getattr(instance, f"{cat_key}_visibility"))
+        }
+        if hidden_categories:
+            visible_interests = instance.user_interests.exclude(
+                category__in=hidden_categories
+            ).values_list('content', flat=True)
+            ret['user_interests'] = list(visible_interests)
+        if 'online_persona' in hidden_categories:
+            ret['user_personas'] = []
 
         return ret
 
@@ -543,7 +564,7 @@ class UserProfileSerializer(UserMinimalSerializer):
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals',
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
                                                       'sent_chat_request_to', 'received_chat_request_from',
-                                                      'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
+                                                      'name', 'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'unread_chat_count', 'unread_message_cnt', 'connection_status',
                                                       'friend_count', 'email_verified',
                                                       'mutual_personas', 'mutual_interests',
