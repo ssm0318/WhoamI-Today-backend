@@ -3,8 +3,30 @@ from datetime import date
 from rest_framework import serializers
 
 from surveys.models import (
-    ScheduledSurvey, Survey, SurveyOption, SurveyQuestion, SurveyResponse,
+    SLIDER, ScheduledSurvey, Survey, SurveyOption, SurveyQuestion, SurveyResponse,
 )
+
+
+def validate_answer_value(question: SurveyQuestion, value) -> None:
+    """Per-question-type validation for an inbound SurveyAnswer value.
+
+    Raises ``serializers.ValidationError`` on rejection — DRF surfaces it as
+    a 400. Currently only slider ranges are checked; other types accept the
+    JSONField shape as-is (matches existing behavior).
+    """
+    if question.type == SLIDER:
+        # Reject bool first (bool is an int subclass in Python).
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise serializers.ValidationError({
+                'answers': [f'slider answer must be an integer (got {type(value).__name__})'],
+            })
+        if value < question.slider_min_value or value > question.slider_max_value:
+            raise serializers.ValidationError({
+                'answers': [
+                    f'slider value {value} out of range '
+                    f'[{question.slider_min_value}, {question.slider_max_value}]'
+                ],
+            })
 
 
 class SurveyOptionSerializer(serializers.ModelSerializer):
@@ -24,6 +46,7 @@ class SurveyQuestionSerializer(serializers.ModelSerializer):
             'low_label_en', 'low_label_ko',
             'high_label_en', 'high_label_ko',
             'reverse_scored',
+            'slider_min_value', 'slider_max_value',
             'options',
         ]
 

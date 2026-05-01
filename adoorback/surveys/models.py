@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -15,11 +16,13 @@ LIKERT_5 = 'likert_5'
 SINGLE_CHOICE = 'single_choice'
 MULTI_CHOICE = 'multi_choice'
 FREE_TEXT = 'free_text'
+SLIDER = 'slider'
 TYPE_CHOICES = (
     (LIKERT_5, 'Likert 5-point'),
     (SINGLE_CHOICE, 'Single choice'),
     (MULTI_CHOICE, 'Multi choice'),
     (FREE_TEXT, 'Free text'),
+    (SLIDER, 'Slider'),
 )
 
 # Result rendering kinds — the registry key shared between the backend aggregation
@@ -28,10 +31,12 @@ TYPE_CHOICES = (
 RESULT_AGGREGATED_LIKERT = 'aggregated_likert'
 RESULT_OPTION_COUNTS = 'option_counts'
 RESULT_WORDCLOUD = 'wordcloud'
+RESULT_SLIDER_HISTOGRAM = 'slider_histogram'
 RESULT_KIND_CHOICES = (
     (RESULT_AGGREGATED_LIKERT, 'Aggregated likert score'),
     (RESULT_OPTION_COUNTS, 'Per-option counts'),
     (RESULT_WORDCLOUD, 'Wordcloud (free-text tokens)'),
+    (RESULT_SLIDER_HISTOGRAM, 'Slider histogram'),
 )
 
 # Default result kind per question type. A panel can override with
@@ -41,6 +46,7 @@ DEFAULT_RESULT_KIND_FOR_TYPE = {
     SINGLE_CHOICE: RESULT_OPTION_COUNTS,
     MULTI_CHOICE: RESULT_OPTION_COUNTS,
     FREE_TEXT: RESULT_WORDCLOUD,
+    SLIDER: RESULT_SLIDER_HISTOGRAM,
 }
 
 # Result kinds for which friend / close-friend buckets are suppressed by default
@@ -115,12 +121,29 @@ class SurveyQuestion(AdoorTimestampedModel):
         default=False,
         help_text='If True, this question is answered but never appears on the results page.',
     )
+    # Slider-only inclusive bounds. Always nullable; required (and validated by
+    # clean()) when type=slider. low_label / high_label double as the slider's
+    # min/max labels — no parallel fields.
+    slider_min_value = models.IntegerField(null=True, blank=True)
+    slider_max_value = models.IntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['survey_id', 'order']
         constraints = [
             models.UniqueConstraint(fields=['survey', 'order'], name='unique_question_order_per_survey'),
         ]
+
+    def clean(self):
+        super().clean()
+        if self.type == SLIDER:
+            if self.slider_min_value is None or self.slider_max_value is None:
+                raise ValidationError(
+                    'slider questions require both slider_min_value and slider_max_value'
+                )
+            if self.slider_min_value >= self.slider_max_value:
+                raise ValidationError(
+                    'slider_min_value must be strictly less than slider_max_value'
+                )
 
     @property
     def effective_result_kind(self) -> str:
