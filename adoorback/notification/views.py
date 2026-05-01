@@ -4,6 +4,7 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from check_in.models import CheckInPost
 from note.models import Note
 from notification.models import Notification
 from notification.serializers import NotificationSerializer
@@ -34,6 +35,7 @@ class NotificationList(generics.ListAPIView):
         # Collect referenced post IDs from redirect_urls
         note_ids = set()
         response_ids = set()
+        check_in_post_ids = set()
         for noti in notifications:
             try:
                 parts = noti.redirect_url.strip('/').split('/')
@@ -41,12 +43,15 @@ class NotificationList(generics.ListAPIView):
                     note_ids.add(int(parts[1]))
                 elif parts[0] == 'responses':
                     response_ids.add(int(parts[1]))
+                elif parts[0] == 'check-in-posts':
+                    check_in_post_ids.add(int(parts[1]))
             except (ValueError, IndexError):
                 pass
 
         # Batch-fetch referenced posts (SafeDeleteManager excludes soft-deleted)
         notes_map = {n.id: n for n in Note.objects.filter(id__in=note_ids)} if note_ids else {}
         responses_map = {r.id: r for r in QnaResponse.objects.filter(id__in=response_ids)} if response_ids else {}
+        check_in_posts_map = {p.id: p for p in CheckInPost.objects.filter(id__in=check_in_post_ids)} if check_in_post_ids else {}
 
         # Filter out notifications whose target post is deleted or user is no longer in audience
         audience_cache = {}
@@ -69,6 +74,15 @@ class NotificationList(generics.ListAPIView):
                     if key not in audience_cache:
                         resp = responses_map.get(response_id)
                         audience_cache[key] = resp.is_audience(user) if resp else False
+                    if audience_cache[key]:
+                        result.append(noti)
+                    continue
+                elif parts[0] == 'check-in-posts':
+                    post_id = int(parts[1])
+                    key = ('check_in_post', post_id)
+                    if key not in audience_cache:
+                        post = check_in_posts_map.get(post_id)
+                        audience_cache[key] = post.is_audience(user) if post else False
                     if audience_cache[key]:
                         result.append(noti)
                     continue

@@ -66,6 +66,7 @@ class NotificationManager(SafeDeleteManager):
                 
                 noti_to_update.message_ko = updated_message_ko
                 noti_to_update.message_en = updated_message_en
+                noti_to_update._skip_push = True
                 noti_to_update.save()
                 return
         elif target.type == "ResponseRequest":
@@ -236,6 +237,8 @@ def notify_firebase(instance):
 
 @receiver(post_save, sender=Notification, dispatch_uid='send_firebase_notification')
 def send_firebase_notification(sender, instance, created, **kwargs):
+    if instance.deleted or getattr(instance, '_skip_push', False):
+        return
     if created:
         notify_firebase(instance)
     elif not instance.is_read:

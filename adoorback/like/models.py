@@ -141,6 +141,7 @@ def update_like_noti_after_delete(instance, **kwargs):
 
             if oldest_like:
                 noti.target_id = oldest_like.id
+                noti._skip_push = True
                 noti.save()
             else:
                 return

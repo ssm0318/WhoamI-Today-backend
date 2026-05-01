@@ -22,22 +22,6 @@ class QCurrentUserDetail(CurrentUserDetail):
     """Current user detail for Version Q (no chip categories/custom chips)."""
     serializer_class = QCurrentUserSerializer
 
-    def perform_update(self, serializer):
-        user = self.get_object()
-        was_public = user.is_public
-
-        super().perform_update(serializer)
-
-        user.refresh_from_db()
-        if was_public and not user.is_public:
-            # Public -> Private: convert all public posts to friends-only
-            Note.objects.filter(
-                author=user, visibility__contains=['public']
-            ).update(visibility=['friends'])
-            _Response.objects.filter(
-                author=user, visibility__contains=['public']
-            ).update(visibility=['friends'])
-
 
 class QUserProfile(UserProfile):
     """User profile for Version Q (no chip-related fields)."""

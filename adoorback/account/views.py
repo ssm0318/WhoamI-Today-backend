@@ -1015,6 +1015,7 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     @transaction.atomic
     def perform_update(self, serializer):
         updated_user = self.get_object()
+        was_public = updated_user.is_public
 
         # Pre-check duplicate username before serializer validation,
         # otherwise UniqueConstraint surfaces as `{username: [...]}` (status 400).
@@ -1123,6 +1124,44 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
 
             serializer.save()
             updated_user = self.get_object()
+
+            # Handle public/private account visibility conversion
+            if was_public and not updated_user.is_public:
+                # Public -> Private: convert all public posts to friends-only
+                from check_in.models import CheckInPost
+                from qna.models import Response as _Response
+                Note.objects.filter(
+                    author=updated_user, visibility__contains=['public']
+                ).update(visibility=['friends'])
+                _Response.objects.filter(
+                    author=updated_user, visibility__contains=['public']
+                ).update(visibility=['friends'])
+                CheckInPost.objects.filter(
+                    author=updated_user, visibility='public'
+                ).update(visibility='friends')
+                CheckInPost.objects.filter(
+                    author=updated_user, pin_visibility='public'
+                ).update(pin_visibility='friends')
+            elif not was_public and updated_user.is_public:
+                # Private -> Public: convert all friends-only posts to public
+                from check_in.models import CheckInPost
+                from qna.models import Response as _Response
+                Note.objects.filter(
+                    author=updated_user, visibility__contains=['friends']
+                ).exclude(
+                    visibility__contains=['close_friends']
+                ).update(visibility=['public'])
+                _Response.objects.filter(
+                    author=updated_user, visibility__contains=['friends']
+                ).exclude(
+                    visibility__contains=['close_friends']
+                ).update(visibility=['public'])
+                CheckInPost.objects.filter(
+                    author=updated_user, visibility='friends'
+                ).update(visibility='public')
+                CheckInPost.objects.filter(
+                    author=updated_user, pin_visibility='friends'
+                ).update(pin_visibility='public')
 
             # record username history
             # update notification redirect url when username changes

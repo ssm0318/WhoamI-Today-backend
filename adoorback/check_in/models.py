@@ -666,6 +666,7 @@ CHECK_IN_POST_EXPIRY_HOURS = 24
 
 class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
     VISIBILITY_CHOICES = [
+        ('public', 'Public'),
         ('friends', 'Friends'),
         ('close_friends', 'Close Friends'),
     ]
@@ -730,7 +731,7 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
         return self.check_in_post_comments.values_list('author_id', flat=True).distinct()
 
     def is_audience(self, user):
-        """Visibility check, mirrors Note.is_audience for friends/close_friends only.
+        """Visibility check for CheckInPost.
 
         Expired (>24h) posts are visible only to the author unless pinned; when pinned,
         the post's `pin_visibility` (set independently by the author) governs access.
@@ -750,6 +751,8 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
         else:
             visibility = self.visibility
 
+        if visibility == 'public':
+            return True
         if visibility == 'friends':
             return user.is_connected(self.author)
         if visibility == 'close_friends':

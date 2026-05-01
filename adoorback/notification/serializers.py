@@ -18,6 +18,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     recent_actors = serializers.SerializerMethodField(read_only=True)
     notification_type = serializers.SerializerMethodField(read_only=True)
     is_recent = serializers.SerializerMethodField(read_only=True)
+    thumbnail_url = serializers.SerializerMethodField(read_only=True)
 
     def get_is_response_request(self, obj):
         if obj.target is None:
@@ -49,6 +50,17 @@ class NotificationSerializer(serializers.ModelSerializer):
         delta = now - obj.created_at
         return delta.days <= 7
 
+    def get_thumbnail_url(self, obj):
+        if not obj.origin_type or obj.origin_type.model != 'checkinpost':
+            return None
+        origin = obj.origin
+        if not origin:
+            return None
+        if origin.image:
+            return origin.image.url
+        if origin.video_thumbnail:
+            return origin.video_thumbnail.url
+        return None
 
     def get_question_content(self, obj):
         content = None
@@ -86,6 +98,6 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Notification
-        fields = ['id', 'is_response_request', 'is_friend_request', 'recent_actors', 'notification_type', 
+        fields = ['id', 'is_response_request', 'is_friend_request', 'recent_actors', 'notification_type',
                   'is_recent', 'message', 'question_content', 'is_read', 'created_at', 'redirect_url',
-                  'notification_updated_at']
+                  'notification_updated_at', 'thumbnail_url']

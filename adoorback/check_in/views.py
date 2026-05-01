@@ -875,10 +875,12 @@ def _check_in_post_visible_filter(user):
     close_visible_author_ids = _authors_who_marked_user_close_friend(user)
 
     visible_live = Q(created_at__gte=threshold) & (
+        Q(visibility='public') |
         Q(visibility='friends') |
         Q(visibility='close_friends', author_id__in=close_visible_author_ids)
     )
     visible_pinned = Q(created_at__lt=threshold, is_pinned=True) & (
+        Q(pin_visibility='public') |
         Q(pin_visibility='friends') |
         Q(pin_visibility='close_friends', author_id__in=close_visible_author_ids)
     )
@@ -979,10 +981,17 @@ class UserCheckInPosts(generics.ListAPIView):
         if target == viewer:
             return qs.order_by('-created_at')
 
-        if not viewer.is_connected(target):
-            return CheckInPost.objects.none()
+        if viewer.is_connected(target):
+            return qs.filter(_check_in_post_visible_filter(viewer)).order_by('-created_at')
 
-        return qs.filter(_check_in_post_visible_filter(viewer)).order_by('-created_at')
+        # Non-friend: show only public-visibility posts if the account is public
+        if target.is_public:
+            threshold = timezone.now() - timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
+            public_live = Q(created_at__gte=threshold, visibility='public')
+            public_pinned = Q(created_at__lt=threshold, is_pinned=True, pin_visibility='public')
+            return qs.filter(public_live | public_pinned).order_by('-created_at')
+
+        return CheckInPost.objects.none()
 
 
 class CheckInPostStories(generics.ListAPIView):
@@ -1151,13 +1160,13 @@ class CheckInPostPinToggle(APIView):
 class CheckInPostVisibility(APIView):
     """PATCH /api/check_in/posts/<pk>/visibility/
 
-    Body: {"visibility": "friends|close_friends"}
+    Body: {"visibility": "public|friends|close_friends"}
 
     Updates the post's main visibility. If the post is also pinned,
     pin_visibility is updated to match.
     """
     permission_classes = [IsAuthenticated]
-    ALLOWED = {'friends', 'close_friends'}
+    ALLOWED = {'public', 'friends', 'close_friends'}
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -1186,16 +1195,15 @@ class CheckInPostVisibility(APIView):
 class CheckInPostPinVisibility(APIView):
     """PATCH /api/check_in/posts/<pk>/pin_visibility/
 
-    Body: {"pin_visibility": "friends|close_friends"}
+    Body: {"pin_visibility": "public|friends|close_friends"}
 
     Updates only the pin's independent visibility. Posts must already be
     pinned; otherwise 400 so clients can't silently set a value that has
-    no effect. Note: CheckInPost only supports friends/close_friends —
-    `public` and `only_me` are not valid here (unlike ArchiveEntry).
+    no effect.
     """
     permission_classes = [IsAuthenticated]
 
-    ALLOWED = {'friends', 'close_friends'}
+    ALLOWED = {'public', 'friends', 'close_friends'}
 
     def get_exception_handler(self):
         return adoor_exception_handler

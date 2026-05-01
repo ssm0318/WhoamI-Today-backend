@@ -279,7 +279,7 @@ class CheckInPostSerializer(serializers.ModelSerializer):
     video_thumbnail_url = serializers.SerializerMethodField(read_only=True)
     video_duration_seconds = serializers.FloatField(read_only=True)
     visibility = serializers.ChoiceField(
-        choices=[('friends', 'Friends'), ('close_friends', 'Close Friends')],
+        choices=[('public', 'Public'), ('friends', 'Friends'), ('close_friends', 'Close Friends')],
         default='friends',
     )
     like_count = serializers.SerializerMethodField(read_only=True)
