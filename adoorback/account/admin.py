@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 
-from account.models import FriendRequest, Interest, Persona, VersionSwapRequest
+from account.models import FriendRequest, Interest, Persona, VersionSwitchRequest
 
 User = get_user_model()
 
@@ -49,14 +49,14 @@ class UserAdmin(ImportExportModelAdmin):
     resource_class = UserResource
 
 
-class VersionSwapRequestResource(resources.ModelResource):
+class VersionSwitchRequestResource(resources.ModelResource):
 
     class Meta:
-        model = VersionSwapRequest
+        model = VersionSwitchRequest
 
 
-class VersionSwapRequestAdmin(ImportExportModelAdmin):
-    resource_class = VersionSwapRequestResource
+class VersionSwitchRequestAdmin(ImportExportModelAdmin):
+    resource_class = VersionSwitchRequestResource
     list_display = ['user', 'from_version', 'to_version', 'status', 'created_at', 'reason']
     list_filter = ['status', 'from_version', 'to_version']
     search_fields = ['user__username']
@@ -67,4 +67,4 @@ admin.site.register(User, UserAdmin)
 admin.site.register(FriendRequest, FriendRequestAdmin)
 admin.site.register(Interest, InterestAdmin)
 admin.site.register(Persona, PersonaAdmin)
-admin.site.register(VersionSwapRequest, VersionSwapRequestAdmin)
+admin.site.register(VersionSwitchRequest, VersionSwitchRequestAdmin)

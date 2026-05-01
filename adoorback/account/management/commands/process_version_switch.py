@@ -2,12 +2,12 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from account.models import VersionSwapRequest
+from account.models import VersionSwitchRequest
 
 
 class Command(BaseCommand):
     help = (
-        'List, approve, or reject VersionSwapRequest entries.\n'
+        'List, approve, or reject VersionSwitchRequest entries.\n'
         '  list                — show pending requests\n'
         '  approve <REQ_ID>    — flip user.current_ver and mark approved\n'
         '  reject  <REQ_ID>    — mark rejected (user unchanged)\n'
@@ -17,7 +17,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('action', choices=['list', 'approve', 'reject'])
         parser.add_argument('request_id', nargs='?', type=int, default=None,
-                            help='VersionSwapRequest id (required for approve/reject)')
+                            help='VersionSwitchRequest id (required for approve/reject)')
         parser.add_argument('--include-user-group', action='store_true',
                             help='Also flip user_group when approving '
                                  '(only set this if research design needs it; off by default).')
@@ -38,7 +38,7 @@ class Command(BaseCommand):
             self._reject(req_id)
 
     def _list_pending(self):
-        qs = (VersionSwapRequest.objects
+        qs = (VersionSwitchRequest.objects
               .filter(status='pending')
               .select_related('user')
               .order_by('created_at'))
@@ -55,11 +55,11 @@ class Command(BaseCommand):
     def _approve(self, req_id, *, include_user_group):
         with transaction.atomic():
             try:
-                r = (VersionSwapRequest.objects
+                r = (VersionSwitchRequest.objects
                      .select_for_update()
                      .select_related('user')
                      .get(id=req_id))
-            except VersionSwapRequest.DoesNotExist:
+            except VersionSwitchRequest.DoesNotExist:
                 raise CommandError(f'Request #{req_id} not found')
 
             if r.status != 'pending':
@@ -67,7 +67,7 @@ class Command(BaseCommand):
             if r.user.current_ver != r.from_version:
                 raise CommandError(
                     f'User current_ver ({r.user.current_ver}) does not match '
-                    f'request from_version ({r.from_version}); refusing to swap.'
+                    f'request from_version ({r.from_version}); refusing to switch.'
                 )
 
             user = r.user
@@ -91,8 +91,8 @@ class Command(BaseCommand):
     def _reject(self, req_id):
         with transaction.atomic():
             try:
-                r = VersionSwapRequest.objects.select_for_update().get(id=req_id)
-            except VersionSwapRequest.DoesNotExist:
+                r = VersionSwitchRequest.objects.select_for_update().get(id=req_id)
+            except VersionSwitchRequest.DoesNotExist:
                 raise CommandError(f'Request #{req_id} not found')
             if r.status != 'pending':
                 raise CommandError(f'Request #{req_id} is already {r.status}')
