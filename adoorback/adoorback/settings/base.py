@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'content_report.apps.ContentReportConfig',
     'user_report.apps.UserReportConfig',
     'translate.apps.TranslateConfig',
+    'surveys.apps.SurveysConfig',
     'custom_fcm',
     'modeltranslation',
     'django.contrib.admin',
@@ -113,6 +114,7 @@ CRON_CLASSES = [
     "account.cron.AutoCloseSessionsCronJob",
     "account.cron.SendDailySurveyNotiCronJob",
     "check_in.cron.ExpireCheckInsCronJob",
+    "surveys.cron.RotateDailySurveyCronJob",
 ]
 
 # reference: https://github.com/jazzband/django-redis
