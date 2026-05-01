@@ -1059,14 +1059,19 @@ def create_connection_noti(created, instance, **kwargs):
         if requester.current_ver == 'version_w':
             from adoorback.utils.content_types import get_check_in_type
             check_in_ct = get_check_in_type()
+            default_types = ('battery', 'mood', 'thought', 'song')
             if requester_choice == 'close_friend':
-                Subscription.objects.create(
-                    subscriber=requester, subscribed_to=requestee, content_type=check_in_ct
-                )
+                for stype in default_types:
+                    Subscription.objects.get_or_create(
+                        subscriber=requester, subscribed_to=requestee,
+                        content_type=check_in_ct, subscription_type=stype,
+                    )
             if requestee_choice == 'close_friend':
-                Subscription.objects.create(
-                    subscriber=requestee, subscribed_to=requester, content_type=check_in_ct
-                )
+                for stype in default_types:
+                    Subscription.objects.get_or_create(
+                        subscriber=requestee, subscribed_to=requester,
+                        content_type=check_in_ct, subscription_type=stype,
+                    )
 
     # make friend request notification invisible once requestee has responded
     instance.friend_request_targetted_notis.filter(user=requestee,

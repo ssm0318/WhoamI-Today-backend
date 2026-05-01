@@ -488,7 +488,7 @@ class Poke(AdoorTimestampedModel, SafeDeleteModel):
 
 
 @transaction.atomic
-@receiver(post_save, sender=Poke)
+@receiver(post_save, sender=Poke, dispatch_uid='create_poke_notification')
 def create_poke_notification(created, instance, **kwargs):
     if not created:
         return
@@ -529,7 +529,7 @@ def create_poke_notification(created, instance, **kwargs):
 
 
 @transaction.atomic
-@receiver(post_save, sender=CheckIn)
+@receiver(post_save, sender=CheckIn, dispatch_uid='add_user_to_readers')
 def add_user_to_readers(instance, created, **kwargs):
     if not created:
         return
@@ -560,7 +560,7 @@ def _fetch_spotify_oembed(track_id, timeout=2):
 
 
 @transaction.atomic
-@receiver(post_save, sender=Song)
+@receiver(post_save, sender=Song, dispatch_uid='write_song_component_entry')
 def write_song_component_entry(instance, created, **kwargs):
     """Mirror Song saves into the CheckInComponentEntry archive.
 
@@ -757,7 +757,7 @@ class CheckInPost(AdoorTimestampedModel, SafeDeleteModel):
         return False
 
 
-@receiver(post_delete, sender=CheckInPost)
+@receiver(post_delete, sender=CheckInPost, dispatch_uid='delete_check_in_post_files')
 def delete_check_in_post_files(sender, instance, **kwargs):
     if instance.image:
         instance.image.delete(save=False)
@@ -767,7 +767,7 @@ def delete_check_in_post_files(sender, instance, **kwargs):
         instance.video_thumbnail.delete(save=False)
 
 
-@receiver(post_save, sender=CheckInPost)
+@receiver(post_save, sender=CheckInPost, dispatch_uid='add_author_to_check_in_post_readers')
 def add_author_to_check_in_post_readers(instance, created, **kwargs):
     if not created:
         return

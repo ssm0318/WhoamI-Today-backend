@@ -86,6 +86,14 @@ CONTENT_TO_VISIBILITY = {
     'song': ('song_visibility', 'song_updated_at'),
 }
 
+# content field → subscription_type
+CONTENT_TO_SUB_TYPE = {
+    'social_battery': 'battery',
+    'mood': 'mood',
+    'thought': 'thought',
+    'song': 'song',
+}
+
 
 def _subscriber_sees_changed_component(check_in, subscriber, changed_components):
     """Return True if subscriber can see at least one of the changed components."""
@@ -103,7 +111,7 @@ def notify_check_in_subscribers(check_in, changed_components=None):
                         If None, treats all components as changed (new check-in).
     """
     from adoorback.utils.content_types import get_check_in_type
-    from notification.models import Notification, NotificationActor
+    from notification.models import Notification, NotificationActor, notify_firebase
     from account.models import Subscription
 
     if changed_components is None:
@@ -114,9 +122,11 @@ def notify_check_in_subscribers(check_in, changed_components=None):
         return
 
     check_in_ct = get_check_in_type()
-    subscriber_ids = list(Subscription.objects.filter(
-        subscribed_to=user, content_type=check_in_ct
-    ).values_list('subscriber_id', flat=True))
+    # 변경된 컴포넌트에 해당하는 subscription_type으로 필터
+    sub_types = [CONTENT_TO_SUB_TYPE[c] for c in changed_components if c in CONTENT_TO_SUB_TYPE]
+    subscriber_ids = list(set(Subscription.objects.filter(
+        subscribed_to=user, content_type=check_in_ct, subscription_type__in=sub_types,
+    ).values_list('subscriber_id', flat=True)))
 
     if not subscriber_ids:
         return
@@ -139,9 +149,16 @@ def notify_check_in_subscribers(check_in, changed_components=None):
         recent_noti = _find_recent_check_in_noti(subscriber_id, user)
 
         if recent_noti:
-            recent_noti.notification_updated_at = timezone.now()
-            recent_noti.target = check_in
-            recent_noti.save()
+            # .update()로 post_save signal 우회 — 중복 push 방지
+            check_in_ct_model = ContentType.objects.get_for_model(check_in)
+            Notification.objects.filter(pk=recent_noti.pk).update(
+                notification_updated_at=timezone.now(),
+                target_id=check_in.pk,
+                target_type=check_in_ct_model,
+            )
+            # push는 1회만 직접 발송 (signal 우회했으므로)
+            recent_noti.refresh_from_db()
+            notify_firebase(recent_noti)
         else:
             noti = Notification.objects.create(
                 user_id=subscriber_id,
@@ -538,6 +555,13 @@ class CurrentSong(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         current_user = self.request.user
+
+        # 같은 track_id의 active song이 이미 있으면 skip
+        new_track_id = serializer.validated_data.get('track_id', '')
+        existing_song = Song.objects.filter(user=current_user, is_active=True).first()
+        if existing_song and existing_song.track_id == new_track_id:
+            serializer.instance = existing_song
+            return Response(serializer.data)
 
         serializer.save(user=current_user, is_active=True)
 
