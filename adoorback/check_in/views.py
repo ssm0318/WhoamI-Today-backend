@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -1027,7 +1027,34 @@ class CheckInPostStories(generics.ListAPIView):
               .distinct('author_id')
               .values_list('id', flat=True)
         )
-        return CheckInPost.objects.filter(id__in=list(latest_ids)).order_by('-created_at')
+
+        # Annotate: does this author have any live post not yet read by viewer?
+        unread_by_author = qs.filter(
+            author_id=OuterRef('author_id'),
+        ).exclude(readers=user)
+        return (
+            CheckInPost.objects.filter(id__in=list(latest_ids))
+            .annotate(_has_unread=Exists(unread_by_author))
+            .order_by('-_has_unread', '-created_at')
+        )
+
+
+class CheckInPostRead(generics.UpdateAPIView):
+    """PATCH /api/check_in/posts/read/  — batch-mark posts as read."""
+    queryset = CheckInPost.objects.all()
+    serializer_class = cs.CheckInPostFriendStorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def patch(self, request, *args, **kwargs):
+        current_user = request.user
+        ids = request.data.get('ids', [])
+        queryset = CheckInPost.objects.filter(id__in=ids)
+        for post in queryset:
+            post.readers.add(current_user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CheckInPostComments(generics.ListAPIView):

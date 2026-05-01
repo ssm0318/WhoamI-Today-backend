@@ -393,13 +393,27 @@ class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField(read_only=True)
     video_url = serializers.SerializerMethodField(read_only=True)
     video_thumbnail_url = serializers.SerializerMethodField(read_only=True)
+    current_user_read = serializers.SerializerMethodField(read_only=True)
+    has_unread = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CheckInPost
         fields = ['id', 'author_detail', 'image_url',
                   'video_url', 'video_thumbnail_url',
                   'caption', 'visibility',
-                  'is_pinned', 'pin_visibility', 'created_at']
+                  'is_pinned', 'pin_visibility', 'created_at',
+                  'current_user_read', 'has_unread']
+
+    def get_current_user_read(self, obj):
+        request = self.context.get('request')
+        if request is None or not request.user.is_authenticated:
+            return False
+        return obj.readers.filter(id=request.user.id).exists()
+
+    def get_has_unread(self, obj):
+        """True if the author has any live post not yet read by the viewer.
+        Populated via annotation in CheckInPostStories; falls back to False."""
+        return getattr(obj, '_has_unread', False)
 
     def get_image_url(self, obj):
         if not obj.image:

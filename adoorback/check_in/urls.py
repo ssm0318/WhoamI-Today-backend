@@ -32,5 +32,6 @@ urlpatterns = [
     path('posts/<int:pk>/comments/', views.CheckInPostComments.as_view(), name='check-in-post-comments'),
     path('posts/<int:pk>/pin/', views.CheckInPostPinToggle.as_view(), name='check-in-post-pin'),
     path('posts/<int:pk>/pin_visibility/', views.CheckInPostPinVisibility.as_view(), name='check-in-post-pin-visibility'),
+    path('posts/read/', views.CheckInPostRead.as_view(), name='check-in-post-read'),
     path('posts/by-user/<int:pk>/', views.UserCheckInPosts.as_view(), name='check-in-posts-by-user'),
 ]
