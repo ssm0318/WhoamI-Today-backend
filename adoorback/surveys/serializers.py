@@ -19,7 +19,7 @@ class SurveyQuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = SurveyQuestion
         fields = [
-            'id', 'order',
+            'id', 'order', 'type',
             'prompt_en', 'prompt_ko',
             'low_label_en', 'low_label_ko',
             'high_label_en', 'high_label_ko',
@@ -35,7 +35,7 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Survey
         fields = [
-            'slug', 'type',
+            'slug',
             'title_en', 'title_ko',
             'description_en', 'description_ko',
             'interpretation_en', 'interpretation_ko',

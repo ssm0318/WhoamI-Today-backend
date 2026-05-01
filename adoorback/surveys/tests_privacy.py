@@ -3,9 +3,13 @@ from django.test import TestCase
 
 from account.models import Connection
 from chat.wit_bot import ensure_wit_bot_user
-from surveys.aggregation import build_likert_distribution, compute_user_percentile
+from surveys.aggregation import (
+    AggregatedLikertStrategy,
+    compute_user_percentile,
+    group_panels,
+)
 from surveys.models import (
-    Survey, SurveyAnswer, SurveyQuestion, SurveyResponse,
+    LIKERT_5, Survey, SurveyAnswer, SurveyQuestion, SurveyResponse,
 )
 from surveys.privacy import (
     MIN_GROUP_DELTA, MIN_GROUP_SIZE, compute_bucket_eligibility, get_visible_friend_ids,
@@ -27,10 +31,11 @@ def _connect(a, b, *, a_choice='friend', b_choice='friend'):
 
 
 def _make_likert_survey(slug='s_likert', n_questions=2):
-    s = Survey.objects.create(slug=slug, type=Survey.LIKERT_5, title_en='T', title_ko='T')
+    s = Survey.objects.create(slug=slug, title_en='T', title_ko='T')
     for i in range(1, n_questions + 1):
         SurveyQuestion.objects.create(
-            survey=s, order=i, prompt_en=f'Q{i}', prompt_ko=f'Q{i}',
+            survey=s, order=i, type=LIKERT_5,
+            prompt_en=f'Q{i}', prompt_ko=f'Q{i}',
             reverse_scored=(i == 2),
         )
     return s
@@ -108,7 +113,10 @@ class AggregationTests(TestCase):
         # u2: q1=3, q2=3 (reverse → 3) → score 6
         _respond(u1, s, [5, 1])
         _respond(u2, s, [3, 3])
-        dist = build_likert_distribution(s, [u1.id, u2.id], viewer_id=u1.id)
+        panels = group_panels(s)
+        self.assertEqual(len(panels), 1)
+        _, questions = panels[0]
+        dist = AggregatedLikertStrategy().build(s, questions, [u1.id, u2.id], viewer_id=u1.id)
         self.assertEqual(dist['min_score'], 2)
         self.assertEqual(dist['max_score'], 10)
         self.assertEqual(dist['user_score'], 10)

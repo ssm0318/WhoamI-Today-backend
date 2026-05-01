@@ -51,13 +51,13 @@
       reverse_scored: true
 
 - slug: example_week_check
-  type: likert_5
+  type: likert_5  # default type for questions below; per-question `type` overrides
   title:
     en: "How is your week going?"
     ko: "이번 주는 어떠세요?"
   description:
-    en: "Five-item check-in to test the long-survey flow."
-    ko: "긴 설문 플로우 테스트용 5문항 체크인."
+    en: "Five-item check-in plus one open reflection — exercises the mixed-type flow."
+    ko: "5문항 체크인 + 자유 응답 1문항 — 혼합 타입 설문 플로우 테스트용."
   interpretation:
     en: "Higher scores indicate a smoother week — more energy, less stress."
     ko: "점수가 높을수록 한 주가 순조롭다는 뜻입니다 — 에너지는 높고 스트레스는 낮아요."
@@ -97,3 +97,8 @@
       low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
       high_label: { en: "Strongly agree", ko: "매우 그렇다" }
       reverse_scored: false
+    - order: 6
+      type: free_text
+      prompt:
+        en: "What's one thing on your mind this week?"
+        ko: "이번 주에 가장 마음에 걸리는 한 가지는?"

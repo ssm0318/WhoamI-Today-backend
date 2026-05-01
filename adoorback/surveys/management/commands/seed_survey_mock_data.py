@@ -55,20 +55,40 @@ def _random_choice_value(rng: random.Random, values: list[int]) -> int:
     return rng.choice(values)
 
 
+_FREE_TEXT_SAMPLES = [
+    "feeling pretty good honestly",
+    "tired but hanging in there",
+    "kind of overwhelmed lately",
+    "happy and grateful",
+    "neutral, just another week",
+    "stressed about work but otherwise fine",
+    "really enjoying the small things",
+    "missing my friends a lot",
+    "anxious but trying to stay positive",
+    "energetic and motivated",
+]
+
+
 def _seed_response(user, survey, rng: random.Random) -> None:
     if SurveyResponse.objects.filter(user=user, survey=survey).exists():
         return
     response = SurveyResponse.objects.create(user=user, survey=survey)
     for question in survey.questions.order_by('order'):
-        if survey.type == Survey.LIKERT_5:
-            value: int | list[int] = _random_likert(rng)
-        elif survey.type == Survey.SINGLE_CHOICE:
+        # Dispatch on question.type (not survey-level type — types live per question now).
+        qtype = question.type
+        if qtype == 'likert_5':
+            value = _random_likert(rng)
+        elif qtype == 'single_choice':
             opts = list(question.options.values_list('value', flat=True))
             value = _random_choice_value(rng, opts) if opts else 0
-        else:  # multi
+        elif qtype == 'multi_choice':
             opts = list(question.options.values_list('value', flat=True))
             n_pick = rng.randint(1, max(1, len(opts)))
             value = rng.sample(opts, k=min(n_pick, len(opts))) if opts else []
+        elif qtype == 'free_text':
+            value = rng.choice(_FREE_TEXT_SAMPLES)
+        else:
+            value = _random_likert(rng)
         SurveyAnswer.objects.create(response=response, question=question, value=value)
 
 

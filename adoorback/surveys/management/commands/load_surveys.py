@@ -42,14 +42,18 @@ class Command(BaseCommand):
 
     def _upsert(self, entry, *, replace_questions: bool):
         slug = entry['slug']
+        # Survey-level `type` becomes the default for all questions in the survey;
+        # individual questions can override via their own `type` field.
+        default_type = entry.get('type', SurveyQuestion._meta.get_field('type').default)
         defaults = {
-            'type': entry['type'],
             'title_en': entry['title']['en'],
             'title_ko': entry['title']['ko'],
             'description_en': entry.get('description', {}).get('en', ''),
             'description_ko': entry.get('description', {}).get('ko', ''),
             'interpretation_en': entry.get('interpretation', {}).get('en', ''),
             'interpretation_ko': entry.get('interpretation', {}).get('ko', ''),
+            'friend_visible': entry.get('friend_visible', True),
+            'results_hidden': entry.get('results_hidden', False),
         }
         survey, created = Survey.objects.update_or_create(slug=slug, defaults=defaults)
         if replace_questions or created:
@@ -58,6 +62,7 @@ class Command(BaseCommand):
                 question = SurveyQuestion.objects.create(
                     survey=survey,
                     order=q['order'],
+                    type=q.get('type', default_type),
                     prompt_en=q['prompt']['en'],
                     prompt_ko=q['prompt']['ko'],
                     low_label_en=q.get('low_label', {}).get('en', ''),
@@ -65,6 +70,9 @@ class Command(BaseCommand):
                     high_label_en=q.get('high_label', {}).get('en', ''),
                     high_label_ko=q.get('high_label', {}).get('ko', ''),
                     reverse_scored=q.get('reverse_scored', False),
+                    result_kind=q.get('result_kind', ''),
+                    result_group=q.get('result_group', ''),
+                    result_hidden=q.get('result_hidden', False),
                 )
                 for opt in q.get('options', []):
                     SurveyOption.objects.create(

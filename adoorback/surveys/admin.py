@@ -17,16 +17,16 @@ class SurveyQuestionInline(admin.StackedInline):
 
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
-    list_display = ('slug', 'title_en', 'type', 'last_used_date')
+    list_display = ('slug', 'title_en', 'friend_visible', 'results_hidden', 'last_used_date')
     search_fields = ('slug', 'title_en', 'title_ko')
-    list_filter = ('type',)
+    list_filter = ('friend_visible', 'results_hidden')
     inlines = [SurveyQuestionInline]
 
 
 @admin.register(SurveyQuestion)
 class SurveyQuestionAdmin(admin.ModelAdmin):
-    list_display = ('survey', 'order', 'prompt_en', 'reverse_scored')
-    list_filter = ('survey', 'reverse_scored')
+    list_display = ('survey', 'order', 'type', 'prompt_en', 'reverse_scored', 'result_hidden')
+    list_filter = ('survey', 'type', 'reverse_scored', 'result_hidden')
     inlines = [SurveyOptionInline]
 
 

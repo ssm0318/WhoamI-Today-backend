@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 
 from account.models import Connection
 from surveys.models import (
-    DailySurvey, Survey, SurveyAnswer, SurveyQuestion, SurveyResponse,
+    DailySurvey, FREE_TEXT, LIKERT_5, Survey, SurveyAnswer, SurveyQuestion, SurveyResponse,
 )
 
 User = get_user_model()
@@ -13,12 +13,38 @@ def make_user(name):
 
 
 def make_likert_survey(slug='s', n_questions=2, schedule_date=None):
-    s = Survey.objects.create(slug=slug, type=Survey.LIKERT_5, title_en='T', title_ko='T')
+    s = Survey.objects.create(slug=slug, title_en='T', title_ko='T')
     for i in range(1, n_questions + 1):
         SurveyQuestion.objects.create(
-            survey=s, order=i, prompt_en=f'Q{i}', prompt_ko=f'Q{i}',
+            survey=s,
+            order=i,
+            type=LIKERT_5,
+            prompt_en=f'Q{i}',
+            prompt_ko=f'Q{i}',
             reverse_scored=(i == 2),
         )
+    if schedule_date is not None:
+        DailySurvey.objects.create(date=schedule_date, survey=s)
+    return s
+
+
+def make_mixed_survey(slug='m', n_likert=2, n_free_text=1, schedule_date=None):
+    """Survey with a likert panel + a free-text panel for testing mixed-type aggregation."""
+    s = Survey.objects.create(slug=slug, title_en='T', title_ko='T')
+    order = 1
+    for i in range(n_likert):
+        SurveyQuestion.objects.create(
+            survey=s, order=order, type=LIKERT_5,
+            prompt_en=f'L{i+1}', prompt_ko=f'L{i+1}',
+            reverse_scored=(i == 1),
+        )
+        order += 1
+    for i in range(n_free_text):
+        SurveyQuestion.objects.create(
+            survey=s, order=order, type=FREE_TEXT,
+            prompt_en=f'F{i+1}', prompt_ko=f'F{i+1}',
+        )
+        order += 1
     if schedule_date is not None:
         DailySurvey.objects.create(date=schedule_date, survey=s)
     return s

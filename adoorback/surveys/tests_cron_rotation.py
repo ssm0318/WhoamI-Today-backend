@@ -8,8 +8,8 @@ from surveys.models import DailySurvey, Survey
 
 class RotationCronTests(TestCase):
     def setUp(self):
-        self.s1 = Survey.objects.create(slug='s1', type=Survey.LIKERT_5, title_en='1', title_ko='1')
-        self.s2 = Survey.objects.create(slug='s2', type=Survey.LIKERT_5, title_en='2', title_ko='2')
+        self.s1 = Survey.objects.create(slug='s1', title_en='1', title_ko='1')
+        self.s2 = Survey.objects.create(slug='s2', title_en='2', title_ko='2')
 
     def test_schedules_tomorrow(self):
         RotateDailySurveyCronJob().do()
