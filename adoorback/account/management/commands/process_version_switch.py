@@ -4,15 +4,11 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-<<<<<<< Updated upstream:adoorback/account/management/commands/process_version_switch.py
-from account.models import VersionSwitchRequest
-=======
 from safedelete.models import HARD_DELETE
 
-from account.models import Connection, FriendRequest, Subscription, VersionSwapRequest
+from account.models import Connection, FriendRequest, Subscription, VersionSwitchRequest
 
 User = get_user_model()
->>>>>>> Stashed changes:adoorback/account/management/commands/process_version_swap.py
 
 
 class Command(BaseCommand):
