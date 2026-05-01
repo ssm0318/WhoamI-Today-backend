@@ -1,3 +1,4 @@
+from datetime import timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import urllib
@@ -44,7 +45,7 @@ class QuestionManager(SafeDeleteManager):
         except (ZoneInfoNotFoundError, AttributeError):
             tz = ZoneInfo('America/Los_Angeles')
 
-        user_today = timezone.now().astimezone(tz).date()
+        user_today = (timezone.now().astimezone(tz) - timedelta(hours=8)).date()
         return self.filter(selected_dates__contains=[user_today], **kwargs)
 
     def date_questions(self, date, **kwargs):
