@@ -1171,7 +1171,7 @@ def provision_wit_admin_rooms(created, instance, **kwargs):
         return
 
 
-class VersionSwapRequest(AdoorTimestampedModel, SafeDeleteModel):
+class VersionSwitchRequest(AdoorTimestampedModel, SafeDeleteModel):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -1179,7 +1179,7 @@ class VersionSwapRequest(AdoorTimestampedModel, SafeDeleteModel):
     )
 
     user = models.ForeignKey(
-        get_user_model(), related_name='version_swap_requests', on_delete=models.CASCADE)
+        get_user_model(), related_name='version_switch_requests', on_delete=models.CASCADE)
     from_version = models.CharField(max_length=20, choices=VERSION_CHOICES)
     to_version = models.CharField(max_length=20, choices=VERSION_CHOICES)
     reason = models.TextField(null=True, blank=True)
@@ -1195,7 +1195,7 @@ class VersionSwapRequest(AdoorTimestampedModel, SafeDeleteModel):
             models.UniqueConstraint(
                 fields=['user'],
                 condition=Q(status='pending') & Q(deleted__isnull=True),
-                name='unique_pending_version_swap_request'),
+                name='unique_pending_version_switch_request'),
         ]
         indexes = [
             models.Index(fields=['-created_at']),

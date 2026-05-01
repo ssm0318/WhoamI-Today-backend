@@ -111,7 +111,7 @@ urlpatterns = [
     path("app-sessions/end/", views.EndSession.as_view(), name="end_session"),
     path("app-sessions/touch/", views.TouchSession.as_view(), name="touch_session"),
 
-    # Version Swap Request
-    path('version-swap-request/', views.VersionSwapRequestCreate.as_view(), name='version-swap-request-create'),
-    path('version-swap-request/me/', views.CurrentUserVersionSwapRequest.as_view(), name='current-user-version-swap-request'),
+    # Version Switch Request
+    path('version-switch-request/', views.VersionSwitchRequestCreate.as_view(), name='version-switch-request-create'),
+    path('version-switch-request/me/', views.CurrentUserVersionSwitchRequest.as_view(), name='current-user-version-switch-request'),
 ]
