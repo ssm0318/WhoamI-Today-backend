@@ -120,6 +120,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     unread_noti = serializers.SerializerMethodField(read_only=True)
     unread_noti_cnt = serializers.SerializerMethodField(read_only=True)
     current_ver = serializers.ChoiceField(choices=VERSION_CHOICES, read_only=True)
+    friend_count = serializers.SerializerMethodField(read_only=True)
     user_interests = serializers.StringRelatedField(many=True, read_only=True)
     user_personas = serializers.StringRelatedField(many=True, read_only=True)
     chips_by_category = serializers.SerializerMethodField(read_only=True)
@@ -155,6 +156,9 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
             notifications = notifications.filter(created_at__gte=obj.ver_changed_at)
 
         return notifications.count()
+
+    def get_friend_count(self, obj):
+        return Connection.objects.filter(Q(user1=obj) | Q(user2=obj)).count()
 
     def validate_noti_period_days(self, value):
         if not isinstance(value, list):
@@ -206,7 +210,8 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
-                  'has_changed_pw', 'unread_message_cnt', 'is_public']
+                  'has_changed_pw', 'unread_message_cnt', 'is_public',
+                  'friend_count']
         extra_kwargs = {'password': {'write_only': True}}
 
 
