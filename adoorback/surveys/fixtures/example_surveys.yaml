@@ -102,3 +102,13 @@
       prompt:
         en: "What's one thing on your mind this week?"
         ko: "이번 주에 가장 마음에 걸리는 한 가지는?"
+    - order: 7
+      type: slider
+      prompt:
+        en: "How are you feeling today?"
+        ko: "오늘 기분이 어떤가요?"
+      low_label: { en: "Terrible", ko: "끔찍해요" }
+      high_label: { en: "Couldn't be better", ko: "더할 나위 없이 좋아요" }
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram

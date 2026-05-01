@@ -19,7 +19,7 @@ from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.scheduling import get_survey_index, get_today_daily
 from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
-    SurveyResponseInputSerializer,
+    SurveyResponseInputSerializer, validate_answer_value,
 )
 
 
@@ -98,6 +98,7 @@ class SurveyResponseSubmitView(APIView):
                 response = SurveyResponse.objects.create(user=request.user, survey=survey)
                 for a in ser.validated_data['answers']:
                     question = SurveyQuestion.objects.get(id=a['question_id'], survey=survey)
+                    validate_answer_value(question, a['value'])
                     SurveyAnswer.objects.create(response=response, question=question, value=a['value'])
         except IntegrityError:
             return Response(

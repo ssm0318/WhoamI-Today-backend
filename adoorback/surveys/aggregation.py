@@ -16,10 +16,13 @@ from abc import ABC, abstractmethod
 from collections import Counter
 from typing import Iterable, Optional
 
+from statistics import median
+
 from surveys.models import (
     LIKERT_5,
     RESULT_AGGREGATED_LIKERT,
     RESULT_OPTION_COUNTS,
+    RESULT_SLIDER_HISTOGRAM,
     RESULT_WORDCLOUD,
     Survey,
     SurveyAnswer,
@@ -203,10 +206,78 @@ class WordcloudStrategy(AggregationStrategy):
         }
 
 
+SLIDER_BIN_COUNT = 10
+
+
+class SliderHistogramStrategy(AggregationStrategy):
+    """Histogram of slider answers across [slider_min_value, slider_max_value].
+
+    Bins are SLIDER_BIN_COUNT equal-width buckets. The lowest bin is
+    closed-closed; the rest are half-open on the left and closed on the right
+    so every value (including slider_max_value itself) falls in exactly one bin.
+    Returns mean and median across all answers.
+
+    A panel of slider questions delegates to its FIRST question for the bin
+    range — same convention as OptionCountsStrategy. Multi-question slider
+    panels are uncommon; if needed, split via explicit ``result_group``.
+    """
+
+    kind = RESULT_SLIDER_HISTOGRAM
+
+    def build(self, survey, questions, responder_ids, viewer_id):
+        question = questions[0] if questions else None
+        if question is None or question.slider_min_value is None or question.slider_max_value is None:
+            return {
+                'kind': self.kind,
+                'question_id': question.id if question else None,
+                'min_value': None,
+                'max_value': None,
+                'bins': [],
+                'mean': None,
+                'median': None,
+                'user_value': None,
+            }
+
+        lo = question.slider_min_value
+        hi = question.slider_max_value
+        span = hi - lo
+        edges = [lo + (span * i) / SLIDER_BIN_COUNT for i in range(SLIDER_BIN_COUNT + 1)]
+        bins = [{'lo': edges[i], 'hi': edges[i + 1], 'count': 0} for i in range(SLIDER_BIN_COUNT)]
+
+        values: list[int] = []
+        user_value = None
+        answers = SurveyAnswer.objects.filter(
+            question=question, response__user_id__in=responder_ids,
+        ).select_related('response')
+        for ans in answers:
+            v = int(ans.value)
+            if v < lo or v > hi:
+                continue  # defensive: out-of-range values shouldn't have made it past submission
+            values.append(v)
+            if ans.response.user_id == viewer_id:
+                user_value = v
+            # Find the bin: clamp to last bucket when value == hi.
+            idx = SLIDER_BIN_COUNT - 1 if v == hi else int((v - lo) / span * SLIDER_BIN_COUNT)
+            bins[idx]['count'] += 1
+
+        n = len(values)
+        return {
+            'kind': self.kind,
+            'question_id': question.id,
+            'min_value': lo,
+            'max_value': hi,
+            'bins': bins,
+            'mean': round(sum(values) / n, 2) if n else None,
+            'median': float(median(values)) if n else None,
+            'user_value': user_value,
+        }
+
+
 STRATEGIES: dict[str, AggregationStrategy] = {
     RESULT_AGGREGATED_LIKERT: AggregatedLikertStrategy(),
     RESULT_OPTION_COUNTS: OptionCountsStrategy(),
     RESULT_WORDCLOUD: WordcloudStrategy(),
+    RESULT_SLIDER_HISTOGRAM: SliderHistogramStrategy(),
 }
 
 

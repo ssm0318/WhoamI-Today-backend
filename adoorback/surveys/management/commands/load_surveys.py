@@ -73,6 +73,8 @@ class Command(BaseCommand):
                     result_kind=q.get('result_kind', ''),
                     result_group=q.get('result_group', ''),
                     result_hidden=q.get('result_hidden', False),
+                    slider_min_value=q.get('slider_min_value'),
+                    slider_max_value=q.get('slider_max_value'),
                 )
                 for opt in q.get('options', []):
                     SurveyOption.objects.create(
