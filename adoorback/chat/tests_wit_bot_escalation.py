@@ -14,12 +14,21 @@ class WitBotEscalationTests(TestCase):
         User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
         self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
         self.bob = User.objects.create_user(username='bob', email='b@e.com', password='x')
-        from chat.wit_bot import ensure_wit_bot_room, ensure_wit_bot_user
         from chat.wit_admin import ensure_wit_admin_user
+        from chat.wit_bot import ensure_wit_bot_user
+        from django.db.models import Q
         self.bot = ensure_wit_bot_user()
         self.admin = ensure_wit_admin_user()
-        self.alice_room = ensure_wit_bot_room(self.alice)
-        self.bob_room = ensure_wit_bot_room(self.bob)
+        # The post_save signal already provisioned both rooms (with welcome
+        # messages); fetch them so the tests can use them.
+        self.alice_room = ChatRoom.objects.get(
+            (Q(user1=self.alice) & Q(user2=self.bot))
+            | (Q(user1=self.bot) & Q(user2=self.alice))
+        )
+        self.bob_room = ChatRoom.objects.get(
+            (Q(user1=self.bob) & Q(user2=self.bot))
+            | (Q(user1=self.bot) & Q(user2=self.bob))
+        )
 
     def test_escalate_promotes_room_in_place(self):
         from chat.wit_bot import escalate_to_human
@@ -144,3 +153,70 @@ class WitBotEscalationTests(TestCase):
             chat_room=self.alice_room, sender=self.bot,
         ).count()
         self.assertEqual(before, after)
+
+    def test_user_leave_evicts_admin_and_demotes_room(self):
+        """When the original user 'leaves' their wit_bot escalated room, the
+        system reroutes that intent to 'evict admin' — the user stays, the
+        admin is removed, and the room demotes to a 1-on-1 with the bot."""
+        from chat.wit_bot import escalate_to_human
+        escalate_to_human(self.alice)
+        self.alice_room.refresh_from_db()
+        self.assertTrue(self.alice_room.is_group)
+
+        from chat.views import GroupChatLeave
+        factory = APIRequestFactory()
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/leave/')
+        force_authenticate(req, user=self.alice)
+        resp = GroupChatLeave.as_view()(req, pk=self.alice_room.id)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['status'], 'admin_evicted')
+        self.assertEqual(resp.data['redirect_user_id'], self.bot.id)
+
+        self.alice_room.refresh_from_db()
+        self.assertFalse(self.alice_room.is_group)
+        self.assertEqual(self.alice_room.name, '')
+        self.assertEqual(self.alice_room.members.count(), 0)
+        # user1/user2 unchanged so the 1-on-1 lookup still finds the room.
+        self.assertEqual(
+            {self.alice_room.user1_id, self.alice_room.user2_id},
+            {self.alice.id, self.bot.id},
+        )
+
+    def test_engine_resumes_after_user_evicts_admin(self):
+        """After admin eviction the room is back to a 1-on-1, so the wit_bot
+        engine signal fires again on the user's next message."""
+        from chat.wit_bot import escalate_to_human
+        escalate_to_human(self.alice)
+
+        from chat.views import GroupChatLeave
+        factory = APIRequestFactory()
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/leave/')
+        force_authenticate(req, user=self.alice)
+        GroupChatLeave.as_view()(req, pk=self.alice_room.id)
+        self.alice_room.refresh_from_db()
+
+        before = Message.objects.filter(
+            chat_room=self.alice_room, sender=self.bot,
+        ).count()
+        Message.objects.create(
+            chat_room=self.alice_room, sender=self.alice, receiver=self.bot,
+            content='hello again',
+        )
+        after = Message.objects.filter(
+            chat_room=self.alice_room, sender=self.bot,
+        ).count()
+        self.assertGreater(after, before)
+
+    def test_admin_button_tap_triggers_escalation(self):
+        """The new beta-loop entry point: tapping 'Call in the admin' button
+        should immediately escalate (no confirmation step)."""
+        from chat.wit_bot import escalate_to_human  # noqa — verifies import path
+        Message.objects.create(
+            chat_room=self.alice_room, sender=self.alice, receiver=self.bot,
+            content='Call in the admin',
+            bot_payload={'kind': 'choice', 'payload': 'admin'},
+        )
+        self.alice_room.refresh_from_db()
+        self.assertTrue(self.alice_room.is_group)
+        member_ids = set(self.alice_room.members.values_list('id', flat=True))
+        self.assertEqual(member_ids, {self.alice.id, self.bot.id, self.admin.id})

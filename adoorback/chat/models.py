@@ -113,6 +113,9 @@ class Message(AdoorTimestampedModel, SafeDeleteModel):
     )
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
 
+    # Interactive bot card payload (buttons bot→user, structured choices user→bot).
+    bot_payload = models.JSONField(null=True, blank=True)
+
     # Shared content (Note, Response, Question, etc.)
     shared_content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
     shared_object_id = models.PositiveIntegerField(null=True, blank=True)
