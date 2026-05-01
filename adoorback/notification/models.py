@@ -234,7 +234,7 @@ def notify_firebase(instance):
             return False
 
 
-@receiver(post_save, sender=Notification)
+@receiver(post_save, sender=Notification, dispatch_uid='send_firebase_notification')
 def send_firebase_notification(sender, instance, created, **kwargs):
     if created:
         notify_firebase(instance)
@@ -250,7 +250,7 @@ def send_firebase_notification(sender, instance, created, **kwargs):
                 notify_firebase(instance)
 
 
-@receiver(post_save, sender=Notification)
+@receiver(post_save, sender=Notification, dispatch_uid='cancel_firebase_notification')
 def cancel_firebase_notification(sender, instance, **kwargs):
     if not instance.deleted:
         return

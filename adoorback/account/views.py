@@ -2477,11 +2477,20 @@ class CheckInSubscribeAdd(generics.CreateAPIView):
 
         from adoorback.utils.content_types import get_check_in_type
         check_in_ct = get_check_in_type()
-        if Subscription.objects.filter(subscriber=user, subscribed_to=friend, content_type=check_in_ct).exists():
+
+        default_types = ('battery', 'mood', 'thought', 'song')
+        if Subscription.objects.filter(
+            subscriber=user, subscribed_to=friend,
+            content_type=check_in_ct, subscription_type__in=default_types,
+        ).exists():
             return Response({'error': 'Already subscribed to this friend\'s check-in.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        Subscription.objects.create(subscriber=user, subscribed_to=friend, content_type=check_in_ct)
+        for stype in default_types:
+            Subscription.objects.get_or_create(
+                subscriber=user, subscribed_to=friend,
+                content_type=check_in_ct, subscription_type=stype,
+            )
         return Response({'message': 'Subscribed to check-in successfully.'}, status=status.HTTP_201_CREATED)
 
 
@@ -2500,10 +2509,10 @@ class CheckInSubscribeDestroy(generics.DestroyAPIView):
         friend = get_object_or_404(User, id=friend_id)
         from adoorback.utils.content_types import get_check_in_type
         check_in_ct = get_check_in_type()
-        subscription = get_object_or_404(
-            Subscription, subscriber=request.user, subscribed_to=friend, content_type=check_in_ct
-        )
-        subscription.delete()
+        # 해당 친구에 대한 모든 구독 삭제 (타입별 + 레거시 NULL)
+        Subscription.objects.filter(
+            subscriber=request.user, subscribed_to=friend, content_type=check_in_ct
+        ).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

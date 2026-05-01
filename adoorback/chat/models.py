@@ -271,7 +271,7 @@ def get_chat_room(user1, user2):
 
 
 @transaction.atomic
-@receiver(post_save, sender=Message)
+@receiver(post_save, sender=Message, dispatch_uid='create_message_notification')
 def create_message_notification(created, instance, **kwargs):
     if not created:
         return
@@ -337,7 +337,7 @@ def create_message_notification(created, instance, **kwargs):
 
 
 @transaction.atomic
-@receiver(post_save, sender=MessageReaction)
+@receiver(post_save, sender=MessageReaction, dispatch_uid='create_message_reaction_notification')
 def create_message_reaction_notification(created, instance, **kwargs):
     """Push-only notification when someone reacts to your chat message."""
     if not created:
@@ -425,7 +425,7 @@ def create_message_reaction_notification(created, instance, **kwargs):
 
 
 @transaction.atomic
-@receiver(post_save, sender=ChatRequest)
+@receiver(post_save, sender=ChatRequest, dispatch_uid='create_chat_request_noti')
 def create_chat_request_noti(created, instance, **kwargs):
     if instance.deleted:
         return
@@ -459,7 +459,7 @@ def create_chat_request_noti(created, instance, **kwargs):
 
 
 @transaction.atomic
-@receiver(post_save, sender=Message)
+@receiver(post_save, sender=Message, dispatch_uid='fanout_wit_admin_messages')
 def fanout_wit_admin_messages(created, instance, **kwargs):
     """WIT Admin hotfix fan-out / fan-in / blast handler.
 
@@ -602,7 +602,7 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
         return
 
 
-@receiver(post_save, sender=Message)
+@receiver(post_save, sender=Message, dispatch_uid='dispatch_wit_bot_engine')
 def dispatch_wit_bot_engine(created, instance, **kwargs):
     """Dispatch user messages in a wit_bot 1-on-1 to the scripted engine.
 
