@@ -192,3 +192,41 @@ if 'column_name' not in existing_columns:
 - `TestCase` + `setUp()`에서 User/Connection 생성
 - `APIClient` + `force_authenticate(user=self.user)`
 - `APIRequestFactory`로 serializer context 테스트
+
+---
+
+## Backend-specific architecture
+
+### Spotify (split frontend/backend)
+- **Frontend** has a `SpotifyManager` singleton (`WhoamI-Today-frontend/src/libs/SpotifyManager.ts`) that caches resolved tracks in memory and dedups concurrent fetches.
+- **Backend has NO `SpotifyManager` class.** Backend uses `_fetch_spotify_oembed()` utility in `check_in/models.py:540` as the oEmbed fallback when API keys are empty (no artist names are available in that mode). Resolved metadata persists in `CheckInComponentEntry.data` JSON.
+
+### Data models
+- **CheckIn / Song split:** Song is a separate model from CheckIn. Two API calls: `POST /check_in/` for check-in data, `POST /check_in/song/` for song.
+- **CheckIn fields:** `mood` (JSONField, array of up to 5 emojis), `thought` (CharField, max 88), `social_battery`, per-component visibility fields, per-component `*_updated_at` timestamps.
+- **Per-component visibility:** `battery_visibility`, `mood_visibility`, `song_visibility`, `thought_visibility` with values `public` / `friends` / `close_friends` / `only_me`. Frontend `ComponentVisibility` enum (`src/models/checkIn.ts`) and backend `VISIBILITY_CHOICES` (`check_in/models.py`) MUST match.
+- **Auto-archive:** components with `*_updated_at` > 12 hours ago serialize visibility as `only_me` and data as `null` in the friend API.
+- **`CheckInComponentEntry`** (`check_in/models.py:~320–400`): snapshot of one component with its own visibility, JSON `data` payload, plus pin/supersede semantics. Read this before assuming a flat-row design.
+- **Poke component types:** `'battery'`, `'mood'`, `'thought'`, `'song'` — NOT `'status'`.
+
+### Feature flags & experiment infra
+- **`checkIn` feature flag** is gated by `myProfile.current_ver === 'version_w'`. Test users need `current_ver='version_w'` AND `user_group='group_w_first'` or the CheckIn UI is invisible. If a fresh test user's CheckIn tab/grid doesn't render, that's the first thing to check.
+- **`ExperimentLoggingMiddleware`** (`adoorback/experiment_logging/middleware.py`): A/B-testing instrumentation tied to `version_w` / `version_q`. Records which version each request came from. Touch carefully — affects research data collection.
+
+### Notification cleanup TODO (as of 2026-04-30)
+When undoing a reaction the corresponding notification should be deleted on backend. Implemented for `Like` only — `Reaction` deletion still leaves notifications behind. If implementing, follow the pattern in `notification/models.py`'s `create_or_update_notification`.
+
+## Verification expectations
+
+Before marking work complete:
+
+- `python manage.py check` — clean, no warnings.
+- `python manage.py makemigrations --check` — clean (no pending unapplied schema changes that you forgot to commit).
+- For migrations: `python manage.py sqlmigrate <app> <number>` — read the generated SQL and confirm it matches intent. Especially important for `RunPython` migrations and any operation touching tables with prod data.
+- For ORM-touching code: run the relevant test suite — `python manage.py test <app>`.
+- For data persistence work: open `python manage.py shell`, query the model, confirm the row landed correctly. Don't trust the API's response shape alone — confirm the DB state.
+
+When a save flow is being added or changed:
+- Verify via shell that the row exists in the expected state.
+- Verify the API endpoint returns the row in the expected shape.
+- Restart the backend after model / signal / middleware changes — the dev server doesn't always pick up these changes hot.
