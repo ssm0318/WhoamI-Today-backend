@@ -75,6 +75,14 @@ CHIP_CATEGORY_CHOICES = [
     ('least_favorite_platform', 'Least Favorite Platform'),
 ]
 
+# Mirrors check_in.models.CheckIn.VISIBILITY_CHOICES — kept here to avoid cross-app import.
+PROFILE_VISIBILITY_CHOICES = [
+    ('public', 'Public'),
+    ('friends', 'Friends'),
+    ('close_friends', 'Close Friends'),
+    ('only_me', 'Only Me'),
+]
+
 CHIP_CATEGORY_DESCRIPTIONS = {
     'music_entertainment': 'What you consume — genres, media, formats.',
     'hobbies_activities': 'What you do with your time — sports, creative work, lifestyle.',
@@ -234,6 +242,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         default=default_noti_period_days,
         help_text="Days of the week for notifications, where 0=Sunday, 1=Monday, etc."
     )
+    name = models.CharField(null=True, blank=True, max_length=50)
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)
     persona = ArrayField(
@@ -247,22 +256,18 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     interests_updated_at = models.DateTimeField(null=True, blank=True)
     personas_updated_at = models.DateTimeField(null=True, blank=True)
 
-    # Visibility fields
-    # interests_friends_only / persona_friends_only are legacy — kept for migration backfill only.
-    # Per-category flags below are the source of truth.
-    interests_friends_only = models.BooleanField(default=False)
-    persona_friends_only = models.BooleanField(default=False)
-    pronouns_friends_only = models.BooleanField(default=False)
-    bio_friends_only = models.BooleanField(default=False)
-
-    # Per-category visibility (one flag per CHIP_CATEGORY_CHOICES key)
-    music_entertainment_friends_only = models.BooleanField(default=False)
-    hobbies_activities_friends_only = models.BooleanField(default=False)
-    on_my_mind_friends_only = models.BooleanField(default=False)
-    as_a_friend_friends_only = models.BooleanField(default=False)
-    online_persona_friends_only = models.BooleanField(default=False)
-    favorite_platform_friends_only = models.BooleanField(default=False)
-    least_favorite_platform_friends_only = models.BooleanField(default=False)
+    # 4-way visibility enum fields (replaces *_friends_only booleans).
+    # Values: 'public' / 'friends' / 'close_friends' / 'only_me'.
+    name_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    pronouns_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    bio_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    music_entertainment_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    hobbies_activities_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    on_my_mind_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    as_a_friend_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    online_persona_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    favorite_platform_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    least_favorite_platform_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
 
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)

@@ -690,11 +690,14 @@ def set_seed(n):
     logging.info("adoor_2: max 5 custom chips in hobbies") if DEBUG else None
 
     # 5. User with friends-only visibility flags set
-    user_6.bio_friends_only = True
-    user_6.interests_friends_only = True
-    user_6.pronouns_friends_only = True
+    user_6.bio_visibility = 'friends'
+    user_6.pronouns_visibility = 'friends'
+    for cat_key in ('music_entertainment', 'hobbies_activities', 'on_my_mind',
+                    'as_a_friend', 'online_persona', 'favorite_platform',
+                    'least_favorite_platform'):
+        setattr(user_6, f'{cat_key}_visibility', 'friends')
     user_6.save()
-    logging.info("adoor_6: friends-only visibility on bio/interests/pronouns") if DEBUG else None
+    logging.info("adoor_6: friends-only visibility on bio/pronouns/categories") if DEBUG else None
 
     # 6. Ensure 2nd and 3rd degree connections exist for degree badge testing
     # adoor_8 is NOT friends with adoor_1 but IS friends with adoor_2 (mutual friend)

@@ -30,9 +30,9 @@ class ProfileViewAsTests(TestCase):
             username='owner', email='owner@example.com', password='pw',
         )
         self.owner.bio = 'Hi, I am the owner.'
-        self.owner.bio_friends_only = True
+        self.owner.bio_visibility = 'friends'
         self.owner.pronouns = 'they/them'
-        self.owner.pronouns_friends_only = True
+        self.owner.pronouns_visibility = 'friends'
         self.owner.save()
         self.client = APIClient()
         self.client.force_authenticate(user=self.owner)
@@ -66,7 +66,7 @@ class ProfileViewAsTests(TestCase):
 
     def test_view_as_public_hides_friends_only_persona(self):
         """When online_persona_friends_only=True, public view sees empty personas."""
-        self.owner.online_persona_friends_only = True
+        self.owner.online_persona_visibility = 'friends'
         self.owner.save()
 
         response = self.client.get('/api/user/me/profile/?view_as=public')
@@ -75,7 +75,7 @@ class ProfileViewAsTests(TestCase):
 
     def test_view_as_friends_includes_persona(self):
         """When online_persona_friends_only=True, friends view still sees personas."""
-        self.owner.online_persona_friends_only = True
+        self.owner.online_persona_visibility = 'friends'
         self.owner.save()
 
         response = self.client.get('/api/user/me/profile/?view_as=friends')
@@ -88,7 +88,7 @@ class ProfileViewAsTests(TestCase):
 
     def test_view_as_close_friends_includes_persona(self):
         """When online_persona_friends_only=True, close_friends view sees personas."""
-        self.owner.online_persona_friends_only = True
+        self.owner.online_persona_visibility = 'friends'
         self.owner.save()
 
         response = self.client.get('/api/user/me/profile/?view_as=close_friends')
@@ -207,7 +207,7 @@ class ShadowViewerProfileTests(TestCase):
             username='owner_sv', email='owner_sv@example.com', password='pw',
         )
         self.owner.bio = 'Hi, I am the owner.'
-        self.owner.bio_friends_only = True
+        self.owner.bio_visibility = 'friends'
         self.owner.save()
 
         self.alice = User.objects.create_user(
@@ -272,7 +272,7 @@ class PublicProxyViewerTests(TestCase):
             username='owner_pp', email='owner_pp@example.com', password='pw',
         )
         self.owner.bio = 'Owner bio'
-        self.owner.bio_friends_only = True
+        self.owner.bio_visibility = 'friends'
         self.owner.save()
         self.proxy = User.objects.create_user(
             username='wit_bot', email='wit_bot@example.com', password='pw',

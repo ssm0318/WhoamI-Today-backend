@@ -55,17 +55,17 @@ class UserProfileUpdateTest(TestCase):
         self.assertEqual(noti.redirect_url, expected_url)
 
     def test_profile_visibility_update_and_view(self):
-        # User updates visibility preferences (per-category flags are the source of truth)
+        # User updates visibility preferences to 'friends' (per-field 4-way enum)
         update_data = {
-            'bio_friends_only': True,
-            'pronouns_friends_only': True,
-            'music_entertainment_friends_only': True,
-            'hobbies_activities_friends_only': True,
-            'on_my_mind_friends_only': True,
-            'as_a_friend_friends_only': True,
-            'online_persona_friends_only': True,
-            'favorite_platform_friends_only': True,
-            'least_favorite_platform_friends_only': True,
+            'bio_visibility': 'friends',
+            'pronouns_visibility': 'friends',
+            'music_entertainment_visibility': 'friends',
+            'hobbies_activities_visibility': 'friends',
+            'on_my_mind_visibility': 'friends',
+            'as_a_friend_visibility': 'friends',
+            'online_persona_visibility': 'friends',
+            'favorite_platform_visibility': 'friends',
+            'least_favorite_platform_visibility': 'friends',
             'bio': 'My secret bio',
             'pronouns': 'they/them'
         }
@@ -73,8 +73,8 @@ class UserProfileUpdateTest(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
         self.user.refresh_from_db()
-        self.assertTrue(self.user.bio_friends_only)
-        self.assertTrue(self.user.online_persona_friends_only)
+        self.assertEqual(self.user.bio_visibility, 'friends')
+        self.assertEqual(self.user.online_persona_visibility, 'friends')
         self.assertEqual(self.user.bio, 'My secret bio')
 
         # Another user, not friends, views the profile

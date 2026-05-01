@@ -19,25 +19,38 @@ def parse_view_as(request) -> Optional[str]:
     return raw
 
 
-# Map of profile field name → friends_only flag name.
-# Public viewer has the field hidden when the flag is True.
-PROFILE_FIELD_FLAGS: Dict[str, str] = {
-    'bio': 'bio_friends_only',
-    'pronouns': 'pronouns_friends_only',
+# Map of profile field name → 4-way visibility enum field name.
+PROFILE_FIELD_VISIBILITY: Dict[str, str] = {
+    'name': 'name_visibility',
+    'bio': 'bio_visibility',
+    'pronouns': 'pronouns_visibility',
 }
+
+
+def _tier_allows(tier: str, visibility: str) -> bool:
+    if visibility == 'public':
+        return True
+    if visibility == 'only_me':
+        return False
+    if visibility == 'friends':
+        return tier in ('friends', 'close_friends')
+    if visibility == 'close_friends':
+        return tier == 'close_friends'
+    return False
 
 
 def apply_profile_view_as(data: dict, owner, tier: Optional[str]) -> dict:
     """Mutate `data` in place to mask owner profile fields per the chosen tier.
 
-    Called only when `tier` is set and the requester is the owner. For the
-    binary `_friends_only` flags, masking applies only to the 'public' tier;
-    'friends' and 'close_friends' see the same fields a real friend sees.
+    A field is masked when its visibility setting is stricter than what the
+    chosen view-as tier should see (e.g. tier='public' hides any field whose
+    visibility is 'friends' / 'close_friends' / 'only_me').
     """
-    if tier != 'public':
+    if tier is None:
         return data
-    for field, flag in PROFILE_FIELD_FLAGS.items():
-        if getattr(owner, flag, False) and field in data:
+    for field, vis_field in PROFILE_FIELD_VISIBILITY.items():
+        visibility = getattr(owner, vis_field, 'public')
+        if not _tier_allows(tier, visibility) and field in data:
             data[field] = None
     return data
 
