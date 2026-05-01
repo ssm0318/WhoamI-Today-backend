@@ -49,3 +49,51 @@
       low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
       high_label: { en: "Strongly agree", ko: "매우 그렇다" }
       reverse_scored: true
+
+- slug: example_week_check
+  type: likert_5
+  title:
+    en: "How is your week going?"
+    ko: "이번 주는 어떠세요?"
+  description:
+    en: "Five-item check-in to test the long-survey flow."
+    ko: "긴 설문 플로우 테스트용 5문항 체크인."
+  interpretation:
+    en: "Higher scores indicate a smoother week — more energy, less stress."
+    ko: "점수가 높을수록 한 주가 순조롭다는 뜻입니다 — 에너지는 높고 스트레스는 낮아요."
+  questions:
+    - order: 1
+      prompt:
+        en: "I feel productive at what I'm working on."
+        ko: "지금 하고 있는 일에 능률이 오르고 있다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+    - order: 2
+      prompt:
+        en: "Deadlines are stressing me out."
+        ko: "마감 때문에 스트레스를 받고 있다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: true
+    - order: 3
+      prompt:
+        en: "I'm making time for things I enjoy."
+        ko: "내가 좋아하는 일에 시간을 내고 있다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+    - order: 4
+      prompt:
+        en: "I feel disconnected from friends."
+        ko: "친구들과 연결이 끊긴 기분이다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: true
+    - order: 5
+      prompt:
+        en: "I'm sleeping well lately."
+        ko: "요즘 잠을 잘 자고 있다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
