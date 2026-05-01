@@ -219,10 +219,18 @@ class CurrentUserSignupSerializer(CurrentUserSerializer):
         user.set_password(password)
         user.save()
 
+        # Assign group/version based on odd/even user ID
+        if user.id % 2 == 1:  # odd
+            user.user_group = 'group_q_first'
+            user.current_ver = 'version_q'
+        else:  # even
+            user.user_group = 'group_w_first'
+            user.current_ver = 'version_w'
+
         # Prevent redirect to password change page
         user.has_changed_pw = True
         user.save()
-        
+
         return user
 
     class Meta(CurrentUserSerializer.Meta):
