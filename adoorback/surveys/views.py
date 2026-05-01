@@ -1,6 +1,7 @@
 from datetime import date
 
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -201,10 +202,16 @@ class SurveyResultsView(APIView):
 
 
 class PastSurveysView(APIView):
-    """Daily-only archive — only rows the user has answered, scheduled
-    on-or-before today. Future dailies are not exposed; past unanswered
-    dailies are hidden because they can no longer be submitted (allow_late=
-    False on daily) and have no results to view.
+    """Daily-only archive of past dailies.
+
+    Includes:
+      - rows the user has answered (any allow_late) → results page
+      - unanswered rows with allow_late=True → still submittable from the
+        archive's "Answer to view results" chip
+
+    Excludes unanswered rows with allow_late=False (real-study missed dailies):
+    they can no longer be submitted and have no results to view, matching the
+    "expired hidden" semantics in the bucketed index.
     """
     permission_classes = [IsAuthenticated]
 
@@ -219,8 +226,8 @@ class PastSurveysView(APIView):
                 cadence=CADENCE_DAILY,
                 survey__results_hidden=False,
                 window_start__lte=today,
-                survey_id__in=answered_survey_ids,
             )
+            .filter(Q(survey_id__in=answered_survey_ids) | Q(allow_late=True))
             .select_related('survey')
             .order_by('-window_start')
         )

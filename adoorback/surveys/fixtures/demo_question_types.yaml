@@ -109,3 +109,147 @@
       slider_min_value: 0
       slider_max_value: 100
       result_kind: slider_histogram
+
+# --- Open / unanswered counterparts ----------------------------------------
+# Mirror surveys for each question type, scheduled on past daily slots but
+# WITHOUT a viewer response — they let QA verify the "answer to view results"
+# locked state and the input UI for past daily entries (allow_late=True so the
+# answer page stays submittable).
+
+- slug: demo_slider_open
+  type: slider
+  title:
+    en: "Demo · Slider (open)"
+    ko: "데모 · 슬라이더 (미응답)"
+  description:
+    en: "Same as Slider demo, left unanswered to verify the locked-results / answer UI."
+    ko: "슬라이더 데모와 동일하나 미응답 상태로 잠금 화면과 응답 UI 검증용."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "How are you feeling right now?", ko: "지금 기분이 어떠세요?" }
+      low_label: { en: "Terrible", ko: "끔찍해요" }
+      high_label: { en: "Couldn't be better", ko: "더할 나위 없이 좋아요" }
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram
+
+- slug: demo_single_choice_open
+  type: single_choice
+  title:
+    en: "Demo · Single choice (open)"
+    ko: "데모 · 단일 선택 (미응답)"
+  description:
+    en: "Same as Single choice demo, left unanswered."
+    ko: "단일 선택 데모와 동일하나 미응답 상태."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "What's your most-used app today?", ko: "오늘 가장 많이 쓴 앱은?" }
+      options:
+        - { order: 1, value: 1, label: { en: "Instagram",   ko: "인스타그램" } }
+        - { order: 2, value: 2, label: { en: "TikTok",      ko: "틱톡" } }
+        - { order: 3, value: 3, label: { en: "X / Twitter", ko: "X (트위터)" } }
+        - { order: 4, value: 4, label: { en: "YouTube",     ko: "유튜브" } }
+        - { order: 5, value: 5, label: { en: "Other",       ko: "기타" } }
+
+- slug: demo_multi_choice_open
+  type: multi_choice
+  title:
+    en: "Demo · Multi choice (open)"
+    ko: "데모 · 다중 선택 (미응답)"
+  description:
+    en: "Same as Multi choice demo, left unanswered."
+    ko: "다중 선택 데모와 동일하나 미응답 상태."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "What did you do for fun today?", ko: "오늘 즐거움을 위해 한 일은?" }
+      options:
+        - { order: 1, value: 1, label: { en: "Listened to music",  ko: "음악 감상" } }
+        - { order: 2, value: 2, label: { en: "Watched something",  ko: "영상 시청" } }
+        - { order: 3, value: 3, label: { en: "Went outside",       ko: "야외 활동" } }
+        - { order: 4, value: 4, label: { en: "Read",               ko: "독서" } }
+        - { order: 5, value: 5, label: { en: "Hung out with friends", ko: "친구들과 시간" } }
+        - { order: 6, value: 6, label: { en: "None of the above",  ko: "해당 없음" } }
+
+- slug: demo_free_text_open
+  type: free_text
+  title:
+    en: "Demo · Free text (open)"
+    ko: "데모 · 자유 응답 (미응답)"
+  description:
+    en: "Same as Free text demo, left unanswered."
+    ko: "자유 응답 데모와 동일하나 미응답 상태."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "One word that describes today?", ko: "오늘을 한 단어로?" }
+
+- slug: demo_likert_open
+  type: likert_5
+  title:
+    en: "Demo · Likert (open)"
+    ko: "데모 · 리커트 (미응답)"
+  description:
+    en: "Same as Likert demo, left unanswered."
+    ko: "리커트 데모와 동일하나 미응답 상태."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "I felt productive today.", ko: "오늘 능률이 올랐다." }
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+    - order: 2
+      prompt: { en: "I felt overwhelmed today.", ko: "오늘 압도되는 기분이었다." }
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: true
+    - order: 3
+      prompt: { en: "I felt connected to people.", ko: "사람들과 연결된 기분이었다." }
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+# --- Multi-panel demo ------------------------------------------------------
+# Mixed-type questions render as separate panels on the results page so QA
+# can see histogram + option counts + wordcloud stacked together.
+
+- slug: demo_multi_panel
+  title:
+    en: "Demo · Multi-panel results"
+    ko: "데모 · 다중 패널"
+  description:
+    en: "Slider + single choice + free text on one survey — three result panels."
+    ko: "슬라이더 + 단일 선택 + 자유 응답 — 결과 패널 3개."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      type: slider
+      prompt: { en: "How was your day overall?", ko: "오늘 하루는 어땠나요?" }
+      low_label: { en: "Awful", ko: "끔찍" }
+      high_label: { en: "Wonderful", ko: "최고" }
+      slider_min_value: 0
+      slider_max_value: 10
+      result_kind: slider_histogram
+    - order: 2
+      type: single_choice
+      prompt: { en: "Where did you spend most of your day?", ko: "오늘 가장 오래 머문 곳은?" }
+      result_kind: option_counts
+      options:
+        - { order: 1, value: 1, label: { en: "Home",     ko: "집" } }
+        - { order: 2, value: 2, label: { en: "Work",     ko: "직장" } }
+        - { order: 3, value: 3, label: { en: "School",   ko: "학교" } }
+        - { order: 4, value: 4, label: { en: "Outdoors", ko: "야외" } }
+        - { order: 5, value: 5, label: { en: "Other",    ko: "기타" } }
+    - order: 3
+      type: free_text
+      prompt: { en: "One thing you're looking forward to?", ko: "기대되는 한 가지?" }
+      result_kind: wordcloud
