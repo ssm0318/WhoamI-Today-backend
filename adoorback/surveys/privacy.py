@@ -160,8 +160,8 @@ def compute_bucket_eligibility(viewer, survey: Survey) -> dict:  # pragma: no co
     ids = compute_responder_ids(viewer, survey)
     # Use the survey's "primary" kind from its first non-hidden question, or option_counts.
     first = survey.questions.filter(result_hidden=False).order_by('order').first()
-    panel_kind = first.effective_result_kind if first else Survey.RESULT_OPTION_COUNTS \
-        if hasattr(Survey, 'RESULT_OPTION_COUNTS') else 'option_counts'
+    from surveys.models import RESULT_OPTION_COUNTS
+    panel_kind = first.effective_result_kind if first else RESULT_OPTION_COUNTS
     report = compute_panel_eligibility(viewer, survey, panel_kind, ids)
     return {
         **report,

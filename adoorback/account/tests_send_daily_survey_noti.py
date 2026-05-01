@@ -21,7 +21,7 @@ class SendDailySurveyNotiCronTests(TestCase):
         self.assertEqual(Notification.objects.count(), before)
 
     def test_authors_notification_as_wit_bot_when_survey_exists(self):
-        s = Survey.objects.create(slug='s', type=Survey.LIKERT_5, title_en='T', title_ko='T')
+        s = Survey.objects.create(slug='s', title_en='T', title_ko='T')
         DailySurvey.objects.create(date=date.today(), survey=s)
         ensure_wit_bot_user()
         u = User.objects.create(username='alice', email='a@x.com', timezone='UTC')
