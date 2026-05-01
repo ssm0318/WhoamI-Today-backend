@@ -1,0 +1,111 @@
+# Demo fixture — one survey per question type, for QA verification of every
+# input UI and every result renderer.
+#
+# Run via:  python manage.py seed_question_type_demos --email <your-email>
+# (the orchestrator command loads this fixture, schedules each demo on a past
+# daily slot, seeds mock responses, and seeds the viewer's response too so
+# /surveys/<slug>/results renders immediately).
+
+- slug: demo_likert
+  type: likert_5
+  title:
+    en: "Demo · Likert (multi-question)"
+    ko: "데모 · 리커트 (다문항)"
+  description:
+    en: "Five-item likert. Aggregates as a single histogram of summed reverse-aware scores."
+    ko: "5문항 리커트. 역점수 합산 히스토그램으로 집계됩니다."
+  interpretation:
+    en: "Higher scores = stronger positive sentiment."
+    ko: "점수가 높을수록 긍정적입니다."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "I felt productive today.", ko: "오늘 능률이 올랐다." }
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+    - order: 2
+      prompt: { en: "I felt overwhelmed today.", ko: "오늘 압도되는 기분이었다." }
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: true
+    - order: 3
+      prompt: { en: "I felt connected to people.", ko: "사람들과 연결된 기분이었다." }
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+- slug: demo_single_choice
+  type: single_choice
+  title:
+    en: "Demo · Single choice"
+    ko: "데모 · 단일 선택"
+  description:
+    en: "Pick exactly one. Aggregates as per-option counts."
+    ko: "하나만 선택. 옵션별 응답 수로 집계됩니다."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "What's your most-used app today?", ko: "오늘 가장 많이 쓴 앱은?" }
+      options:
+        - { order: 1, value: 1, label: { en: "Instagram",   ko: "인스타그램" } }
+        - { order: 2, value: 2, label: { en: "TikTok",      ko: "틱톡" } }
+        - { order: 3, value: 3, label: { en: "X / Twitter", ko: "X (트위터)" } }
+        - { order: 4, value: 4, label: { en: "YouTube",     ko: "유튜브" } }
+        - { order: 5, value: 5, label: { en: "Other",       ko: "기타" } }
+
+- slug: demo_multi_choice
+  type: multi_choice
+  title:
+    en: "Demo · Multi choice"
+    ko: "데모 · 다중 선택"
+  description:
+    en: "Pick any that apply. Aggregates as per-option counts (each pick adds 1)."
+    ko: "해당하는 것 모두 선택. 옵션별 응답 수로 집계됩니다."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "What did you do for fun today?", ko: "오늘 즐거움을 위해 한 일은?" }
+      options:
+        - { order: 1, value: 1, label: { en: "Listened to music",  ko: "음악 감상" } }
+        - { order: 2, value: 2, label: { en: "Watched something",  ko: "영상 시청" } }
+        - { order: 3, value: 3, label: { en: "Went outside",       ko: "야외 활동" } }
+        - { order: 4, value: 4, label: { en: "Read",               ko: "독서" } }
+        - { order: 5, value: 5, label: { en: "Hung out with friends", ko: "친구들과 시간" } }
+        - { order: 6, value: 6, label: { en: "None of the above",  ko: "해당 없음" } }
+
+- slug: demo_free_text
+  type: free_text
+  title:
+    en: "Demo · Free text"
+    ko: "데모 · 자유 응답"
+  description:
+    en: "Open response. Aggregates as a wordcloud (tokens with count ≥ 3)."
+    ko: "자유 응답. 워드클라우드(빈도 3 이상)로 집계됩니다."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "One word that describes today?", ko: "오늘을 한 단어로?" }
+
+- slug: demo_slider
+  type: slider
+  title:
+    en: "Demo · Slider"
+    ko: "데모 · 슬라이더"
+  description:
+    en: "Pick a number on a 0–100 scale. Aggregates as a 10-bin histogram with mean and median."
+    ko: "0–100 척도에서 숫자 선택. 10개 구간 히스토그램(평균/중앙값 포함)으로 집계됩니다."
+  friend_visible: true
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt: { en: "How are you feeling right now?", ko: "지금 기분이 어떠세요?" }
+      low_label: { en: "Terrible", ko: "끔찍해요" }
+      high_label: { en: "Couldn't be better", ko: "더할 나위 없이 좋아요" }
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram

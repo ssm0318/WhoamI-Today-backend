@@ -1,0 +1,40 @@
+# One-off "survey of the day" content for QA testing.
+# Loaded + scheduled via:
+#   python manage.py load_surveys adoorback/surveys/fixtures/mock_test_today.yaml
+#   python manage.py seed_survey_mock_data --email <dev-email> --today-slug mock_test_2026q2
+#
+# The --today-slug flag creates (or re-points) the daily ScheduledSurvey for
+# today to this survey, so it shows up on /share as Survey of the Day.
+
+- slug: mock_test_2026q2
+  title:
+    en: "quick mock survey"
+    ko: "간단 모의 설문"
+  description:
+    en: "short survey"
+    ko: "짧은 설문"
+  friend_visible: false
+  results_hidden: false
+  questions:
+    - order: 1
+      type: slider
+      prompt:
+        en: "How are you feeling today?"
+        ko: "오늘 기분이 어떤가요?"
+      low_label: { en: "Terrible", ko: "끔찍해요" }
+      high_label: { en: "Couldn't be better", ko: "더할 나위 없이 좋아요" }
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram
+    - order: 2
+      type: single_choice
+      prompt:
+        en: "What's the weather like where you are right now?"
+        ko: "지금 있는 곳의 날씨는 어때요?"
+      result_kind: option_counts
+      options:
+        - { order: 1, value: 1, label: { en: "☀️ Sunny", ko: "☀️ 맑음" } }
+        - { order: 2, value: 2, label: { en: "⛅ Partly cloudy", ko: "⛅ 구름 조금" } }
+        - { order: 3, value: 3, label: { en: "☁️ Cloudy", ko: "☁️ 흐림" } }
+        - { order: 4, value: 4, label: { en: "🌧️ Rainy", ko: "🌧️ 비" } }
+        - { order: 5, value: 5, label: { en: "❄️ Snowy / Other", ko: "❄️ 눈 / 기타" } }
