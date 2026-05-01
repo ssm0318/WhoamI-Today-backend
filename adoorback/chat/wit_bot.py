@@ -13,7 +13,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files import File
 from django.db import IntegrityError, transaction
@@ -34,15 +33,9 @@ WIT_BOT_USERNAME = 'wit_bot'
 WIT_BOT_EMAIL = 'wit.bot@whoami.today'
 WIT_BOT_DISPLAY_NAME = 'wit_bot'
 
-# BASE_DIR is .../WhoamI-Today-backend/adoorback/adoorback (the inner project
-# package). Three levels up is the whoami-code workspace root, where the
-# frontend repo lives as a sibling of the backend repo.
-WIT_BOT_AVATAR_SOURCE = (
-    Path(settings.BASE_DIR).parent.parent.parent
-    / 'WhoamI-Today-frontend'
-    / 'public'
-    / 'whoami384.png'
-)
+# Bundled inside the backend repo so the avatar is available in any deployment
+# without depending on the frontend repo being checked out next door.
+WIT_BOT_AVATAR_SOURCE = Path(__file__).parent / 'assets' / 'wit_bot_avatar.png'
 
 
 def _set_avatar_from_source(user):
@@ -120,7 +113,10 @@ def ensure_wit_bot_room(user):
         return None
 
     u1, u2 = _ordered_pair(user, bot)
-    room, _ = ChatRoom.objects.get_or_create(user1=u1, user2=u2)
+    room, created = ChatRoom.objects.get_or_create(user1=u1, user2=u2)
+    if created:
+        from chat.wit_bot_engine import _post_welcome
+        _post_welcome(room, bot, user)
     return room
 
 

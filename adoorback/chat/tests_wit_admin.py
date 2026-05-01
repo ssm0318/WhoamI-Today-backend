@@ -387,8 +387,15 @@ class JaewonBlastTests(TestCase):
         u1, u2 = (wit, self.koyrkr) if wit.id < self.koyrkr.id else (self.koyrkr, wit)
         log = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_blast_room=True)
         Message.objects.create(chat_room=log, sender=self.koyrkr, receiver=wit, content='leak')
-        # No fan-out: no messages anywhere except the original in koyrkr's log
-        self.assertEqual(Message.objects.exclude(chat_room=log).count(), 0)
+        # No fan-out: no messages anywhere except the original in koyrkr's log.
+        # (Excludes wit_bot welcome cards posted to operator rooms — unrelated.)
+        from chat.wit_bot import WIT_BOT_USERNAME
+        self.assertEqual(
+            Message.objects.exclude(chat_room=log)
+            .exclude(sender__username=WIT_BOT_USERNAME)
+            .count(),
+            0,
+        )
 
 
 class LoopGuardTests(TestCase):
@@ -402,24 +409,30 @@ class LoopGuardTests(TestCase):
 
     def test_inbound_produces_exactly_three_mirrors_no_recursion(self):
         from chat.wit_admin import ensure_wit_admin_user
+        from chat.wit_bot import WIT_BOT_USERNAME
         wit = ensure_wit_admin_user()
         u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
         room = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
         Message.objects.create(chat_room=room, sender=self.alice, receiver=wit, content='no-loop')
         # Total messages = 1 original + 3 mirrors = 4. Anything more = infinite loop.
-        self.assertEqual(Message.objects.count(), 4)
-        self.assertEqual(Message.objects.filter(is_wit_admin_mirror=True).count(), 3)
+        # (Excludes wit_bot welcome posted to alice's bot room.)
+        non_bot = Message.objects.exclude(sender__username=WIT_BOT_USERNAME)
+        self.assertEqual(non_bot.count(), 4)
+        self.assertEqual(non_bot.filter(is_wit_admin_mirror=True).count(), 3)
 
     def test_blast_produces_n_plus_two_no_recursion(self):
         from chat.wit_admin import ensure_wit_admin_user
+        from chat.wit_bot import WIT_BOT_USERNAME
         wit = ensure_wit_admin_user()
         jaewon = User.objects.get(email='jaewonkim628@gmail.com')
         u1, u2 = (jaewon, wit) if jaewon.id < wit.id else (wit, jaewon)
         blast = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_blast_room=True)
         Message.objects.create(chat_room=blast, sender=jaewon, receiver=wit, content='broadcast')
         # 1 original + 1 (alice WIT room) + 2 (observer logs) = 4
-        self.assertEqual(Message.objects.count(), 4)
-        self.assertEqual(Message.objects.filter(is_wit_admin_mirror=True).count(), 3)
+        # (Excludes wit_bot welcome posted to alice's bot room.)
+        non_bot = Message.objects.exclude(sender__username=WIT_BOT_USERNAME)
+        self.assertEqual(non_bot.count(), 4)
+        self.assertEqual(non_bot.filter(is_wit_admin_mirror=True).count(), 3)
 
 
 class ChatListPinTests(TestCase):

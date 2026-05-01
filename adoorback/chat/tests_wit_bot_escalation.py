@@ -14,12 +14,21 @@ class WitBotEscalationTests(TestCase):
         User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
         self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
         self.bob = User.objects.create_user(username='bob', email='b@e.com', password='x')
-        from chat.wit_bot import ensure_wit_bot_room, ensure_wit_bot_user
         from chat.wit_admin import ensure_wit_admin_user
+        from chat.wit_bot import ensure_wit_bot_user
+        from django.db.models import Q
         self.bot = ensure_wit_bot_user()
         self.admin = ensure_wit_admin_user()
-        self.alice_room = ensure_wit_bot_room(self.alice)
-        self.bob_room = ensure_wit_bot_room(self.bob)
+        # The post_save signal already provisioned both rooms (with welcome
+        # messages); fetch them so the tests can use them.
+        self.alice_room = ChatRoom.objects.get(
+            (Q(user1=self.alice) & Q(user2=self.bot))
+            | (Q(user1=self.bot) & Q(user2=self.alice))
+        )
+        self.bob_room = ChatRoom.objects.get(
+            (Q(user1=self.bob) & Q(user2=self.bot))
+            | (Q(user1=self.bot) & Q(user2=self.bob))
+        )
 
     def test_escalate_promotes_room_in_place(self):
         from chat.wit_bot import escalate_to_human
@@ -144,3 +153,17 @@ class WitBotEscalationTests(TestCase):
             chat_room=self.alice_room, sender=self.bot,
         ).count()
         self.assertEqual(before, after)
+
+    def test_admin_button_tap_triggers_escalation(self):
+        """The new beta-loop entry point: tapping 'Call in the admin' button
+        should immediately escalate (no confirmation step)."""
+        from chat.wit_bot import escalate_to_human  # noqa — verifies import path
+        Message.objects.create(
+            chat_room=self.alice_room, sender=self.alice, receiver=self.bot,
+            content='Call in the admin',
+            bot_payload={'kind': 'choice', 'payload': 'admin'},
+        )
+        self.alice_room.refresh_from_db()
+        self.assertTrue(self.alice_room.is_group)
+        member_ids = set(self.alice_room.members.values_list('id', flat=True))
+        self.assertEqual(member_ids, {self.alice.id, self.bot.id, self.admin.id})
