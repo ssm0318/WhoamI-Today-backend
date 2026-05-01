@@ -1092,6 +1092,31 @@ class CheckInPostComments(generics.ListAPIView):
         ).order_by('created_at')
 
 
+class CheckInPostLikes(generics.ListAPIView):
+    """GET /api/check_in/posts/<pk>/likes/
+
+    List users who liked a CheckInPost. Only the post author can view this.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_serializer_class(self):
+        from like.serializers import LikeSerializer
+        return LikeSerializer
+
+    def get_queryset(self):
+        current_user = self.request.user
+        post = get_object_or_404(CheckInPost, id=self.kwargs.get('pk'))
+        if post.author != current_user:
+            raise exceptions.PermissionDenied("Only the author can view likes.")
+        blocked_ids = current_user.user_report_blocked_ids
+        return post.check_in_post_likes.exclude(
+            user_id__in=blocked_ids,
+        ).order_by('-created_at')
+
+
 class CheckInPostPinToggle(APIView):
     """PATCH /api/check_in/posts/<pk>/pin/
 

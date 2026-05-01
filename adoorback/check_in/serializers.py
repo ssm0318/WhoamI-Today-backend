@@ -395,6 +395,8 @@ class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
     video_thumbnail_url = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     has_unread = serializers.SerializerMethodField(read_only=True)
+    like_count = serializers.SerializerMethodField(read_only=True)
+    comment_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CheckInPost
@@ -402,7 +404,22 @@ class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
                   'video_url', 'video_thumbnail_url',
                   'caption', 'visibility',
                   'is_pinned', 'pin_visibility', 'created_at',
-                  'current_user_read', 'has_unread']
+                  'current_user_read', 'has_unread', 'like_count',
+                  'comment_count']
+
+    def get_like_count(self, obj):
+        request = self.context.get('request')
+        if request is None or obj.author != request.user:
+            return None
+        blocked_ids = request.user.user_report_blocked_ids
+        return obj.check_in_post_likes.exclude(user_id__in=blocked_ids).count()
+
+    def get_comment_count(self, obj):
+        request = self.context.get('request')
+        if request is None or obj.author != request.user:
+            return None
+        blocked_ids = request.user.user_report_blocked_ids
+        return obj.check_in_post_comments.exclude(author_id__in=blocked_ids).count()
 
     def get_current_user_read(self, obj):
         request = self.context.get('request')
