@@ -11,6 +11,7 @@ from django.utils import timezone
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
 from adoorback.models import AdoorTimestampedModel
+from adoorback.utils.helpers import wrap_content
 from notification.models import Notification, NotificationActor
 
 
@@ -83,6 +84,8 @@ MESSAGE_EMOJI_CHOICES = (
     ('cry', '😭'),
     ('laugh', '🤣'),
 )
+
+EMOJI_DISPLAY = dict(MESSAGE_EMOJI_CHOICES)
 
 MESSAGE_EVENT_CHOICES = (
     ('', 'Message'),
@@ -353,6 +356,8 @@ def create_message_reaction_notification(created, instance, **kwargs):
         return
 
     emoji = instance.emoji
+    emoji_char = EMOJI_DISPLAY.get(emoji, emoji)
+    msg_preview = wrap_content(message.content) if message.content else ''
 
     # 같은 메시지에 대한 기존 리액션 노티 찾기 (24시간 내)
     message_ct = ContentType.objects.get_for_model(Message)
@@ -382,14 +387,14 @@ def create_message_reaction_notification(created, instance, **kwargs):
             second_name = None
 
         if N == 1:
-            noti_ko = f"{reactor.username}님이 회원님의 메시지에 반응했습니다: {emoji}"
-            noti_en = f"{reactor.username} reacted to your message: {emoji}"
+            noti_ko = f"{reactor.username}님이 회원님의 메시지에 {emoji_char} 반응을 남겼습니다: {msg_preview}"
+            noti_en = f"{reactor.username} reacted {emoji_char} to your message: {msg_preview}"
         elif N == 2:
-            noti_ko = f"{reactor.username}님과 {second_name}님이 회원님의 메시지에 반응했습니다"
-            noti_en = f"{reactor.username} and {second_name} reacted to your message"
+            noti_ko = f"{reactor.username}님과 {second_name}님이 회원님의 메시지에 {emoji_char} 반응을 남겼습니다: {msg_preview}"
+            noti_en = f"{reactor.username} and {second_name} reacted {emoji_char} to your message: {msg_preview}"
         else:
-            noti_ko = f"{reactor.username}님, {second_name}님, 외 {N - 2}명이 회원님의 메시지에 반응했습니다"
-            noti_en = f"{reactor.username}, {second_name}, and {N - 2} other(s) reacted to your message"
+            noti_ko = f"{reactor.username}님, {second_name}님, 외 {N - 2}명이 회원님의 메시지에 {emoji_char} 반응을 남겼습니다: {msg_preview}"
+            noti_en = f"{reactor.username}, {second_name}, and {N - 2} other(s) reacted {emoji_char} to your message: {msg_preview}"
 
         recent_noti.message_ko = noti_ko
         recent_noti.message_en = noti_en
@@ -398,8 +403,8 @@ def create_message_reaction_notification(created, instance, **kwargs):
         recent_noti.save()
         NotificationActor.objects.create(user=reactor, notification=recent_noti)
     else:
-        noti_ko = f"{reactor.username}님이 회원님의 메시지에 반응했습니다: {emoji}"
-        noti_en = f"{reactor.username} reacted to your message: {emoji}"
+        noti_ko = f"{reactor.username}님이 회원님의 메시지에 {emoji_char} 반응을 남겼습니다: {msg_preview}"
+        noti_en = f"{reactor.username} reacted {emoji_char} to your message: {msg_preview}"
 
         if chat_room.is_group:
             redirect_url = f"/chats/group/{chat_room.id}"
