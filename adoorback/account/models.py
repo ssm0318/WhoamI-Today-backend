@@ -1169,3 +1169,42 @@ def provision_wit_admin_rooms(created, instance, **kwargs):
     except (LookupError, IntegrityError):
         # Bot user not yet seeded or DB collision — seed_wit_bot will heal.
         return
+
+
+class VersionSwapRequest(AdoorTimestampedModel, SafeDeleteModel):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
+    user = models.ForeignKey(
+        get_user_model(), related_name='version_swap_requests', on_delete=models.CASCADE)
+    from_version = models.CharField(max_length=20, choices=VERSION_CHOICES)
+    to_version = models.CharField(max_length=20, choices=VERSION_CHOICES)
+    reason = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    processed_at = models.DateTimeField(null=True, blank=True)
+    processed_by = models.ForeignKey(
+        get_user_model(), related_name='+', on_delete=models.SET_NULL, null=True, blank=True)
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user'],
+                condition=Q(status='pending') & Q(deleted__isnull=True),
+                name='unique_pending_version_swap_request'),
+        ]
+        indexes = [
+            models.Index(fields=['-created_at']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user} {self.from_version}→{self.to_version} ({self.status})'
+
+    @property
+    def type(self):
+        return self.__class__.__name__
