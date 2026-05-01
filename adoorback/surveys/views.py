@@ -12,16 +12,25 @@ from surveys.aggregation import (
     group_panels,
 )
 from surveys.models import (
-    DailySurvey, Survey, SurveyAnswer, SurveyQuestion, SurveyResponse,
+    CADENCE_DAILY, ScheduledSurvey, Survey, SurveyAnswer, SurveyQuestion,
+    SurveyResponse,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
+from surveys.scheduling import get_survey_index, get_today_daily
 from surveys.serializers import (
-    PastSurveySerializer, SurveyDetailSerializer, SurveyResponseInputSerializer,
+    PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
+    SurveyResponseInputSerializer,
 )
 
 
 def _bereal_gate(viewer, survey: Survey):
-    """Return (visible, error_payload). error_payload is None if visible."""
+    """Return (visible, error_payload). error_payload is None if visible.
+
+    Daily surveys keep the BeReal-style lock: results unlock only after the
+    daily window closes. Non-daily surveys (weekly, biweekly, anytime,
+    endpoint) have no daily ScheduledSurvey row, so this gate is a no-op for
+    them — results are visible as soon as the user submits.
+    """
     has_response = SurveyResponse.objects.filter(survey=survey, user=viewer).exists()
     if not has_response:
         return False, {
@@ -30,7 +39,11 @@ def _bereal_gate(viewer, survey: Survey):
             'available_at': None,
         }
     survey_day = (
-        DailySurvey.objects.filter(survey=survey).order_by('date').values_list('date', flat=True).first()
+        ScheduledSurvey.objects
+        .filter(survey=survey, cadence=CADENCE_DAILY)
+        .order_by('window_start')
+        .values_list('window_start', flat=True)
+        .first()
     )
     if survey_day is None:
         return True, None
@@ -47,12 +60,11 @@ class SurveyOfTheDayView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        today = date.today()
-        ds = DailySurvey.objects.filter(date=today).select_related('survey').first()
-        if ds is None:
+        scheduled = get_today_daily(request.user)
+        if scheduled is None:
             return Response({'survey': None})
-        ser = SurveyDetailSerializer(ds.survey, context={'request': request})
-        return Response({'date': today.isoformat(), 'survey': ser.data})
+        ser = SurveyDetailSerializer(scheduled.survey, context={'request': request})
+        return Response({'date': scheduled.window_start.isoformat(), 'survey': ser.data})
 
 
 class SurveyDetailView(APIView):
@@ -167,9 +179,47 @@ class SurveyResultsView(APIView):
 
 
 class PastSurveysView(APIView):
+    """Daily-only archive. Powers the 'Daily check-ins (N completed)' page —
+    a flat list of daily ScheduledSurvey rows newest-first.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        qs = DailySurvey.objects.select_related('survey').filter(survey__results_hidden=False).order_by('-date')
+        qs = (
+            ScheduledSurvey.objects
+            .filter(cadence=CADENCE_DAILY, survey__results_hidden=False)
+            .select_related('survey')
+            .order_by('-window_start')
+        )
         ser = PastSurveySerializer(qs, many=True, context={'request': request})
         return Response({'results': ser.data})
+
+
+class SurveyIndexView(APIView):
+    """Three-bucket survey index for the /surveys page.
+
+    GET /api/surveys/index/ →
+        {
+          "available_now":     [SurveyIndexEntry, ...],
+          "late_but_accepted": [SurveyIndexEntry, ...],
+          "completed":         [SurveyIndexEntry, ...]
+        }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        result = get_survey_index(request.user)
+        for bucket_name in ('available_now', 'late_but_accepted', 'completed'):
+            for entry in result[bucket_name]:
+                entry.bucket = bucket_name
+        return Response({
+            'available_now': SurveyIndexEntrySerializer(
+                result['available_now'], many=True, context={'request': request},
+            ).data,
+            'late_but_accepted': SurveyIndexEntrySerializer(
+                result['late_but_accepted'], many=True, context={'request': request},
+            ).data,
+            'completed': SurveyIndexEntrySerializer(
+                result['completed'], many=True, context={'request': request},
+            ).data,
+        })

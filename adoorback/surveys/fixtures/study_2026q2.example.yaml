@@ -1,0 +1,227 @@
+# 4-week study survey content — REFERENCE TEMPLATE.
+#
+# Copy to study_2026q2.yaml and replace the placeholder content with the real
+# survey questions for the 2026-Q2 deployment. The seed migration
+# (surveys/migrations/0004_seed_study_schedule.py) requires every slug below
+# to exist in the DB before it applies.
+#
+# Loaded via: python manage.py load_surveys surveys/fixtures/study_2026q2.yaml
+# (or .example.yaml for round-trip tests)
+#
+# Required slugs (exactly these, no more, no less unless SPECIAL_DAILY_DAYS in
+# the seed migration is non-empty):
+#   daily_base, pre_study, mid_study, post_study,
+#   week1_reflection, week2_reflection, week3_reflection, week4_reflection,
+#   anytime_reflection, study_endpoint
+
+- slug: daily_base
+  type: likert_5
+  title:
+    en: "Daily check-in"
+    ko: "일일 체크인"
+  description:
+    en: "How are you feeling right now?"
+    ko: "지금 기분 어떠세요?"
+  interpretation:
+    en: "Higher numbers indicate higher mood."
+    ko: "숫자가 높을수록 기분이 좋다는 의미예요."
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt:
+        en: "Mood right now"
+        ko: "지금 기분"
+      low_label: { en: "Very low", ko: "매우 낮음" }
+      high_label: { en: "Very high", ko: "매우 높음" }
+      reverse_scored: false
+
+- slug: pre_study
+  type: likert_5
+  title:
+    en: "Pre-study survey"
+    ko: "사전 설문"
+  description:
+    en: "Baseline information collected before the study begins."
+    ko: "연구 시작 전 수집하는 기본 정보입니다."
+  interpretation:
+    en: "Baseline only — no public results."
+    ko: "기본값 측정만 — 결과는 공개되지 않습니다."
+  results_hidden: true
+  questions:
+    - order: 1
+      type: single_choice
+      prompt:
+        en: "How often do you currently use social apps?"
+        ko: "현재 소셜 앱을 얼마나 자주 사용하세요?"
+      options:
+        - { order: 1, label: { en: "Rarely", ko: "거의 안 함" }, value: 1 }
+        - { order: 2, label: { en: "Sometimes", ko: "가끔" }, value: 2 }
+        - { order: 3, label: { en: "Often", ko: "자주" }, value: 3 }
+        - { order: 4, label: { en: "Almost always", ko: "거의 항상" }, value: 4 }
+    - order: 2
+      type: free_text
+      prompt:
+        en: "What do you hope to gain from these four weeks?"
+        ko: "다음 4주 동안 무엇을 얻고 싶으신가요?"
+
+- slug: mid_study
+  type: likert_5
+  title:
+    en: "Mid-study reflection"
+    ko: "중간 회고"
+  description:
+    en: "Halfway through the study."
+    ko: "연구 중간 시점에서의 회고입니다."
+  interpretation:
+    en: "Self-reflection only."
+    ko: "자기 성찰용입니다."
+  results_hidden: true
+  questions:
+    - order: 1
+      prompt:
+        en: "I'm getting what I hoped for from this study."
+        ko: "이 연구에서 기대했던 것을 얻고 있다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+- slug: post_study
+  type: likert_5
+  title:
+    en: "Post-study reflection"
+    ko: "사후 회고"
+  description:
+    en: "Wrapping up the four-week study."
+    ko: "4주 연구를 마무리하며."
+  interpretation:
+    en: "Wrap-up reflection."
+    ko: "마무리 회고입니다."
+  results_hidden: true
+  questions:
+    - order: 1
+      prompt:
+        en: "I would recommend this study to a friend."
+        ko: "이 연구를 친구에게 추천하고 싶다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+- slug: week1_reflection
+  type: likert_5
+  title:
+    en: "Week 1 reflection"
+    ko: "1주차 회고"
+  description:
+    en: "Looking back on the past week."
+    ko: "지난 한 주를 돌아봅니다."
+  interpretation:
+    en: "Higher scores indicate a smoother week."
+    ko: "점수가 높을수록 한 주가 순조로웠다는 의미입니다."
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt:
+        en: "I felt productive this week."
+        ko: "이번 주 능률이 올랐다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+- slug: week2_reflection
+  type: likert_5
+  title:
+    en: "Week 2 reflection"
+    ko: "2주차 회고"
+  description:
+    en: "Looking back on the past week."
+    ko: "지난 한 주를 돌아봅니다."
+  interpretation:
+    en: "Higher scores indicate a smoother week."
+    ko: "점수가 높을수록 한 주가 순조로웠다는 의미입니다."
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt:
+        en: "I felt productive this week."
+        ko: "이번 주 능률이 올랐다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+- slug: week3_reflection
+  type: likert_5
+  title:
+    en: "Week 3 reflection"
+    ko: "3주차 회고"
+  description:
+    en: "Looking back on the past week."
+    ko: "지난 한 주를 돌아봅니다."
+  interpretation:
+    en: "Higher scores indicate a smoother week."
+    ko: "점수가 높을수록 한 주가 순조로웠다는 의미입니다."
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt:
+        en: "I felt productive this week."
+        ko: "이번 주 능률이 올랐다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+- slug: week4_reflection
+  type: likert_5
+  title:
+    en: "Week 4 reflection"
+    ko: "4주차 회고"
+  description:
+    en: "Looking back on the past week."
+    ko: "지난 한 주를 돌아봅니다."
+  interpretation:
+    en: "Higher scores indicate a smoother week."
+    ko: "점수가 높을수록 한 주가 순조로웠다는 의미입니다."
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt:
+        en: "I felt productive this week."
+        ko: "이번 주 능률이 올랐다."
+      low_label: { en: "Strongly disagree", ko: "매우 그렇지 않다" }
+      high_label: { en: "Strongly agree", ko: "매우 그렇다" }
+      reverse_scored: false
+
+- slug: anytime_reflection
+  type: free_text
+  title:
+    en: "Anytime reflection"
+    ko: "자유 회고"
+  description:
+    en: "Share something whenever you'd like during these four weeks."
+    ko: "4주 동안 언제든지 자유롭게 공유해주세요."
+  interpretation:
+    en: "Open-ended reflection."
+    ko: "자유로운 회고입니다."
+  results_hidden: false
+  questions:
+    - order: 1
+      prompt:
+        en: "What's on your mind?"
+        ko: "지금 무슨 생각을 하고 있나요?"
+
+- slug: study_endpoint
+  type: free_text
+  title:
+    en: "Final reflection"
+    ko: "최종 회고"
+  description:
+    en: "Looking back on the past four weeks."
+    ko: "지난 4주를 돌아봅니다."
+  interpretation:
+    en: "Open-ended reflection."
+    ko: "자유로운 회고입니다."
+  results_hidden: true
+  questions:
+    - order: 1
+      prompt:
+        en: "What changed for you over these four weeks?"
+        ko: "지난 4주 동안 무엇이 달라졌나요?"
