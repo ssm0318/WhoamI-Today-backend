@@ -66,13 +66,15 @@ USER_TYPE_CHOICES = (
 )
 
 CHIP_CATEGORY_CHOICES = [
-    ('music_entertainment', 'Music & Entertainment'),
+    ('basic_identities', 'Basic Identities'),
+    ('favorite_platform', 'Favorite Platform'),
+    ('least_favorite_platform', 'Least Favorite Platform'),
     ('hobbies_activities', 'Hobbies & Activities'),
+    ('music_entertainment', 'Music & Entertainment'),
+    ('values_allyship', 'Values & Allyship'),
     ('on_my_mind', 'On My Mind'),
     ('as_a_friend', 'As a Friend'),
     ('online_persona', 'Online Persona'),
-    ('favorite_platform', 'Favorite Platform'),
-    ('least_favorite_platform', 'Least Favorite Platform'),
 ]
 
 # Mirrors check_in.models.CheckIn.VISIBILITY_CHOICES — kept here to avoid cross-app import.
@@ -84,26 +86,55 @@ PROFILE_VISIBILITY_CHOICES = [
 ]
 
 CHIP_CATEGORY_DESCRIPTIONS = {
-    'music_entertainment': 'What you consume — genres, media, formats.',
+    'basic_identities': 'Life stage, social style, and personal traits.',
+    'favorite_platform': 'The platforms you love most.',
+    'least_favorite_platform': 'The platforms you could do without.',
     'hobbies_activities': 'What you do with your time — sports, creative work, lifestyle.',
+    'music_entertainment': 'What you consume — genres, media, formats.',
+    'values_allyship': 'Values, causes, and allyship you stand for.',
     'on_my_mind': 'Current rabbit holes, intellectual interests, life-phase topics.',
     'as_a_friend': 'How you show up in relationships — personality and values.',
     'online_persona': 'How you behave on the internet — distinct behavioral archetypes.',
-    'favorite_platform': 'The platforms you love most.',
-    'least_favorite_platform': 'The platforms you could do without.',
 }
 
 CHIPS_BY_CATEGORY = {
-    'music_entertainment': [
-        'Hip-Hop', 'R&B', 'Pop', 'Indie', 'K-Pop', 'Rock', 'EDM', 'Jazz', 'Lo-Fi',
-        'Anime', 'K-Drama', 'Reality TV', 'Horror', 'Sci-Fi', 'Documentaries',
-        'Comedy', 'Podcasts', 'Manga/Webtoons',
+    'basic_identities': [
+        'In High School', 'In College', 'In Grad School', 'Working',
+        'Gap Year', 'Figuring It Out', 'Taking a Break', 'Busy Most Days',
+        'Introverted', 'Extroverted', 'Ambivert',
+        'Lowkey', 'Chaotic', 'Chill',
+        'Early Bird', 'Night Owl',
+        'New Here', 'Local', 'From Out of State', 'International',
+        'Research Participant', 'Been in Studies Before',
+        'Here to Meet People', 'Just Exploring', 'Down for Whatever',
+    ],
+    'favorite_platform': [
+        'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
+        'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
+        'WhoamI Today (WIT)',
+    ],
+    'least_favorite_platform': [
+        'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
+        'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
+        'WhoamI Today (WIT)',
     ],
     'hobbies_activities': [
         'Gaming', 'Basketball', 'Soccer', 'Volleyball', 'Tennis', 'Gym', 'Running',
         'Skating', 'Climbing', 'Hiking', 'Surfing', 'Cycling', 'Drawing',
         'Photography', 'Cooking', 'Baking', 'Thrifting', 'Journaling', 'Reading',
         'Coding', 'Music Production', 'Video Editing', 'Fashion', 'DIY',
+    ],
+    'music_entertainment': [
+        'Hip-Hop', 'R&B', 'Pop', 'Indie', 'K-Pop', 'Rock', 'EDM', 'Jazz', 'Lo-Fi',
+        'Anime', 'K-Drama', 'Reality TV', 'Horror', 'Sci-Fi', 'Documentaries',
+        'Comedy', 'Podcasts', 'Manga/Webtoons',
+    ],
+    'values_allyship': [
+        'Pro-Choice', 'Climate Conscious', 'LGBTQ+ Ally',
+        'BLM Supporter', 'Feminist', 'Mental Health Matters',
+        'Anti-Racist', 'Disability Ally', 'Pro-Immigrant',
+        'Open-Minded', 'Big on Kindness', 'Respect Matters',
+        'Community-Focused', 'Growth-Oriented',
     ],
     'on_my_mind': [
         'Astrology', 'Psychology', 'Philosophy', 'Sustainability', 'Mental Health',
@@ -121,14 +152,6 @@ CHIPS_BY_CATEGORY = {
         'Occasional Poster', 'Story Watcher', 'Always in the Comments',
         'Curated Feed', 'Posts and Deletes', 'Oversharer', 'Silent Supporter',
         'Late Replier',
-    ],
-    'favorite_platform': [
-        'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
-        'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
-    ],
-    'least_favorite_platform': [
-        'Instagram', 'TikTok', 'YouTube', 'Snapchat', 'X / Twitter',
-        'Discord', 'Reddit', 'Pinterest', 'BeReal', 'Threads',
     ],
 }
 
@@ -268,6 +291,8 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     online_persona_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
     favorite_platform_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
     least_favorite_platform_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    basic_identities_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
+    values_allyship_visibility = models.CharField(max_length=20, choices=PROFILE_VISIBILITY_CHOICES, default='public')
 
     favorites = models.ManyToManyField('self', symmetrical=False, related_name='favorite_of', blank=True)
     hidden = models.ManyToManyField('self', symmetrical=False, related_name='hidden_by', blank=True)
