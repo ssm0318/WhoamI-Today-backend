@@ -931,6 +931,14 @@ class GroupChatLeave(generics.GenericAPIView):
         if not room.members.filter(id=user.id).exists():
             raise exceptions.PermissionDenied("You are not a member of this group.")
 
+        # Special case: when the original user "leaves" their own escalated
+        # wit_bot support thread, what they actually want is to dismiss the
+        # admin and go back to a 1-on-1 with the bot. Detect that and reroute
+        # so the user stays in the room and the bot engine resumes replying.
+        bot, evictees = _wit_bot_escalation_evictees(room, user)
+        if bot is not None:
+            return self._evict_admins_and_demote(room, user, bot, evictees)
+
         leave_msg = Message.objects.create(
             chat_room=room, sender=user, receiver=None,
             event_type='member_left',
@@ -949,6 +957,50 @@ class GroupChatLeave(generics.GenericAPIView):
         leave_msg.delete()
         room.delete()
         return Response({'status': 'left'})
+
+    def _evict_admins_and_demote(self, room, user, bot, evictees):
+        """Remove non-(user, bot) members from a wit_bot escalated room and
+        demote it back to a 1-on-1 with the bot. Restores the shape that
+        ensure_wit_bot_room creates so the engine signal fires again."""
+        if evictees:
+            evict_msg = Message.objects.create(
+                chat_room=room, sender=user, receiver=None,
+                event_type='member_left',
+            )
+            evict_msg.event_target_users.set(evictees)
+            # Notify evictees (so the room disappears from their chat list) and
+            # the user (so their list shows the demoted shape).
+            _broadcast_system_message(
+                room, evict_msg, chat_list_recipients=evictees + [user],
+            )
+            for evictee in evictees:
+                room.members.remove(evictee)
+
+        room.is_group = False
+        room.name = ''
+        room.save(update_fields=['is_group', 'name'])
+        room.members.clear()
+        GroupReadCursor.objects.filter(chat_room=room).delete()
+
+        return Response({
+            'status': 'admin_evicted',
+            'redirect_user_id': bot.id,
+        })
+
+
+def _wit_bot_escalation_evictees(room, user):
+    """If `room` is the escalated wit_bot 1-on-1 between `user` and the bot,
+    return (bot_user, [members_to_evict]). Otherwise return (None, [])."""
+    from chat.wit_bot import is_wit_bot
+    bot = None
+    if room.user1_id and is_wit_bot(room.user1) and room.user2_id == user.id:
+        bot = room.user1
+    elif room.user2_id and is_wit_bot(room.user2) and room.user1_id == user.id:
+        bot = room.user2
+    if bot is None:
+        return (None, [])
+    evictees = list(room.members.exclude(id__in=[user.id, bot.id]))
+    return (bot, evictees)
 
 
 class GroupMessageList(generics.ListCreateAPIView):

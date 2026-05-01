@@ -154,6 +154,59 @@ class WitBotEscalationTests(TestCase):
         ).count()
         self.assertEqual(before, after)
 
+    def test_user_leave_evicts_admin_and_demotes_room(self):
+        """When the original user 'leaves' their wit_bot escalated room, the
+        system reroutes that intent to 'evict admin' — the user stays, the
+        admin is removed, and the room demotes to a 1-on-1 with the bot."""
+        from chat.wit_bot import escalate_to_human
+        escalate_to_human(self.alice)
+        self.alice_room.refresh_from_db()
+        self.assertTrue(self.alice_room.is_group)
+
+        from chat.views import GroupChatLeave
+        factory = APIRequestFactory()
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/leave/')
+        force_authenticate(req, user=self.alice)
+        resp = GroupChatLeave.as_view()(req, pk=self.alice_room.id)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['status'], 'admin_evicted')
+        self.assertEqual(resp.data['redirect_user_id'], self.bot.id)
+
+        self.alice_room.refresh_from_db()
+        self.assertFalse(self.alice_room.is_group)
+        self.assertEqual(self.alice_room.name, '')
+        self.assertEqual(self.alice_room.members.count(), 0)
+        # user1/user2 unchanged so the 1-on-1 lookup still finds the room.
+        self.assertEqual(
+            {self.alice_room.user1_id, self.alice_room.user2_id},
+            {self.alice.id, self.bot.id},
+        )
+
+    def test_engine_resumes_after_user_evicts_admin(self):
+        """After admin eviction the room is back to a 1-on-1, so the wit_bot
+        engine signal fires again on the user's next message."""
+        from chat.wit_bot import escalate_to_human
+        escalate_to_human(self.alice)
+
+        from chat.views import GroupChatLeave
+        factory = APIRequestFactory()
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/leave/')
+        force_authenticate(req, user=self.alice)
+        GroupChatLeave.as_view()(req, pk=self.alice_room.id)
+        self.alice_room.refresh_from_db()
+
+        before = Message.objects.filter(
+            chat_room=self.alice_room, sender=self.bot,
+        ).count()
+        Message.objects.create(
+            chat_room=self.alice_room, sender=self.alice, receiver=self.bot,
+            content='hello again',
+        )
+        after = Message.objects.filter(
+            chat_room=self.alice_room, sender=self.bot,
+        ).count()
+        self.assertGreater(after, before)
+
     def test_admin_button_tap_triggers_escalation(self):
         """The new beta-loop entry point: tapping 'Call in the admin' button
         should immediately escalate (no confirmation step)."""
