@@ -83,7 +83,6 @@ class Command(BaseCommand):
                     user_group=user_group,
                     current_ver=current_ver,
                     language='en',
-                    timezone='America/Los_Angeles',
                 )
             except Exception as e:
                 skipped_details.append((email, f"user creation failed: {str(e)}"))
