@@ -15,9 +15,10 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'whoamitoday'),
         'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),  
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
         'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': os.environ.get('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 600,
     },
 }
 
@@ -79,3 +80,8 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Production logging: reduce disk I/O by raising log levels
+# base.py의 DEBUG 레벨은 개발 환경용으로 유지하고, 프로덕션에서만 오버라이드
+LOGGING['loggers']['django']['level'] = 'WARNING'
+LOGGING['loggers']['adoorback']['level'] = 'INFO'
