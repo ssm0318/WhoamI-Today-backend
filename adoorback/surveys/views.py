@@ -91,6 +91,27 @@ class SurveyResponseSubmitView(APIView):
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
+        # Reject submissions to scheduled surveys whose window has already
+        # closed without late-submission allowance (matches the bucketing
+        # rule's "expired hidden" semantics — daily is the canonical case).
+        today = date.today()
+        if ScheduledSurvey.objects.filter(
+            survey=survey, allow_late=False, window_end__lt=today,
+        ).exists():
+            return Response(
+                {'detail': 'This survey has expired and can no longer be answered.'},
+                status=status.HTTP_410_GONE,
+            )
+        # Reject submissions to scheduled surveys whose window hasn't opened
+        # yet — direct-URL access to a future-dated survey shouldn't bypass
+        # the index/UI gating.
+        if ScheduledSurvey.objects.filter(
+            survey=survey, window_start__gt=today,
+        ).exists():
+            return Response(
+                {'detail': 'This survey is not yet open for responses.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         ser = SurveyResponseInputSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         try:
@@ -180,15 +201,26 @@ class SurveyResultsView(APIView):
 
 
 class PastSurveysView(APIView):
-    """Daily-only archive. Powers the 'Daily check-ins (N completed)' page —
-    a flat list of daily ScheduledSurvey rows newest-first.
+    """Daily-only archive — only rows the user has answered, scheduled
+    on-or-before today. Future dailies are not exposed; past unanswered
+    dailies are hidden because they can no longer be submitted (allow_late=
+    False on daily) and have no results to view.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        today = date.today()
+        answered_survey_ids = list(
+            SurveyResponse.objects.filter(user=request.user).values_list('survey_id', flat=True)
+        )
         qs = (
             ScheduledSurvey.objects
-            .filter(cadence=CADENCE_DAILY, survey__results_hidden=False)
+            .filter(
+                cadence=CADENCE_DAILY,
+                survey__results_hidden=False,
+                window_start__lte=today,
+                survey_id__in=answered_survey_ids,
+            )
             .select_related('survey')
             .order_by('-window_start')
         )
