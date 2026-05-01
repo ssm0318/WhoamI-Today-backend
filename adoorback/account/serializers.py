@@ -16,7 +16,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
     VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona, CustomChip, CHIP_CATEGORY_CHOICES, \
-    FriendEvaluation, RELATIONSHIP_TYPE_CHOICES
+    FriendEvaluation, RELATIONSHIP_TYPE_CHOICES, VersionSwapRequest
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -1083,3 +1083,17 @@ class CustomChipSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomChip
         fields = ['id', 'text', 'category']
+
+
+class VersionSwapRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VersionSwapRequest
+        fields = ['id', 'reason', 'from_version', 'to_version', 'status', 'created_at']
+        read_only_fields = ['id', 'from_version', 'to_version', 'status', 'created_at']
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        if VersionSwapRequest.objects.filter(user=user, status='pending').exists():
+            raise serializers.ValidationError(
+                {'detail': 'A pending version swap request already exists.'})
+        return attrs

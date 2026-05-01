@@ -38,7 +38,7 @@ from safedelete.models import SOFT_DELETE_CASCADE
 from .email import email_manager
 from .models import Subscription, Connection, AppSession, DiscoverFeed, DiscoverFeedMusic, Persona, Interest
 from custom_fcm.models import CustomFCMDevice
-from account.models import FriendRequest, BlockRec, CustomChip, FriendEvaluation
+from account.models import FriendRequest, BlockRec, CustomChip, FriendEvaluation, VersionSwapRequest
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
                                  UserFriendRequestCreateSerializer, UserFriendRequestUpdateSerializer, \
                                  UserFriendshipStatusSerializer, \
@@ -51,6 +51,7 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  UserMinimalSerializer, \
                                  UserInterestUpdateSerializer, UserPersonaUpdateSerializer, \
                                  InterestSerializer, PersonaSerializer, viewer_sees_check_in_component,
+                                 VersionSwapRequestSerializer,
                                  RECENT_POST_WINDOW)
 from account.view_as import apply_profile_view_as, parse_view_as, resolve_public_proxy_viewer, resolve_shadow_viewer
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
@@ -3511,3 +3512,31 @@ class TmiPlaceholder(APIView):
             placeholder = random.choice(fallbacks)
             cache.set(cache_key, placeholder, 60 * 60)
             return Response({'placeholder': placeholder})
+
+
+class VersionSwapRequestCreate(generics.CreateAPIView):
+    queryset = VersionSwapRequest.objects.all()
+    serializer_class = VersionSwapRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        user = self.request.user
+        from_version = user.current_ver
+        to_version = 'version_q' if from_version == 'version_w' else 'version_w'
+        serializer.save(user=user, from_version=from_version, to_version=to_version)
+
+
+class CurrentUserVersionSwapRequest(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        pending = VersionSwapRequest.objects.filter(
+            user=request.user, status='pending').first()
+        if pending is None:
+            return Response({'pending': None}, status=status.HTTP_200_OK)
+        serializer = VersionSwapRequestSerializer(pending, context={'request': request})
+        return Response({'pending': serializer.data}, status=status.HTTP_200_OK)
