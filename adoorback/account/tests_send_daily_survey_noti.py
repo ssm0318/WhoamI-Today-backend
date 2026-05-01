@@ -8,7 +8,7 @@ from django.utils import timezone
 from account.cron import SendDailySurveyNotiCronJob
 from chat.wit_bot import WIT_BOT_USERNAME, ensure_wit_bot_user
 from notification.models import Notification, NotificationActor
-from surveys.models import DailySurvey, Survey
+from surveys.models import CADENCE_DAILY, ScheduledSurvey, Survey
 
 
 User = get_user_model()
@@ -22,7 +22,12 @@ class SendDailySurveyNotiCronTests(TestCase):
 
     def test_authors_notification_as_wit_bot_when_survey_exists(self):
         s = Survey.objects.create(slug='s', title_en='T', title_ko='T')
-        DailySurvey.objects.create(date=date.today(), survey=s)
+        today = date.today()
+        ScheduledSurvey.objects.create(
+            survey=s, cadence=CADENCE_DAILY,
+            window_start=today, window_end=today,
+            allow_late=False, sequence_index=1,
+        )
         ensure_wit_bot_user()
         u = User.objects.create(username='alice', email='a@x.com', timezone='UTC')
 

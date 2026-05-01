@@ -74,13 +74,16 @@ class SendDailySurveyNotiCronJob(CronJobBase):
     def do(self):
         # Local imports: account should not introduce top-level deps on chat / surveys.
         from chat.wit_bot import ensure_wit_bot_user
-        from surveys.models import DailySurvey
+        from surveys.models import CADENCE_DAILY, ScheduledSurvey
 
         print('=========================')
         print("Creating daily survey notifications...............")
 
-        if not DailySurvey.objects.filter(date=timezone.now().date()).exists():
-            print('No DailySurvey scheduled for today — skipping.')
+        today = timezone.now().date()
+        if not ScheduledSurvey.objects.filter(
+            cadence=CADENCE_DAILY, window_start=today,
+        ).exists():
+            print('No daily ScheduledSurvey for today — skipping.')
             print('=========================')
             return
 
