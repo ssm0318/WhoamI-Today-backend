@@ -1,15 +1,22 @@
 import traceback
 
+from django.db import IntegrityError, transaction
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework import status
 from .models import CustomFCMDevice
-from .serializers import CustomFCMDeviceSerializer 
+from .serializers import CustomFCMDeviceSerializer
 from rest_framework.permissions import IsAuthenticated
 
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.settings import LANGUAGE_CODE, LANGUAGES
 from adoorback.utils.validators import adoor_exception_handler
+
+
+def _is_duplicate_registration_id_constraint(exc):
+    """True when PostgreSQL unique violation is on custom_fcm registration_id."""
+    msg = str(exc)
+    return 'custom_fcm_customfcmdevice_registration_id_key' in msg
 
 
 class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
@@ -35,29 +42,46 @@ class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
         device.save()
         return serializer
 
+    def _respond_registration_exists(self, existing_device, request, current_user, language):
+        """Attach registration row to current user and merge payload (HTTP 200)."""
+        if existing_device.user_id != current_user.id:
+            print(f"Device previously belonged to user {existing_device.user_id}, updating to {current_user.id}")
+
+        existing_device.user_id = current_user.id
+        serializer = self.update_device(existing_device, request.data, language)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def create(self, request, *args, **kwargs):
         try:
             current_user = self.request.user
             language = self.__get_language_from_request(request)
             registration_id = request.data.get('registration_id')
-            
+
             # Check for existing device with same registration_id
             existing_device = CustomFCMDevice.objects.filter(registration_id=registration_id).first()
             # If found a device with the same registration_id - update it to current user
             if existing_device:
-                # If device belongs to a different user, update the user to current_user
-                if existing_device.user_id != current_user.id:
-                    print(f"Device previously belonged to user {existing_device.user_id}, updating to {current_user.id}")
-                
-                # Update the device with current user and other data
-                existing_device.user_id = current_user.id
-                serializer = self.update_device(existing_device, request.data, language)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            
+                return self._respond_registration_exists(
+                    existing_device, request, current_user, language
+                )
+
             # Create new device if no existing device found
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
+            try:
+                with transaction.atomic():
+                    self.perform_create(serializer)
+            except IntegrityError as exc:
+                if not _is_duplicate_registration_id_constraint(exc):
+                    raise
+                # Concurrent request inserted the same registration_id first; merge like update path.
+                existing_device = CustomFCMDevice.objects.filter(registration_id=registration_id).first()
+                if not existing_device:
+                    raise
+                return self._respond_registration_exists(
+                    existing_device, request, current_user, language
+                )
+
             device = serializer.instance
             device.language = language
             device.user_id = current_user.id
