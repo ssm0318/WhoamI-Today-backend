@@ -441,7 +441,13 @@ class UserProfileSerializer(UserMinimalSerializer):
             return True
         return viewer.is_connected(obj)
 
+    def _is_view_as(self):
+        return self.context.get('view_as') is not None or self.context.get('shadow_viewer') is not None
+
     def get_connection_status(self, obj):  # what user has set obj as
+        # Never expose close-friend status in View As — it's private to the shadow viewer.
+        if self._is_view_as():
+            return None
         viewer = self._get_viewer()
         if viewer is None:
             return None
@@ -455,24 +461,32 @@ class UserProfileSerializer(UserMinimalSerializer):
         return None
 
     def get_received_friend_request_from(self, obj):
+        if self._is_view_as():
+            return False
         viewer = self._get_viewer()
         if viewer is None:
             return False
         return viewer.id in obj.sent_friend_requests.filter(accepted__isnull=True).values_list('requestee_id', flat=True)
 
     def get_sent_friend_request_to(self, obj):
+        if self._is_view_as():
+            return False
         viewer = self._get_viewer()
         if viewer is None:
             return False
         return viewer.id in obj.received_friend_requests.exclude(accepted=True).values_list('requester_id', flat=True)
 
     def get_sent_chat_request_to(self, obj):
+        if self._is_view_as():
+            return False
         viewer = self._get_viewer()
         if viewer is None:
             return False
         return obj.received_chat_requests.filter(requester=viewer, accepted__isnull=True).exists()
 
     def get_received_chat_request_from(self, obj):
+        if self._is_view_as():
+            return None
         viewer = self._get_viewer()
         if viewer is None:
             return None
@@ -480,6 +494,8 @@ class UserProfileSerializer(UserMinimalSerializer):
         return req.id if req else None
 
     def get_unread_chat_count(self, obj):
+        if self._is_view_as():
+            return 0
         viewer = self._get_viewer()
         if viewer is not None:
             if viewer == obj:
