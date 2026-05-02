@@ -13,7 +13,7 @@ from adoorback.utils.exceptions import (
     ExistingUsername, LongUsername, InvalidUsername,
     ExistingEmail, InvalidEmail, ExistingReaction,
     NoSuchTarget, NotFriend, ExistingResponseRequest,
-    NoSuchQuestion, DeletedQuestion,
+    NoSuchQuestion, DeletedQuestion, ConflictError,
 )
 
 
@@ -22,7 +22,7 @@ USER_INPUT_EXCEPTIONS = (
     ExistingUsername, LongUsername, InvalidUsername,
     ExistingEmail, InvalidEmail, ExistingReaction,
     NoSuchTarget, NotFriend, ExistingResponseRequest,
-    NoSuchQuestion, DeletedQuestion,
+    NoSuchQuestion, DeletedQuestion, ConflictError,
 )
 
 

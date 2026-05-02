@@ -60,7 +60,7 @@ from account.view_as import (
 )
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
-    NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail, InvalidInviterUsername
+    NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail, InvalidInviterUsername, ConflictError
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
 from note.serializers import NoteSerializer
@@ -1346,7 +1346,17 @@ class CustomChipListCreate(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         user = self.request.user
+        text = serializer.validated_data.get('text')
         category = serializer.validated_data.get('category')
+        # Check for active duplicate
+        if CustomChip.objects.filter(user=user, text=text, category=category).exists():
+            raise ConflictError("This chip already exists.")
+        # Restore soft-deleted chip if it exists
+        deleted_chip = CustomChip.deleted_objects.filter(user=user, text=text, category=category).first()
+        if deleted_chip:
+            deleted_chip.undelete()
+            serializer.instance = deleted_chip
+            return
         # Enforce max 15 per category
         count = CustomChip.objects.filter(user=user, category=category).count()
         if count >= 15:

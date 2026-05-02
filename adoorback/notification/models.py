@@ -14,7 +14,6 @@ from adoorback.utils.alerts import send_msg_to_slack
 from notification.helpers import find_like_noti, construct_message
 
 from firebase_admin.messaging import Message
-from firebase_admin.messaging import Notification as FirebaseNotification
 from firebase_admin._messaging_utils import UnregisteredError
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
@@ -190,13 +189,25 @@ class NotificationActor(AdoorTimestampedModel, SafeDeleteModel):
 
 
 def get_notification_tag(instance):
-    """Chat message notifications use sender-based tags so they collapse into one push."""
-    if instance.target_type and instance.target_type.model == 'message':
-        first_actor = instance.actors.first()
-        if first_actor:
-            return f"chat_message_{first_actor.id}"
-    if instance.target_type and instance.target_type.model == 'messagereaction':
+    """Return a tag that groups related push notifications so newer ones replace older ones.
+
+    Same tag → the service worker replaces the previous notification instead of stacking.
+    """
+    target_model = instance.target_type.model if instance.target_type else None
+    origin_model = instance.origin_type.model if instance.origin_type else None
+
+    if target_model == 'message':
+        if instance.origin_id:
+            return f"chat_message_{instance.origin_id}"
+    elif target_model == 'messagereaction':
         return f"chat_reaction_{instance.origin_id}"
+    elif target_model == 'like':
+        return f"like_{origin_model}_{instance.origin_id}"
+    elif target_model == 'reaction':
+        return f"reaction_{origin_model}_{instance.origin_id}"
+    elif target_model == 'responserequest':
+        return f"response_request_{instance.origin_id}"
+
     return str(instance.id)
 
 
@@ -206,10 +217,6 @@ def notify_firebase(instance):
     for device in devices:
         body = instance.message_ko if device.language == 'ko' else instance.message_en
         message = Message(
-            notification=FirebaseNotification(
-                title='WhoAmI Today',
-                body=body
-            ),
             data={
                 'message_en': instance.message_en,
                 'message_ko': instance.message_ko,

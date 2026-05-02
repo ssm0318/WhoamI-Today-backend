@@ -903,7 +903,7 @@ class CustomChip(AdoorTimestampedModel, SafeDeleteModel):
             models.Index(fields=['user', 'category']),
         ]
         constraints = [
-            models.UniqueConstraint(fields=['user', 'text', 'category'], name='unique_custom_chip_per_user'),
+            models.UniqueConstraint(fields=['user', 'text', 'category'], condition=Q(deleted__isnull=True), name='unique_custom_chip_per_user'),
         ]
 
     def __str__(self):

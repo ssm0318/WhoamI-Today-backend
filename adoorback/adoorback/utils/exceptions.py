@@ -108,3 +108,9 @@ class DeletedQuestion(APIException):
     status_code = status.HTTP_406_NOT_ACCEPTABLE
     default_detail = _("삭제된 질문입니다.")
     default_code = 'deleted_question'
+
+
+class ConflictError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = _("이미 존재합니다.")
+    default_code = 'conflict'

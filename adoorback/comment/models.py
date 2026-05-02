@@ -88,9 +88,12 @@ def create_noti(instance, created, **kwargs):
     if origin.type == 'Comment':
         redirect_url = f'/{origin.target.type.lower()}s/{origin.target.id}'
         # send a notification to the author of the origin comment
+        post = origin.target
         if origin_author == actor:
             pass
         elif actor.id in origin_author.user_report_blocked_ids:
+            pass
+        elif not post.is_audience(origin_author):
             pass
         else:
             noti = Notification.objects.create(user=origin_author,
@@ -133,6 +136,8 @@ def create_noti(instance, created, **kwargs):
                     continue
                 participant = User.objects.get(id=participant_id)
                 if actor.id in participant.user_report_blocked_ids:
+                    continue
+                if not post.is_audience(participant):
                     continue
                 content_type = ContentType.objects.get_for_model(origin).model
                 if (content_type, origin.id) in participant.content_report_blocked_model_ids:
@@ -185,6 +190,8 @@ def create_noti(instance, created, **kwargs):
                     continue
                 participant = User.objects.get(id=participant_id)
                 if actor.id in participant.user_report_blocked_ids:
+                    continue
+                if not origin.is_audience(participant):
                     continue
                 content_type = ContentType.objects.get_for_model(origin).model
                 if (content_type, origin.id) in participant.content_report_blocked_model_ids:

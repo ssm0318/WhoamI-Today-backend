@@ -1,7 +1,5 @@
 from django.conf import settings
 from rest_framework import authentication
-from rest_framework import exceptions
-from rest_framework.authentication import CSRFCheck
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from zoneinfo import ZoneInfo
 from django.utils import timezone
@@ -22,18 +20,6 @@ class SessionAuthentication(authentication.SessionAuthentication):
 
     def authenticate_header(self, request):
         return 'Session'
-
-
-def dummy_get_response(request):  # pragma: no cover
-    return None
-
-
-def enforce_csrf(request):
-    check = CSRFCheck(dummy_get_response)
-    check.process_request(request)
-    reason = check.process_view(request, None, (), {})
-    if reason:
-        raise exceptions.PermissionDenied('CSRF Failed: %s' % reason)
 
 
 class CustomAuthentication(JWTAuthentication):
@@ -57,8 +43,6 @@ class CustomAuthentication(JWTAuthentication):
         # for logging
         set_current_request(request)
 
-        if header is None:
-            enforce_csrf(request)
         user = self.get_user(validated_token)
         if user and user.is_authenticated and user.timezone:
             timezone.activate(ZoneInfo(user.timezone))
