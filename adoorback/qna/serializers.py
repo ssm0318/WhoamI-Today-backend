@@ -19,7 +19,7 @@ User = get_user_model()
 class QuestionMinimumSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
-        fields = ['id', 'type', 'content']
+        fields = ['id', 'type', 'content', 'created_at', 'selected_dates']
 
 
 class QuestionBaseSerializer(serializers.ModelSerializer):

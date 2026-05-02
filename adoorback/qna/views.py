@@ -278,6 +278,75 @@ class QuestionDetail(generics.RetrieveAPIView):
         return queryset
 
 
+class QuestionResponses(generics.ListAPIView):
+    serializer_class = qs.ResponseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_question(self):
+        if not hasattr(self, '_question'):
+            self._question = get_object_or_404(Question, id=self.kwargs.get('pk'))
+        return self._question
+
+    def get_queryset(self):
+        question = self.get_question()
+        responses = Response.objects.filter(question=question).select_related(
+            'author',
+            'question',
+        ).prefetch_related(
+            'readers',
+            'response_likes',
+            'response_comments',
+            'response_comments__replies',
+        ).order_by('-created_at')
+
+        visible_response_ids = [
+            response.id for response in responses if response.is_audience(self.request.user)
+        ]
+        return Response.objects.filter(id__in=visible_response_ids).select_related(
+            'author',
+            'question',
+        ).prefetch_related(
+            'readers',
+            'response_likes',
+            'response_comments',
+            'response_comments__replies',
+        ).order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        question = self.get_question()
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            paginated_response = self.get_paginated_response(serializer.data)
+            paginated_response.data = OrderedDict([
+                ('id', question.id),
+                ('content', question.content),
+                ('type', question.type),
+                ('created_at', question.created_at),
+                ('selected_dates', question.selected_dates),
+                *paginated_response.data.items(),
+            ])
+            return paginated_response
+
+        serializer = self.get_serializer(queryset, many=True)
+        return DjangoResponse({
+            'id': question.id,
+            'content': question.content,
+            'type': question.type,
+            'created_at': question.created_at,
+            'selected_dates': question.selected_dates,
+            'count': len(serializer.data),
+            'next': None,
+            'previous': None,
+            'results': serializer.data,
+        })
+
+
 class ResponseRequestCreate(generics.CreateAPIView):
     """
     Get response requests of the selected question.

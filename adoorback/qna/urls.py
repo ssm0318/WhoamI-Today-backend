@@ -14,6 +14,11 @@ urlpatterns = [
     path('questions/', views.QuestionList.as_view(), name='question-list'),
 
     # Question Detail Page related
+    path(
+        'questions/<int:pk>/responses/',
+        views.QuestionResponses.as_view(),
+        name='question-responses',
+    ),
     path('questions/<int:pk>/', views.QuestionDetail.as_view(), name='question-detail'),
 
     # Response Request related
