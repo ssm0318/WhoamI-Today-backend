@@ -172,45 +172,59 @@ class WitBotEscalationTests(TestCase):
             "who triggered it.",
         )
 
-    def test_user_leave_evicts_admin_and_demotes_room(self):
-        """When the original user 'leaves' their wit_bot escalated room, the
-        system reroutes that intent to 'evict admin' — the user stays, the
-        admin is removed, and the room demotes to a 1-on-1 with the bot."""
+    def test_dismiss_admin_endpoint_demotes_room_for_original_user(self):
+        """POST /chat/groups/{id}/dismiss-admin/ run by the original user
+        evicts admin/operators and demotes the room back to a 1-on-1 with
+        the bot. Leave (POST /leave/) keeps its standard meaning of removing
+        the requester from members."""
         from chat.wit_bot import escalate_to_human
         escalate_to_human(self.alice)
         self.alice_room.refresh_from_db()
         self.assertTrue(self.alice_room.is_group)
 
-        from chat.views import GroupChatLeave
+        from chat.views import GroupChatDismissAdmin
         factory = APIRequestFactory()
-        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/leave/')
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/dismiss-admin/')
         force_authenticate(req, user=self.alice)
-        resp = GroupChatLeave.as_view()(req, pk=self.alice_room.id)
+        resp = GroupChatDismissAdmin.as_view()(req, pk=self.alice_room.id)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['status'], 'admin_evicted')
+        self.assertEqual(resp.data['status'], 'admin_dismissed')
         self.assertEqual(resp.data['redirect_user_id'], self.bot.id)
 
         self.alice_room.refresh_from_db()
         self.assertFalse(self.alice_room.is_group)
         self.assertEqual(self.alice_room.name, '')
         self.assertEqual(self.alice_room.members.count(), 0)
-        # user1/user2 unchanged so the 1-on-1 lookup still finds the room.
         self.assertEqual(
             {self.alice_room.user1_id, self.alice_room.user2_id},
             {self.alice.id, self.bot.id},
         )
 
-    def test_engine_resumes_after_user_evicts_admin(self):
-        """After admin eviction the room is back to a 1-on-1, so the wit_bot
+    def test_dismiss_admin_endpoint_rejected_for_non_owner(self):
+        """A user who isn't the original owner of the wit_bot thread (e.g.
+        the admin themselves, or a different user) can't call the dismiss
+        endpoint."""
+        from chat.wit_bot import escalate_to_human
+        escalate_to_human(self.alice)
+        from chat.views import GroupChatDismissAdmin
+        factory = APIRequestFactory()
+        # Admin trying to dismiss themselves via this endpoint should be denied.
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/dismiss-admin/')
+        force_authenticate(req, user=self.admin)
+        resp = GroupChatDismissAdmin.as_view()(req, pk=self.alice_room.id)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_engine_resumes_after_dismiss_admin(self):
+        """After dismiss-admin the room is back to a 1-on-1, so the wit_bot
         engine signal fires again on the user's next message."""
         from chat.wit_bot import escalate_to_human
         escalate_to_human(self.alice)
 
-        from chat.views import GroupChatLeave
+        from chat.views import GroupChatDismissAdmin
         factory = APIRequestFactory()
-        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/leave/')
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/dismiss-admin/')
         force_authenticate(req, user=self.alice)
-        GroupChatLeave.as_view()(req, pk=self.alice_room.id)
+        GroupChatDismissAdmin.as_view()(req, pk=self.alice_room.id)
         self.alice_room.refresh_from_db()
 
         before = Message.objects.filter(
@@ -224,6 +238,30 @@ class WitBotEscalationTests(TestCase):
             chat_room=self.alice_room, sender=self.bot,
         ).count()
         self.assertGreater(after, before)
+
+    def test_user_leave_actually_removes_user_from_escalated_room(self):
+        """Leave is for leaving the chatroom yourself. In a wit_bot escalated
+        room, that means the user is removed from members (NOT a reroute to
+        admin eviction). The room stays is_group=True with [bot, admin]."""
+        from chat.wit_bot import escalate_to_human
+        escalate_to_human(self.alice)
+        self.alice_room.refresh_from_db()
+        self.assertTrue(self.alice_room.is_group)
+
+        from chat.views import GroupChatLeave
+        factory = APIRequestFactory()
+        req = factory.post(f'/api/chat/groups/{self.alice_room.id}/leave/')
+        force_authenticate(req, user=self.alice)
+        resp = GroupChatLeave.as_view()(req, pk=self.alice_room.id)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['status'], 'left')
+
+        self.alice_room.refresh_from_db()
+        self.assertTrue(self.alice_room.is_group)
+        self.assertEqual(
+            set(self.alice_room.members.values_list('id', flat=True)),
+            {self.bot.id, self.admin.id},
+        )
 
     def test_admin_button_tap_triggers_escalation(self):
         """The new beta-loop entry point: tapping 'Call in the admin' button

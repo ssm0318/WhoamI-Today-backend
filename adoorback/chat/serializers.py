@@ -25,7 +25,7 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = [
-            'id', 'sender', 'emoji', 'content', 'image', 'is_read', 'created_at',
+            'id', 'chat_room_id', 'sender', 'emoji', 'content', 'image', 'is_read', 'created_at',
             'parent', 'reactions', 'parent_preview',
             'shared_content_type', 'shared_object_id', 'shared_content_preview',
             'event_type', 'event_target_users', 'bot_payload',

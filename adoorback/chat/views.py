@@ -931,14 +931,6 @@ class GroupChatLeave(generics.GenericAPIView):
         if not room.members.filter(id=user.id).exists():
             raise exceptions.PermissionDenied("You are not a member of this group.")
 
-        # Special case: when the original user "leaves" their own escalated
-        # wit_bot support thread, what they actually want is to dismiss the
-        # admin and go back to a 1-on-1 with the bot. Detect that and reroute
-        # so the user stays in the room and the bot engine resumes replying.
-        bot, evictees = _wit_bot_escalation_evictees(room, user)
-        if bot is not None:
-            return self._evict_admins_and_demote(room, user, bot, evictees)
-
         leave_msg = Message.objects.create(
             chat_room=room, sender=user, receiver=None,
             event_type='member_left',
@@ -958,10 +950,30 @@ class GroupChatLeave(generics.GenericAPIView):
         room.delete()
         return Response({'status': 'left'})
 
-    def _evict_admins_and_demote(self, room, user, bot, evictees):
-        """Remove non-(user, bot) members from a wit_bot escalated room and
-        demote it back to a 1-on-1 with the bot. Restores the shape that
-        ensure_wit_bot_room creates so the engine signal fires again."""
+
+class GroupChatDismissAdmin(generics.GenericAPIView):
+    """POST /chat/groups/{id}/dismiss-admin/ — for the user who triggered a
+    wit_bot escalation, dismiss wit_admin (and any other operators) and demote
+    the room back to a 1-on-1 with the bot. Only the original user (the non-bot
+    user1/user2 of the room) may call this."""
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def post(self, request, pk):
+        user = request.user
+        try:
+            room = ChatRoom.objects.get(id=pk, is_group=True)
+        except ChatRoom.DoesNotExist:
+            raise exceptions.NotFound("Group not found.")
+
+        bot, evictees = _wit_bot_escalation_evictees(room, user)
+        if bot is None:
+            raise exceptions.PermissionDenied(
+                "This action is only available in your own wit_bot support thread."
+            )
+
         if evictees:
             evict_msg = Message.objects.create(
                 chat_room=room, sender=user, receiver=None,
@@ -983,7 +995,7 @@ class GroupChatLeave(generics.GenericAPIView):
         GroupReadCursor.objects.filter(chat_room=room).delete()
 
         return Response({
-            'status': 'admin_evicted',
+            'status': 'admin_dismissed',
             'redirect_user_id': bot.id,
         })
 
