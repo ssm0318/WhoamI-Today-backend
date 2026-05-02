@@ -9,14 +9,12 @@ from account.serializers import UserMinimalSerializer
 from adoorback.models import Mission
 from adoorback.serializers import AdoorBaseSerializer
 from adoorback.utils.content_types import get_generic_relation_type
+from adoorback.utils.mission_limits import MAX_MISSION_ATTEMPTS_PER_DAY
 from note.models import Note, ShareType
 from reaction.models import Reaction
 
 
 User = get_user_model()
-
-
-MAX_MISSION_ATTEMPTS_PER_DAY = 5
 
 
 class BaseNoteSerializer(AdoorBaseSerializer):
@@ -203,5 +201,4 @@ class NoteSerializer(BaseNoteSerializer):
             'mission_prompt',
             'mission_attempt_number',
         ]
-
 

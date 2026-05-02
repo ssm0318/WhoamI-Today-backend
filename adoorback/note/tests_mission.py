@@ -70,13 +70,13 @@ class MissionNoteCreateTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_mission_post_after_five_attempts_today_fails(self):
-        for i in range(5):
+    def test_mission_post_after_three_attempts_today_fails(self):
+        for i in range(3):
             r = self._post_mission_note(content=f'attempt {i + 1}')
             self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.data)
 
-        sixth = self._post_mission_note(content='attempt 6')
-        self.assertEqual(sixth.status_code, status.HTTP_400_BAD_REQUEST)
+        fourth = self._post_mission_note(content='attempt 4')
+        self.assertEqual(fourth.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_mission_post_with_unknown_mission_id_fails(self):
         response = self.client.post(
@@ -341,8 +341,8 @@ class MissionsTodayEndpointTests(TestCase):
         self.assertIn('prompt', response.data)
         self.assertIn('type', response.data)
         self.assertEqual(response.data['attempts_used'], 0)
-        self.assertEqual(response.data['attempts_remaining'], 5)
-        self.assertEqual(response.data['max_attempts'], 5)
+        self.assertEqual(response.data['attempts_remaining'], 3)
+        self.assertEqual(response.data['max_attempts'], 3)
 
     def test_attempts_used_counts_only_todays_mission_notes_for_request_user(self):
         # Two mission notes for the user today
@@ -366,7 +366,7 @@ class MissionsTodayEndpointTests(TestCase):
 
         response = self.client.get('/api/missions/today/')
         self.assertEqual(response.data['attempts_used'], 2)
-        self.assertEqual(response.data['attempts_remaining'], 3)
+        self.assertEqual(response.data['attempts_remaining'], 1)
 
     def test_attempts_used_excludes_notes_before_todays_7am_la_boundary(self):
         """Notes created before today's 7AM LA boundary should not count."""

@@ -8,12 +8,10 @@ from rest_framework.views import APIView
 
 from adoorback.models import Mission
 from adoorback.serializers import MissionSerializer
+from adoorback.utils.mission_limits import MAX_MISSION_ATTEMPTS_PER_DAY
 from adoorback.utils.mission_day import get_today_la_boundary
 from note.models import Note, ShareType
 from note.serializers import NoteSerializer
-
-
-MAX_MISSION_ATTEMPTS_PER_DAY = 5
 
 
 def count_mission_attempts_today(user, now=None):
