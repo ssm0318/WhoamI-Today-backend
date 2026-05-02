@@ -56,6 +56,7 @@ class ShareType(models.TextChoices):
     REGULAR = 'regular', 'Regular'
     TMI_OF_THE_DAY = 'tmi_of_the_day', 'TMI of the Day'
     PHOTO_OF_THE_DAY = 'photo_of_the_day', 'Photo of the Day'
+    MISSION = 'mission', 'Mission'
 
 
 class Note(AdoorModel, SafeDeleteModel):
@@ -70,6 +71,12 @@ class Note(AdoorModel, SafeDeleteModel):
         choices=ShareType.choices,
         default=ShareType.REGULAR,
     )
+
+    # Snapshot of the mission prompt at post time. We snapshot rather than FK
+    # to Mission so historical posts survive Mission row edits/deletes — what
+    # the user "responded to" should not change retroactively.
+    mission_prompt = models.TextField(blank=True, null=True)
+    mission_attempt_number = models.PositiveSmallIntegerField(null=True, blank=True)
 
     note_comments = GenericRelation(Comment)
     note_likes = GenericRelation(Like)

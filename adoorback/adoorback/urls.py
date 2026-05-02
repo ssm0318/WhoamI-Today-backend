@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/translate/', include('translate.urls')),
     path('api/surveys/', include('surveys.urls')),
     path('api/missions/', adoorback_views.MissionList.as_view(), name='mission-list'),
+    path('api/missions/today/', adoorback_views.MissionToday.as_view(), name='mission-today'),
 
     # Version Q endpoints (subset — only where behavior differs from W)
     path('api/q/user/', include('account.urls_q')),

@@ -6,6 +6,7 @@ from django.db.models import F, Value, CharField, BooleanField
 from rest_framework import serializers
 
 from account.serializers import UserMinimalSerializer
+from adoorback.models import Mission
 from adoorback.serializers import AdoorBaseSerializer
 from adoorback.utils.content_types import get_generic_relation_type
 from note.models import Note, ShareType
@@ -13,6 +14,9 @@ from reaction.models import Reaction
 
 
 User = get_user_model()
+
+
+MAX_MISSION_ATTEMPTS_PER_DAY = 5
 
 
 class BaseNoteSerializer(AdoorBaseSerializer):
@@ -91,6 +95,9 @@ class NoteSerializer(BaseNoteSerializer):
     visibility = VisibilityField(choices=['only_me', 'close_friends', 'friends', 'public'], required=True)
     share_type = serializers.CharField(required=False, default='regular')
     content = serializers.CharField(required=False, allow_blank=True, default='')
+    mission_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    mission_prompt = serializers.CharField(read_only=True)
+    mission_attempt_number = serializers.IntegerField(read_only=True)
 
     def validate_visibility(self, value):
         if len(value) != 1:
@@ -110,11 +117,49 @@ class NoteSerializer(BaseNoteSerializer):
         if share_type == ShareType.PHOTO_OF_THE_DAY:
             if not has_images:
                 raise serializers.ValidationError({'images': 'Photo of the Day는 이미지가 필요합니다.'})
+        elif share_type == ShareType.MISSION:
+            mission_id = attrs.get('mission_id')
+            if not mission_id:
+                raise serializers.ValidationError({'mission_id': 'Mission posts require a mission_id.'})
+            try:
+                Mission.objects.get(id=mission_id)
+            except Mission.DoesNotExist:
+                raise serializers.ValidationError({'mission_id': 'Mission not found.'})
+            if request and request.user.is_authenticated:
+                from adoorback.views import count_mission_attempts_today
+                if count_mission_attempts_today(request.user) >= MAX_MISSION_ATTEMPTS_PER_DAY:
+                    raise serializers.ValidationError(
+                        {'detail': 'No mission attempts remaining today.'}
+                    )
+            if not content and not has_images and not has_video:
+                raise serializers.ValidationError('텍스트, 이미지, 또는 동영상 중 하나 이상을 포함해야 합니다.')
         else:
             if not content and not has_images and not has_video:
                 raise serializers.ValidationError('텍스트, 이미지, 또는 동영상 중 하나 이상을 포함해야 합니다.')
 
         return attrs
+
+    def create(self, validated_data):
+        mission_id = validated_data.pop('mission_id', None)
+        if validated_data.get('share_type') == ShareType.MISSION and mission_id is not None:
+            mission = Mission.objects.get(id=mission_id)
+            validated_data['mission_prompt'] = mission.prompt
+            request = self.context.get('request')
+            existing = 0
+            if request and request.user.is_authenticated:
+                from adoorback.views import count_mission_attempts_today
+                existing = count_mission_attempts_today(request.user)
+            validated_data['mission_attempt_number'] = existing + 1
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Mission fields and share_type are immutable — strip any incoming attempts
+        # to change them. Edits only mutate content/images/visibility.
+        validated_data.pop('share_type', None)
+        validated_data.pop('mission_id', None)
+        validated_data.pop('mission_prompt', None)
+        validated_data.pop('mission_attempt_number', None)
+        return super().update(instance, validated_data)
 
     def get_current_user_reaction_id_list(self, obj):
         current_user_id = self.context['request'].user.id
@@ -149,6 +194,14 @@ class NoteSerializer(BaseNoteSerializer):
         ]
 
     class Meta(BaseNoteSerializer.Meta):
-        fields = BaseNoteSerializer.Meta.fields + ['current_user_reaction_id_list', 'like_reaction_user_sample', 'visibility', 'share_type']
+        fields = BaseNoteSerializer.Meta.fields + [
+            'current_user_reaction_id_list',
+            'like_reaction_user_sample',
+            'visibility',
+            'share_type',
+            'mission_id',
+            'mission_prompt',
+            'mission_attempt_number',
+        ]
 
 
