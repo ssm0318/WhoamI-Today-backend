@@ -59,10 +59,8 @@ jobs:
             echo "🏗  새 이미지 빌드 (기존 컨테이너는 계속 동작 중 — 다운타임 없음)"
             docker compose -f docker-compose.production.yml build web
 
-            echo "🔧 점검 모드 ON (유저에게 점검 페이지 표시)"
-            docker exec nginx-reverse-proxy touch /usr/share/nginx/html/maintenance_on 2>/dev/null || echo "⚠️ nginx 컨테이너 없음 — 점검 모드 건너뜀"
-
             echo "🔄 web/cron만 재시작 (DB/Redis는 유지 — 다운타임 최소화)"
+            echo "   (백엔드 다운 시 nginx가 자동으로 503 응답 → 프론트엔드에서 점검 안내)"
             docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
 
             echo "⏳ 컨테이너 시작 대기 (최대 60초)"
@@ -81,8 +79,7 @@ jobs:
                 docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
                 echo "🔄 롤백 완료 (이전 버전으로 복구)"
               fi
-              docker exec nginx-reverse-proxy rm -f /usr/share/nginx/html/maintenance_on 2>/dev/null || true
-              exit 1
+                            exit 1
             }
 
             echo "🧪 Migration Dry Run 테스트"
@@ -100,8 +97,7 @@ jobs:
                 docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
                 echo "🔄 롤백 완료 (이전 버전으로 복구)"
               fi
-              docker exec nginx-reverse-proxy rm -f /usr/share/nginx/html/maintenance_on 2>/dev/null || true
-              exit 1
+                            exit 1
             }
 
             echo "✅ 배포 후 검증"
@@ -123,12 +119,8 @@ jobs:
                 docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
                 echo "🔄 롤백 완료 (이전 버전으로 복구)"
               fi
-              docker exec nginx-reverse-proxy rm -f /usr/share/nginx/html/maintenance_on 2>/dev/null || true
-              exit 1
+                            exit 1
             }
-
-            echo "🔓 점검 모드 OFF (유저 접속 허용)"
-            docker exec nginx-reverse-proxy rm -f /usr/share/nginx/html/maintenance_on 2>/dev/null || true
 
             # 에러 로그 확인
             echo "📋 최근 에러 로그 확인:"
