@@ -659,6 +659,8 @@ class FriendListSerializer(UserMinimalSerializer):
     is_check_in_subscribed = serializers.SerializerMethodField(read_only=True)
     is_subscribed = serializers.SerializerMethodField(read_only=True)
     last_updated_field = serializers.SerializerMethodField(read_only=True)
+    last_updated_at = serializers.SerializerMethodField(read_only=True)
+    last_updated_kind = serializers.SerializerMethodField(read_only=True)
     pinned_count = serializers.SerializerMethodField(read_only=True)
 
     def get_pinned_count(self, obj):
@@ -700,6 +702,43 @@ class FriendListSerializer(UserMinimalSerializer):
         if not candidates:
             return None
         return max(candidates, key=lambda c: c[1])[0]
+
+    def _widget_update_candidates(self, obj):
+        cutoff = timezone.now() - RECENT_POST_WINDOW
+        out = []
+        for n in self.context.get('visible_notes_by_author', {}).get(obj.id, []):
+            if n.created_at >= cutoff:
+                out.append((n.created_at, 'post'))
+        for r in self.context.get('visible_resps_by_author', {}).get(obj.id, []):
+            if r.created_at >= cutoff:
+                out.append((r.created_at, 'post'))
+        check_in = self.check_in(obj)
+        if check_in:
+            if check_in.created_at >= cutoff:
+                out.append((check_in.created_at, 'checkin'))
+            for vis_field, ts_field in [
+                ('mood_visibility',    'mood_updated_at'),
+                ('battery_visibility', 'battery_updated_at'),
+                ('song_visibility',    'song_updated_at'),
+                ('thought_visibility', 'thought_updated_at'),
+            ]:
+                if self._is_component_visible(obj, vis_field, ts_field):
+                    ts = getattr(check_in, ts_field, None)
+                    if ts and ts >= cutoff:
+                        out.append((ts, 'checkin'))
+        return out
+
+    def get_last_updated_at(self, obj):
+        cands = self._widget_update_candidates(obj)
+        if not cands:
+            return None
+        return max(cands, key=lambda c: c[0])[0].isoformat()
+
+    def get_last_updated_kind(self, obj):
+        cands = self._widget_update_candidates(obj)
+        if not cands:
+            return None
+        return max(cands, key=lambda c: c[0])[1]
 
     def get_sent_pokes(self, obj):
         return self.context.get('pokes_by_receiver', {}).get(obj.id, {})
@@ -852,7 +891,8 @@ class FriendListSerializer(UserMinimalSerializer):
                                                       'unread_chat_count', 'social_battery', 'mood',
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
                                                       'sent_pokes', 'is_check_in_subscribed', 'is_subscribed',
-                                                      'last_updated_field', 'pinned_count']
+                                                      'last_updated_field', 'last_updated_at', 'last_updated_kind',
+                                                      'pinned_count']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):
