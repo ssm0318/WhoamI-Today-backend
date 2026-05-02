@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'user_report.apps.UserReportConfig',
     'translate.apps.TranslateConfig',
     'surveys.apps.SurveysConfig',
+    'mission.apps.MissionConfig',
     'custom_fcm',
     'modeltranslation',
     'django.contrib.admin',
