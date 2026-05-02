@@ -15,6 +15,11 @@ urlpatterns = [
         name='browse-mode-preset-mark-used',
     ),
     path(
+        'picks/',
+        views.BrowseModePickEventCreate.as_view(),
+        name='browse-mode-pick-event-create',
+    ),
+    path(
         'wishlist/',
         views.BrowseModeWishlistCreate.as_view(),
         name='browse-mode-wishlist-create',

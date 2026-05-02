@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
-from browse_mode.models import BrowseModePreset, BrowseModeWishlistEntry
+from browse_mode.models import (
+    BrowseModePickEvent,
+    BrowseModePreset,
+    BrowseModeWishlistEntry,
+)
 
 
 # Tab keys the frontend lets the user toggle. `my` (profile) and `questions`
@@ -138,3 +142,63 @@ class BrowseModeWishlistEntrySerializer(serializers.ModelSerializer):
         if len(trimmed) > 2000:
             raise serializers.ValidationError("Wishlist entry must be 2000 characters or fewer.")
         return trimmed
+
+
+class BrowseModePickEventSerializer(serializers.ModelSerializer):
+    # `preset_id` is the natural input from the frontend; map it onto the
+    # FK without forcing the client to know DRF's PrimaryKeyRelatedField
+    # conventions. Validation enforces ownership: a user can't log a pick
+    # against another user's preset.
+    preset_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+
+    class Meta:
+        model = BrowseModePickEvent
+        fields = ['id', 'kind', 'built_in_id', 'preset_id', 'preset', 'created_at']
+        read_only_fields = ['id', 'preset', 'created_at']
+
+    def validate(self, attrs):
+        kind = attrs.get('kind')
+        built_in_id = attrs.get('built_in_id')
+        preset_id = attrs.get('preset_id')
+
+        if kind == 'built_in':
+            if not built_in_id:
+                raise serializers.ValidationError(
+                    {'built_in_id': 'Required when kind=built_in.'}
+                )
+            if preset_id is not None:
+                raise serializers.ValidationError(
+                    {'preset_id': 'Must be null when kind=built_in.'}
+                )
+        elif kind == 'custom':
+            if preset_id is None:
+                raise serializers.ValidationError(
+                    {'preset_id': 'Required when kind=custom.'}
+                )
+            if built_in_id:
+                raise serializers.ValidationError(
+                    {'built_in_id': 'Must be null when kind=custom.'}
+                )
+        elif kind == 'apply_without_saving':
+            if built_in_id or preset_id is not None:
+                raise serializers.ValidationError(
+                    'kind=apply_without_saving cannot carry built_in_id or preset_id.'
+                )
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context['request']
+        preset_id = validated_data.pop('preset_id', None)
+        preset = None
+        if preset_id is not None:
+            try:
+                preset = BrowseModePreset.objects.get(pk=preset_id, user=request.user)
+            except BrowseModePreset.DoesNotExist:
+                raise serializers.ValidationError(
+                    {'preset_id': 'Preset not found or not owned by user.'}
+                )
+        return BrowseModePickEvent.objects.create(
+            user=request.user,
+            preset=preset,
+            **validated_data,
+        )

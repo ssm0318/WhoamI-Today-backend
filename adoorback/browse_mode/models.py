@@ -55,6 +55,71 @@ class BrowseModePreset(AdoorTimestampedModel):
         return f'{self.user} — {self.name}'
 
 
+class BrowseModePickEvent(AdoorTimestampedModel):
+    """One row per active pick of a browse mode — the analytics ground truth
+    for "how often did the user activate a mode, switch, or apply-without-
+    saving." Skips / dismisses are NOT recorded; only positive picks.
+
+    Three kinds:
+      - `built_in`: one of the frontend constants (very_social /
+        selectively_social / quiet). `built_in_id` is set, `preset` is
+        null.
+      - `custom`: a saved `BrowseModePreset` was activated. `preset` FK
+        is set, `built_in_id` is null. `preset` uses SET_NULL on delete
+        so historical events survive preset deletion.
+      - `apply_without_saving`: the user customized something in the
+        sheet and tapped "Apply without saving" — both `built_in_id`
+        and `preset` are null.
+
+    `created_at` from `AdoorTimestampedModel` is the pick time; no
+    separate `picked_at` field needed.
+    """
+
+    KIND_CHOICES = (
+        ('built_in', 'built_in'),
+        ('custom', 'custom'),
+        ('apply_without_saving', 'apply_without_saving'),
+    )
+
+    BUILT_IN_ID_CHOICES = (
+        ('very_social', 'very_social'),
+        ('selectively_social', 'selectively_social'),
+        ('quiet', 'quiet'),
+    )
+
+    user = models.ForeignKey(
+        User,
+        related_name='browse_mode_pick_events',
+        on_delete=models.CASCADE,
+    )
+    kind = models.CharField(max_length=30, choices=KIND_CHOICES)
+    built_in_id = models.CharField(
+        max_length=40,
+        choices=BUILT_IN_ID_CHOICES,
+        null=True,
+        blank=True,
+    )
+    preset = models.ForeignKey(
+        BrowseModePreset,
+        related_name='pick_events',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        target = self.built_in_id or (
+            f'preset:{self.preset_id}' if self.preset_id else 'apply_without_saving'
+        )
+        return f'{self.user} → {target} @ {self.created_at:%Y-%m-%d %H:%M}'
+
+
 class BrowseModeWishlistEntry(AdoorTimestampedModel):
     """Free-text feature requests the user submits from the customize sheet —
     "what other granular changes would you like?". Read by the team to inform
