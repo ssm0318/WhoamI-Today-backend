@@ -154,6 +154,24 @@ class WitBotEscalationTests(TestCase):
         ).count()
         self.assertEqual(before, after)
 
+    def test_escalation_does_not_inflate_user_unread_count(self):
+        """The 'wit_admin was added' system event the user just triggered
+        should not show up as unread FOR that user — they caused it."""
+        from chat.wit_bot import escalate_to_human
+        # Start clean: simulate alice having read everything in the room
+        # (mark-read endpoint behavior).
+        Message.objects.filter(
+            chat_room=self.alice_room, receiver=self.alice,
+        ).update(is_read=True)
+        self.assertEqual(self.alice.unread_message_cnt, 0)
+        escalate_to_human(self.alice)
+        self.assertEqual(
+            self.alice.unread_message_cnt, 0,
+            "escalation should not inflate alice's unread count: the "
+            "member_added system event must be marked read for the user "
+            "who triggered it.",
+        )
+
     def test_user_leave_evicts_admin_and_demotes_room(self):
         """When the original user 'leaves' their wit_bot escalated room, the
         system reroutes that intent to 'evict admin' — the user stays, the
