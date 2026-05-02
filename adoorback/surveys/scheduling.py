@@ -3,11 +3,20 @@
 Pure query helpers — no view code. Consumed by `SurveyOfTheDayView` (today's
 daily) and `SurveyIndexView` (the bucketed index).
 """
-from datetime import date
+from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 
 from django.db.models import Exists, OuterRef, Q, Subquery
+from django.utils import timezone
 
 from surveys.models import CADENCE_DAILY, ScheduledSurvey, SurveyResponse
+
+
+def _today_la_7am():
+    """Return the current 'logical date' using a 7 AM America/Los_Angeles boundary.
+    Before 7 AM LA, this returns yesterday's date."""
+    la_tz = ZoneInfo('America/Los_Angeles')
+    return (timezone.now().astimezone(la_tz) - timedelta(hours=7)).date()
 
 
 def _annotate_user_response(qs, user):
@@ -32,7 +41,7 @@ def get_today_daily(user):
     and a stale-cache window where users could navigate back into the
     answer form and hit a 409.
     """
-    today = date.today()
+    today = _today_la_7am()
     return (
         _annotate_user_response(
             ScheduledSurvey.objects.filter(
@@ -56,7 +65,7 @@ def get_survey_index(user):
     Expired-and-hidden rows (window closed, allow_late=False, not answered —
     i.e. missed dailies) appear in NONE of the buckets and are never returned.
     """
-    today = date.today()
+    today = _today_la_7am()
     qs = _annotate_user_response(
         ScheduledSurvey.objects.select_related('survey'), user,
     )

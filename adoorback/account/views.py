@@ -2888,22 +2888,19 @@ class DiscoverFeedView(generics.ListAPIView):
         now = timezone.now()
         last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
 
-        # Check if date has changed in user's timezone
-        user_timezone = getattr(user, 'timezone', 'UTC')
-        try:
-            from zoneinfo import ZoneInfo
-            tz = ZoneInfo(user_timezone)
-        except:
-            tz = timezone.get_current_timezone()
-
-        now_local = now.astimezone(tz)
+        # Check if the 7 AM PST boundary has been crossed since last feed
+        from zoneinfo import ZoneInfo
+        la_tz = ZoneInfo('America/Los_Angeles')
+        now_la = now.astimezone(la_tz)
+        current_day = (now_la - timedelta(hours=7)).date()
 
         needs_new_feed = False
         if not last_feed:
             needs_new_feed = True
         else:
-            last_feed_local = last_feed.created_at.astimezone(tz)
-            if now_local.date() > last_feed_local.date():
+            last_feed_la = last_feed.created_at.astimezone(la_tz)
+            last_feed_day = (last_feed_la - timedelta(hours=7)).date()
+            if current_day > last_feed_day:
                 needs_new_feed = True
 
         if needs_new_feed:
@@ -3022,13 +3019,13 @@ class DiscoverFeedView(generics.ListAPIView):
                     existing_obj_ids.add((type(cand), cand.id))
                     break
 
-        # Step 2: If still less than 7, fill more in round-robin fashion
-        while len(feed_items) < 7:
+        # Step 2: If still less than 10, fill more in round-robin fashion
+        while len(feed_items) < 10:
             added_in_round = False
             for candidates, category_name in category_candidates:
-                if len(feed_items) >= 7:
+                if len(feed_items) >= 10:
                     break
-                
+
                 while candidates:
                     cand = candidates.pop(0)
                     if (type(cand), cand.id) not in existing_obj_ids:
@@ -3040,8 +3037,8 @@ class DiscoverFeedView(generics.ListAPIView):
             if not added_in_round:
                 break
 
-        # 5. Fallback: Fill up to 7 random posts (from any non-friends) if still not enough
-        if len(feed_items) < 7:
+        # 5. Fallback: Fill up to 10 random posts (from any non-friends) if still not enough
+        if len(feed_items) < 10:
             # Random Response — only public
             random_responses = list(_Response.objects.filter(
                 visibility__contains=['public'],
@@ -3062,7 +3059,7 @@ class DiscoverFeedView(generics.ListAPIView):
             random.shuffle(random_potentials) # Shuffle candidates for random selection
             
             for obj in random_potentials:
-                if len(feed_items) >= 7:
+                if len(feed_items) >= 10:
                     break
                 if (type(obj), obj.id) not in existing_obj_ids and obj.is_audience(user):
                     feed_items.append((obj, 'random'))
@@ -3096,7 +3093,7 @@ class DiscoverFeedView(generics.ListAPIView):
 
         music_songs = []
         for song in music_candidates:
-            if len(music_songs) >= 7:
+            if len(music_songs) >= 10:
                 break
             author = song.user
             active_check_in = CheckInModel.objects.filter(user=author, is_active=True).first()

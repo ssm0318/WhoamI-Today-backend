@@ -1,5 +1,3 @@
-from datetime import date
-
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from rest_framework import status
@@ -17,7 +15,7 @@ from surveys.models import (
     SurveyResponse,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
-from surveys.scheduling import get_survey_index, get_today_daily
+from surveys.scheduling import _today_la_7am, get_survey_index, get_today_daily
 from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
     SurveyResponseInputSerializer, validate_answer_value,
@@ -48,7 +46,7 @@ def _bereal_gate(viewer, survey: Survey):
     )
     if survey_day is None:
         return True, None
-    if survey_day >= date.today():
+    if survey_day >= _today_la_7am():
         return False, {
             'detail': 'Results available tomorrow.',
             'needs_submission': False,
@@ -95,7 +93,7 @@ class SurveyResponseSubmitView(APIView):
         # Reject submissions to scheduled surveys whose window has already
         # closed without late-submission allowance (matches the bucketing
         # rule's "expired hidden" semantics — daily is the canonical case).
-        today = date.today()
+        today = _today_la_7am()
         if ScheduledSurvey.objects.filter(
             survey=survey, allow_late=False, window_end__lt=today,
         ).exists():
@@ -216,7 +214,7 @@ class PastSurveysView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        today = date.today()
+        today = _today_la_7am()
         answered_survey_ids = list(
             SurveyResponse.objects.filter(user=request.user).values_list('survey_id', flat=True)
         )

@@ -40,12 +40,8 @@ class QuestionManager(SafeDeleteManager):
         return self.filter(is_admin_question=False, **kwargs)
 
     def daily_questions(self, user, **kwargs):
-        try:
-            tz = ZoneInfo(user.timezone)
-        except (ZoneInfoNotFoundError, AttributeError):
-            tz = ZoneInfo('America/Los_Angeles')
-
-        user_today = (timezone.now().astimezone(tz) - timedelta(hours=8)).date()
+        la_tz = ZoneInfo('America/Los_Angeles')
+        user_today = (timezone.now().astimezone(la_tz) - timedelta(hours=7)).date()
         return self.filter(selected_dates__contains=[user_today], **kwargs)
 
     def date_questions(self, date, **kwargs):

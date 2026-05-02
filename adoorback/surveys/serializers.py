@@ -1,10 +1,9 @@
-from datetime import date
-
 from rest_framework import serializers
 
 from surveys.models import (
     SLIDER, ScheduledSurvey, Survey, SurveyOption, SurveyQuestion, SurveyResponse,
 )
+from surveys.scheduling import _today_la_7am
 
 
 def validate_answer_value(question: SurveyQuestion, value) -> None:
@@ -128,7 +127,7 @@ class PastSurveySerializer(serializers.ModelSerializer):
     def get_results_unlocked(self, obj):
         if not self.get_user_answered(obj):
             return False
-        return obj.window_start < date.today()
+        return obj.window_start < _today_la_7am()
 
 
 class SurveyIndexEntrySerializer(serializers.ModelSerializer):
