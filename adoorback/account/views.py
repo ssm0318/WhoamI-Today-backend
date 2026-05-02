@@ -23,6 +23,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
+from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -1056,6 +1057,7 @@ class CurrentUserNoteStatus(APIView):
         return Response({'has_posted_note_today': has_posted_note_today}, status=200)
 
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class CurrentUserDetail(generics.RetrieveUpdateAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [IsAuthenticated]
