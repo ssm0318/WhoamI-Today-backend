@@ -61,6 +61,8 @@ jobs:
 
             echo "🔄 web/cron만 재시작 (DB/Redis는 유지 — 다운타임 최소화)"
             echo "   (백엔드 다운 시 nginx가 자동으로 503 응답 → 프론트엔드에서 점검 안내)"
+            DOWNTIME_START=$(date +%s)
+            echo "   ⏱ 다운타임 시작: $(date '+%H:%M:%S')"
             docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
 
             echo "⏳ 컨테이너 시작 대기 (최대 60초)"
@@ -121,6 +123,9 @@ jobs:
               fi
                             exit 1
             }
+
+            DOWNTIME_END=$(date +%s)
+            echo "   ⏱ 다운타임 종료: $(date '+%H:%M:%S') (총 $((DOWNTIME_END - DOWNTIME_START))초)"
 
             # 에러 로그 확인
             echo "📋 최근 에러 로그 확인:"
