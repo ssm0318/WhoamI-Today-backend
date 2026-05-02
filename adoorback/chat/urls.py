@@ -13,6 +13,7 @@ urlpatterns = [
     path('groups/', views.GroupChatCreate.as_view(), name='group-chat-create'),
     path('groups/<int:pk>/', views.GroupChatUpdate.as_view(), name='group-chat-update'),
     path('groups/<int:pk>/leave/', views.GroupChatLeave.as_view(), name='group-chat-leave'),
+    path('groups/<int:pk>/dismiss-admin/', views.GroupChatDismissAdmin.as_view(), name='group-chat-dismiss-admin'),
     path('groups/<int:pk>/messages/', views.GroupMessageList.as_view(), name='group-message-list'),
     path('groups/<int:pk>/mark-read/', views.MarkGroupMessagesRead.as_view(), name='mark-group-messages-read'),
     # Chat requests
