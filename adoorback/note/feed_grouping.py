@@ -2,6 +2,16 @@ from note.models import ShareType
 from note.serializers import NoteSerializer
 
 
+def resolve_mission_id_from_prompt(prompt):
+    if not prompt:
+        return None
+    try:
+        from adoorback.models import Mission
+        return Mission.objects.filter(prompt=prompt).values_list('id', flat=True).first()
+    except Exception:
+        return None
+
+
 def get_note_mission_id(note):
     return getattr(note, 'mission_id_id', None)
 
@@ -106,6 +116,8 @@ def build_mission_group(entries):
         (entry['note'].mission_prompt for entry in attempts if entry['note'].mission_prompt),
         None,
     )
+    if mission_id is None:
+        mission_id = resolve_mission_id_from_prompt(mission_prompt)
 
     group = {
         'type': 'MissionGroup',
