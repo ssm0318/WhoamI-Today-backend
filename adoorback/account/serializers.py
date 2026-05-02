@@ -678,54 +678,48 @@ class FriendListSerializer(UserMinimalSerializer):
     def get_is_subscribed(self, obj):
         return obj.id in self.context.get('subscription_ids', set())
 
-    def get_last_updated_field(self, obj):
-        check_in = self.check_in(obj)
-        if not check_in:
-            return None
-        candidates = []
-        if self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
-            ts = getattr(check_in, 'mood_updated_at', None)
-            if ts:
-                candidates.append(('mood', ts))
-        if self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
-            ts = getattr(check_in, 'battery_updated_at', None)
-            if ts:
-                candidates.append(('social_battery', ts))
-        if self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
-            ts = getattr(check_in, 'song_updated_at', None)
-            if ts:
-                candidates.append(('song', ts))
-        if self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
-            ts = getattr(check_in, 'thought_updated_at', None)
-            if ts:
-                candidates.append(('thought', ts))
-        if not candidates:
-            return None
-        return max(candidates, key=lambda c: c[1])[0]
-
     def _widget_update_candidates(self, obj):
+        """(timestamp, kind, field) tuples that the widget can actually render.
+
+        kind is 'post' or 'checkin'; field is the check-in component name
+        ('mood' / 'social_battery' / 'song' / 'thought') for kind='checkin',
+        else None. Entries pass three filters:
+          - within RECENT_POST_WINDOW
+          - viewer can see the component (visibility tier + auto-archive)
+          - the underlying value is non-empty (no empty thought / empty
+            mood array / missing track id), so the widget won't pick this
+            timestamp and then fail to render anything
+        """
         cutoff = timezone.now() - RECENT_POST_WINDOW
         out = []
         for n in self.context.get('visible_notes_by_author', {}).get(obj.id, []):
             if n.created_at >= cutoff:
-                out.append((n.created_at, 'post'))
+                out.append((n.created_at, 'post', None))
         for r in self.context.get('visible_resps_by_author', {}).get(obj.id, []):
             if r.created_at >= cutoff:
-                out.append((r.created_at, 'post'))
+                out.append((r.created_at, 'post', None))
         check_in = self.check_in(obj)
         if check_in:
-            if check_in.created_at >= cutoff:
-                out.append((check_in.created_at, 'checkin'))
-            for vis_field, ts_field in [
-                ('mood_visibility',    'mood_updated_at'),
-                ('battery_visibility', 'battery_updated_at'),
-                ('song_visibility',    'song_updated_at'),
-                ('thought_visibility', 'thought_updated_at'),
-            ]:
-                if self._is_component_visible(obj, vis_field, ts_field):
-                    ts = getattr(check_in, ts_field, None)
-                    if ts and ts >= cutoff:
-                        out.append((ts, 'checkin'))
+            if self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
+                ts = getattr(check_in, 'mood_updated_at', None)
+                mood = getattr(check_in, 'mood', None) or []
+                if ts and ts >= cutoff and any((m or '').strip() for m in mood):
+                    out.append((ts, 'checkin', 'mood'))
+            if self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
+                ts = getattr(check_in, 'battery_updated_at', None)
+                battery = (getattr(check_in, 'social_battery', None) or '').strip()
+                if ts and ts >= cutoff and battery:
+                    out.append((ts, 'checkin', 'social_battery'))
+            if self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
+                ts = getattr(check_in, 'thought_updated_at', None)
+                thought = (getattr(check_in, 'thought', None) or '').strip()
+                if ts and ts >= cutoff and thought:
+                    out.append((ts, 'checkin', 'thought'))
+            if self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
+                ts = getattr(check_in, 'song_updated_at', None)
+                song = self.context.get('active_song_by_user_id', {}).get(obj.id)
+                if ts and ts >= cutoff and song and (getattr(song, 'track_id', None) or '').strip():
+                    out.append((ts, 'checkin', 'song'))
         return out
 
     def get_last_updated_at(self, obj):
@@ -739,6 +733,12 @@ class FriendListSerializer(UserMinimalSerializer):
         if not cands:
             return None
         return max(cands, key=lambda c: c[0])[1]
+
+    def get_last_updated_field(self, obj):
+        checkin_cands = [c for c in self._widget_update_candidates(obj) if c[1] == 'checkin']
+        if not checkin_cands:
+            return None
+        return max(checkin_cands, key=lambda c: c[0])[2]
 
     def get_sent_pokes(self, obj):
         return self.context.get('pokes_by_receiver', {}).get(obj.id, {})
