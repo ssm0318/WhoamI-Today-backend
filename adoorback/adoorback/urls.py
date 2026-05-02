@@ -50,6 +50,7 @@ urlpatterns = [
     path('api/surveys/', include('surveys.urls')),
     path('api/missions/', adoorback_views.MissionList.as_view(), name='mission-list'),
     path('api/missions/today/', adoorback_views.MissionToday.as_view(), name='mission-today'),
+    path('api/missions/<int:mission_id>/attempts/', adoorback_views.MissionAttempts.as_view(), name='mission-attempts'),
 
     # Version Q endpoints (subset — only where behavior differs from W)
     path('api/q/user/', include('account.urls_q')),

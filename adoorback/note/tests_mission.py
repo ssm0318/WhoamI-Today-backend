@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from account.models import Connection, DiscoverFeed
 from adoorback.models import Mission
 from note.models import Note, ShareType
 
@@ -212,6 +213,107 @@ class MissionNoteSerializationTests(TestCase):
         self.assertIsNone(response.data['mission_attempt_number'])
 
 
+class MissionFeedGroupingTests(TestCase):
+    """Mission attempts should collapse into one feed item after visibility filtering."""
+
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username='mission_author', email='mission_author@example.com', password='password'
+        )
+        self.friend = User.objects.create_user(
+            username='mission_friend', email='mission_friend@example.com', password='password'
+        )
+        self.stranger = User.objects.create_user(
+            username='mission_stranger', email='mission_stranger@example.com', password='password'
+        )
+        Connection.objects.create(user1=self.author, user2=self.friend)
+        self.client = APIClient()
+
+    def _create_mission_attempt(self, content, attempt_number, visibility=None, prompt='Prompt snapshot'):
+        return Note.objects.create(
+            author=self.author,
+            content=content,
+            visibility=visibility or ['public'],
+            share_type=ShareType.MISSION,
+            mission_prompt=prompt,
+            mission_attempt_number=attempt_number,
+        )
+
+    def test_user_notes_feed_groups_legacy_prompt_attempts_in_attempt_order(self):
+        self._create_mission_attempt('first attempt', 1)
+        self._create_mission_attempt('second attempt', 2)
+        self._create_mission_attempt('third attempt', 3)
+
+        self.client.force_authenticate(user=self.friend)
+        response = self.client.get(f'/api/user/{self.author.username}/notes/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(len(response.data['results']), 1)
+        group = response.data['results'][0]
+        self.assertEqual(group['type'], 'MissionGroup')
+        self.assertIsNone(group['mission_id'])
+        self.assertEqual(group['mission_prompt'], 'Prompt snapshot')
+        self.assertEqual(group['author_detail']['id'], self.author.id)
+        self.assertEqual([attempt['content'] for attempt in group['attempts']], [
+            'first attempt',
+            'second attempt',
+            'third attempt',
+        ])
+        self.assertEqual([attempt['mission_attempt_number'] for attempt in group['attempts']], [1, 2, 3])
+
+    def test_user_notes_feed_groups_after_visibility_filtering(self):
+        self._create_mission_attempt('public attempt', 1, visibility=['public'])
+        self._create_mission_attempt('friends attempt', 2, visibility=['friends'])
+
+        self.client.force_authenticate(user=self.friend)
+        friend_response = self.client.get(f'/api/user/{self.author.username}/notes/')
+        self.assertEqual(friend_response.status_code, status.HTTP_200_OK, friend_response.data)
+        self.assertEqual(
+            [attempt['content'] for attempt in friend_response.data['results'][0]['attempts']],
+            ['public attempt', 'friends attempt'],
+        )
+
+        self.client.force_authenticate(user=self.stranger)
+        stranger_response = self.client.get(f'/api/user/{self.author.username}/notes/')
+        self.assertEqual(stranger_response.status_code, status.HTTP_200_OK, stranger_response.data)
+        self.assertEqual(len(stranger_response.data['results']), 1)
+        self.assertEqual(stranger_response.data['results'][0]['type'], 'MissionGroup')
+        self.assertEqual(
+            [attempt['content'] for attempt in stranger_response.data['results'][0]['attempts']],
+            ['public attempt'],
+        )
+
+    def test_discover_feed_groups_public_mission_attempts(self):
+        attempts = [
+            self._create_mission_attempt('first discover attempt', 1),
+            self._create_mission_attempt('second discover attempt', 2),
+            self._create_mission_attempt('third discover attempt', 3),
+        ]
+        batch_time = timezone.now()
+        for index, note in enumerate(reversed(attempts)):
+            DiscoverFeed.objects.create(
+                user=self.stranger,
+                note=note,
+                category='discover',
+                sort_order=index,
+                created_at=batch_time,
+            )
+
+        self.client.force_authenticate(user=self.stranger)
+        response = self.client.get('/api/user/discover/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(len(response.data['results']), 1)
+        group = response.data['results'][0]
+        self.assertEqual(group['type'], 'MissionGroup')
+        self.assertEqual(group['category'], 'discover')
+        self.assertEqual([attempt['content'] for attempt in group['attempts']], [
+            'first discover attempt',
+            'second discover attempt',
+            'third discover attempt',
+        ])
+
+
 def _at_la_time(year, month, day, hour, minute=0):
     """Helper: build an aware datetime at the given America/Los_Angeles wall-clock time."""
     la_tz = zoneinfo.ZoneInfo('America/Los_Angeles')
@@ -295,4 +397,149 @@ class MissionsTodayEndpointTests(TestCase):
     def test_endpoint_requires_authentication(self):
         anon = APIClient()
         response = anon.get('/api/missions/today/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+def _create_mission_note_for_test(mission, **kwargs):
+    """Attach the mission FK when item #1 has landed; otherwise use prompt fallback."""
+    data = {
+        'share_type': ShareType.MISSION,
+        'mission_prompt': mission.prompt,
+        **kwargs,
+    }
+    note_field_names = {field.name for field in Note._meta.get_fields()}
+    if 'mission_id' in note_field_names:
+        data['mission_id'] = mission
+    elif 'mission' in note_field_names:
+        data['mission'] = mission
+    return Note.objects.create(**data)
+
+
+class MissionAttemptsEndpointTests(TestCase):
+    """GET /api/missions/<id>/attempts/ returns visible attempts for one mission."""
+
+    def setUp(self):
+        self.viewer = User.objects.create_user(
+            username='viewer', email='viewer@example.com', password='password'
+        )
+        self.public_author = User.objects.create_user(
+            username='public_author', email='public@example.com', password='password'
+        )
+        self.friend_author = User.objects.create_user(
+            username='friend_author', email='friend@example.com', password='password'
+        )
+        self.close_author = User.objects.create_user(
+            username='close_author', email='close@example.com', password='password'
+        )
+        self.private_author = User.objects.create_user(
+            username='private_author', email='private@example.com', password='password'
+        )
+        self.unconnected_author = User.objects.create_user(
+            username='unconnected_author', email='unconnected@example.com', password='password'
+        )
+        self.mission = Mission.objects.create(prompt='Share a tiny win from today', type='text')
+        self.other_mission = Mission.objects.create(prompt='Share a favorite song', type='song')
+
+        Connection.objects.create(
+            user1=self.viewer,
+            user2=self.friend_author,
+            user1_choice='friend',
+            user2_choice='friend',
+        )
+        Connection.objects.create(
+            user1=self.viewer,
+            user2=self.close_author,
+            user1_choice='friend',
+            user2_choice='close_friend',
+        )
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.viewer)
+
+    def _set_created_at(self, note, minutes_ago):
+        created_at = timezone.now() - timedelta(minutes=minutes_ago)
+        Note.objects.filter(id=note.id).update(created_at=created_at)
+        note.created_at = created_at
+        return note
+
+    def test_endpoint_returns_visible_attempts_with_mission_metadata_newest_first(self):
+        old_visible = self._set_created_at(_create_mission_note_for_test(
+            self.mission,
+            author=self.public_author,
+            content='public attempt',
+            visibility=['public'],
+            mission_attempt_number=1,
+        ), 30)
+        friend_visible = self._set_created_at(_create_mission_note_for_test(
+            self.mission,
+            author=self.friend_author,
+            content='friends attempt',
+            visibility=['friends'],
+            mission_attempt_number=2,
+        ), 20)
+        close_visible = self._set_created_at(_create_mission_note_for_test(
+            self.mission,
+            author=self.close_author,
+            content='close friends attempt',
+            visibility=['close_friends'],
+            mission_attempt_number=3,
+        ), 10)
+        _create_mission_note_for_test(
+            self.mission,
+            author=self.private_author,
+            content='private attempt',
+            visibility=['only_me'],
+            mission_attempt_number=4,
+        )
+        _create_mission_note_for_test(
+            self.mission,
+            author=self.unconnected_author,
+            content='unconnected friends attempt',
+            visibility=['friends'],
+            mission_attempt_number=5,
+        )
+        _create_mission_note_for_test(
+            self.other_mission,
+            author=self.public_author,
+            content='other mission attempt',
+            visibility=['public'],
+            mission_attempt_number=1,
+        )
+
+        response = self.client.get(f'/api/missions/{self.mission.id}/attempts/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['id'], self.mission.id)
+        self.assertEqual(response.data['prompt'], self.mission.prompt)
+        self.assertEqual(response.data['type'], self.mission.type)
+        self.assertEqual(response.data['count'], 3)
+        self.assertIsNone(response.data['previous'])
+
+        result_ids = [item['id'] for item in response.data['results']]
+        self.assertEqual(result_ids, [close_visible.id, friend_visible.id, old_visible.id])
+        self.assertEqual(response.data['results'][0]['author_detail']['username'], 'close_author')
+        self.assertEqual(response.data['results'][0]['mission_attempt_number'], 3)
+
+    def test_endpoint_includes_only_me_attempt_for_author_viewer(self):
+        own_note = _create_mission_note_for_test(
+            self.mission,
+            author=self.viewer,
+            content='my private attempt',
+            visibility=['only_me'],
+            mission_attempt_number=1,
+        )
+
+        response = self.client.get(f'/api/missions/{self.mission.id}/attempts/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], own_note.id)
+
+    def test_endpoint_returns_404_for_unknown_mission(self):
+        response = self.client.get('/api/missions/999999/attempts/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_endpoint_requires_authentication(self):
+        anon = APIClient()
+        response = anon.get(f'/api/missions/{self.mission.id}/attempts/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
