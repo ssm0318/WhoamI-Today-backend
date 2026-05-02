@@ -57,13 +57,10 @@ jobs:
             df -h / | tail -1
 
             echo "🏗  새 이미지 빌드 (기존 컨테이너는 계속 동작 중 — 다운타임 없음)"
-            docker compose -f docker-compose.production.yml build
+            docker compose -f docker-compose.production.yml build web
 
-            echo "🛑 기존 컨테이너 종료 (다운타임 시작)"
-            docker compose -f docker-compose.production.yml down
-
-            echo "🔄 새 컨테이너 기동 (-d로 백그라운드 실행)"
-            docker compose -f docker-compose.production.yml up -d
+            echo "🔄 web/cron만 재시작 (DB/Redis는 유지 — 다운타임 최소화)"
+            docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
 
             echo "⏳ 컨테이너 시작 대기 (최대 60초)"
             timeout 60 bash -c 'until docker compose -f docker-compose.production.yml exec -T web python manage.py check --database default 2>/dev/null; do sleep 2; done' || {
@@ -75,12 +72,10 @@ jobs:
               
               if [ -f "$BACKUP_FILE" ]; then
                 echo "🔄 롤백 시도..."
-                docker compose -f docker-compose.production.yml down
-                docker compose -f docker-compose.production.yml up -d db
-                sleep 10
-                docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < "$BACKUP_FILE" || echo "롤백 실패"
+                docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < "$BACKUP_FILE" || echo "DB 롤백 실패"
                 git reset --hard HEAD~1
-                docker compose -f docker-compose.production.yml up --build -d
+                docker compose -f docker-compose.production.yml build web
+                docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
                 echo "🔄 롤백 완료 (이전 버전으로 복구)"
               fi
               exit 1
@@ -93,7 +88,14 @@ jobs:
 
             echo "🚀 Migration 실행"
             docker compose -f docker-compose.production.yml exec -T web python manage.py migrate --verbosity=2 || {
-              echo "❌ Migration 실패"
+              echo "❌ Migration 실패 — 롤백 시작"
+              if [ -f "$BACKUP_FILE" ]; then
+                docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < "$BACKUP_FILE" || echo "DB 롤백 실패"
+                git reset --hard HEAD~1
+                docker compose -f docker-compose.production.yml build web
+                docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
+                echo "🔄 롤백 완료 (이전 버전으로 복구)"
+              fi
               exit 1
             }
 
@@ -102,13 +104,20 @@ jobs:
             docker compose -f docker-compose.production.yml exec -T web python manage.py check --database default || {
               echo "⚠️ Django 시스템 체크에서 문제 발견"
             }
-            
+
             # API 헬스체크 (5초 대기 후)
             sleep 5
             curl -f http://localhost:8000/api/health/ || {
-              echo "❌ API 헬스체크 실패"
+              echo "❌ API 헬스체크 실패 — 롤백 시작"
               echo "📋 백엔드 로그 확인:"
               docker logs whoami-backend --tail 30 2>/dev/null || echo "로그 확인 불가"
+              if [ -f "$BACKUP_FILE" ]; then
+                docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < "$BACKUP_FILE" || echo "DB 롤백 실패"
+                git reset --hard HEAD~1
+                docker compose -f docker-compose.production.yml build web
+                docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
+                echo "🔄 롤백 완료 (이전 버전으로 복구)"
+              fi
               exit 1
             }
 
@@ -127,3 +136,21 @@ jobs:
               echo "💡 문제 발생 시 롤백 명령어:"
               echo "   docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < $BACKUP_FILE"
             fi
+
+      - name: Slack 알림 (성공)
+        if: success()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_DEPLOY_WEBHOOK }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "✅ 백엔드 배포 성공 (${{ github.ref_name }})\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Slack 알림 (실패/롤백)
+        if: failure()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_DEPLOY_WEBHOOK }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "❌ 백엔드 배포 실패 — 롤백 실행됨 (${{ github.ref_name }})\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

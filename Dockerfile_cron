@@ -1,35 +1,14 @@
-FROM python:3.9
+FROM whoami-today-backend-web:latest AS base
+
+USER root
+
+# cron 패키지만 추가 설치
+RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-
-# Note: `ant` is required to build JPype1 from source (transitive dep of konlpy)
-RUN apt-get update && apt-get install -y \
-    curl \
-    gcc \
-    python3-dev \
-    postgresql-server-dev-all \
-    libpq-dev \
-    cron \
-    libev-dev \
-    libevent-dev \
-    default-jdk \
-    ant \
-    libxml2-dev \
-    libxslt-dev \
-    libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --upgrade pip setuptools wheel
-
-COPY . .
-
-WORKDIR /app/adoorback
-
-RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./cron/crontab_jobs /etc/cron.d/crontab_jobs
 RUN chmod 0644 /etc/cron.d/crontab_jobs
 RUN crontab /etc/cron.d/crontab_jobs
 
-# 6) Run cron in foreground when container starts
 CMD ["cron", "-f"]

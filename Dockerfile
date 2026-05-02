@@ -18,27 +18,31 @@ RUN apt-get update && apt-get install -y \
     libxslt-dev \
     libffi-dev \
     ffmpeg \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
-RUN pip install --upgrade pip setuptools wheel
+RUN pip install --upgrade pip "setuptools<70.0.0" wheel
 
-# Start script
+# Install Python packages FIRST (cached unless requirements change)
+COPY adoorback/requirements.txt adoorback/requirements.lock* /app/adoorback/
+WORKDIR /app/adoorback
+RUN if [ -f requirements.lock ]; then \
+      pip install --no-cache-dir -r requirements.lock; \
+    else \
+      pip install --no-cache-dir -r requirements.txt; \
+    fi
+RUN pip install uwsgi
+
+# Copy project files
+WORKDIR /app
 COPY start.sh .
-RUN chmod +x /app/start.sh  # Use full path
-RUN ls -la /app/start.sh    # For permission verification
-
-# Copy project files - prevent nested directory structure
+RUN chmod +x /app/start.sh
 COPY adoorback /app/adoorback
 COPY docker-compose.* ./
 COPY .env* ./
 COPY .dockerignore ./
 COPY .gitignore ./
-
-# Install Python packages
-WORKDIR /app/adoorback
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install uwsgi
 
 # Maintain working directory
 WORKDIR /app/adoorback

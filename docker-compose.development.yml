@@ -1,7 +1,10 @@
 version: "3.8"
 services:
   web:
-    build: .
+    image: whoami-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:
@@ -39,9 +42,7 @@ services:
       - whoamitoday-network
 
   cron:
-    build:
-      context: .
-      dockerfile: Dockerfile_cron
+    image: whoami-backend:latest
     env_file:
       - .env.development
     volumes:
@@ -51,6 +52,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    command: >
+      sh -c '
+      crontab /app/cron/crontab_jobs &&
+      cron -f
+      '
     networks:
       - whoamitoday-network
 
