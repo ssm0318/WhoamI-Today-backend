@@ -145,21 +145,3 @@ jobs:
               echo "💡 문제 발생 시 롤백 명령어:"
               echo "   docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < $BACKUP_FILE"
             fi
-
-      - name: Slack 알림 (성공)
-        if: success()
-        uses: slackapi/slack-github-action@v2.0.0
-        with:
-          webhook: ${{ secrets.SLACK_DEPLOY_WEBHOOK }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "✅ 백엔드 배포 성공 (${{ github.ref_name }})\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-      - name: Slack 알림 (실패/롤백)
-        if: failure()
-        uses: slackapi/slack-github-action@v2.0.0
-        with:
-          webhook: ${{ secrets.SLACK_DEPLOY_WEBHOOK }}
-          webhook-type: incoming-webhook
-          payload: |
-            text: "❌ 백엔드 배포 실패 — 롤백 실행됨 (${{ github.ref_name }})\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
