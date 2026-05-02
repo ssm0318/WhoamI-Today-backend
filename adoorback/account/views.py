@@ -63,6 +63,7 @@ from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUs
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail, InvalidInviterUsername, ConflictError
 from adoorback.utils.validators import adoor_exception_handler
 from note.models import Note
+from note.feed_grouping import group_note_entries, serialize_mission_grouped_notes, serialize_note_entries
 from note.serializers import NoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
@@ -74,6 +75,16 @@ from tracking.utils import clean_session_key
 import random
 
 User = get_user_model()
+
+
+class MissionGroupedNoteListMixin:
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        notes = list(page if page is not None else queryset)
+
+        data = serialize_mission_grouped_notes(notes, context=self.get_serializer_context())
+        return self.get_paginated_response(data) if page is not None else Response(data)
 
 
 def get_user_by_username_or_404(username):
@@ -737,7 +748,7 @@ class UserProfile(generics.RetrieveAPIView):
         return Response(data)
 
 
-class UserNoteList(generics.ListAPIView):
+class UserNoteList(MissionGroupedNoteListMixin, generics.ListAPIView):
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated]
 
@@ -866,14 +877,32 @@ class UserAllPostList(generics.ListAPIView):
         
         user = request.user
         serialized_data = []
+        pending_note_entries = []
+
+        def flush_note_entries():
+            nonlocal pending_note_entries
+            if pending_note_entries:
+                serialized_data.extend(group_note_entries(pending_note_entries))
+                pending_note_entries = []
+
         for obj in objects_to_serialize:
             if isinstance(obj, Note):
-                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
+                serialized = dict(NoteSerializer(obj, context=self.get_serializer_context()).data)
                 serialized['type'] = 'Note' # Optional: helps client distinguish
+                pending_note_entries.extend(
+                    serialize_note_entries(
+                        [obj],
+                        context=self.get_serializer_context(),
+                        data_by_note_id={obj.id: serialized},
+                    )
+                )
             elif isinstance(obj, _Response):
-                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+                flush_note_entries()
+                serialized = dict(ResponseSerializer(obj, context=self.get_serializer_context()).data)
                 serialized['type'] = 'Response' # Optional
-            serialized_data.append(serialized)
+                serialized_data.append(serialized)
+
+        flush_note_entries()
 
         for obj in objects_to_serialize:
             obj.readers.add(user)
@@ -907,14 +936,32 @@ class UserUnreadPostList(generics.ListAPIView):
         combined = sorted(chain(unread_notes, unread_responses), key=lambda x: x.created_at, reverse=True)
 
         serialized_data = []
+        pending_note_entries = []
+
+        def flush_note_entries():
+            nonlocal pending_note_entries
+            if pending_note_entries:
+                serialized_data.extend(group_note_entries(pending_note_entries))
+                pending_note_entries = []
+
         for obj in combined:
             if isinstance(obj, Note):
-                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
+                serialized = dict(NoteSerializer(obj, context=self.get_serializer_context()).data)
                 serialized['type'] = 'Note'
+                pending_note_entries.extend(
+                    serialize_note_entries(
+                        [obj],
+                        context=self.get_serializer_context(),
+                        data_by_note_id={obj.id: serialized},
+                    )
+                )
             elif isinstance(obj, _Response):
-                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+                flush_note_entries()
+                serialized = dict(ResponseSerializer(obj, context=self.get_serializer_context()).data)
                 serialized['type'] = 'Response'
-            serialized_data.append(serialized)
+                serialized_data.append(serialized)
+
+        flush_note_entries()
 
         # Mark all as read after fetching
         for obj in unread_notes:
@@ -1435,7 +1482,7 @@ class CurrentUserProfile(generics.RetrieveAPIView):
         return Response(data)
 
 
-class CurrentUserNoteList(generics.ListAPIView):
+class CurrentUserNoteList(MissionGroupedNoteListMixin, generics.ListAPIView):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated]
@@ -1494,14 +1541,32 @@ class CurrentUserAllPostList(generics.ListAPIView):
         objects_to_serialize = page if page is not None else combined_items
         
         serialized_data = []
+        pending_note_entries = []
+
+        def flush_note_entries():
+            nonlocal pending_note_entries
+            if pending_note_entries:
+                serialized_data.extend(group_note_entries(pending_note_entries))
+                pending_note_entries = []
+
         for obj in objects_to_serialize:
             if isinstance(obj, Note):
-                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
+                serialized = dict(NoteSerializer(obj, context=self.get_serializer_context()).data)
                 serialized['type'] = 'Note'
+                pending_note_entries.extend(
+                    serialize_note_entries(
+                        [obj],
+                        context=self.get_serializer_context(),
+                        data_by_note_id={obj.id: serialized},
+                    )
+                )
             elif isinstance(obj, _Response):
-                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
+                flush_note_entries()
+                serialized = dict(ResponseSerializer(obj, context=self.get_serializer_context()).data)
                 serialized['type'] = 'Response'
-            serialized_data.append(serialized)
+                serialized_data.append(serialized)
+
+        flush_note_entries()
             
         return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
 
@@ -2792,21 +2857,31 @@ class FriendFeed(generics.ListAPIView):
         notes_before_update = list(Note.objects.filter(id__in=note_ids).order_by('-created_at'))
 
         page = self.paginate_queryset(notes_before_update)
-        if page is not None:
-            serialized_data = NoteSerializer(page, many=True, context=self.get_serializer_context()).data
-        else:
-            serialized_data = NoteSerializer(notes_before_update, many=True, context=self.get_serializer_context()).data
+        source_items = list(page if page is not None else notes_before_update)
+        serialized_notes = NoteSerializer(source_items, many=True, context=self.get_serializer_context()).data
 
         # inject is_check_in_subscribed into author_detail (version_w only)
+        data_by_note_id = {}
         if user.current_ver == 'version_w':
             from adoorback.utils.content_types import get_check_in_type
             check_in_sub_ids = set(Subscription.objects.filter(
                 subscriber=user, content_type=get_check_in_type()
             ).values_list('subscribed_to_id', flat=True))
-            source_items = page if page is not None else notes_before_update
-            for item, serialized in zip(source_items, serialized_data):
-                if 'author_detail' in serialized and serialized['author_detail']:
-                    serialized['author_detail']['is_check_in_subscribed'] = item.author_id in check_in_sub_ids
+        else:
+            check_in_sub_ids = set()
+
+        for item, serialized in zip(source_items, serialized_notes):
+            data = dict(serialized)
+            if user.current_ver == 'version_w':
+                if 'author_detail' in data and data['author_detail']:
+                    data['author_detail']['is_check_in_subscribed'] = item.author_id in check_in_sub_ids
+            data_by_note_id[item.id] = data
+
+        serialized_data = serialize_mission_grouped_notes(
+            source_items,
+            context=self.get_serializer_context(),
+            data_by_note_id=data_by_note_id,
+        )
 
         # mark all notes as read
         unread_note_ids = queryset.exclude(readers=request.user).values_list("id", flat=True)
@@ -2870,25 +2945,46 @@ class FullFriendFeed(generics.ListAPIView):
             ).values_list('subscribed_to_id', flat=True))
 
         serialized_data = []
-        for obj in objects_to_serialize:
-            if isinstance(obj, Note):
-                serialized = NoteSerializer(obj, context=self.get_serializer_context()).data
-            elif isinstance(obj, _Response):
-                serialized = ResponseSerializer(obj, context=self.get_serializer_context()).data
-            # Add connection_status and is_check_in_subscribed to author_detail
-            if 'author_detail' in serialized and serialized['author_detail']:
+        pending_note_entries = []
+
+        def flush_note_entries():
+            nonlocal pending_note_entries
+            if pending_note_entries:
+                serialized_data.extend(group_note_entries(pending_note_entries))
+                pending_note_entries = []
+
+        def add_author_feed_fields(obj, data):
+            if 'author_detail' in data and data['author_detail']:
                 author = obj.author
                 if author == user:
-                    serialized['author_detail']['connection_status'] = None
+                    data['author_detail']['connection_status'] = None
                 elif author.is_close_friend(user):
-                    serialized['author_detail']['connection_status'] = 'close_friend'
+                    data['author_detail']['connection_status'] = 'close_friend'
                 elif user.is_connected(author):
-                    serialized['author_detail']['connection_status'] = 'friend'
+                    data['author_detail']['connection_status'] = 'friend'
                 else:
-                    serialized['author_detail']['connection_status'] = None
+                    data['author_detail']['connection_status'] = None
                 if user.current_ver == 'version_w':
-                    serialized['author_detail']['is_check_in_subscribed'] = obj.author_id in check_in_sub_ids
-            serialized_data.append(serialized)
+                    data['author_detail']['is_check_in_subscribed'] = obj.author_id in check_in_sub_ids
+
+        for obj in objects_to_serialize:
+            if isinstance(obj, Note):
+                serialized = dict(NoteSerializer(obj, context=self.get_serializer_context()).data)
+                add_author_feed_fields(obj, serialized)
+                pending_note_entries.extend(
+                    serialize_note_entries(
+                        [obj],
+                        context=self.get_serializer_context(),
+                        data_by_note_id={obj.id: serialized},
+                    )
+                )
+            elif isinstance(obj, _Response):
+                flush_note_entries()
+                serialized = dict(ResponseSerializer(obj, context=self.get_serializer_context()).data)
+                add_author_feed_fields(obj, serialized)
+                serialized_data.append(serialized)
+
+        flush_note_entries()
 
         # mark all notes as read
         unread_note_ids = [n.id for n in notes if user not in n.readers.all()]
@@ -3307,6 +3403,14 @@ class DiscoverFeedView(generics.ListAPIView):
         req_user_personas = set(req_user.user_personas.values_list('id', flat=True)) if req_user_persona_public else set()
 
         results = []
+        pending_note_entries = []
+
+        def flush_note_entries():
+            nonlocal pending_note_entries
+            if pending_note_entries:
+                results.extend(group_note_entries(pending_note_entries, wrap_notes=True))
+                pending_note_entries = []
+
         for item in feed_objects:
             author = item.response.author if item.response else item.note.author
 
@@ -3332,6 +3436,7 @@ class DiscoverFeedView(generics.ListAPIView):
                     mut_personas = len(req_user_personas & author_personas)
 
             if item.response:
+                flush_note_entries()
                 data = resp_data_map.get(item.response.id)
                 if data:
                     if 'author_detail' in data and isinstance(data['author_detail'], dict):
@@ -3346,15 +3451,21 @@ class DiscoverFeedView(generics.ListAPIView):
             elif item.note:
                 data = note_data_map.get(item.note.id)
                 if data:
+                    data = dict(data)
                     if 'author_detail' in data and isinstance(data['author_detail'], dict):
                         data['author_detail']['mutual_friend_count'] = mut_friends
                         data['author_detail']['mutual_interest_count'] = mut_interests
                         data['author_detail']['mutual_persona_count'] = mut_personas
-                    results.append({
-                        "type": "Note",
-                        "category": item.category,
-                        "body": data
-                    })
+                    pending_note_entries.extend(
+                        serialize_note_entries(
+                            [item.note],
+                            context=self.get_serializer_context(),
+                            data_by_note_id={item.note.id: data},
+                            extra_by_note_id={item.note.id: {'category': item.category}},
+                        )
+                    )
+
+        flush_note_entries()
 
         # Inject Daily Question
         from qna.models import Question
