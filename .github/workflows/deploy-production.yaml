@@ -56,8 +56,8 @@ jobs:
             echo "    정리 후 디스크:"
             df -h / | tail -1
 
-            echo "🏗  새 이미지 빌드 (기존 컨테이너는 계속 동작 중 — 다운타임 없음)"
-            docker compose -f docker-compose.production.yml build web
+            echo "🏗  새 이미지 빌드 (낮은 우선순위로 기존 서비스 영향 최소화)"
+            nice -n 19 ionice -c 3 docker compose -f docker-compose.production.yml build web
 
             echo "🔄 web/cron만 재시작 (DB/Redis는 유지 — 다운타임 최소화)"
             echo "   (백엔드 다운 시 nginx가 자동으로 503 응답 → 프론트엔드에서 점검 안내)"
