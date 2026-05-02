@@ -317,6 +317,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         help_text="History of previously used usernames"
     )
     email_verified = models.BooleanField(default=False)
+    has_received_first_archive_noti = models.BooleanField(default=False)
 
     friendship_targetted_notis = GenericRelation("notification.Notification",
                                                  content_type_field='target_type',
