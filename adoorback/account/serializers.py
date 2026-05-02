@@ -516,10 +516,10 @@ class UserProfileSerializer(UserMinimalSerializer):
                 return True
             if user is None:
                 return False
-            if user == instance:
-                return True
             if is_owner_preview:
                 # Owner previewing as a specific audience tier.
+                # Must be checked BEFORE user == instance, because in tier mode
+                # without a shadow viewer, user IS the owner (instance).
                 if visibility == 'only_me':
                     return False
                 if visibility == 'friends':
@@ -527,6 +527,8 @@ class UserProfileSerializer(UserMinimalSerializer):
                 if visibility == 'close_friends':
                     return view_as == 'close_friends'
                 return False
+            if user == instance:
+                return True
             if visibility == 'only_me':
                 return False
             if visibility == 'friends':

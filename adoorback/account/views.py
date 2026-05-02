@@ -53,7 +53,10 @@ from account.serializers import (CurrentUserSerializer, CurrentUserSignupSeriali
                                  InterestSerializer, PersonaSerializer, viewer_sees_check_in_component,
                                  VersionSwitchRequestSerializer,
                                  RECENT_POST_WINDOW)
-from account.view_as import apply_profile_view_as, parse_view_as, resolve_public_proxy_viewer, resolve_shadow_viewer
+from account.view_as import (
+    apply_profile_view_as, parse_view_as, resolve_public_proxy_viewer,
+    resolve_shadow_viewer, tier_allows_post,
+)
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail, InvalidInviterUsername
@@ -726,13 +729,29 @@ class UserNoteList(generics.ListAPIView):
         user = self.request.user
         author_username = self.kwargs.get('username')
         author = User.objects.get(username=author_username)
-        
+
         # don't show superuser's note list (Notice must be shown on its own tab)
         if author.is_superuser:
             return Note.objects.none()
-    
+
+        # View As: owner 본인이 preview할 때만 적용
+        effective_viewer = user
+        tier = None
+        if user == author:
+            view_as = parse_view_as(self.request)
+            shadow_viewer = resolve_shadow_viewer(self.request, author)
+            if shadow_viewer is None and view_as == 'public':
+                shadow_viewer = resolve_public_proxy_viewer(author)
+            if shadow_viewer is not None:
+                effective_viewer = shadow_viewer
+            elif view_as is not None:
+                tier = view_as
+
         all_notes = Note.objects.filter(author=author)
-        note_ids = [note.id for note in all_notes if note.is_audience(user)]
+        if tier is not None:
+            note_ids = [n.id for n in all_notes if tier_allows_post(tier, n.visibility)]
+        else:
+            note_ids = [n.id for n in all_notes if n.is_audience(effective_viewer)]
         return Note.objects.filter(id__in=note_ids).order_by('-created_at')
 
 
@@ -749,8 +768,26 @@ class UserResponseList(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        all_responses = _Response.objects.filter(author__username=self.kwargs.get('username')).order_by('-created_at')
-        response_ids = [response.id for response in all_responses if response.is_audience(user)]
+        author_username = self.kwargs.get('username')
+        author = User.objects.get(username=author_username)
+
+        effective_viewer = user
+        tier = None
+        if user == author:
+            view_as = parse_view_as(self.request)
+            shadow_viewer = resolve_shadow_viewer(self.request, author)
+            if shadow_viewer is None and view_as == 'public':
+                shadow_viewer = resolve_public_proxy_viewer(author)
+            if shadow_viewer is not None:
+                effective_viewer = shadow_viewer
+            elif view_as is not None:
+                tier = view_as
+
+        all_responses = _Response.objects.filter(author=author).order_by('-created_at')
+        if tier is not None:
+            response_ids = [r.id for r in all_responses if tier_allows_post(tier, r.visibility)]
+        else:
+            response_ids = [r.id for r in all_responses if r.is_audience(effective_viewer)]
         return _Response.objects.filter(id__in=response_ids)
 
 
@@ -764,17 +801,35 @@ class UserAllPostList(generics.ListAPIView):
         user = self.request.user
         author_username = self.kwargs.get('username')
         author = get_object_or_404(User, username=author_username)
-        
+
+        effective_viewer = user
+        tier = None
+        if user == author:
+            view_as = parse_view_as(self.request)
+            shadow_viewer = resolve_shadow_viewer(self.request, author)
+            if shadow_viewer is None and view_as == 'public':
+                shadow_viewer = resolve_public_proxy_viewer(author)
+            if shadow_viewer is not None:
+                effective_viewer = shadow_viewer
+            elif view_as is not None:
+                tier = view_as
+
         # don't show superuser's note list (Notice must be shown on its own tab)
         if author.is_superuser:
             notes = []
         else:
             all_notes = Note.objects.filter(author=author)
-            note_ids = [note.id for note in all_notes if note.is_audience(user)]
+            if tier is not None:
+                note_ids = [n.id for n in all_notes if tier_allows_post(tier, n.visibility)]
+            else:
+                note_ids = [n.id for n in all_notes if n.is_audience(effective_viewer)]
             notes = list(Note.objects.filter(id__in=note_ids).order_by('-created_at'))
 
         all_responses = _Response.objects.filter(author=author).order_by('-created_at')
-        response_ids = [response.id for response in all_responses if response.is_audience(user)]
+        if tier is not None:
+            response_ids = [r.id for r in all_responses if tier_allows_post(tier, r.visibility)]
+        else:
+            response_ids = [r.id for r in all_responses if r.is_audience(effective_viewer)]
         responses = list(_Response.objects.filter(id__in=response_ids))
 
         combined = sorted(chain(notes, responses), key=lambda x: x.created_at, reverse=True)

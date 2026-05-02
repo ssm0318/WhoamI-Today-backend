@@ -351,3 +351,112 @@ class ResolvePublicProxyViewerUnitTests(TestCase):
             username='wit_bot', email='wit_bot_owner@example.com', password='pw',
         )
         self.assertIsNone(resolve_public_proxy_viewer(weird_owner))
+
+
+class PostListViewAsTests(TestCase):
+    """Integration tests: view_as filtering on note/response/all-posts list endpoints."""
+
+    def setUp(self):
+        from account.models import Connection
+        from note.models import Note
+
+        self.owner = User.objects.create_user(
+            username='owner_pl', email='owner_pl@example.com', password='pw',
+        )
+        self.friend = User.objects.create_user(
+            username='friend_pl', email='friend_pl@example.com', password='pw',
+        )
+        Connection.objects.create(
+            user1=self.friend, user2=self.owner,
+            user1_choice='friend', user2_choice='friend',
+        )
+        self.stranger = User.objects.create_user(
+            username='stranger_pl', email='stranger_pl@example.com', password='pw',
+        )
+        self.proxy = User.objects.create_user(
+            username='wit_bot', email='wit_bot_pl@example.com', password='pw',
+        )
+
+        self.note_public = Note.objects.create(
+            author=self.owner, content='Public note', visibility=['public'],
+        )
+        self.note_friends = Note.objects.create(
+            author=self.owner, content='Friends note', visibility=['friends'],
+        )
+        self.note_close_friends = Note.objects.create(
+            author=self.owner, content='Close friends note', visibility=['close_friends'],
+        )
+
+        self.client = APIClient()
+
+    def _get_note_ids(self, response):
+        return {item['id'] for item in response.data.get('results', response.data)}
+
+    def test_owner_without_view_as_sees_all_notes(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(f'/api/user/{self.owner.username}/notes/')
+        self.assertEqual(response.status_code, 200)
+        ids = self._get_note_ids(response)
+        self.assertIn(self.note_public.id, ids)
+        self.assertIn(self.note_friends.id, ids)
+        self.assertIn(self.note_close_friends.id, ids)
+
+    def test_view_as_public_shows_only_public_notes(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(f'/api/user/{self.owner.username}/notes/?view_as=public')
+        self.assertEqual(response.status_code, 200)
+        ids = self._get_note_ids(response)
+        self.assertIn(self.note_public.id, ids)
+        self.assertNotIn(self.note_friends.id, ids)
+        self.assertNotIn(self.note_close_friends.id, ids)
+
+    def test_view_as_friends_shows_public_and_friends(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(f'/api/user/{self.owner.username}/notes/?view_as=friends')
+        self.assertEqual(response.status_code, 200)
+        ids = self._get_note_ids(response)
+        self.assertIn(self.note_public.id, ids)
+        self.assertIn(self.note_friends.id, ids)
+        self.assertNotIn(self.note_close_friends.id, ids)
+
+    def test_view_as_close_friends_shows_public_friends_close_friends(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(f'/api/user/{self.owner.username}/notes/?view_as=close_friends')
+        self.assertEqual(response.status_code, 200)
+        ids = self._get_note_ids(response)
+        self.assertIn(self.note_public.id, ids)
+        self.assertIn(self.note_friends.id, ids)
+        self.assertIn(self.note_close_friends.id, ids)
+
+    def test_view_as_user_stranger_sees_only_public(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(
+            f'/api/user/{self.owner.username}/notes/?view_as_user={self.stranger.username}',
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = self._get_note_ids(response)
+        self.assertIn(self.note_public.id, ids)
+        self.assertNotIn(self.note_friends.id, ids)
+        self.assertNotIn(self.note_close_friends.id, ids)
+
+    def test_non_owner_view_as_is_ignored(self):
+        """Non-owner sending view_as on someone else's notes should be ignored."""
+        self.client.force_authenticate(user=self.stranger)
+        response = self.client.get(
+            f'/api/user/{self.owner.username}/notes/?view_as=close_friends',
+        )
+        self.assertEqual(response.status_code, 200)
+        ids = self._get_note_ids(response)
+        # Stranger can only see public notes regardless of view_as param
+        self.assertIn(self.note_public.id, ids)
+        self.assertNotIn(self.note_friends.id, ids)
+        self.assertNotIn(self.note_close_friends.id, ids)
+
+    def test_view_as_public_on_all_posts_endpoint(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.get(f'/api/user/{self.owner.username}/all-posts/?view_as=public')
+        self.assertEqual(response.status_code, 200)
+        ids = {item['id'] for item in response.data.get('results', response.data)}
+        self.assertIn(self.note_public.id, ids)
+        self.assertNotIn(self.note_friends.id, ids)
+        self.assertNotIn(self.note_close_friends.id, ids)

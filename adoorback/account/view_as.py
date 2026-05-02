@@ -39,6 +39,11 @@ def _tier_allows(tier: str, visibility: str) -> bool:
     return False
 
 
+def tier_allows_post(tier: str, visibility_array) -> bool:
+    """Check whether a view-as tier can see a post with the given visibility array."""
+    return any(_tier_allows(tier, v) for v in visibility_array)
+
+
 def apply_profile_view_as(data: dict, owner, tier: Optional[str]) -> dict:
     """Mutate `data` in place to mask owner profile fields per the chosen tier.
 
