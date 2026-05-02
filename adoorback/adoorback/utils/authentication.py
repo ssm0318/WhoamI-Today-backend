@@ -36,27 +36,6 @@ def enforce_csrf(request):
         raise exceptions.PermissionDenied('CSRF Failed: %s' % reason)
 
 
-class CookieJWTAuthentication(JWTAuthentication):
-    """Cookie-based JWT authentication without CSRF enforcement."""
-
-    def authenticate(self, request):
-        header = self.get_header(request)
-
-        if header is not None:
-            raw_token = self.get_raw_token(header)
-        else:
-            raw_token = request.COOKIES.get(settings.SIMPLE_JWT['AUTH_COOKIE']) or None
-        if raw_token is None:
-            return None
-
-        try:
-            validated_token = self.get_validated_token(raw_token)
-        except Exception:
-            return None
-
-        return self.get_user(validated_token), validated_token
-
-
 class CustomAuthentication(JWTAuthentication):
     def authenticate(self, request):
         header = self.get_header(request)

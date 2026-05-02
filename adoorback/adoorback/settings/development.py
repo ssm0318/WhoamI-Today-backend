@@ -34,6 +34,8 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://localhost:3001']
 CSRF_TRUSTED_ORIGINS = ['http://localhost:3000', 'http://localhost:3001']
 CORS_ALLOW_CREDENTIALS = True
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = [*default_headers, 'x-current-page']
 CSRF_COOKIE_HTTPONLY = False 
 CSRF_COOKIE_SAMESITE = 'Lax'
 

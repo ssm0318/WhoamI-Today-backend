@@ -10,13 +10,11 @@ from rest_framework.permissions import IsAuthenticated
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.settings import LANGUAGE_CODE, LANGUAGES
 from adoorback.utils.validators import adoor_exception_handler
-from adoorback.utils.authentication import CookieJWTAuthentication
 
 
 class CustomFCMDeviceViewSet(viewsets.ModelViewSet):
     queryset = CustomFCMDevice.objects.all()
     serializer_class = CustomFCMDeviceSerializer
-    authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get_exception_handler(self):

@@ -2112,6 +2112,8 @@ class UserFriendRequest(generics.ListCreateAPIView):
                 relationship_type_detail=evaluation_data['relationship_type_detail'] or None,
                 skipped=evaluation_data['skipped'],
             )
+        except IntegrityError:
+            raise ValidationError({'error': 'Friend request already sent.'})
         except serializers.ValidationError as e:
             if 'error' in e.detail and "different versions" in str(e.detail['error']):
                 raise PermissionDenied("Users belong to different groups, so a friend request cannot be sent.")
