@@ -757,6 +757,7 @@ RELATIONSHIP_TYPE_CHOICES = (
     ('family', 'Family'),
     ('online_friend', 'Online Friend'),
     ('club_community', 'Club/Community'),
+    ('not_yet', 'Not Yet Met'),
     ('other', 'Other'),
 )
 
