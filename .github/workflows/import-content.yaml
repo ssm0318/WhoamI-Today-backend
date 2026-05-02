@@ -1,0 +1,125 @@
+name: Import Mission Content
+
+on:
+  push:
+    branches:
+      - content/main
+    paths:
+      - 'adoorback/adoorback/assets/*.xlsx'
+
+concurrency:
+  group: import-content
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate xlsx (no DB)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install openpyxl
+        run: pip install openpyxl
+
+      - name: Validate xlsx
+        run: |
+          python adoorback/mission/management/commands/_xlsx_lib.py \
+            --validate adoorback/adoorback/assets/missions.xlsx
+
+  apply:
+    name: Apply via SSH (mutates DB)
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy xlsx to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.NEW_SERVER_HOST }}
+          username: ${{ secrets.NEW_SERVER_USER }}
+          key: ${{ secrets.NEW_SERVER_KEY }}
+          source: 'adoorback/adoorback/assets/missions.xlsx'
+          target: '/tmp/'
+          strip_components: 3
+
+      - name: Apply via docker compose exec
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.NEW_SERVER_HOST }}
+          username: ${{ secrets.NEW_SERVER_USER }}
+          key: ${{ secrets.NEW_SERVER_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            cd ~/WhoamI-Today-backend
+            docker compose -f docker-compose.production.yml \
+              cp /tmp/missions.xlsx web:/app/adoorback/assets/missions.xlsx
+            docker compose -f docker-compose.production.yml \
+              exec -T web python manage.py load_missions_xlsx \
+              --path=/app/adoorback/assets/missions.xlsx
+
+  reset-commit:
+    name: Reset xlsx statuses + commit back
+    runs-on: ubuntu-latest
+    needs: apply
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: content/main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install openpyxl
+        run: pip install openpyxl
+
+      - name: Reset status column to 'unchanged'
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from openpyxl import load_workbook
+
+          path = Path('adoorback/adoorback/assets/missions.xlsx')
+          wb = load_workbook(filename=str(path))
+          ws = wb.active
+          rows = list(ws.iter_rows())
+          if not rows:
+              raise SystemExit('Empty xlsx')
+          header = [c.value.strip().lower() if c.value else '' for c in rows[0]]
+          status_col = header.index('status') + 1
+          for row in rows[1:]:
+              cell = ws.cell(row=row[0].row, column=status_col)
+              if cell.value is None:
+                  continue
+              if str(cell.value).strip().lower() in {'added', 'modified', 'removed'}:
+                  cell.value = 'unchanged'
+          wb.save(path)
+          print(f'Reset statuses in {path}')
+          PY
+
+      - name: Commit and push
+        run: |
+          if [ -z "$(git status --porcelain adoorback/adoorback/assets/missions.xlsx)" ]; then
+            echo "No status changes to commit."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add adoorback/adoorback/assets/missions.xlsx
+          git commit -m "chore(content): reset mission statuses after apply [skip ci]"
+          git push origin content/main
