@@ -352,6 +352,9 @@ class UserProfileSerializer(UserMinimalSerializer):
         return request.user
 
     def get_is_check_in_subscribed(self, obj):
+        # In View As mode, never expose whether the shadow viewer subscribes.
+        if self.context.get('view_as') is not None or self.context.get('shadow_viewer') is not None:
+            return False
         viewer = self._get_viewer()
         if viewer is not None and viewer.current_ver == 'version_w':
             from adoorback.utils.content_types import get_check_in_type
@@ -362,6 +365,8 @@ class UserProfileSerializer(UserMinimalSerializer):
         return False
 
     def get_is_subscribed(self, obj):
+        if self.context.get('view_as') is not None or self.context.get('shadow_viewer') is not None:
+            return False
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             from account.models import Subscription
@@ -371,6 +376,8 @@ class UserProfileSerializer(UserMinimalSerializer):
         return False
 
     def get_is_favorite(self, obj):
+        if self.context.get('view_as') is not None or self.context.get('shadow_viewer') is not None:
+            return False
         viewer = self._get_viewer()
         if viewer is not None:
             return obj in viewer.favorites.all()
