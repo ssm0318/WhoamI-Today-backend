@@ -161,6 +161,13 @@ def escalate_to_human(user):
         event_type='member_added',
     )
     added_msg.event_target_users.set([admin])
+    # The original user triggered the escalation, so the "wit_admin was added"
+    # event isn't an unread message FOR them. Advance their cursor past it.
+    # Admin/bot keep their pre-event cursors so admin's chat list still shows
+    # the room as unread until they actually open it.
+    GroupReadCursor.objects.filter(user=user, chat_room=room).update(
+        last_read_message=added_msg,
+    )
     _broadcast_system_message(room, added_msg)
 
     noti = Notification.objects.create(
