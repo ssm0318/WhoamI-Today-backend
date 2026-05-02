@@ -2897,7 +2897,7 @@ class DiscoverFeedView(generics.ListAPIView):
         now = timezone.now()
         last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
 
-        # Check if the 7 AM PST boundary has been crossed since last feed
+        # Check if the 7 AM PDT boundary has been crossed since last feed
         from zoneinfo import ZoneInfo
         la_tz = ZoneInfo('America/Los_Angeles')
         now_la = now.astimezone(la_tz)
@@ -2910,6 +2910,13 @@ class DiscoverFeedView(generics.ListAPIView):
             last_feed_la = last_feed.created_at.astimezone(la_tz)
             last_feed_day = (last_feed_la - timedelta(hours=7)).date()
             if current_day > last_feed_day:
+                needs_new_feed = True
+
+        # Temporary: one-time regeneration at PDT 9AM on May 2, 2026 (new discover logic deploy)
+        if not needs_new_feed and last_feed:
+            from datetime import datetime
+            override_time = datetime(2026, 5, 2, 9, 0, 0, tzinfo=la_tz)
+            if now_la >= override_time and last_feed.created_at.astimezone(la_tz) < override_time:
                 needs_new_feed = True
 
         if needs_new_feed:
@@ -2945,6 +2952,77 @@ class DiscoverFeedView(generics.ListAPIView):
         blocked_ids = set(user.user_report_blocked_ids)
         exclude_ids = friend_ids | blocked_ids | {user.id}
 
+        # --- NEW SIMPLIFIED LOGIC: show all posts before 7 AM PDT cutoff ---
+        from zoneinfo import ZoneInfo
+        la_tz = ZoneInfo('America/Los_Angeles')
+        now_la = batch_time.astimezone(la_tz)
+        today_7am_la = now_la.replace(hour=7, minute=0, second=0, microsecond=0)
+        if now_la.hour < 7:
+            cutoff_la = today_7am_la - timedelta(days=1)
+        else:
+            cutoff_la = today_7am_la
+
+        responses = list(_Response.objects.filter(
+            author__current_ver=user.current_ver,
+            visibility__contains=['public'],
+            created_at__lt=cutoff_la,
+        ).exclude(author_id__in=exclude_ids).exclude(author__is_superuser=True))
+
+        notes = list(Note.objects.filter(
+            author__current_ver=user.current_ver,
+            visibility__contains=['public'],
+            created_at__lt=cutoff_la,
+        ).exclude(author_id__in=exclude_ids).exclude(author__is_superuser=True))
+
+        all_posts = sorted(responses + notes, key=attrgetter('created_at'), reverse=True)
+
+        for i, obj in enumerate(all_posts):
+            response_obj = obj if isinstance(obj, _Response) else None
+            note_obj = obj if isinstance(obj, Note) else None
+            DiscoverFeed.objects.create(
+                user=user,
+                response=response_obj,
+                note=note_obj,
+                category='discover',
+                created_at=batch_time,
+                sort_order=i
+            )
+
+        from check_in.models import Song, CheckIn as CheckInModel
+        music_candidates = Song.objects.filter(
+            is_active=True,
+            user__current_ver=user.current_ver,
+            created_at__lt=cutoff_la,
+        ).exclude(user_id__in=exclude_ids).exclude(
+            user__is_superuser=True
+        ).select_related('user').order_by('-created_at')
+
+        music_songs = []
+        for song in music_candidates:
+            author = song.user
+            active_check_in = CheckInModel.objects.filter(user=author, is_active=True).first()
+            if not active_check_in:
+                continue
+            if not active_check_in.is_audience(user):
+                continue
+            if not viewer_sees_check_in_component(
+                active_check_in, author, user, 'song_visibility', 'song_updated_at'
+            ):
+                continue
+            music_songs.append(song)
+
+        for idx, song in enumerate(music_songs):
+            DiscoverFeedMusic.objects.create(
+                user=user,
+                song=song,
+                category='discover',
+                sort_order=idx,
+                created_at=batch_time,
+            )
+
+        return  # Skip original logic below
+
+        # --- ORIGINAL DISCOVER LOGIC (kept for future restoration) ---
         feed_items = []  # List of (object, category)
 
         # Helper to get candidates (only public visibility for non-friend discover)
