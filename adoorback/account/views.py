@@ -2207,15 +2207,17 @@ class BaseUserFriendRequestUpdate(generics.UpdateAPIView):
 
         # Create FriendEvaluation for the requestee on acceptance
         if accepted:
-            FriendEvaluation.objects.create(
+            FriendEvaluation.objects.get_or_create(
                 evaluator=requestee,
                 evaluated_user=requester,
                 friend_request=friend_request,
-                context='accept',
-                closeness=evaluation_data['closeness'],
-                relationship_type=evaluation_data['relationship_type'],
-                relationship_type_detail=evaluation_data['relationship_type_detail'] or None,
-                skipped=evaluation_data['skipped'],
+                defaults={
+                    'context': 'accept',
+                    'closeness': evaluation_data['closeness'],
+                    'relationship_type': evaluation_data['relationship_type'],
+                    'relationship_type_detail': evaluation_data['relationship_type_detail'] or None,
+                    'skipped': evaluation_data['skipped'],
+                },
             )
 
         send_users = []
