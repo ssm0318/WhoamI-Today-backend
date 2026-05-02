@@ -21,6 +21,13 @@ class NotificationSerializer(serializers.ModelSerializer):
     is_recent = serializers.SerializerMethodField(read_only=True)
     thumbnail_url = serializers.SerializerMethodField(read_only=True)
     target_id = serializers.SerializerMethodField(read_only=True)
+    redirect_url = serializers.SerializerMethodField(read_only=True)
+
+    def get_redirect_url(self, obj):
+        url = obj.redirect_url
+        if url in ('/check-in/', '/check-in'):
+            return '/update'
+        return url
 
     def get_is_response_request(self, obj):
         if obj.target is None:

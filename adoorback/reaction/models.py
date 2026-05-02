@@ -91,7 +91,7 @@ def create_reaction_noti(instance, created, **kwargs):
     if origin.type == 'CheckIn':
         component = instance.component
         content = wrap_content(origin.content)
-        redirect_url = '/check-in/'
+        redirect_url = '/update'
         noti_type = 'reaction_checkin_noti'
         Notification.objects.create_or_update_notification(
             user=user, actor=actor, origin=origin, target=target,
