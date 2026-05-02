@@ -576,6 +576,15 @@ class UserProfileSerializer(UserMinimalSerializer):
                 category__in=hidden_categories
             ).values_list('content', flat=True)
             ret['user_interests'] = list(visible_interests)
+            chips_by_category = ret.get('chips_by_category')
+            if isinstance(chips_by_category, dict):
+                for hidden in hidden_categories:
+                    chips_by_category[hidden] = []
+            custom_chips = ret.get('custom_chips')
+            if isinstance(custom_chips, list):
+                ret['custom_chips'] = [
+                    c for c in custom_chips if c.get('category') not in hidden_categories
+                ]
         if 'online_persona' in hidden_categories:
             ret['user_personas'] = []
 
@@ -583,6 +592,22 @@ class UserProfileSerializer(UserMinimalSerializer):
 
     user_interests = serializers.StringRelatedField(many=True, read_only=True)
     user_personas = serializers.StringRelatedField(many=True, read_only=True)
+    chips_by_category = serializers.SerializerMethodField(read_only=True)
+    custom_chips = serializers.SerializerMethodField(read_only=True)
+
+    def get_chips_by_category(self, obj):
+        # Per-category chip selections — authoritative source for UIs that need
+        # to disambiguate chip names that appear in multiple categories
+        # (e.g. "Instagram" in both favorite_platform and least_favorite_platform).
+        # Visibility filtering is applied in to_representation.
+        result = {}
+        for cat_key, _ in CHIP_CATEGORY_CHOICES:
+            chips = obj.user_interests.filter(category=cat_key).values_list('content', flat=True)
+            result[cat_key] = list(chips)
+        return result
+
+    def get_custom_chips(self, obj):
+        return CustomChipSerializer(obj.custom_chips.all(), many=True).data
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
@@ -590,6 +615,7 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
                                                       'sent_chat_request_to', 'received_chat_request_from',
                                                       'name', 'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
+                                                      'chips_by_category', 'custom_chips',
                                                       'unread_chat_count', 'unread_message_cnt', 'connection_status',
                                                       'friend_count', 'email_verified',
                                                       'mutual_personas', 'mutual_interests',
