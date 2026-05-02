@@ -2078,6 +2078,11 @@ class UserFriendRequest(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         if int(self.request.data.get('requester_id')) != int(self.request.user.id):
             raise PermissionDenied("The requester must be yourself.")
+        if FriendRequest.objects.filter(
+            requester_id=self.request.user.id,
+            requestee_id=self.request.data.get('requestee_id'),
+        ).exists():
+            raise ValidationError({'error': 'Friend request already sent.'})
         try:
             requester_update_past_posts = self.request.data.get('requester_update_past_posts', False)
             # Extract evaluation data before saving (not part of FriendRequest model)
