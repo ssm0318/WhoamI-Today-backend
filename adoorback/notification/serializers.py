@@ -42,7 +42,9 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_is_chat_request(self, obj):
         if obj.target is None:
             return False
-        return obj.target.type == 'ChatRequest'
+        if obj.target.type != 'ChatRequest':
+            return False
+        return obj.target.accepted is None
 
     def get_target_id(self, obj):
         return obj.target.id if obj.target else None

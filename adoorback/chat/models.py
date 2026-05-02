@@ -475,10 +475,14 @@ def create_chat_request_noti(created, instance, **kwargs):
             target=instance,
             message_ko=f'{requester.username}님이 채팅 요청을 보냈습니다.',
             message_en=f'{requester.username} sent you a chat request.',
-            redirect_url='/chat/requests',
+            redirect_url=f'/users/{requester.username}',
         )
         NotificationActor.objects.create(user=requester, notification=noti)
     elif instance.accepted is True:
+        # Update the original "sent you a chat request" notification to point to the chat room
+        instance.chat_request_targetted_notis.filter(user=requestee).update(
+            redirect_url=f'/users/{requester.id}/chat',
+        )
         noti = Notification.objects.create(
             user=requester,
             origin=requestee,

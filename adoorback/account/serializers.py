@@ -329,6 +329,7 @@ class UserProfileSerializer(UserMinimalSerializer):
     received_friend_request_from = serializers.SerializerMethodField(read_only=True)
     sent_chat_request_to = serializers.SerializerMethodField(read_only=True)
     received_chat_request_from = serializers.SerializerMethodField(read_only=True)
+    accepted_chat_request = serializers.SerializerMethodField(read_only=True)
     unread_chat_count = serializers.SerializerMethodField(read_only=True)
     friend_count = serializers.SerializerMethodField(read_only=True)
     mutual_personas = serializers.SerializerMethodField(read_only=True)
@@ -493,6 +494,18 @@ class UserProfileSerializer(UserMinimalSerializer):
         req = obj.sent_chat_requests.filter(requestee=viewer, accepted__isnull=True).first()
         return req.id if req else None
 
+    def get_accepted_chat_request(self, obj):
+        if self._is_view_as():
+            return False
+        viewer = self._get_viewer()
+        if viewer is None:
+            return False
+        from chat.models import ChatRequest
+        return ChatRequest.objects.filter(
+            Q(requester=viewer, requestee=obj) | Q(requester=obj, requestee=viewer),
+            accepted=True,
+        ).exists()
+
     def get_unread_chat_count(self, obj):
         if self._is_view_as():
             return 0
@@ -613,7 +626,7 @@ class UserProfileSerializer(UserMinimalSerializer):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['check_in', 'is_favorite', 'mutuals',
                                                       'are_friends', 'sent_friend_request_to', 'received_friend_request_from',
-                                                      'sent_chat_request_to', 'received_chat_request_from',
+                                                      'sent_chat_request_to', 'received_chat_request_from', 'accepted_chat_request',
                                                       'name', 'pronouns', 'bio', 'persona', 'user_interests', 'user_personas',
                                                       'chips_by_category', 'custom_chips',
                                                       'unread_chat_count', 'unread_message_cnt', 'connection_status',
