@@ -20,7 +20,7 @@ from django.views.static import serve
 from django.conf.urls.i18n import i18n_patterns
 from django.http import JsonResponse
 
-from adoorback import views as adoorback_views
+from mission.views import DailyMissionList
 
 def health_check(request):
     return JsonResponse({"status": "ok"}, status=200)
@@ -48,7 +48,7 @@ urlpatterns = [
 
     path('api/translate/', include('translate.urls')),
     path('api/surveys/', include('surveys.urls')),
-    path('api/missions/', adoorback_views.MissionList.as_view(), name='mission-list'),
+    path('api/missions/', DailyMissionList.as_view(), name='mission-list'),
 
     # Version Q endpoints (subset — only where behavior differs from W)
     path('api/q/user/', include('account.urls_q')),
