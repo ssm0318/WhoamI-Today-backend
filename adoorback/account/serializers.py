@@ -211,8 +211,8 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
                   'has_changed_pw', 'unread_message_cnt', 'is_public',
-                  'friend_count']
-        extra_kwargs = {'password': {'write_only': True}}
+                  'friend_count', 'username_history']
+        extra_kwargs = {'password': {'write_only': True}, 'username_history': {'read_only': True}}
 
 
 class CurrentUserSignupSerializer(CurrentUserSerializer):
