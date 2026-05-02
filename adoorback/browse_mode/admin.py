@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from browse_mode.models import BrowseModePreset, BrowseModeWishlistEntry
+from browse_mode.models import BrowseModePickEvent, BrowseModePreset, BrowseModeWishlistEntry
 
 
 @admin.register(BrowseModePreset)
@@ -8,6 +8,14 @@ class BrowseModePresetAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'name', 'last_used_at', 'updated_at')
     list_filter = ('user',)
     search_fields = ('user__username', 'name')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(BrowseModePickEvent)
+class BrowseModePickEventAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'kind', 'built_in_id', 'preset', 'created_at')
+    list_filter = ('kind', 'built_in_id')
+    search_fields = ('user__username',)
     readonly_fields = ('created_at', 'updated_at')
 
 

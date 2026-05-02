@@ -7,8 +7,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from browse_mode.models import BrowseModePreset, BrowseModeWishlistEntry
+from browse_mode.models import (
+    BrowseModePickEvent,
+    BrowseModePreset,
+    BrowseModeWishlistEntry,
+)
 from browse_mode.serializers import (
+    BrowseModePickEventSerializer,
     BrowseModePresetSerializer,
     BrowseModeWishlistEntrySerializer,
 )
@@ -61,6 +66,17 @@ class BrowseModePresetMarkUsed(APIView):
         preset.save(update_fields=['last_used_at', 'updated_at'])
         serializer = BrowseModePresetSerializer(preset)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class BrowseModePickEventCreate(generics.CreateAPIView):
+    """Append-only pick log. Frontend hits this every time the user
+    actively activates a mode (built-in, custom, or apply-without-saving).
+    Skips / dismisses are NOT logged here — only positive picks. Used by
+    research analytics to count picks, switches, and distinct mode types.
+    """
+
+    serializer_class = BrowseModePickEventSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class BrowseModeWishlistCreate(generics.CreateAPIView):

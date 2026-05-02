@@ -4,7 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from browse_mode.models import BrowseModePreset, BrowseModeWishlistEntry
+from browse_mode.models import BrowseModePickEvent, BrowseModePreset, BrowseModeWishlistEntry
 
 User = get_user_model()
 
@@ -283,3 +283,81 @@ class BrowseModeWishlistTest(TestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class BrowseModePickEventTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='alice', email='alice@example.com', password='pw'
+        )
+        self.other = User.objects.create_user(
+            username='bob', email='bob@example.com', password='pw'
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _post(self, payload):
+        return self.client.post(
+            reverse('browse-mode-pick-event-create'),
+            payload,
+            format='json',
+        )
+
+    def test_built_in_pick_creates_row(self):
+        response = self._post({'kind': 'built_in', 'built_in_id': 'quiet'})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        event = BrowseModePickEvent.objects.get(user=self.user)
+        self.assertEqual(event.kind, 'built_in')
+        self.assertEqual(event.built_in_id, 'quiet')
+        self.assertIsNone(event.preset)
+
+    def test_custom_pick_creates_row(self):
+        preset = BrowseModePreset.objects.create(
+            user=self.user, name='Hangout', config=VALID_CONFIG
+        )
+        response = self._post({'kind': 'custom', 'preset_id': preset.id})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        event = BrowseModePickEvent.objects.get(user=self.user)
+        self.assertEqual(event.kind, 'custom')
+        self.assertEqual(event.preset_id, preset.id)
+        self.assertIsNone(event.built_in_id)
+
+    def test_apply_without_saving_pick_creates_row(self):
+        response = self._post({'kind': 'apply_without_saving'})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.content)
+        event = BrowseModePickEvent.objects.get(user=self.user)
+        self.assertEqual(event.kind, 'apply_without_saving')
+        self.assertIsNone(event.built_in_id)
+        self.assertIsNone(event.preset)
+
+    def test_built_in_requires_built_in_id(self):
+        response = self._post({'kind': 'built_in'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_custom_requires_preset_id(self):
+        response = self._post({'kind': 'custom'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_pick_other_users_preset(self):
+        other_preset = BrowseModePreset.objects.create(
+            user=self.other, name='Other', config=VALID_CONFIG
+        )
+        response = self._post({'kind': 'custom', 'preset_id': other_preset.id})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unauthenticated_blocked(self):
+        self.client.force_authenticate(user=None)
+        response = self._post({'kind': 'built_in', 'built_in_id': 'quiet'})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_preset_deletion_preserves_event_history(self):
+        preset = BrowseModePreset.objects.create(
+            user=self.user, name='Hangout', config=VALID_CONFIG
+        )
+        self._post({'kind': 'custom', 'preset_id': preset.id})
+        preset.delete()
+        event = BrowseModePickEvent.objects.get(user=self.user)
+        # SET_NULL on preset FK preserves the row so analytics can still
+        # count the activation even after preset deletion.
+        self.assertIsNone(event.preset)
+        self.assertEqual(event.kind, 'custom')
