@@ -3082,13 +3082,36 @@ class DiscoverFeedView(generics.ListAPIView):
 
         mf_candidates = get_candidates(mf_ids, limit=20)
 
-        # Mutual Traits Candidates
-        user_interests = set(user.user_interests.values_list('id', flat=True))
-        user_personas = set(user.user_personas.values_list('id', flat=True))
-        trait_ids = set(User.objects.filter(
-            Q(user_interests__id__in=user_interests) | Q(user_personas__id__in=user_personas),
-            current_ver=user.current_ver
-        ).exclude(id__in=exclude_ids).values_list('id', flat=True))
+        # Mutual Traits Candidates — only public-visibility categories for
+        # both the current user and the matched user.
+        user_public_cats = {
+            cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
+            if getattr(user, f"{cat_key}_visibility", 'public') == 'public'
+        }
+        trait_q = Q()
+        for cat_key in user_public_cats:
+            cat_interest_ids = list(user.user_interests.filter(
+                category=cat_key
+            ).values_list('id', flat=True))
+            if cat_interest_ids:
+                trait_q |= Q(
+                    user_interests__id__in=cat_interest_ids,
+                    **{f"{cat_key}_visibility": 'public'}
+                )
+        if getattr(user, 'online_persona_visibility', 'public') == 'public':
+            user_persona_ids = list(user.user_personas.values_list('id', flat=True))
+            if user_persona_ids:
+                trait_q |= Q(
+                    user_personas__id__in=user_persona_ids,
+                    online_persona_visibility='public'
+                )
+        if trait_q:
+            trait_ids = set(User.objects.filter(
+                trait_q,
+                current_ver=user.current_ver
+            ).exclude(id__in=exclude_ids).values_list('id', flat=True))
+        else:
+            trait_ids = set()
 
         trait_candidates = get_candidates(trait_ids, limit=20)
 
@@ -3263,8 +3286,15 @@ class DiscoverFeedView(generics.ListAPIView):
         # --- Injection Logic ---
         req_user = request.user
         req_user_friends = set(req_user.friend_ids + req_user.close_friend_ids)
-        req_user_interests = set(req_user.user_interests.values_list('id', flat=True))
-        req_user_personas = set(req_user.user_personas.values_list('id', flat=True))
+        req_user_public_cats = {
+            cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
+            if getattr(req_user, f"{cat_key}_visibility", 'public') == 'public'
+        }
+        req_user_interests = set(req_user.user_interests.filter(
+            category__in=req_user_public_cats
+        ).values_list('id', flat=True))
+        req_user_persona_public = getattr(req_user, 'online_persona_visibility', 'public') == 'public'
+        req_user_personas = set(req_user.user_personas.values_list('id', flat=True)) if req_user_persona_public else set()
 
         results = []
         for item in feed_objects:
@@ -3276,12 +3306,20 @@ class DiscoverFeedView(generics.ListAPIView):
 
             if req_user != author:
                 author_friends = set(author.friend_ids + author.close_friend_ids)
-                author_interests = set(author.user_interests.values_list('id', flat=True))
-                author_personas = set(author.user_personas.values_list('id', flat=True))
-                
+                author_public_cats = {
+                    cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
+                    if getattr(author, f"{cat_key}_visibility", 'public') == 'public'
+                }
+                author_interests = set(author.user_interests.filter(
+                    category__in=author_public_cats
+                ).values_list('id', flat=True))
+
                 mut_friends = len(req_user_friends & author_friends)
                 mut_interests = len(req_user_interests & author_interests)
-                mut_personas = len(req_user_personas & author_personas)
+                author_persona_public = getattr(author, 'online_persona_visibility', 'public') == 'public'
+                if req_user_persona_public and author_persona_public:
+                    author_personas = set(author.user_personas.values_list('id', flat=True))
+                    mut_personas = len(req_user_personas & author_personas)
 
             if item.response:
                 data = resp_data_map.get(item.response.id)

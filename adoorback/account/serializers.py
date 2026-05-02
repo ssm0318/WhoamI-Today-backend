@@ -404,9 +404,19 @@ class UserProfileSerializer(UserMinimalSerializer):
             return UserMinimalSerializer(mutual_users, many=True).data
         return {}
 
+    def _public_categories(self, user):
+        """Return the set of chip categories the user has set to 'public'."""
+        return {
+            cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
+            if getattr(user, f"{cat_key}_visibility", 'public') == 'public'
+        }
+
     def get_mutual_personas(self, obj):
         viewer = self._get_viewer()
         if viewer is not None:
+            if (getattr(viewer, 'online_persona_visibility', 'public') != 'public'
+                    or getattr(obj, 'online_persona_visibility', 'public') != 'public'):
+                return []
             current_user_personas = set(viewer.user_personas.all())
             obj_personas = set(obj.user_personas.all())
             mutual_personas = current_user_personas & obj_personas
@@ -416,8 +426,9 @@ class UserProfileSerializer(UserMinimalSerializer):
     def get_mutual_interests(self, obj):
         viewer = self._get_viewer()
         if viewer is not None:
-            current_user_interests = set(viewer.user_interests.all())
-            obj_interests = set(obj.user_interests.all())
+            both_public = self._public_categories(viewer) & self._public_categories(obj)
+            current_user_interests = set(viewer.user_interests.filter(category__in=both_public))
+            obj_interests = set(obj.user_interests.filter(category__in=both_public))
             mutual_interests = current_user_interests & obj_interests
             return InterestSerializer(mutual_interests, many=True).data
         return []
