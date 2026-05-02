@@ -130,11 +130,10 @@ CHIPS_BY_CATEGORY = {
         'Comedy', 'Podcasts', 'Manga/Webtoons',
     ],
     'values_allyship': [
-        'Pro-Choice', 'Climate Conscious', 'LGBTQ+ Ally',
-        'BLM Supporter', 'Feminist', 'Mental Health Matters',
-        'Anti-Racist', 'Disability Ally', 'Pro-Immigrant',
-        'Open-Minded', 'Big on Kindness', 'Respect Matters',
-        'Community-Focused', 'Growth-Oriented',
+        'Trans Rights', 'Reproductive Rights', 'Immigrant Rights',
+        'Racial Justice', 'Disability Rights', 'Neurodiversity',
+        'Climate', 'Mental Health', 'Feminism', 'Queer Community',
+        'Body Positivity', 'Sex Positivity',
     ],
     'on_my_mind': [
         'Astrology', 'Psychology', 'Philosophy', 'Sustainability', 'Mental Health',
@@ -143,7 +142,7 @@ CHIPS_BY_CATEGORY = {
     ],
     'as_a_friend': [
         'Good Listener', 'Brutally Honest', 'Hype Person', 'Low Maintenance',
-        'Planner', 'Spontaneous', 'Night Owl', 'Early Bird', 'Overthinker',
+        'Planner', 'Spontaneous', 'Overthinker',
         'Go With the Flow', 'Needs Alone Time', 'Always Down to Talk',
         'Dry Humor', 'Keeps It Real',
     ],
