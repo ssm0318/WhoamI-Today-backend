@@ -76,6 +76,18 @@ import random
 User = get_user_model()
 
 
+def get_user_by_username_or_404(username):
+    """username으로 조회하되, 없으면 username_history에서 찾아 현재 유저 반환.
+    history에 2명 이상 매칭되면 ambiguous하므로 404."""
+    try:
+        return User.objects.get(username=username)
+    except User.DoesNotExist:
+        users = User.objects.filter(username_history__contains=[username])
+        if users.count() == 1:
+            return users.first()
+        raise Http404("No User matches the given query.")
+
+
 def normalize_tag(t):
     return t.lower().replace('-', '').replace('_', '').replace(' ', '')
 
@@ -697,6 +709,12 @@ class UserProfile(generics.RetrieveAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    def get_object(self):
+        username = self.kwargs[self.lookup_field]
+        obj = get_user_by_username_or_404(username)
+        self.check_object_permissions(self.request, obj)
+        return obj
+
     def retrieve(self, request, *args, **kwargs):
         view_as = parse_view_as(request)  # raises 400 if invalid
         instance = self.get_object()
@@ -801,7 +819,7 @@ class UserAllPostList(generics.ListAPIView):
     def get_combined_items(self):
         user = self.request.user
         author_username = self.kwargs.get('username')
-        author = get_object_or_404(User, username=author_username)
+        author = get_user_by_username_or_404(author_username)
 
         effective_viewer = user
         tier = None
@@ -872,7 +890,7 @@ class UserUnreadPostList(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         user = request.user
         author_username = self.kwargs.get('username')
-        author = get_object_or_404(User, username=author_username)
+        author = get_user_by_username_or_404(author_username)
 
         all_notes = Note.objects.filter(author=author)
         note_ids = [note.id for note in all_notes if note.is_audience(user)]
@@ -1227,23 +1245,12 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
                     updated_user.username_history.append(new_username)
                     updated_user.save()
 
-                # "friend request recieved" notification
-                friend_request_ct = get_friend_request_type()
-                self.request.user.friendship_originated_notis.filter(
-                    target_type=friend_request_ct
-                ).update(
-                    redirect_url=f"/users/{new_username}"
-                )
-                
-                # "became friends" notification
-                Notification = apps.get_model('notification', 'Notification')
-                user_ct = ContentType.objects.get_for_model(User)
-                notis_to_change = self.request.user.friendship_originated_notis.filter(
-                    target_type=user_ct
-                )
-                notis_to_change.update(
-                    redirect_url=f"/users/{new_username}"
-                )
+                    Notification = apps.get_model('notification', 'Notification')
+                    Notification.objects.filter(
+                        redirect_url=f"/users/{old_username}"
+                    ).update(
+                        redirect_url=f"/users/{new_username}"
+                    )
 
 
 class CurrentUserInterestUpdate(generics.UpdateAPIView):
@@ -2502,13 +2509,12 @@ class UserMarkAllNotesAsRead(APIView):
         if not username:
             return Response({'error': 'Username is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        User = get_user_model()
         try:
             if username.isdigit():
                 target_user = get_object_or_404(User, pk=username)
             else:
-                target_user = get_object_or_404(User, username=username)
-        except User.DoesNotExist:
+                target_user = get_user_by_username_or_404(username)
+        except Http404:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
         notes = Note.objects.filter(author=target_user).exclude(readers=request.user).exclude(author__is_superuser=True)
@@ -2529,13 +2535,12 @@ class UserMarkAllResponsesAsRead(APIView):
         if not username:
             return Response({'error': 'Username is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        User = get_user_model()
         try:
             if username.isdigit():
                 target_user = get_object_or_404(User, pk=username)
             else:
-                target_user = get_object_or_404(User, username=username)
-        except User.DoesNotExist:
+                target_user = get_user_by_username_or_404(username)
+        except Http404:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
         responses = _Response.objects.filter(author=target_user).exclude(readers=request.user)
@@ -2885,8 +2890,13 @@ class FullFriendFeed(generics.ListAPIView):
         return self.get_paginated_response(serialized_data) if page is not None else Response(serialized_data)
 
 
+class DiscoverFeedPagination(PageNumberPagination):
+    page_size = 50
+
+
 class DiscoverFeedView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
+    pagination_class = DiscoverFeedPagination
 
     def get_exception_handler(self):
         return adoor_exception_handler
