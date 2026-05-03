@@ -345,7 +345,9 @@ class CheckInPostSerializer(serializers.ModelSerializer):
 
     def get_like_count(self, obj):
         request = self.context.get('request')
-        if request is None or obj.author != request.user:
+        if request is None or not request.user.is_authenticated:
+            return None
+        if not obj.is_audience(request.user):
             return None
         blocked_user_ids = request.user.user_report_blocked_ids
         return obj.check_in_post_likes.exclude(user_id__in=blocked_user_ids).count()
@@ -409,7 +411,9 @@ class CheckInPostFriendStorySerializer(serializers.ModelSerializer):
 
     def get_like_count(self, obj):
         request = self.context.get('request')
-        if request is None or obj.author != request.user:
+        if request is None or not request.user.is_authenticated:
+            return None
+        if not obj.is_audience(request.user):
             return None
         blocked_ids = request.user.user_report_blocked_ids
         return obj.check_in_post_likes.exclude(user_id__in=blocked_ids).count()
