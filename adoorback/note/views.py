@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
-from like.serializers import InteractionSerializer
+from like.serializers import InteractionSerializer, LikeSerializer
 from adoorback.utils.video import validate_video_file, generate_video_thumbnail
 from note.models import Note, NoteImage, NoteVideo
 from note.serializers import NoteSerializer
@@ -161,6 +161,29 @@ class NoteInteractions(generics.ListAPIView):
         )
 
         return combined_interactions
+
+
+class NoteLikes(generics.ListAPIView):
+    """GET /api/notes/<pk>/likes/ — paginated likes for viewers in the note audience."""
+
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        from like.models import Like
+
+        note_id = self.kwargs['pk']
+        note = get_object_or_404(Note, pk=note_id)
+        if not note.is_audience(self.request.user):
+            raise PermissionDenied("You do not have permission to view likes on this note.")
+
+        blocked_ids = self.request.user.user_report_blocked_ids
+        return Like.objects.filter(content_type__model='note', object_id=note_id).exclude(
+            user_id__in=blocked_ids,
+        ).order_by('-created_at')
 
 
 class NoteRead(generics.UpdateAPIView):

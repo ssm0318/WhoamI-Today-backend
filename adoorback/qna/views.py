@@ -21,7 +21,7 @@ from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlock
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
 import qna.serializers as qs
-from like.serializers import InteractionSerializer
+from like.serializers import InteractionSerializer, LikeSerializer
 from qna.models import Response, Question, ResponseRequest
 
 User = get_user_model()
@@ -164,6 +164,29 @@ class ResponseInteractions(generics.ListAPIView):
         )
 
         return combined_interactions
+
+
+class ResponseLikes(generics.ListAPIView):
+    """GET /api/qna/responses/<pk>/likes/ — paginated likes for viewers in the response audience."""
+
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_queryset(self):
+        from like.models import Like
+
+        response_id = self.kwargs['pk']
+        response = get_object_or_404(Response, pk=response_id)
+        if not response.is_audience(self.request.user):
+            raise PermissionDenied("You do not have permission to view likes on this response.")
+
+        blocked_ids = self.request.user.user_report_blocked_ids
+        return Like.objects.filter(content_type__model='response', object_id=response_id).exclude(
+            user_id__in=blocked_ids,
+        ).order_by('-created_at')
 
 
 class ResponseRead(generics.UpdateAPIView):

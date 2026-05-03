@@ -39,11 +39,18 @@ class QResponseSerializer(AdoorBaseSerializer):
         return current_user_id in obj.reader_ids
 
     def get_like_count(self, obj):
-        return obj.response_likes.count()
+        request = self.context.get('request')
+        qs = obj.response_likes.all()
+        if request is not None and request.user.is_authenticated:
+            qs = qs.exclude(user_id__in=request.user.user_report_blocked_ids)
+        return qs.count()
 
     def get_like_user_sample(self, obj):
-        recent_likes = obj.response_likes.order_by('-created_at')[:3]
-        recent_users = [like.user for like in recent_likes]
+        request = self.context.get('request')
+        qs = obj.response_likes.order_by('-created_at')
+        if request is not None and request.user.is_authenticated:
+            qs = qs.exclude(user_id__in=request.user.user_report_blocked_ids)
+        recent_users = [like.user for like in qs[:3]]
         return UserMinimalSerializer(recent_users, many=True, context=self.context).data
 
     class Meta(AdoorBaseSerializer.Meta):

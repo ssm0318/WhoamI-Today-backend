@@ -24,11 +24,18 @@ class QNoteSerializer(BaseNoteSerializer):
         return list(value)
 
     def get_like_count(self, obj):
-        return obj.liked_user_ids.count()
+        request = self.context.get('request')
+        qs = obj.note_likes.all()
+        if request is not None and request.user.is_authenticated:
+            qs = qs.exclude(user_id__in=request.user.user_report_blocked_ids)
+        return qs.count()
 
     def get_like_user_sample(self, obj):
-        recent_likes = obj.note_likes.order_by('-created_at')[:3]
-        recent_users = [like.user for like in recent_likes]
+        request = self.context.get('request')
+        qs = obj.note_likes.order_by('-created_at')
+        if request is not None and request.user.is_authenticated:
+            qs = qs.exclude(user_id__in=request.user.user_report_blocked_ids)
+        recent_users = [like.user for like in qs[:3]]
         return UserMinimalSerializer(recent_users, many=True, context=self.context).data
 
     class Meta(BaseNoteSerializer.Meta):

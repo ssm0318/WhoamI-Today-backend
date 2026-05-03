@@ -1104,7 +1104,7 @@ class CheckInPostComments(generics.ListAPIView):
 class CheckInPostLikes(generics.ListAPIView):
     """GET /api/check_in/posts/<pk>/likes/
 
-    List users who liked a CheckInPost. Only the post author can view this.
+    List users who liked a CheckInPost (any user in the post audience).
     """
     permission_classes = [IsAuthenticated]
 
@@ -1118,8 +1118,8 @@ class CheckInPostLikes(generics.ListAPIView):
     def get_queryset(self):
         current_user = self.request.user
         post = get_object_or_404(CheckInPost, id=self.kwargs.get('pk'))
-        if post.author != current_user:
-            raise exceptions.PermissionDenied("Only the author can view likes.")
+        if not post.is_audience(current_user):
+            raise exceptions.PermissionDenied("You cannot view likes on this post.")
         blocked_ids = current_user.user_report_blocked_ids
         return post.check_in_post_likes.exclude(
             user_id__in=blocked_ids,
