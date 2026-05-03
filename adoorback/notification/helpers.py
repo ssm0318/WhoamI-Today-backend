@@ -104,8 +104,8 @@ def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, 
             return f'{user_a_ko}이 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
                 f'{user_a_en} reacted with {emoji} to your response: {content_en}'
         elif N == 2:
-            return f'{user_a_ko}과 {user_b_ko}이 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
-                f'{user_a_en} and {user_b_en} reacted with {emoji} to your response: {content_en}'
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 답변에 반응을 남겼습니다: {content_ko}', \
+                f'{user_a_en} and {user_b_en} reacted to your response: {content_en}'
         else:
             return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
                 f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) reacted with {emoji} to your response: {content_en}'

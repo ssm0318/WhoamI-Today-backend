@@ -13,7 +13,7 @@ from adoorback.utils.content_types import get_response_request_type, get_questio
 from adoorback.utils.alerts import send_msg_to_slack
 from notification.helpers import find_like_noti, construct_message
 
-from firebase_admin.messaging import Message
+from firebase_admin.messaging import Message, WebpushConfig, WebpushNotification
 from firebase_admin._messaging_utils import UnregisteredError
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
@@ -235,6 +235,15 @@ def notify_firebase(instance):
                 'content-available': '1',  # for ios silent notification
                 'priority': 'high',  # for android
             },
+            webpush=WebpushConfig(
+                notification=WebpushNotification(
+                    title='WhoAmI Today',
+                    body=body,
+                    tag=tag,
+                    renotify=True,
+                    icon='/whoami192.png',
+                ),
+            ),
         )
         try:
             device.send_message(message)

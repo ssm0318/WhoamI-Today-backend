@@ -84,6 +84,9 @@ jobs:
                             exit 1
             }
 
+            echo "🔄 Nginx DNS 캐시 갱신 (백엔드 컨테이너 IP 변경 반영)"
+            docker exec nginx-reverse-proxy nginx -s reload 2>/dev/null || echo "⚠️ nginx reload 실패 (프론트엔드 컨테이너 확인 필요)"
+
             echo "🧪 Migration Dry Run 테스트"
             docker compose -f docker-compose.production.yml exec -T web python manage.py migrate --dry-run --verbosity=2 || {
               echo "⚠️ Migration dry-run에서 문제 감지됨"
