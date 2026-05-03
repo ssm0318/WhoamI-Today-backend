@@ -76,16 +76,19 @@ class AggregatedLikertStrategy(AggregationStrategy):
         question_ids = {q.id for q in questions}
         min_score = LIKERT_MIN_VALUE * n_questions
         max_score = LIKERT_MAX_VALUE * n_questions
+        # Viewer's own score is queried separately so the highlight on the
+        # results page works even when the viewer is filtered out of the
+        # aggregation pool (e.g. operator accounts in `_exclude_system_users_qs`).
+        user_score: Optional[int] = None
+        viewer_response = SurveyResponse.objects.filter(
+            survey=survey, user_id=viewer_id
+        ).prefetch_related('answers__question').first()
+        if viewer_response is not None:
+            user_score = _trait_score_for_response(viewer_response, question_ids)
         responses = SurveyResponse.objects.filter(
             survey=survey, user_id__in=responder_ids
         ).prefetch_related('answers__question')
-        scores: list[int] = []
-        user_score: Optional[int] = None
-        for r in responses:
-            s = _trait_score_for_response(r, question_ids)
-            scores.append(s)
-            if r.user_id == viewer_id:
-                user_score = s
+        scores: list[int] = [_trait_score_for_response(r, question_ids) for r in responses]
         counter = Counter(scores)
         bins = [{'score': i, 'count': counter.get(i, 0)} for i in range(min_score, max_score + 1)]
         return {
@@ -114,11 +117,15 @@ class OptionCountsStrategy(AggregationStrategy):
         if question is None:
             return {'kind': self.kind, 'question_id': None, 'options': [], 'user_choice': None}
         options = list(question.options.order_by('order').all())
+        # Viewer's own choice is queried separately so the highlight works even
+        # when the viewer is filtered out of `responder_ids` (e.g. operators).
+        user_choice = SurveyAnswer.objects.filter(
+            question=question, response__user_id=viewer_id
+        ).values_list('value', flat=True).first()
         counts: Counter = Counter()
-        user_choice = None
         answers = SurveyAnswer.objects.filter(
             question=question, response__user_id__in=responder_ids
-        ).select_related('response')
+        )
         for ans in answers:
             v = ans.value
             if isinstance(v, list):
@@ -126,8 +133,6 @@ class OptionCountsStrategy(AggregationStrategy):
                     counts[int(item)] += 1
             else:
                 counts[int(v)] += 1
-            if ans.response.user_id == viewer_id:
-                user_choice = v
         return {
             'kind': self.kind,
             'question_id': question.id,
@@ -244,18 +249,21 @@ class SliderHistogramStrategy(AggregationStrategy):
         edges = [lo + (span * i) / SLIDER_BIN_COUNT for i in range(SLIDER_BIN_COUNT + 1)]
         bins = [{'lo': edges[i], 'hi': edges[i + 1], 'count': 0} for i in range(SLIDER_BIN_COUNT)]
 
+        # Viewer's own value is queried separately so the highlight works even
+        # when the viewer is filtered out of `responder_ids` (e.g. operators).
+        viewer_raw = SurveyAnswer.objects.filter(
+            question=question, response__user_id=viewer_id
+        ).values_list('value', flat=True).first()
+        user_value = int(viewer_raw) if viewer_raw is not None else None
         values: list[int] = []
-        user_value = None
         answers = SurveyAnswer.objects.filter(
             question=question, response__user_id__in=responder_ids,
-        ).select_related('response')
+        )
         for ans in answers:
             v = int(ans.value)
             if v < lo or v > hi:
                 continue  # defensive: out-of-range values shouldn't have made it past submission
             values.append(v)
-            if ans.response.user_id == viewer_id:
-                user_value = v
             # Find the bin: clamp to last bucket when value == hi.
             idx = SLIDER_BIN_COUNT - 1 if v == hi else int((v - lo) / span * SLIDER_BIN_COUNT)
             bins[idx]['count'] += 1
