@@ -7,6 +7,7 @@ from comment.models import Comment
 from comment.serializers import CommentFriendSerializer
 
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsNotBlocked
+from adoorback.utils.publishing import ensure_can_publish
 from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 from utils.helpers import parse_user_tag_from_content
@@ -24,6 +25,7 @@ class CommentCreate(generics.CreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        ensure_can_publish(self.request.user)
         content_type = get_generic_relation_type(self.request.data['target_type'])
         content_type_id = content_type.id
 

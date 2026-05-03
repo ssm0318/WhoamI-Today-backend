@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from adoorback.utils.permissions import IsNotBlocked, IsAuthorOrReadOnly, IsShared
+from adoorback.utils.publishing import ensure_can_publish
 from adoorback.utils.validators import adoor_exception_handler
 import comment.serializers as cs
 from like.serializers import InteractionSerializer, LikeSerializer
@@ -32,6 +33,7 @@ class NoteCreate(generics.CreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        ensure_can_publish(self.request.user)
         images = self.request.FILES.getlist('images')
         video = self.request.FILES.get('video')
 
