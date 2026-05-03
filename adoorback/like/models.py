@@ -16,6 +16,19 @@ from notification.models import Notification
 
 User = get_user_model()
 
+# Map post-like model `type` to its frontend route segment. Default of
+# `f'{type.lower()}s'` only works when the type is a single lowercase word;
+# `CheckInPost` would otherwise become `/checkinposts/{id}` (no hyphen) and
+# fall through to the frontend's NotFound route.
+_TYPE_URL_SEGMENT = {
+    'CheckInPost': 'check-in-posts',
+}
+
+
+def _post_url(post):
+    segment = _TYPE_URL_SEGMENT.get(post.type, f'{post.type.lower()}s')
+    return f'/{segment}/{post.id}'
+
 
 class LikeManager(SafeDeleteManager):
     use_for_related_fields = True
@@ -81,33 +94,31 @@ def create_like_noti(instance, created, **kwargs):
     content = wrap_content(raw_content)
 
     if origin.type == 'Comment' and origin.target.type == 'Comment':  # if is reply
-        redirect_url = f'/{origin.target.target.type.lower()}s/' \
-                       f'{origin.target.target.id}'
+        redirect_url = _post_url(origin.target.target)
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_reply_noti",
                                                            redirect_url=redirect_url,
                                                            content_en=content, content_ko=content)
     elif origin.type == 'Comment':  # if is comment
-        redirect_url = f'/{origin.target.type.lower()}s/' \
-                       f'{origin.target.id}'
+        redirect_url = _post_url(origin.target)
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_comment_noti",
                                                            redirect_url=redirect_url,
                                                            content_en=content, content_ko=content)
     elif origin.type == 'Response':
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+        redirect_url = _post_url(origin)
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_response_noti",
                                                            redirect_url=redirect_url,
                                                            content_en=content, content_ko=content)
     elif origin.type == 'Note':
-        redirect_url = f'/{origin.type.lower()}s/{origin.id}'
+        redirect_url = _post_url(origin)
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_note_noti",
                                                            redirect_url=redirect_url,
                                                            content_en=content, content_ko=content)
     elif origin.type == 'CheckInPost':
-        redirect_url = f'/check-in-posts/{origin.id}'
+        redirect_url = _post_url(origin)
         Notification.objects.create_or_update_notification(user=user, actor=actor,
                                                            origin=origin, target=target, noti_type="like_check_in_post_noti",
                                                            redirect_url=redirect_url,
