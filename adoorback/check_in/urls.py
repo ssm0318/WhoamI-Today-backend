@@ -8,9 +8,7 @@ urlpatterns = [
     path('latest-visibility/', views.CurrentUserLatestCheckInVisibility.as_view(), name='current-user-latest-check-in-visibility'),
     path('latest/', views.LatestCheckIn.as_view(), name='latest-check-in'),
 
-    path('components/<str:component>/archive/', views.ArchiveLiveComponent.as_view(), name='archive-live-component'),
-
-    path('entries/', views.OwnArchiveEntries.as_view(), name='own-archive-entries'),
+    path('entries/', views.OwnHistoryEntries.as_view(), name='own-history-entries'),
     path('entries/<int:pk>/', views.ArchiveEntryDelete.as_view(), name='archive-entry-delete'),
     path('entries/<int:pk>/pin/', views.ArchiveEntryPinToggle.as_view(), name='archive-entry-pin'),
     path('entries/<int:pk>/pin_visibility/', views.ArchiveEntryPinVisibility.as_view(), name='archive-entry-pin-visibility'),

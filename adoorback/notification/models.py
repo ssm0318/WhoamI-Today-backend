@@ -251,12 +251,13 @@ def get_notification_tag(instance):
 def notify_firebase(instance):
     devices = CustomFCMDevice.objects.filter(user_id=instance.user.id, active=True)
     tag = get_notification_tag(instance)
+    print(f"[FCM DEBUG] notify_firebase called: noti_id={instance.id}, user={instance.user_id}, devices={devices.count()}, tag={tag}")
     for device in devices:
         body = instance.message_ko if device.language == 'ko' else instance.message_en
         data = {
             'notification_id': str(instance.id),
-            'message_en': instance.message_en,
-            'message_ko': instance.message_ko,
+            'message_en': instance.message_en or '',
+            'message_ko': instance.message_ko or '',
             'url': instance.redirect_url,
             'tag': tag,
             'type': 'new',
@@ -279,21 +280,24 @@ def notify_firebase(instance):
         else:
             message = Message(data=data)
         try:
-            device.send_message(message)
+            response = device.send_message(message)
+            print(f"[FCM DEBUG] sent to device {device.id} (type={device.type}): {response}")
         except UnregisteredError:
             device.active = False
             device.save()
+            print(f"[FCM DEBUG] device {device.id} unregistered, deactivated")
         except Exception as e:
             stack_trace = traceback.format_exc()
             send_msg_to_slack(
                 text=f"🚨 Failed to send firebase notification to device {device.id}: {e}\n```{stack_trace}```",
                 level="ERROR"
             )
-            print(f"🚨 Failed to send firebase notification to device {device.id}: {e}\n```{stack_trace}```")
+            print(f"[FCM DEBUG] ERROR device {device.id} (type={device.type}): {e}\n{stack_trace}")
 
 
 @receiver(post_save, sender=Notification, dispatch_uid='send_firebase_notification')
 def send_firebase_notification(sender, instance, created, **kwargs):
+    print(f"[FCM DEBUG] send_firebase_notification signal: noti_id={instance.id}, created={created}, deleted={instance.deleted}, skip_push={getattr(instance, '_skip_push', False)}")
     if instance.deleted or getattr(instance, '_skip_push', False):
         return
     if created:

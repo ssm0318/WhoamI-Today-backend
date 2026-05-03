@@ -153,9 +153,12 @@ class CheckInSubscribeToggleAPITests(TestCase):
         ).exists())
 
     def test_subscribe_duplicate_returns_400(self):
-        Subscription.objects.create(
-            subscriber=self.user, subscribed_to=self.friend, content_type=get_check_in_ct()
-        )
+        ct = get_check_in_ct()
+        for stype in ('battery', 'mood', 'thought', 'song'):
+            Subscription.objects.create(
+                subscriber=self.user, subscribed_to=self.friend,
+                content_type=ct, subscription_type=stype,
+            )
         resp = self.client.post(self.subscribe_url, {'friend_id': self.friend.id})
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -168,13 +171,16 @@ class CheckInSubscribeToggleAPITests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_unsubscribe_success(self):
-        Subscription.objects.create(
-            subscriber=self.user, subscribed_to=self.friend, content_type=get_check_in_ct()
-        )
+        ct = get_check_in_ct()
+        for stype in ('battery', 'mood', 'thought', 'song'):
+            Subscription.objects.create(
+                subscriber=self.user, subscribed_to=self.friend,
+                content_type=ct, subscription_type=stype,
+            )
         resp = self.client.delete(self.unsubscribe_url)
         self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Subscription.objects.filter(
-            subscriber=self.user, subscribed_to=self.friend, content_type=get_check_in_ct()
+            subscriber=self.user, subscribed_to=self.friend, content_type=ct,
         ).exists())
 
     def test_version_q_user_gets_403(self):
@@ -200,10 +206,12 @@ class CheckInNotificationTests(TestCase):
             user1=self.author, user2=self.subscriber,
             user1_choice='close_friend', user2_choice='close_friend',
         )
-        Subscription.objects.create(
-            subscriber=self.subscriber, subscribed_to=self.author,
-            content_type=get_check_in_ct(),
-        )
+        ct = get_check_in_ct()
+        for stype in ('battery', 'mood', 'thought', 'song'):
+            Subscription.objects.create(
+                subscriber=self.subscriber, subscribed_to=self.author,
+                content_type=ct, subscription_type=stype,
+            )
         self.client = APIClient()
         self.client.force_authenticate(user=self.author)
         self.checkin_url = reverse('current-check-in')
@@ -318,10 +326,12 @@ class CheckInSubscriptionSerializerTests(TestCase):
         self.factory = APIRequestFactory()
 
     def test_profile_subscribed_true(self):
-        Subscription.objects.create(
-            subscriber=self.user, subscribed_to=self.friend,
-            content_type=get_check_in_ct(),
-        )
+        ct = get_check_in_ct()
+        for stype in ('battery', 'mood', 'thought', 'song'):
+            Subscription.objects.create(
+                subscriber=self.user, subscribed_to=self.friend,
+                content_type=ct, subscription_type=stype,
+            )
         request = self.factory.get('/')
         request.user = self.user
         serializer = UserProfileSerializer(self.friend, context={'request': request})
@@ -334,10 +344,12 @@ class CheckInSubscriptionSerializerTests(TestCase):
         self.assertFalse(serializer.data['is_check_in_subscribed'])
 
     def test_friend_list_uses_batch_context(self):
-        Subscription.objects.create(
-            subscriber=self.user, subscribed_to=self.friend,
-            content_type=get_check_in_ct(),
-        )
+        ct = get_check_in_ct()
+        for stype in ('battery', 'mood', 'thought', 'song'):
+            Subscription.objects.create(
+                subscriber=self.user, subscribed_to=self.friend,
+                content_type=ct, subscription_type=stype,
+            )
         request = self.factory.get('/')
         request.user = self.user
         context = {
@@ -361,10 +373,12 @@ class CheckInSubscriptionSerializerTests(TestCase):
     def test_version_q_always_false(self):
         self.user.current_ver = 'version_q'
         self.user.save()
-        Subscription.objects.create(
-            subscriber=self.user, subscribed_to=self.friend,
-            content_type=get_check_in_ct(),
-        )
+        ct = get_check_in_ct()
+        for stype in ('battery', 'mood', 'thought', 'song'):
+            Subscription.objects.create(
+                subscriber=self.user, subscribed_to=self.friend,
+                content_type=ct, subscription_type=stype,
+            )
         request = self.factory.get('/')
         request.user = self.user
         serializer = UserProfileSerializer(self.friend, context={'request': request})

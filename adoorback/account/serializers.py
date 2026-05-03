@@ -28,24 +28,18 @@ from django_countries.serializers import CountryFieldMixin
 
 User = get_user_model()
 
-CHECKIN_AUTO_ARCHIVE_HOURS = 12
 RECENT_POST_WINDOW = timedelta(hours=24)
 
 
 def viewer_sees_check_in_component(check_in, profile_user, viewer, visibility_field, updated_at_field):
     """
     Whether `viewer` may see a check-in component's value on another user's profile.
-    Applies 12h auto-archive (same as FriendListSerializer) and per-component visibility
-    (public / friends / close_friends / only_me).
+    Applies per-component visibility (public / friends / close_friends / only_me).
     """
     if viewer == profile_user:
         return True
 
-    updated_at = getattr(check_in, updated_at_field, None)
-    if updated_at and (timezone.now() - updated_at > timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)):
-        effective_vis = 'only_me'
-    else:
-        effective_vis = getattr(check_in, visibility_field)
+    effective_vis = getattr(check_in, visibility_field)
 
     if effective_vis == 'only_me':
         return False
@@ -696,7 +690,7 @@ class FriendListSerializer(UserMinimalSerializer):
         ('mood' / 'social_battery' / 'song' / 'thought') for kind='checkin',
         else None. Entries pass three filters:
           - within RECENT_POST_WINDOW
-          - viewer can see the component (visibility tier + auto-archive)
+          - viewer can see the component (visibility tier)
           - the underlying value is non-empty (no empty thought / empty
             mood array / missing track id), so the widget won't pick this
             timestamp and then fail to render anything
@@ -869,13 +863,9 @@ class FriendListSerializer(UserMinimalSerializer):
         return check_in.mood if check_in else None
 
     def _component_visibility(self, check_in, visibility_field, updated_at_field):
-        """Return component visibility, applying auto-archive if >12h old."""
-        from datetime import timedelta
+        """Return component visibility."""
         if not check_in:
             return None
-        updated_at = getattr(check_in, updated_at_field, None)
-        if updated_at and (timezone.now() - updated_at > timedelta(hours=12)):
-            return 'only_me'
         return getattr(check_in, visibility_field)
 
     def get_battery_visibility(self, obj):

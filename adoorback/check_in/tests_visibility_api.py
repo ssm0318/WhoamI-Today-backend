@@ -25,10 +25,10 @@ class CheckInLatestVisibilityAPITests(APITestCase):
         If the user has check-ins, return the visibility of the most recent one.
         """
         # Create an old check-in
-        CheckIn.objects.create(user=self.user, visibility=['public'], description="Old check-in")
+        CheckIn.objects.create(user=self.user, visibility=['public'])
         
         # Create a newer check-in
-        CheckIn.objects.create(user=self.user, visibility=['friends'], description="New check-in")
+        CheckIn.objects.create(user=self.user, visibility=['friends'])
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -38,7 +38,7 @@ class CheckInLatestVisibilityAPITests(APITestCase):
         """
         Ensure that deleting a check-in (soft delete) respects the remaining latest one (or default).
         """
-        check_in = CheckIn.objects.create(user=self.user, visibility=['friends'], description="To be deleted")
+        check_in = CheckIn.objects.create(user=self.user, visibility=['friends'])
 
         # Verify initial state
         response = self.client.get(self.url)

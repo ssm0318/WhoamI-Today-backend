@@ -32,21 +32,14 @@ import check_in.serializers as cs
 User = get_user_model()
 
 
-CHECKIN_AUTO_ARCHIVE_HOURS = 12
+def _history_filter(user):
+    """Queryset filter for the owner's history view.
 
-
-def _archive_filter(user):
-    """Queryset filter for the OP's archive view.
-
-    An entry is "archived" (belongs in the feed) when it is no longer live —
-    i.e. either it has been superseded by a newer entry for the same
-    (owner, component), or its created_at is older than the 12h auto-archive
-    window. This mirrors the visibility collapse in CheckInBaseSerializer.
+    Returns all entries for the user — both live (superseded_at IS NULL)
+    and superseded — so the history feed shows every past and current
+    check-in component.
     """
-    threshold = timezone.now() - timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
-    return CheckInComponentEntry.objects.filter(owner=user).filter(
-        Q(superseded_at__isnull=False) | Q(created_at__lt=threshold)
-    )
+    return CheckInComponentEntry.objects.filter(owner=user)
 
 
 class ArchiveCursorPagination(pagination.CursorPagination):
@@ -313,22 +306,20 @@ def _get_own_entry_or_404(user, pk):
         raise exceptions.NotFound("Entry not found.")
 
 
-def _is_live_entry(entry):
-    """True when the entry is still the live component value for its owner."""
-    if entry.superseded_at is not None:
-        return False
-    return timezone.now() - entry.updated_at <= timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
-
 
 class ArchiveEntryPinToggle(APIView):
     """PATCH /api/check_in/entries/<pk>/pin/
 
-    Body: none (toggles current pin state). When turning the pin ON the
-    entry's current `visibility` — the value the owner explicitly chose
-    at save time, not the auto-downgraded only_me — is copied into
-    `pin_visibility`. When turning OFF, `pin_visibility` is cleared.
+    Body (optional): {"pin_visibility": "public|friends|close_friends|only_me"}
+
+    Toggles current pin state. When turning the pin ON, uses
+    client-supplied `pin_visibility` if provided, otherwise falls back
+    to the entry's original `visibility`. When turning OFF,
+    `pin_visibility` is cleared.
     """
     permission_classes = [IsAuthenticated]
+
+    ALLOWED_VISIBILITY = {'public', 'friends', 'close_friends', 'only_me'}
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -341,7 +332,11 @@ class ArchiveEntryPinToggle(APIView):
             entry.pin_visibility = None
         else:
             entry.is_pinned = True
-            entry.pin_visibility = entry.visibility
+            requested_vis = request.data.get('pin_visibility')
+            if requested_vis and requested_vis in self.ALLOWED_VISIBILITY:
+                entry.pin_visibility = requested_vis
+            else:
+                entry.pin_visibility = entry.visibility
         entry.save(update_fields=['is_pinned', 'pin_visibility', 'updated_at'])
         return Response(
             cs.ArchiveEntrySerializer(entry).data,
@@ -390,10 +385,9 @@ class ArchiveEntryPinVisibility(APIView):
 class ArchiveEntryDelete(APIView):
     """DELETE /api/check_in/entries/<pk>/
 
-    Soft-deletes an archived entry via SafeDeleteModel (matches the rest
-    of the codebase). Live entries — superseded_at IS NULL AND created_at
-    within the 12h window — are rejected with 400 so the mutation can
-    only retire rows that have already aged out or been displaced.
+    Soft-deletes a history entry via SafeDeleteModel (matches the rest
+    of the codebase). All entries — both live and superseded — can be
+    deleted from the history feed.
     """
     permission_classes = [IsAuthenticated]
 
@@ -403,85 +397,20 @@ class ArchiveEntryDelete(APIView):
     @transaction.atomic
     def delete(self, request, pk):
         entry = _get_own_entry_or_404(request.user, pk)
-        if _is_live_entry(entry):
-            return Response(
-                {'detail': 'Live entries cannot be deleted from the archive.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         entry.delete()  # SafeDeleteModel soft-delete (sets `deleted` timestamp)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ArchiveLiveComponent(APIView):
-    """PATCH /api/check_in/components/<component>/archive/
-
-    Archive the user's currently-live entry for `component` without
-    replacing it with new content. The strategy is to make the live
-    CheckInComponentEntry look like it has crossed the 12h auto-archive
-    cutoff: created_at and updated_at are aged past the threshold while
-    superseded_at stays NULL. This way the existing serializer collapse
-    (visibility → 'only_me' via _is_archived) and archive-feed filter
-    (created_at < threshold) pick up the row, the data field stays
-    visible to the owner, and a refresh keeps showing the archived
-    snippet with the "Only Me (Archived)" badge.
-
-    Live data sources are left untouched: CheckIn.social_battery /
-    mood / thought keep their values and Song.is_active stays True.
-    The entry-level age check is the single source of truth.
-
-    Idempotent at the entry level: a 404 is returned when the
-    component has no live entry to archive.
-    """
-    permission_classes = [IsAuthenticated]
-    ALLOWED = ('battery', 'mood', 'thought', 'song')
-
-    def get_exception_handler(self):
-        return adoor_exception_handler
-
-    @transaction.atomic
-    def patch(self, request, component):
-        if component not in self.ALLOWED:
-            return Response(
-                {'detail': f'component must be one of {list(self.ALLOWED)}.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = request.user
-
-        live_entry = (
-            CheckInComponentEntry.objects
-            .filter(owner=user, component=component, superseded_at__isnull=True)
-            .order_by('-created_at')
-            .first()
-        )
-        if not live_entry:
-            return Response(
-                {'detail': f'No active {component} to archive.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Age past the 12h auto-archive cutoff. queryset.update() bypasses
-        # AdoorTimestampedModel's auto_now/auto_now_add on save().
-        aged = timezone.now() - timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS, minutes=1)
-        CheckInComponentEntry.objects.filter(pk=live_entry.pk).update(
-            created_at=aged,
-            updated_at=aged,
-        )
-        return Response({'archived': component}, status=status.HTTP_200_OK)
-
-
-class OwnArchiveEntries(generics.ListAPIView):
+class OwnHistoryEntries(generics.ListAPIView):
     """GET /check_in/entries/?tab=all|pinned&cursor=...
 
-    Owner-only archive feed of per-component entries. Excludes live entries
-    (superseded_at IS NULL AND created_at within the 12h window). The flat
-    list is ordered newest-first; the frontend groups by `created_at` date
+    Owner-only history feed of per-component entries. Includes all
+    entries — both live (current) and superseded (past). The flat list
+    is ordered newest-first; the frontend groups by `created_at` date
     to render the section headers (Today / Yesterday / Mar 12 / …). The
     top-level response augments the default paginated payload with
-    `pinned_count` (OP's total pinned archived entries) and
-    `archived_count` (total archived rows, unfiltered by tab) so the
-    `[ All (N) | Pinned (M) ]` segmented control can render without a
-    second request.
+    `pinned_count` and `history_count` so the segmented control can
+    render without a second request.
     """
     serializer_class = cs.ArchiveEntrySerializer
     permission_classes = [IsAuthenticated]
@@ -492,7 +421,7 @@ class OwnArchiveEntries(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = _archive_filter(user)
+        qs = _history_filter(user)
         tab = self.request.query_params.get('tab', 'all')
         if tab == 'pinned':
             qs = qs.filter(is_pinned=True)
@@ -501,9 +430,10 @@ class OwnArchiveEntries(generics.ListAPIView):
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
         user = request.user
-        archived_qs = _archive_filter(user)
-        response.data['archived_count'] = archived_qs.count()
-        response.data['pinned_count'] = archived_qs.filter(is_pinned=True).count()
+        history_qs = _history_filter(user)
+        response.data['history_count'] = history_qs.count()
+        response.data['archived_count'] = history_qs.count()  # backward compat
+        response.data['pinned_count'] = history_qs.filter(is_pinned=True).count()
         return response
 
 
@@ -572,9 +502,8 @@ class CurrentSong(generics.ListCreateAPIView):
             previous_song.is_active = False
             previous_song.save()
 
-        # Mirror the song change to the active check-in's song_updated_at so the
-        # auto-archive logic (>12h) doesn't hide the just-saved song. Use update()
-        # to bypass CheckIn.save()'s per-field timestamp logic.
+        # Mirror the song change to the active check-in's song_updated_at.
+        # Use update() to bypass CheckIn.save()'s per-field timestamp logic.
         CheckIn.objects.filter(user=current_user, is_active=True) \
                        .update(song_updated_at=timezone.now())
 
@@ -620,8 +549,7 @@ class SongDetail(generics.RetrieveUpdateAPIView):
         instance.is_active = False
         instance.save()
 
-        # Mirror the song removal to the active check-in's song_updated_at so the
-        # auto-archive logic stays consistent with the song state.
+        # Mirror the song removal to the active check-in's song_updated_at.
         CheckIn.objects.filter(user=request.user, is_active=True) \
                        .update(song_updated_at=timezone.now())
 

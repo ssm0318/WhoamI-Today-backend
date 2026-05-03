@@ -1,6 +1,4 @@
-from datetime import timedelta
 from django.urls import reverse
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
@@ -157,27 +155,3 @@ class LatestCheckInTests(APITestCase):
         self.assertEqual(response.data['id'], active.id)
 
 
-class CheckInExpiryTests(APITestCase):
-    """Test that the cron job expires check-ins after 12 hours."""
-
-    def setUp(self):
-        self.user = User.objects.create_user(username='testuser', email='test@test.com', password='password')
-
-    def test_expire_old_check_ins(self):
-        from check_in.cron import ExpireCheckInsCronJob
-
-        # Create a check-in older than 12 hours
-        old = CheckIn.objects.create(user=self.user, is_active=True, thought='old')
-        CheckIn.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(hours=13))
-
-        # Create a fresh check-in
-        fresh = CheckIn.objects.create(user=self.user, is_active=True, thought='fresh')
-
-        # Run cron
-        job = ExpireCheckInsCronJob()
-        job.do()
-
-        old.refresh_from_db()
-        fresh.refresh_from_db()
-        self.assertFalse(old.is_active)
-        self.assertTrue(fresh.is_active)

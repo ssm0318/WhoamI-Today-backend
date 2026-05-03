@@ -1,7 +1,4 @@
-from datetime import timedelta
-
 from django.contrib.contenttypes.models import ContentType
-from django.utils import timezone
 from rest_framework import serializers
 
 from django.db.models import Q
@@ -11,8 +8,6 @@ from check_in.models import CheckIn, CheckInComponentEntry, CheckInPost, Song, P
 from comment.models import Comment
 from content_report.models import ContentReport
 from like.models import Like
-
-CHECKIN_AUTO_ARCHIVE_HOURS = 12
 
 
 class CheckInBaseSerializer(serializers.ModelSerializer):
@@ -69,13 +64,6 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
     def _live_entry(self, obj, component):
         return self._get_live_map(obj.user).get(component)
 
-    @staticmethod
-    def _is_archived(entry):
-        if entry is None:
-            return True
-        age = timezone.now() - entry.updated_at
-        return age > timedelta(hours=CHECKIN_AUTO_ARCHIVE_HOURS)
-
     # ------ data fields ------
 
     def get_social_battery(self, obj):
@@ -90,31 +78,23 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
         entry = self._live_entry(obj, 'thought')
         return entry.data.get('thought', '') if entry else ''
 
-    # ------ visibility fields (12h archive collapse) ------
+    # ------ visibility fields ------
 
     def get_battery_visibility(self, obj):
         entry = self._live_entry(obj, 'battery')
-        if self._is_archived(entry):
-            return 'only_me'
-        return entry.visibility
+        return entry.visibility if entry else 'only_me'
 
     def get_mood_visibility(self, obj):
         entry = self._live_entry(obj, 'mood')
-        if self._is_archived(entry):
-            return 'only_me'
-        return entry.visibility
+        return entry.visibility if entry else 'only_me'
 
     def get_song_visibility(self, obj):
         entry = self._live_entry(obj, 'song')
-        if self._is_archived(entry):
-            return 'only_me'
-        return entry.visibility
+        return entry.visibility if entry else 'only_me'
 
     def get_thought_visibility(self, obj):
         entry = self._live_entry(obj, 'thought')
-        if self._is_archived(entry):
-            return 'only_me'
-        return entry.visibility
+        return entry.visibility if entry else 'only_me'
 
     # ------ *_updated_at fields ------
 

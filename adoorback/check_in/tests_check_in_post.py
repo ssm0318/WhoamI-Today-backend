@@ -114,7 +114,8 @@ class CheckInPostExpiryTests(TestCase):
             reverse('check-in-posts-by-user', kwargs={'pk': self.author.id})
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        ids = [r['id'] for r in resp.data]
+        results = resp.data.get('results', resp.data) if isinstance(resp.data, dict) else resp.data
+        ids = [r['id'] for r in results]
         self.assertIn(post.id, ids)
 
     def test_expired_unpinned_detail_404_for_friend(self):
