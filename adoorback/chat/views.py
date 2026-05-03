@@ -2,7 +2,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db.models import F, OuterRef, Subquery, Count, Q
+from django.db.models import F, OuterRef, Prefetch, Subquery, Count, Q
 from rest_framework import generics, exceptions, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -179,7 +179,22 @@ class ChatRoomList(generics.ListAPIView):
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
-        ctx['close_friend_ids'] = set(self.request.user.close_friend_ids)
+        user = self.request.user
+        ctx['close_friend_ids'] = set(user.close_friend_ids)
+        # Pre-load relationship + chat-request data ONCE so the per-room
+        # serializer methods don't run N+1 queries. Each cache is one query
+        # (or in the request_map case, two filtered selects merged).
+        ctx['connected_user_ids'] = set(user.connected_user_ids)
+        from chat.models import ChatRequest
+        from django.db.models import Q as _Q
+        request_map = {}
+        for req in ChatRequest.objects.filter(_Q(requester=user) | _Q(requestee=user)):
+            peer_id = req.requestee_id if req.requester_id == user.id else req.requester_id
+            # Keep the most-recently created request per peer if multiple exist.
+            existing = request_map.get(peer_id)
+            if existing is None or req.id > existing.id:
+                request_map[peer_id] = req
+        ctx['chat_requests_by_peer'] = request_map
         return ctx
 
     def get_queryset(self):
@@ -215,9 +230,21 @@ class ChatRoomList(generics.ListAPIView):
             output_field=IntegerField(),
         )
 
+        # select_related the 1-on-1 user FKs so opponent/user1/user2 access in
+        # the serializer doesn't fire two queries per row. prefetch_related
+        # `members` so group-room renders don't fire one query per row, and
+        # prefetch the requesting user's GroupReadCursor so unread-count for
+        # groups doesn't either. Combined: kills the largest N+1 on chat-list.
         qs = ChatRoom.objects.filter(
             Q(user1=user) | Q(user2=user) | Q(members=user)
-        ).distinct()
+        ).distinct().select_related('user1', 'user2').prefetch_related(
+            'members',
+            Prefetch(
+                'read_cursors',
+                queryset=GroupReadCursor.objects.filter(user=user).select_related('last_read_message'),
+                to_attr='_user_cursors',
+            ),
+        )
 
         if blocked_ids:
             qs = qs.exclude(
