@@ -1,5 +1,7 @@
+import threading
 import traceback
 
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
@@ -19,6 +21,31 @@ from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
 from safedelete.managers import SafeDeleteManager
+
+
+def _should_push_synchronously():
+    """Force synchronous Firebase push in test runners so existing mocks +
+    assertions work without timing races. The settings flag lets prod opt back
+    in if we ever need to (e.g. for one-off scripts)."""
+    if getattr(settings, 'FIREBASE_PUSH_SYNCHRONOUS', False):
+        return True
+    import sys
+    return 'test' in sys.argv or 'pytest' in sys.modules
+
+
+def _push_firebase_async(instance):
+    """Fire-and-forget Firebase push so it doesn't block the request thread.
+
+    Each device.send_message() is a synchronous HTTP call to Firebase that can
+    take 100-500ms; chained per-device this dominates chat-write latency. A
+    daemon thread keeps the process able to exit cleanly. Errors inside
+    notify_firebase are already swallowed (logged + Slack alert), so dropping
+    the exception path here is fine.
+    """
+    if _should_push_synchronously():
+        notify_firebase(instance)
+        return
+    threading.Thread(target=notify_firebase, args=(instance,), daemon=True).start()
 
 
 class NotificationManager(SafeDeleteManager):
@@ -247,7 +274,7 @@ def send_firebase_notification(sender, instance, created, **kwargs):
     if instance.deleted or getattr(instance, '_skip_push', False):
         return
     if created:
-        notify_firebase(instance)
+        _push_firebase_async(instance)
     elif not instance.is_read:
         is_push_only_chat = (
             not instance.is_visible
@@ -257,7 +284,7 @@ def send_firebase_notification(sender, instance, created, **kwargs):
         if instance.is_visible or is_push_only_chat:
             is_any_actor_active = instance.actors.filter(deleted__isnull=True).exists()
             if is_any_actor_active:
-                notify_firebase(instance)
+                _push_firebase_async(instance)
 
 
 @receiver(post_save, sender=Notification, dispatch_uid='cancel_firebase_notification')

@@ -137,3 +137,65 @@ class SeedWitBotCommandTests(TestCase):
         first = ChatRoom.objects.count()
         call_command('seed_wit_bot')
         self.assertEqual(ChatRoom.objects.count(), first)
+
+
+class WitBotFastPathTests(TestCase):
+    """The wit_bot fast path on POST /chat/user/<bot_id>/ should:
+    - skip notification creation (bot is reactive; user is in-app)
+    - skip WS broadcast (bot reply rides back inline)
+    - return bot replies in `bot_replies` on the response
+    """
+
+    def setUp(self):
+        # Operators required for signup signal.
+        User.objects.create_user(username='jaewon', email='jaewonkim628@gmail.com', password='x')
+        User.objects.create_user(username='koyrkr', email='koyrkr@gmail.com', password='x')
+        User.objects.create_user(username='njs', email='njs03332@gmail.com', password='x')
+        self.alice = User.objects.create_user(username='alice', email='a@e.com', password='x')
+        from chat.wit_bot import ensure_wit_bot_user
+        self.bot = ensure_wit_bot_user()
+
+    def test_bot_reply_does_not_create_notification(self):
+        from chat.models import Message
+        from notification.models import Notification
+        from django.contrib.contenttypes.models import ContentType
+        msg_ct = ContentType.objects.get_for_model(Message)
+        before = Notification.objects.filter(user=self.alice, target_type=msg_ct).count()
+        # Trigger a turn: alice sends a non-admin button payload.
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from chat.views import MessageList
+        factory = APIRequestFactory()
+        req = factory.post(
+            f'/api/chat/user/{self.bot.id}/',
+            {'emoji': '', 'content': 'tehehe',
+             'bot_payload': {'kind': 'choice', 'payload': 'tehehe'}},
+            format='json',
+        )
+        force_authenticate(req, user=self.alice)
+        resp = MessageList.as_view()(req, pk=self.bot.id)
+        self.assertEqual(resp.status_code, 201)
+        after = Notification.objects.filter(user=self.alice, target_type=msg_ct).count()
+        self.assertEqual(before, after, 'bot replies must not create chat notifications')
+
+    def test_bot_reply_returned_inline(self):
+        from rest_framework.test import APIRequestFactory, force_authenticate
+        from chat.views import MessageList
+        factory = APIRequestFactory()
+        req = factory.post(
+            f'/api/chat/user/{self.bot.id}/',
+            {'emoji': '', 'content': 'tehehe',
+             'bot_payload': {'kind': 'choice', 'payload': 'tehehe'}},
+            format='json',
+        )
+        force_authenticate(req, user=self.alice)
+        resp = MessageList.as_view()(req, pk=self.bot.id)
+        self.assertEqual(resp.status_code, 201)
+        from chat.wit_bot_engine import BETA_REPLIES
+        bot_replies = resp.data.get('bot_replies') or []
+        self.assertEqual(len(bot_replies), 1)
+        self.assertIn(bot_replies[0]['content'], BETA_REPLIES)
+        self.assertEqual(bot_replies[0]['sender']['username'], 'wit_bot')
+        # Carries the 4-button card.
+        payload = bot_replies[0].get('bot_payload') or {}
+        self.assertEqual(payload.get('kind'), 'card')
+        self.assertEqual(len(payload.get('buttons') or []), 4)

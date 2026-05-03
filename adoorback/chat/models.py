@@ -348,8 +348,38 @@ def create_message_notification(created, instance, **kwargs):
     if instance.chat_room.is_wit_admin_proxy and not instance.is_wit_admin_mirror:
         return
 
-    sender = instance.sender
+    # Suppress notifications for the FORWARD mirror (user→wit_admin gets
+    # mirrored into each operator's proxy room) when the recipient is an
+    # observer operator. The replier still gets a notification so they know
+    # to act; observers can refresh their proxy chat list.
+    # The BACKWARD mirror (operator reply → user's wit_admin room, as
+    # sender=wit_admin) IS user-facing and is unaffected by this guard.
+    if instance.is_wit_admin_mirror and instance.chat_room.is_wit_admin_proxy:
+        from chat.wit_admin import is_replier
+        proxy_room = instance.chat_room
+        # Identify the operator side of the proxy (it's user1 or user2; the
+        # other is the regular user).
+        operator = proxy_room.user1 if proxy_room.user1 != instance.sender else proxy_room.user2
+        if not is_replier(operator):
+            return
+
+    # Suppress notifications for system event messages (member_added /
+    # member_left). The audit-trail bubble in chat is the visible surface;
+    # nobody needs a push notification for "X was added to this group".
+    if instance.event_type:
+        return
+
+    # Suppress notifications for wit_bot 1-on-1 rooms. The bot is reactive
+    # (only replies to user prompts) and the welcome happens during signup, so
+    # the user is always in the app when bot messages land — the chat-list
+    # unread badge is enough surface area without burning notification rows.
     chat_room = instance.chat_room
+    if not chat_room.is_group:
+        from chat.wit_bot import is_wit_bot
+        if is_wit_bot(chat_room.user1) or is_wit_bot(chat_room.user2):
+            return
+
+    sender = instance.sender
 
     if chat_room.is_group:
         # 그룹 채팅: sender 제외 모든 멤버에게 알림
@@ -532,6 +562,7 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
         and not is_wit_admin(sender)
     )
     if is_user_to_wit_admin_room:
+        from chat.wit_admin import is_replier
         try:
             operators = resolve_operators()
         except LookupError:
@@ -559,7 +590,11 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
                 receiver=op,
                 **_copy_message_fields(instance),
             )
-            broadcast_message_for_room(mirror)
+            # Only push the replier's mirror over WebSocket — observers can
+            # refresh their proxy chat list. Saves 2 of 3 Redis pubs per
+            # inbound user→wit_admin message.
+            if is_replier(op):
+                broadcast_message_for_room(mirror)
 
     # Branch 2 — jaewon reply in proxy room → mirror to user's WIT Admin room
     if room.is_wit_admin_proxy and is_replier(sender):

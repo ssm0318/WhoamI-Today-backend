@@ -1,9 +1,9 @@
 """Beta-loop engine for wit_bot conversations.
 
 Behavior is deliberately tiny: every user input — free text or any non-admin
-button tap — gets a "hehe!" reply with the same 4-button card. Tapping the
-"Call in the admin" button immediately escalates to wit_admin (via the
-existing `escalate_to_human` flow) and posts an acknowledgement.
+button tap — gets a randomized playful reply with the same 4-button card.
+Tapping the "Call in the admin" button immediately escalates to wit_admin
+(via the existing `escalate_to_human` flow) and posts an acknowledgement.
 
 Welcome message is posted into the room when `ensure_wit_bot_room` first
 creates it (see `_post_welcome`).
@@ -11,11 +11,41 @@ creates it (see `_post_welcome`).
 from __future__ import annotations
 
 import logging
+import random
 
 from django.db import transaction
 
 
 logger = logging.getLogger(__name__)
+
+
+# Pool of playful, deliberately-not-helpful replies. Every line is written so
+# the user cannot mistake it for an error or NLU failure: random facts are
+# tagged with 🎲 so the pattern is recognizable as "the bot is doing the
+# random-fact thing", not "the bot didn't understand". The "by design" lines
+# call out intent explicitly. Welcome message is NOT randomized — it stays as
+# the canonical introduction in `_post_welcome`.
+BETA_REPLIES = (
+    # Playful giggles (3) — pure vibes, obviously not an answer.
+    "hehe!",
+    "tehe ✨",
+    "🫧 bloop",
+    # Random facts (8) — non-sequiturs, clearly tagged so the user reads them
+    # as intentional silliness rather than failed comprehension.
+    "🎲 random fact: a group of flamingos is called a flamboyance 🦩",
+    "🎲 random fact: octopuses have three hearts and blue blood 🐙",
+    "🎲 random fact: bananas are berries but strawberries aren't 🍌",
+    "🎲 random fact: a day on Venus is longer than its year 🪐",
+    "🎲 random fact: wombat poop is cube-shaped 🟫",
+    "🎲 random fact: cows have best friends and get stressed when separated 🐄",
+    "🎲 random fact: honey never spoils — archaeologists have eaten 3000-year-old honey 🍯",
+    "🎲 random fact: there are more possible chess games than atoms in the universe ♟️",
+    # Explicitly "by design" (3) — names the bot's unhelpfulness as intentional
+    # so the user doesn't read it as broken.
+    "not a bug — I'm just here to vibe 🎀",
+    "I'm intentionally unhelpful for now — by design ✨",
+    "pretend that was helpful 🎀",
+)
 
 
 def _beta_card():
@@ -32,23 +62,24 @@ def _beta_card():
 
 
 def _post_replies(room, bot, user, replies):
-    """Persist each reply as a Message and broadcast to both participants.
+    """Persist each reply as a Message. The user's REST POST that triggered
+    this engine run picks up newly-created messages from the same room and
+    returns them inline (see MessageList.create), so we don't broadcast over
+    WebSocket — that just races the inline response.
 
     Each item in `replies` is `(text, bot_payload | None)`.
     """
     if not replies:
         return
     from chat.models import Message
-    from chat.views import broadcast_message_for_room
     for text, bot_payload in replies:
-        msg = Message.objects.create(
+        Message.objects.create(
             chat_room=room,
             sender=bot,
             receiver=user,
             content=text,
             bot_payload=bot_payload,
         )
-        broadcast_message_for_room(msg)
 
 
 def _post_welcome(room, bot, user):
@@ -93,7 +124,8 @@ def handle_user_message(message):
             ])
             return
 
-        # Free text OR any of the three joke buttons → loop.
+        # Free text OR any of the three joke buttons → loop with a random
+        # playful reply + the same 4-button card.
         _post_replies(room, bot, user, [
-            ("hehe!", _beta_card()),
+            (random.choice(BETA_REPLIES), _beta_card()),
         ])
