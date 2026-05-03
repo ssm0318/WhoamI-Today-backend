@@ -451,8 +451,6 @@ class CheckInComponentEntry(AdoorTimestampedModel, SafeDeleteModel):
 
 
 class Poke(AdoorTimestampedModel, SafeDeleteModel):
-    DAILY_POKE_LIMIT = 5
-
     COMPONENT_TYPE_CHOICES = [
         ('song', 'Song'),
         ('mood', 'Mood'),
