@@ -982,14 +982,18 @@ class UserCheckInPosts(generics.ListAPIView):
             return qs.order_by('-created_at')
 
         if viewer.is_connected(target):
-            return qs.filter(_check_in_post_visible_filter(viewer)).order_by('-created_at')
+            threshold = timezone.now() - timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
+            return qs.filter(
+                _check_in_post_visible_filter(viewer),
+                created_at__gte=threshold,
+            ).order_by('-created_at')
 
         # Non-friend: show only public-visibility posts if the account is public
         if target.is_public:
             threshold = timezone.now() - timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
-            public_live = Q(created_at__gte=threshold, visibility='public')
-            public_pinned = Q(created_at__lt=threshold, is_pinned=True, pin_visibility='public')
-            return qs.filter(public_live | public_pinned).order_by('-created_at')
+            return qs.filter(
+                created_at__gte=threshold, visibility='public'
+            ).order_by('-created_at')
 
         return CheckInPost.objects.none()
 

@@ -38,9 +38,27 @@ class ReactionList(generics.ListCreateAPIView):
 
     def get_queryset(self):
         target, content_type_id, object_id = self.validate_target()
+        blocked_ids = self.request.user.user_report_blocked_ids
+
+        if target.type == 'Comment':
+            user = self.request.user
+            comment = target
+            # private 댓글 접근 체크
+            if comment.is_private:
+                is_author = comment.author == user
+                is_target_author = comment.target.author == user
+                is_grandparent_author = (
+                    comment.is_reply() and comment.target.target.author == user
+                )
+                if not (is_author or is_target_author or is_grandparent_author):
+                    return Reaction.objects.none()
+            return Reaction.objects.filter(
+                object_id=object_id, content_type_id=content_type_id
+            ).exclude(user_id__in=blocked_ids).order_by('-created_at')
+
+        # 기본 동작 (Note, Response 등)
         if target.author != self.request.user:
             return Reaction.objects.filter(object_id=object_id, content_type_id=content_type_id, user=self.request.user).order_by('-created_at')
-        blocked_ids = self.request.user.user_report_blocked_ids
         return Reaction.objects.filter(object_id=object_id, content_type_id=content_type_id).exclude(user_id__in=blocked_ids).order_by('-created_at')
 
     @transaction.atomic

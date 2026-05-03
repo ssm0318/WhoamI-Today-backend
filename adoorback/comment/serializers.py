@@ -1,14 +1,19 @@
+from itertools import chain
+
 from django.contrib.auth import get_user_model
+from django.db.models import F, Value, CharField, BooleanField
 from rest_framework import serializers
 from django.urls import reverse
 
 from comment.models import Comment
 
 from adoorback.serializers import AdoorBaseSerializer
+from adoorback.utils.content_types import get_generic_relation_type
 from django.conf import settings
 from account.serializers import UserMinimalSerializer
 from note.models import Note
 from qna.models import Response
+from reaction.models import Reaction
 from user_tag.serializers import UserTagSerializer
 
 User = get_user_model()
@@ -25,6 +30,8 @@ class CommentBaseSerializer(AdoorBaseSerializer):
     target_id = serializers.SerializerMethodField()
     user_tags = serializers.SerializerMethodField()
     like_user_sample = serializers.SerializerMethodField(read_only=True)
+    like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
+    current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
 
     def get_is_reply(self, obj):
         return obj.target.type == 'Comment'
@@ -42,9 +49,41 @@ class CommentBaseSerializer(AdoorBaseSerializer):
         recent_users = [like.user for like in recent_likes]
         return UserMinimalSerializer(recent_users, many=True, context=self.context).data
 
+    def get_like_reaction_user_sample(self, obj):
+        blocked_ids = self.context['request'].user.user_report_blocked_ids
+        likes = obj.comment_likes.exclude(user_id__in=blocked_ids).annotate(
+            created=F('created_at'),
+            like=Value(True, output_field=BooleanField()),
+            reaction=Value(None, output_field=CharField())
+        ).values('user', 'created', 'like', 'reaction')
+
+        reactions = obj.reactions.exclude(user_id__in=blocked_ids).annotate(
+            created=F('created_at'),
+            like=Value(False, output_field=BooleanField()),
+            reaction=F('emoji')
+        ).values('user', 'created', 'like', 'reaction')
+
+        combined = sorted(
+            chain(likes, reactions),
+            key=lambda x: x['created'],
+            reverse=True
+        )[:3]
+
+        return [
+            {**UserMinimalSerializer(User.objects.get(id=item['user']), context=self.context).data,
+             'like': item['like'], 'reaction': item['reaction']}
+            for item in combined
+        ]
+
+    def get_current_user_reaction_id_list(self, obj):
+        current_user_id = self.context['request'].user.id
+        content_type_id = get_generic_relation_type(obj.type).id
+        reactions = Reaction.objects.filter(user_id=current_user_id, content_type_id=content_type_id, object_id=obj.id)
+        return [{"id": reaction.id, "emoji": reaction.emoji} for reaction in reactions]
+
     class Meta(AdoorBaseSerializer.Meta):
         model = Comment
-        fields = AdoorBaseSerializer.Meta.fields + ['is_reply', 'is_private', 'target_id', 'user_tags', 'like_user_sample']
+        fields = AdoorBaseSerializer.Meta.fields + ['is_reply', 'is_private', 'target_id', 'user_tags', 'like_user_sample', 'like_reaction_user_sample', 'current_user_reaction_id_list']
 
 
 class CommentFriendSerializer(CommentBaseSerializer):

@@ -99,6 +99,24 @@ def create_reaction_noti(instance, created, **kwargs):
             content_en=content, content_ko=content,
             emoji=target.emoji, component=component,
         )
+    elif origin.type == 'Comment':
+        content = wrap_content(origin.content)
+        # reply인 경우 origin.target.target이 root post
+        if origin.target.type == 'Comment':
+            post = origin.target.target
+        else:
+            post = origin.target
+
+        if post.type == 'CheckInPost':
+            redirect_url = f'/check-in-posts/{post.id}'
+        else:
+            redirect_url = f'/{post.type.lower()}s/{post.id}'
+
+        Notification.objects.create_or_update_notification(
+            user=user, actor=actor, origin=origin, target=target,
+            noti_type='reaction_comment_noti', redirect_url=redirect_url,
+            content_en=content, content_ko=content,
+        )
     else:
         content = wrap_content(origin.content)
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'

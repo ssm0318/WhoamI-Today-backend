@@ -17,6 +17,7 @@ from adoorback.utils.content_types import get_comment_type, get_generic_relation
 from content_report.models import ContentReport
 from like.models import Like
 from notification.models import Notification, NotificationActor
+from reaction.models import Reaction
 from user_tag.models import UserTag
 from utils.helpers import parse_user_tag_from_content
 
@@ -43,6 +44,7 @@ class Comment(AdoorModel, SafeDeleteModel):
 
     replies = GenericRelation('self')
     comment_likes = GenericRelation(Like)
+    comment_reactions = GenericRelation(Reaction)
     comment_user_tags = GenericRelation(UserTag)
 
     comment_targetted_notis = GenericRelation(Notification,
@@ -63,6 +65,12 @@ class Comment(AdoorModel, SafeDeleteModel):
     @property
     def liked_user_ids(self):
         return self.comment_likes.values_list('user_id', flat=True)
+
+    @property
+    def reactions(self):
+        from django.contrib.contenttypes.models import ContentType
+        comment_content_type = ContentType.objects.get_for_model(self)
+        return Reaction.objects.filter(content_type=comment_content_type, object_id=self.id)
 
     @property
     def participants(self):

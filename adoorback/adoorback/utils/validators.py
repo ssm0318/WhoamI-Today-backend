@@ -66,6 +66,7 @@ def adoor_exception_handler(exc, context):
             "이 필드는 필수 항목입니다.",
             "This field is required.",
             "Cannot send friend requests to users using different versions",
+            "Friend request already sent.",
         }
         if all(msg in skip_messages for msg in flat_messages):
             slack_level = None

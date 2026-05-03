@@ -772,6 +772,6 @@ def delete_check_in_post_files(sender, instance, **kwargs):
 
 @receiver(post_save, sender=CheckInPost, dispatch_uid='add_author_to_check_in_post_readers')
 def add_author_to_check_in_post_readers(instance, created, **kwargs):
-    if not created:
-        return
-    instance.readers.add(instance.author)
+    # Author is NOT auto-added to readers so that the own-story bubble
+    # shows the unread (purple ring) state until the author views it.
+    pass

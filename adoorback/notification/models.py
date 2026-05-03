@@ -78,11 +78,19 @@ class NotificationManager(SafeDeleteManager):
                                                 target_type=ContentType.objects.get_for_model(target))
             if notis.count() > 0:
                 for noti in notis:
-                    if noti.target.emoji == emoji and noti.target.component == component:
+                    if emoji is None:
+                        # 댓글 리액션: 이모지 상관없이 하나로 합침
+                        noti_to_update = noti
+                        break
+                    elif noti.target.emoji == emoji and noti.target.component == component:
                         noti_to_update = noti
                         break
 
         if noti_to_update:
+            # 이미 같은 유저가 actor로 등록돼있으면 중복 추가하지 않음
+            if noti_to_update.actors.filter(id=actor.id).exists():
+                return
+
             actors = noti_to_update.actors.order_by('-notificationactor__created_at')
             N = actors.count()
             new_actor = actors.first()
@@ -218,6 +226,7 @@ def notify_firebase(instance):
         body = instance.message_ko if device.language == 'ko' else instance.message_en
         message = Message(
             data={
+                'notification_id': str(instance.id),
                 'message_en': instance.message_en,
                 'message_ko': instance.message_ko,
                 'url': instance.redirect_url,
