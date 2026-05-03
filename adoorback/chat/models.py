@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -17,6 +19,7 @@ from notification.models import Notification, NotificationActor
 
 
 MAX_GROUP_MEMBERS = 10
+logger = logging.getLogger(__name__)
 
 
 class ChatRoom(AdoorTimestampedModel, SafeDeleteModel):
@@ -631,45 +634,68 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
 
         # 3a — every regular user's WIT Admin room
         for user in regular_recipients().iterator(chunk_size=500):
-            u1, u2 = (user, wit) if user.id < wit.id else (wit, user)
-            wit_room = ChatRoom.objects.filter(
-                user1=u1, user2=u2, is_wit_admin_proxy=False,
-            ).first()
-            if wit_room is None:
-                from chat.wit_admin import provision_user_rooms
-                provision_user_rooms(user)
+            try:
+                u1, u2 = (user, wit) if user.id < wit.id else (wit, user)
                 wit_room = ChatRoom.objects.filter(
                     user1=u1, user2=u2, is_wit_admin_proxy=False,
                 ).first()
                 if wit_room is None:
-                    continue
-            mirror = Message.objects.create(
-                chat_room=wit_room,
-                sender=wit,
-                receiver=user,
-                **_copy_message_fields(instance),
-            )
-            broadcast_message_for_room(mirror)
+                    from chat.wit_admin import provision_user_rooms
+                    provision_user_rooms(user)
+                    wit_room = ChatRoom.objects.filter(
+                        user1=u1, user2=u2, is_wit_admin_proxy=False,
+                    ).first()
+                    if wit_room is None:
+                        logger.warning(
+                            'wit_admin blast skipped user=%s: missing wit_admin room after provisioning',
+                            user.id,
+                        )
+                        continue
+                mirror = Message.objects.create(
+                    chat_room=wit_room,
+                    sender=wit,
+                    receiver=user,
+                    **_copy_message_fields(instance),
+                )
+                broadcast_message_for_room(mirror)
+            except Exception:
+                logger.exception(
+                    'wit_admin blast failed for user=%s source_message=%s',
+                    user.id,
+                    instance.id,
+                )
 
         # 3b — observer (koyrkr, njs) blast logs
         UserModel = get_user_model()
         for email in OPERATOR_OBSERVER_EMAILS:
-            observer = UserModel.objects.filter(email=email).first()
-            if observer is None:
-                continue
-            u1, u2 = (wit, observer) if wit.id < observer.id else (observer, wit)
-            log_room = ChatRoom.objects.filter(
-                user1=u1, user2=u2, is_wit_admin_blast_room=True,
-            ).first()
-            if log_room is None:
-                continue
-            mirror = Message.objects.create(
-                chat_room=log_room,
-                sender=wit,
-                receiver=observer,
-                **_copy_message_fields(instance),
-            )
-            broadcast_message_for_room(mirror)
+            try:
+                observer = UserModel.objects.filter(email=email).first()
+                if observer is None:
+                    logger.warning('wit_admin blast observer skipped: missing operator email=%s', email)
+                    continue
+                u1, u2 = (wit, observer) if wit.id < observer.id else (observer, wit)
+                log_room = ChatRoom.objects.filter(
+                    user1=u1, user2=u2, is_wit_admin_blast_room=True,
+                ).first()
+                if log_room is None:
+                    logger.warning(
+                        'wit_admin blast observer skipped: missing blast room operator=%s',
+                        observer.id,
+                    )
+                    continue
+                mirror = Message.objects.create(
+                    chat_room=log_room,
+                    sender=wit,
+                    receiver=observer,
+                    **_copy_message_fields(instance),
+                )
+                broadcast_message_for_room(mirror)
+            except Exception:
+                logger.exception(
+                    'wit_admin blast observer failed email=%s source_message=%s',
+                    email,
+                    instance.id,
+                )
         return
 
 
