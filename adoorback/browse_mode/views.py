@@ -18,6 +18,8 @@ from browse_mode.serializers import (
     BrowseModeWishlistEntrySerializer,
 )
 
+from adoorback.utils.alerts import send_user_event_to_slack
+
 
 class BrowseModePresetList(generics.ListCreateAPIView):
     serializer_class = BrowseModePresetSerializer
@@ -88,4 +90,13 @@ class BrowseModeWishlistCreate(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        entry = serializer.save(user=self.request.user)
+        content = entry.content or ''
+        preview = content[:300] + ('…' if len(content) > 300 else '')
+        send_user_event_to_slack(
+            f"*📝 Browse Mode Survey Response*\n"
+            f"```\n"
+            f"User: {self.request.user.username} (ID: {self.request.user.id})\n"
+            f"Content: {preview}\n"
+            f"```"
+        )

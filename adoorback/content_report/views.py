@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from content_report.models import ContentReport
 from content_report.serializers import ContentReportSerializer
 
+from adoorback.utils.alerts import send_user_event_to_slack
 from adoorback.utils.content_types import get_generic_relation_type
 from adoorback.utils.validators import adoor_exception_handler
 
@@ -27,3 +28,10 @@ class ContentReportList(generics.CreateAPIView):
 
         if content_type and object_id:
             serializer.save(user=user, content_type_id=content_type_id, object_id=object_id)
+            send_user_event_to_slack(
+                f"*🚩 Content Report*\n"
+                f"```\n"
+                f"Reporter: {user.username} (ID: {user.id})\n"
+                f"Target: {content_type} #{object_id}\n"
+                f"```"
+            )
