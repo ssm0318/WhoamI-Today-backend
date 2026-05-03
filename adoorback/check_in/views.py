@@ -581,11 +581,7 @@ class PokeCreate(generics.CreateAPIView):
         if sender.current_ver != receiver.current_ver:
             raise exceptions.PermissionDenied("Cannot poke a user on a different version.")
 
-        # Check daily poke limit
         today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        sent_today = Poke.objects.filter(sender=sender, created_at__gte=today_start).count()
-        if sent_today >= Poke.DAILY_POKE_LIMIT:
-            raise exceptions.Throttled(detail="Daily poke limit reached.")
 
         # Check duplicate: same sender->receiver->component_type today
         component_type = serializer.validated_data.get('component_type')
