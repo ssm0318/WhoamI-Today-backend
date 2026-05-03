@@ -18,7 +18,7 @@ from notification.helpers import find_like_noti, construct_message
 from firebase_admin.messaging import Message
 from firebase_admin._messaging_utils import (
     UnregisteredError, WebpushConfig, WebpushNotification,
-    APNSConfig, APNSPayload, Aps, AndroidConfig, AndroidNotification,
+    APNSConfig, APNSPayload, Aps, ApsAlert, AndroidConfig, AndroidNotification,
 )
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
@@ -286,7 +286,7 @@ def notify_firebase(instance):
                 apns=APNSConfig(
                     payload=APNSPayload(
                         aps=Aps(
-                            alert={'title': 'WhoAmI Today', 'body': body},
+                            alert=ApsAlert(title='WhoAmI Today', body=body),
                             sound='default',
                             content_available=True,
                         ),
