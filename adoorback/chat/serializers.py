@@ -177,7 +177,10 @@ class ChatRoomSerializer(serializers.ModelSerializer):
     def get_unread_count(self, obj):
         user = self.context['request'].user
         if obj.is_group:
-            cursor = GroupReadCursor.objects.filter(user=user, chat_room=obj).first()
+            # Use the prefetched cursor (one per requesting user, attached via
+            # ChatRoomList.get_queryset) instead of running a SELECT per room.
+            user_cursors = getattr(obj, '_user_cursors', None)
+            cursor = user_cursors[0] if user_cursors else None
             if cursor and cursor.last_read_message:
                 return obj.messages.exclude(sender=user).filter(
                     created_at__gt=cursor.last_read_message.created_at
@@ -210,20 +213,30 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         ):
             return 'friends'
 
-        if user.is_connected(opponent):
-            return 'friends'
-        req = ChatRequest.objects.filter(
-            requester=user, requestee=opponent
-        ).first() or ChatRequest.objects.filter(
-            requester=opponent, requestee=user
-        ).first()
+        # Use pre-loaded sets/maps from the serializer context to avoid
+        # 2-3 DB hits per room (Connection.exists + 2× ChatRequest.first).
+        connected_ids = self.context.get('connected_user_ids')
+        if connected_ids is not None:
+            if opponent.id in connected_ids:
+                return 'friends'
+            req = self.context.get('chat_requests_by_peer', {}).get(opponent.id)
+        else:
+            # Single-room serializer fallback (no list-view context) — keep the
+            # original per-row queries.
+            if user.is_connected(opponent):
+                return 'friends'
+            req = ChatRequest.objects.filter(
+                requester=user, requestee=opponent
+            ).first() or ChatRequest.objects.filter(
+                requester=opponent, requestee=user
+            ).first()
         if req is None:
             return None
         if req.accepted is True:
             return 'accepted'
         if req.accepted is False:
             return 'declined'
-        if req.requester == user:
+        if req.requester_id == user.id:
             return 'sent'
         return 'received'
 
