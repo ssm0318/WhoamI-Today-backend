@@ -53,7 +53,7 @@ class WitBotBetaLoopTests(TestCase):
         self.assertEqual(latest.bot_payload.get('kind'), 'card')
         labels = [b['label'] for b in latest.bot_payload['buttons']]
         self.assertEqual(labels, [
-            'Onboarding (coming soon)',
+            'Get started with onboarding',
             "I'm confused",
             'tehehe',
             'Call in the admin',
@@ -64,7 +64,7 @@ class WitBotBetaLoopTests(TestCase):
     def test_onboarding_choice_replies_with_pool_text(self):
         from chat.wit_bot_engine import BETA_REPLIES
         before = self._bot_replies().count()
-        self._send_choice('onboarding', 'Onboarding (coming soon)')
+        self._send_choice('onboarding', 'Get started with onboarding')
         latest = self._bot_replies().order_by('-created_at').first()
         self.assertEqual(self._bot_replies().count(), before + 1)
         self.assertIn(latest.content, BETA_REPLIES)
@@ -146,7 +146,7 @@ class WitBotBetaLoopTests(TestCase):
         self.assertEqual(welcome.bot_payload['kind'], 'card')
         labels = [b['label'] for b in welcome.bot_payload['buttons']]
         self.assertEqual(labels, [
-            'Onboarding (coming soon)',
+            'Get started with onboarding',
             "I'm confused",
             'tehehe',
             'Call in the admin',

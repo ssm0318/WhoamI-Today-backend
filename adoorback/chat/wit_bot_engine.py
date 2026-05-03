@@ -53,7 +53,7 @@ def _beta_card():
     return {
         "kind": "card",
         "buttons": [
-            {"label": "Onboarding (coming soon)", "action": "reply", "payload": "onboarding"},
+            {"label": "Get started with onboarding", "action": "reply", "payload": "onboarding"},
             {"label": "I'm confused", "action": "reply", "payload": "confused"},
             {"label": "tehehe", "action": "reply", "payload": "tehehe"},
             {"label": "Call in the admin", "action": "reply", "payload": "admin"},
