@@ -98,6 +98,24 @@ class QuestionResponsesTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_excludes_responses_from_different_version_users(self):
+        other_ver_author = User.objects.create_user(
+            username='other_ver', email='other_ver@example.com', password='password',
+            current_ver='version_q',
+        )
+        other_ver_response = Response.objects.create(
+            author=other_ver_author,
+            question=self.question,
+            content='Other version response',
+            visibility=['public'],
+        )
+
+        response = self.client.get(f'/api/qna/questions/{self.question.id}/responses/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response_ids = [item['id'] for item in response.data['results']]
+        self.assertNotIn(other_ver_response.id, response_ids)
+
     def test_anonymous_request_returns_401(self):
         anon = APIClient()
 

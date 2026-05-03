@@ -535,6 +535,25 @@ class MissionAttemptsEndpointTests(TestCase):
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['id'], own_note.id)
 
+    def test_endpoint_excludes_attempts_from_different_version_users(self):
+        other_ver_author = User.objects.create_user(
+            username='other_ver', email='other_ver@example.com', password='password',
+            current_ver='version_q',
+        )
+        other_ver_note = _create_mission_note_for_test(
+            self.mission,
+            author=other_ver_author,
+            content='other version attempt',
+            visibility=['public'],
+            mission_attempt_number=1,
+        )
+
+        response = self.client.get(f'/api/missions/{self.mission.id}/attempts/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = [item['id'] for item in response.data['results']]
+        self.assertNotIn(other_ver_note.id, result_ids)
+
     def test_endpoint_returns_404_for_unknown_mission(self):
         response = self.client.get('/api/missions/999999/attempts/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

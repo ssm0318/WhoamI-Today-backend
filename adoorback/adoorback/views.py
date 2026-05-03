@@ -84,16 +84,18 @@ class MissionAttempts(generics.ListAPIView):
 
     def get_queryset(self):
         mission = self.get_mission()
+        user = self.request.user
         notes = Note.objects.filter(
             share_type=ShareType.MISSION,
             **_mission_note_filter(mission),
+            author__current_ver=user.current_ver,
         ).select_related('author').prefetch_related(
             'images',
             'videos',
             'readers',
         ).order_by('-created_at')
 
-        visible_note_ids = [note.id for note in notes if note.is_audience(self.request.user)]
+        visible_note_ids = [note.id for note in notes if note.is_audience(user)]
         return Note.objects.filter(id__in=visible_note_ids).order_by('-created_at')
 
     def list(self, request, *args, **kwargs):

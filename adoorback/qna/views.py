@@ -315,7 +315,11 @@ class QuestionResponses(generics.ListAPIView):
 
     def get_queryset(self):
         question = self.get_question()
-        responses = Response.objects.filter(question=question).select_related(
+        user = self.request.user
+        responses = Response.objects.filter(
+            question=question,
+            author__current_ver=user.current_ver,
+        ).select_related(
             'author',
             'question',
         ).prefetch_related(
@@ -326,7 +330,7 @@ class QuestionResponses(generics.ListAPIView):
         ).order_by('-created_at')
 
         visible_response_ids = [
-            response.id for response in responses if response.is_audience(self.request.user)
+            response.id for response in responses if response.is_audience(user)
         ]
         return Response.objects.filter(id__in=visible_response_ids).select_related(
             'author',

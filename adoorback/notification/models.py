@@ -226,27 +226,31 @@ def notify_firebase(instance):
     tag = get_notification_tag(instance)
     for device in devices:
         body = instance.message_ko if device.language == 'ko' else instance.message_en
-        message = Message(
-            data={
-                'notification_id': str(instance.id),
-                'message_en': instance.message_en,
-                'message_ko': instance.message_ko,
-                'url': instance.redirect_url,
-                'tag': tag,
-                'type': 'new',
-                'content-available': '1',  # for ios silent notification
-                'priority': 'high',  # for android
-            },
-            webpush=WebpushConfig(
-                notification=WebpushNotification(
-                    title='WhoAmI Today',
-                    body=body,
-                    tag=tag,
-                    renotify=True,
-                    icon='/whoami192.png',
+        data = {
+            'notification_id': str(instance.id),
+            'message_en': instance.message_en,
+            'message_ko': instance.message_ko,
+            'url': instance.redirect_url,
+            'tag': tag,
+            'type': 'new',
+            'content-available': '1',  # for ios silent notification
+            'priority': 'high',  # for android
+        }
+        if device.type == 'web':
+            message = Message(
+                data=data,
+                webpush=WebpushConfig(
+                    notification=WebpushNotification(
+                        title='WhoAmI Today',
+                        body=body,
+                        tag=tag,
+                        renotify=True,
+                        icon='/whoami192.png',
+                    ),
                 ),
-            ),
-        )
+            )
+        else:
+            message = Message(data=data)
         try:
             device.send_message(message)
         except UnregisteredError:
@@ -259,7 +263,6 @@ def notify_firebase(instance):
                 level="ERROR"
             )
             print(f"🚨 Failed to send firebase notification to device {device.id}: {e}\n```{stack_trace}```")
-            return False
 
 
 @receiver(post_save, sender=Notification, dispatch_uid='send_firebase_notification')
