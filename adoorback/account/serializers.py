@@ -109,7 +109,61 @@ def serialize_check_in_base_for_viewer(check_in, request, context=None):
     )
 
 
-class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSerializer):
+class RecentPostsMixin:
+    def get_recent_posts(self, obj):
+        from itertools import chain
+        from note.serializers import NoteSerializer
+        from qna.serializers import ResponseSerializer
+        from qna.models import Response as QnaResponse
+        cutoff = timezone.now() - RECENT_POST_WINDOW
+        request = self.context.get('request')
+        if not request:
+            return []
+        viewer = request.user
+        viewer_id = viewer.id
+
+        visible_notes = self.context.get('visible_notes_by_author', {}).get(obj.id)
+        if visible_notes is None:
+            all_notes = Note.objects.filter(author=obj)
+            visible_notes = [n for n in all_notes if n.is_audience(viewer)]
+
+        visible_resps = self.context.get('visible_resps_by_author', {}).get(obj.id)
+        if visible_resps is None:
+            all_resps = QnaResponse.objects.filter(author=obj)
+            visible_resps = [r for r in all_resps if r.is_audience(viewer)]
+
+        # Union of 24h-recent posts and unread posts
+        notes_by_id = {}
+        for n in visible_notes:
+            is_recent = n.created_at >= cutoff
+            is_unread = viewer_id not in {r.id for r in n.readers.all()} if viewer_id != obj.id else False
+            if is_recent or is_unread:
+                notes_by_id[n.id] = n
+
+        resps_by_id = {}
+        for r in visible_resps:
+            is_recent = r.created_at >= cutoff
+            is_unread = viewer_id not in {rd.id for rd in r.readers.all()} if viewer_id != obj.id else False
+            if is_recent or is_unread:
+                resps_by_id[r.id] = r
+
+        combined = sorted(
+            chain(notes_by_id.values(), resps_by_id.values()),
+            key=lambda p: p.created_at, reverse=True,
+        )
+        out = []
+        for p in combined:
+            if isinstance(p, Note):
+                data = NoteSerializer(p, context=self.context).data
+                data['type'] = 'Note'
+            else:
+                data = ResponseSerializer(p, context=self.context).data
+                data['type'] = 'Response'
+            out.append(data)
+        return out
+
+
+class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.HyperlinkedModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     unread_noti = serializers.SerializerMethodField(read_only=True)
     unread_noti_cnt = serializers.SerializerMethodField(read_only=True)
@@ -119,6 +173,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
     user_personas = serializers.StringRelatedField(many=True, read_only=True)
     chips_by_category = serializers.SerializerMethodField(read_only=True)
     custom_chips = serializers.SerializerMethodField(read_only=True)
+    recent_posts = serializers.SerializerMethodField(read_only=True)
 
     def get_chips_by_category(self, obj):
         """Return user's interests grouped by category."""
@@ -205,7 +260,7 @@ class CurrentUserSerializer(CountryFieldMixin, serializers.HyperlinkedModelSeria
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
                   'has_changed_pw', 'unread_message_cnt', 'is_public',
-                  'friend_count', 'username_history']
+                  'friend_count', 'username_history', 'recent_posts']
         extra_kwargs = {'password': {'write_only': True}, 'username_history': {'read_only': True}}
 
 
@@ -640,7 +695,7 @@ class UserProfileSerializer(UserMinimalSerializer):
                                                       'friendship_level', 'is_check_in_subscribed', 'is_subscribed']
 
 
-class FriendListSerializer(UserMinimalSerializer):
+class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
     url = serializers.SerializerMethodField(read_only=True)
     is_favorite = serializers.SerializerMethodField(read_only=True)
     is_hidden = serializers.SerializerMethodField(read_only=True)
@@ -667,6 +722,11 @@ class FriendListSerializer(UserMinimalSerializer):
     last_updated_at = serializers.SerializerMethodField(read_only=True)
     last_updated_kind = serializers.SerializerMethodField(read_only=True)
     pinned_count = serializers.SerializerMethodField(read_only=True)
+    recently_updated_check_in = serializers.SerializerMethodField(read_only=True)
+    battery_updated_at = serializers.SerializerMethodField(read_only=True)
+    mood_updated_at = serializers.SerializerMethodField(read_only=True)
+    song_updated_at = serializers.SerializerMethodField(read_only=True)
+    thought_updated_at = serializers.SerializerMethodField(read_only=True)
 
     def get_pinned_count(self, obj):
         """Viewer-visible pinned archive entries for this friend.
@@ -794,26 +854,7 @@ class FriendListSerializer(UserMinimalSerializer):
         return (self.context.get('unread_note_count_by_author', {}).get(obj.id, 0)
                 + self.context.get('unread_response_count_by_author', {}).get(obj.id, 0))
 
-    def get_recent_posts(self, obj):
-        from itertools import chain
-        from note.serializers import NoteSerializer
-        from qna.serializers import ResponseSerializer
-        cutoff = timezone.now() - RECENT_POST_WINDOW
-        notes = [n for n in self.context.get('visible_notes_by_author', {}).get(obj.id, [])
-                 if n.created_at >= cutoff]
-        resps = [r for r in self.context.get('visible_resps_by_author', {}).get(obj.id, [])
-                 if r.created_at >= cutoff]
-        combined = sorted(chain(notes, resps), key=lambda p: p.created_at, reverse=True)
-        out = []
-        for p in combined:
-            if isinstance(p, Note):
-                data = NoteSerializer(p, context=self.context).data
-                data['type'] = 'Note'
-            else:
-                data = ResponseSerializer(p, context=self.context).data
-                data['type'] = 'Response'
-            out.append(data)
-        return out
+    recent_posts = serializers.SerializerMethodField()
 
     def get_unread_cnt(self, obj):
         return self.context.get('unread_chat_count_by_friend_id', {}).get(obj.id, 0)
@@ -880,8 +921,51 @@ class FriendListSerializer(UserMinimalSerializer):
     def get_thought_visibility(self, obj):
         return self._component_visibility(self.check_in(obj), 'thought_visibility', 'thought_updated_at')
 
+    def get_battery_updated_at(self, obj):
+        ci = self.check_in(obj)
+        return ci.battery_updated_at.isoformat() if ci and ci.battery_updated_at else None
+
+    def get_mood_updated_at(self, obj):
+        ci = self.check_in(obj)
+        return ci.mood_updated_at.isoformat() if ci and ci.mood_updated_at else None
+
+    def get_song_updated_at(self, obj):
+        ci = self.check_in(obj)
+        return ci.song_updated_at.isoformat() if ci and ci.song_updated_at else None
+
+    def get_thought_updated_at(self, obj):
+        ci = self.check_in(obj)
+        return ci.thought_updated_at.isoformat() if ci and ci.thought_updated_at else None
+
     def get_unread_chat_count(self, obj):
         return self.context.get('unread_chat_count_by_friend_id', {}).get(obj.id, 0)
+
+    def get_recently_updated_check_in(self, obj):
+        """Return check-in components that are currently visible and have content.
+
+        No 24h cutoff — the 12-hour auto-archive already nulls out stale
+        components, so anything with data here is genuinely recent.
+        Example: ['mood'] when only mood is active.
+        """
+        check_in = self.check_in(obj)
+        if not check_in:
+            return []
+        out = []
+        if self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
+            if (getattr(check_in, 'social_battery', None) or '').strip():
+                out.append('battery')
+        if self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
+            mood = getattr(check_in, 'mood', None) or []
+            if any((m or '').strip() for m in mood):
+                out.append('mood')
+        if self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
+            if (getattr(check_in, 'thought', None) or '').strip():
+                out.append('thought')
+        if self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
+            song = self.context.get('active_song_by_user_id', {}).get(obj.id)
+            if song and (getattr(song, 'track_id', None) or '').strip():
+                out.append('song')
+        return out
 
     class Meta(UserMinimalSerializer.Meta):
         model = User
@@ -893,7 +977,9 @@ class FriendListSerializer(UserMinimalSerializer):
                                                       'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
                                                       'sent_pokes', 'is_check_in_subscribed', 'is_subscribed',
                                                       'last_updated_field', 'last_updated_at', 'last_updated_kind',
-                                                      'pinned_count']
+                                                      'pinned_count', 'recently_updated_check_in',
+                                                      'battery_updated_at', 'mood_updated_at',
+                                                      'song_updated_at', 'thought_updated_at']
 
 
 class FriendFriendListSerializer(UserMinimalSerializer):

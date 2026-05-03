@@ -15,8 +15,11 @@ from adoorback.utils.content_types import get_response_request_type, get_questio
 from adoorback.utils.alerts import send_msg_to_slack
 from notification.helpers import find_like_noti, construct_message
 
-from firebase_admin.messaging import Message, WebpushConfig, WebpushNotification
-from firebase_admin._messaging_utils import UnregisteredError
+from firebase_admin.messaging import Message
+from firebase_admin._messaging_utils import (
+    UnregisteredError, WebpushConfig, WebpushNotification,
+    APNSConfig, APNSPayload, Aps, AndroidConfig, AndroidNotification,
+)
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE, HARD_DELETE
@@ -274,6 +277,31 @@ def notify_firebase(instance):
                         tag=tag,
                         renotify=True,
                         icon='/whoami192.png',
+                    ),
+                ),
+            )
+        elif device.type == 'ios':
+            message = Message(
+                data=data,
+                apns=APNSConfig(
+                    payload=APNSPayload(
+                        aps=Aps(
+                            alert={'title': 'WhoAmI Today', 'body': body},
+                            sound='default',
+                            content_available=True,
+                        ),
+                    ),
+                ),
+            )
+        elif device.type == 'android':
+            message = Message(
+                data=data,
+                android=AndroidConfig(
+                    priority='high',
+                    notification=AndroidNotification(
+                        title='WhoAmI Today',
+                        body=body,
+                        tag=tag,
                     ),
                 ),
             )
