@@ -42,13 +42,14 @@ class WitBotBetaLoopTests(TestCase):
 
     # ---------- Free-text loop ----------
 
-    def test_free_text_replies_hehe_with_card(self):
+    def test_free_text_replies_with_pool_text_and_card(self):
+        from chat.wit_bot_engine import BETA_REPLIES
         before = self._bot_replies().count()
         self._send_text('what is this app')
         replies = self._bot_replies().order_by('-created_at')
         self.assertEqual(replies.count(), before + 1)
         latest = replies.first()
-        self.assertEqual(latest.content, 'hehe!')
+        self.assertIn(latest.content, BETA_REPLIES)
         self.assertEqual(latest.bot_payload.get('kind'), 'card')
         labels = [b['label'] for b in latest.bot_payload['buttons']]
         self.assertEqual(labels, [
@@ -60,27 +61,30 @@ class WitBotBetaLoopTests(TestCase):
 
     # ---------- Joke buttons all loop the same way ----------
 
-    def test_onboarding_choice_replies_hehe(self):
+    def test_onboarding_choice_replies_with_pool_text(self):
+        from chat.wit_bot_engine import BETA_REPLIES
         before = self._bot_replies().count()
         self._send_choice('onboarding', 'Get started with onboarding')
         latest = self._bot_replies().order_by('-created_at').first()
         self.assertEqual(self._bot_replies().count(), before + 1)
-        self.assertEqual(latest.content, 'hehe!')
+        self.assertIn(latest.content, BETA_REPLIES)
         self.assertEqual(latest.bot_payload['kind'], 'card')
 
-    def test_confused_choice_replies_hehe(self):
+    def test_confused_choice_replies_with_pool_text(self):
+        from chat.wit_bot_engine import BETA_REPLIES
         before = self._bot_replies().count()
         self._send_choice('confused', "I'm confused")
         latest = self._bot_replies().order_by('-created_at').first()
         self.assertEqual(self._bot_replies().count(), before + 1)
-        self.assertEqual(latest.content, 'hehe!')
+        self.assertIn(latest.content, BETA_REPLIES)
 
-    def test_tehehe_choice_replies_hehe(self):
+    def test_tehehe_choice_replies_with_pool_text(self):
+        from chat.wit_bot_engine import BETA_REPLIES
         before = self._bot_replies().count()
         self._send_choice('tehehe', 'tehehe')
         latest = self._bot_replies().order_by('-created_at').first()
         self.assertEqual(self._bot_replies().count(), before + 1)
-        self.assertEqual(latest.content, 'hehe!')
+        self.assertIn(latest.content, BETA_REPLIES)
 
     # ---------- Admin button escalates ----------
 

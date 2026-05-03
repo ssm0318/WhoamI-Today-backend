@@ -498,7 +498,7 @@ class WebSocketBroadcastTests(TestCase):
         u1, u2 = (self.alice, wit) if self.alice.id < wit.id else (wit, self.alice)
         return ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
 
-    def test_inbound_fanout_broadcasts_for_each_mirror(self):
+    def test_inbound_fanout_broadcasts_only_for_replier_mirror(self):
         from unittest.mock import patch
         room = self._alice_wit_room()
         with patch('chat.views.async_to_sync') as mock_ats:
@@ -507,10 +507,10 @@ class WebSocketBroadcastTests(TestCase):
             Message.objects.create(
                 chat_room=room, sender=self.alice, receiver=self._wit(), content='hello',
             )
-        # Each mirror produces:
-        #   1 chat.message + 2 chat.list.update = 3 group_sends
-        # x 3 mirrors = 9 invocations.
-        self.assertEqual(mock_ats.call_count, 9)
+        # Only the replier's mirror is broadcast over WS — observers can
+        # refresh their proxy chat list. 1 mirror × (1 chat.message +
+        # 2 chat.list.update) = 3 invocations.
+        self.assertEqual(mock_ats.call_count, 3)
 
     def test_jaewon_blast_broadcasts_for_each_recipient_and_observer(self):
         from unittest.mock import patch

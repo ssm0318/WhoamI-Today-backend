@@ -322,38 +322,41 @@ class MessageList(generics.ListCreateAPIView):
         except User.DoesNotExist:
             raise exceptions.NotFound("Connected user not found")
 
+        # Cache the chat_room lookup once for both branches below.
+        chat_room = get_chat_room(request.user, connected_user)
+
         # Rebrand the blast room header as "Announcements" so the chat detail
         # view matches the chat-list label.
         from chat.wit_admin import is_wit_admin
         display_username = connected_user.username
-        chat_room = get_chat_room(request.user, connected_user)
         if chat_room and chat_room.is_wit_admin_blast_room and is_wit_admin(connected_user):
             display_username = 'Announcements'
         response.data['username'] = display_username
         response.data['oldest_unread_page'] = self.oldest_unread_page
 
         paginated_queryset = self.paginator.paginate_queryset(self.get_queryset(), request)
-        if paginated_queryset:
+        if paginated_queryset and chat_room:
             msg_ids = [msg.id for msg in paginated_queryset]
             marked = Message.objects.filter(id__in=msg_ids, receiver=request.user, is_read=False).update(is_read=True)
+            # Only fire the chat-list WS update when at least one message
+            # actually flipped to read — otherwise we burn a Redis pub for a
+            # no-op every time the user re-opens an already-read chat.
             if marked > 0:
-                chat_room = get_chat_room(request.user, connected_user)
-                if chat_room:
-                    remaining = chat_room.messages.filter(receiver=request.user, is_read=False).count()
-                    channel_layer = get_channel_layer()
-                    try:
-                        async_to_sync(channel_layer.group_send)(
-                            f"user_{request.user.id}_chat_list",
-                            {
-                                "type": "chat.list.update",
-                                "data": {
-                                    "opponent_id": connected_user.id,
-                                    "unread_count": remaining,
-                                },
+                remaining = chat_room.messages.filter(receiver=request.user, is_read=False).count()
+                channel_layer = get_channel_layer()
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{request.user.id}_chat_list",
+                        {
+                            "type": "chat.list.update",
+                            "data": {
+                                "opponent_id": connected_user.id,
+                                "unread_count": remaining,
                             },
-                        )
-                    except Exception:
-                        pass
+                        },
+                    )
+                except Exception:
+                    pass
 
         return response
 
@@ -424,6 +427,8 @@ class MessageList(generics.ListCreateAPIView):
         serializer.save(sender=user, receiver=connected_user, chat_room=chat_room, parent=parent, **extra)
 
     def create(self, request, *args, **kwargs):
+        from chat.wit_bot import is_wit_bot
+
         response = super().create(request, *args, **kwargs)
 
         user = request.user
@@ -435,6 +440,24 @@ class MessageList(generics.ListCreateAPIView):
             raise exceptions.NotFound("Connected user not found")
 
         response.data['unread_count'] = unread_count
+
+        # wit_bot fast path: when the room is a 1-on-1 with the bot, the
+        # dispatch_wit_bot_engine signal has already created the bot's reply
+        # synchronously inside super().create(). Pick up everything created
+        # since the user's message and ride it back inline so the frontend
+        # doesn't need a WebSocket hop. Skip the WS broadcasts entirely for
+        # this path — bot has no WS client and the user's own message is
+        # already in the response.
+        if not chat_room.is_group and is_wit_bot(connected_user):
+            user_msg_id = response.data.get('id')
+            if user_msg_id:
+                bot_replies_qs = chat_room.messages.filter(
+                    id__gt=user_msg_id,
+                ).order_by('id')
+                response.data['bot_replies'] = MessageSerializer(
+                    bot_replies_qs, many=True, context={'request': request},
+                ).data
+            return response
 
         # Broadcast via WebSocket to the chat room
         group_name = _get_chat_group_name(user.id, connected_user.id)
