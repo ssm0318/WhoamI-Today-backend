@@ -90,26 +90,30 @@ class SurveyResponseSubmitView(APIView):
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
-        # Reject submissions to scheduled surveys whose window has already
-        # closed without late-submission allowance (matches the bucketing
-        # rule's "expired hidden" semantics — daily is the canonical case).
+        # Accept the submission if at least one ScheduledSurvey row is
+        # currently submittable. A row is submittable when the window has
+        # opened (window_start <= today) AND the window is still open
+        # (window_end is null/today-or-later OR allow_late is True).
+        #
+        # Important for surveys scheduled on multiple days (e.g. `daily_base`,
+        # which has 28 daily rows): we must not reject just because *some* row
+        # is in the future or in the past — only when no row is currently
+        # submittable. A naive `window_start__gt=today` check would match
+        # tomorrow's row and incorrectly reject today's submission.
         today = _today_la_7am()
-        if ScheduledSurvey.objects.filter(
-            survey=survey, allow_late=False, window_end__lt=today,
-        ).exists():
+        survey_schedule = ScheduledSurvey.objects.filter(survey=survey)
+        is_open_now = survey_schedule.filter(window_start__lte=today).filter(
+            Q(window_end__isnull=True) | Q(window_end__gte=today) | Q(allow_late=True),
+        ).exists()
+        if not is_open_now:
+            if survey_schedule.filter(window_start__gt=today).exists():
+                return Response(
+                    {'detail': 'This survey is not yet open for responses.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             return Response(
                 {'detail': 'This survey has expired and can no longer be answered.'},
                 status=status.HTTP_410_GONE,
-            )
-        # Reject submissions to scheduled surveys whose window hasn't opened
-        # yet — direct-URL access to a future-dated survey shouldn't bypass
-        # the index/UI gating.
-        if ScheduledSurvey.objects.filter(
-            survey=survey, window_start__gt=today,
-        ).exists():
-            return Response(
-                {'detail': 'This survey is not yet open for responses.'},
-                status=status.HTTP_403_FORBIDDEN,
             )
         ser = SurveyResponseInputSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
