@@ -461,6 +461,7 @@ class Poke(AdoorTimestampedModel, SafeDeleteModel):
     sender = models.ForeignKey(User, related_name='sent_pokes', on_delete=models.CASCADE)
     receiver = models.ForeignKey(User, related_name='received_pokes', on_delete=models.CASCADE)
     component_type = models.CharField(max_length=20, choices=COMPONENT_TYPE_CHOICES)
+    responded_at = models.DateTimeField(null=True, blank=True)
 
     poke_targetted_notis = GenericRelation(
         'notification.Notification',
