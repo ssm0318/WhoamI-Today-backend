@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.test import TestCase
@@ -366,6 +368,33 @@ class JaewonBlastTests(TestCase):
             )
             self.assertEqual(user_msgs.count(), 1, f"Missing blast for {user.username}")
             self.assertEqual(user_msgs.first().content, 'announcement')
+
+    def test_jaewon_blast_continues_after_single_user_broadcast_error(self):
+        blast = self._jaewon_blast_room()
+
+        def fail_for_alice(message):
+            if message.receiver_id == self.alice.id:
+                raise RuntimeError('broadcast failed')
+
+        with patch('chat.views.broadcast_message_for_room', side_effect=fail_for_alice):
+            Message.objects.create(
+                chat_room=blast, sender=self.jaewon, receiver=self._wit(),
+                content='announcement',
+            )
+
+        wit = self._wit()
+        for user in (self.alice, self.bob):
+            u1, u2 = (user, wit) if user.id < wit.id else (wit, user)
+            wit_room = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=False)
+            self.assertTrue(
+                Message.objects.filter(
+                    chat_room=wit_room,
+                    is_wit_admin_mirror=True,
+                    sender=wit,
+                    content='announcement',
+                ).exists(),
+                f"Missing blast for {user.username}",
+            )
 
     def test_jaewon_blast_mirrors_into_observer_logs(self):
         blast = self._jaewon_blast_room()
