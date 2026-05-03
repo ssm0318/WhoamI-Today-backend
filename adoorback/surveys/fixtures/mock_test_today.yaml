@@ -1,12 +1,98 @@
-# One-off "survey of the day" content for QA testing.
+# Pre-study mock daily surveys for May 1–3, 2026. Three Survey rows with
+# identical questions but distinct slugs — `SurveyResponse.UniqueConstraint`
+# forces one response per (user, survey), so each day needs its own Survey
+# row to keep result aggregations separate.
+#
 # Loaded + scheduled via:
 #   python manage.py load_surveys adoorback/surveys/fixtures/mock_test_today.yaml
-#   python manage.py seed_survey_mock_data --email <dev-email> --today-slug mock_test_2026q2
+#   # then create one ScheduledSurvey row per day, e.g.:
+#   python manage.py shell -c "
+#   from datetime import date
+#   from surveys.models import Survey, ScheduledSurvey, CADENCE_DAILY
+#   for slug, day, seq in [
+#       ('mock_test_2026q2',    date(2026, 5, 1), 900),
+#       ('mock_test_2026_05_02', date(2026, 5, 2), 901),
+#       ('mock_test_2026_05_03', date(2026, 5, 3), 902),
+#   ]:
+#       ScheduledSurvey.objects.update_or_create(
+#           cadence=CADENCE_DAILY, sequence_index=seq,
+#           defaults={'survey': Survey.objects.get(slug=slug),
+#                     'window_start': day, 'window_end': day,
+#                     'allow_late': True},
+#       )
+#   "
 #
-# The --today-slug flag creates (or re-points) the daily ScheduledSurvey for
-# today to this survey, so it shows up on /share as Survey of the Day.
+# allow_late=True keeps each pre-study mock day visible in the daily archive
+# even if a user misses the day, so QA can still inspect every result page
+# from one place.
 
 - slug: mock_test_2026q2
+  title:
+    en: "Quick Mock Survey"
+    ko: "간단 모의 설문"
+  description:
+    en: "short survey"
+    ko: "짧은 설문"
+  friend_visible: false
+  results_hidden: false
+  questions:
+    - order: 1
+      type: slider
+      prompt:
+        en: "How are you feeling today?"
+        ko: "오늘 기분이 어떤가요?"
+      low_label: { en: "Terrible", ko: "끔찍해요" }
+      high_label: { en: "Couldn't be better", ko: "더할 나위 없이 좋아요" }
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram
+    - order: 2
+      type: single_choice
+      prompt:
+        en: "What's the weather like where you are right now?"
+        ko: "지금 있는 곳의 날씨는 어때요?"
+      result_kind: option_counts
+      options:
+        - { order: 1, value: 1, label: { en: "☀️ Sunny", ko: "☀️ 맑음" } }
+        - { order: 2, value: 2, label: { en: "⛅ Partly cloudy", ko: "⛅ 구름 조금" } }
+        - { order: 3, value: 3, label: { en: "☁️ Cloudy", ko: "☁️ 흐림" } }
+        - { order: 4, value: 4, label: { en: "🌧️ Rainy", ko: "🌧️ 비" } }
+        - { order: 5, value: 5, label: { en: "❄️ Snowy / Other", ko: "❄️ 눈 / 기타" } }
+
+- slug: mock_test_2026_05_02
+  title:
+    en: "Quick Mock Survey"
+    ko: "간단 모의 설문"
+  description:
+    en: "short survey"
+    ko: "짧은 설문"
+  friend_visible: false
+  results_hidden: false
+  questions:
+    - order: 1
+      type: slider
+      prompt:
+        en: "How are you feeling today?"
+        ko: "오늘 기분이 어떤가요?"
+      low_label: { en: "Terrible", ko: "끔찍해요" }
+      high_label: { en: "Couldn't be better", ko: "더할 나위 없이 좋아요" }
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram
+    - order: 2
+      type: single_choice
+      prompt:
+        en: "What's the weather like where you are right now?"
+        ko: "지금 있는 곳의 날씨는 어때요?"
+      result_kind: option_counts
+      options:
+        - { order: 1, value: 1, label: { en: "☀️ Sunny", ko: "☀️ 맑음" } }
+        - { order: 2, value: 2, label: { en: "⛅ Partly cloudy", ko: "⛅ 구름 조금" } }
+        - { order: 3, value: 3, label: { en: "☁️ Cloudy", ko: "☁️ 흐림" } }
+        - { order: 4, value: 4, label: { en: "🌧️ Rainy", ko: "🌧️ 비" } }
+        - { order: 5, value: 5, label: { en: "❄️ Snowy / Other", ko: "❄️ 눈 / 기타" } }
+
+- slug: mock_test_2026_05_03
   title:
     en: "Quick Mock Survey"
     ko: "간단 모의 설문"
