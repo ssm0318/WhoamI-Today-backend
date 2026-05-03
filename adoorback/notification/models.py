@@ -212,6 +212,8 @@ def get_notification_tag(instance):
     elif target_model == 'like':
         return f"like_{origin_model}_{instance.origin_id}"
     elif target_model == 'reaction':
+        if origin_model == 'checkin':
+            return str(instance.id)
         return f"reaction_{origin_model}_{instance.origin_id}"
     elif target_model == 'responserequest':
         return f"response_request_{instance.origin_id}"

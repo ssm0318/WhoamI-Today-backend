@@ -10,7 +10,8 @@ from django.dispatch import receiver
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.helpers import wrap_content
 from like.models import Like
-from notification.models import Notification
+from notification.helpers import construct_message
+from notification.models import Notification, NotificationActor
 
 from safedelete.models import SafeDeleteModel
 from safedelete.models import SOFT_DELETE_CASCADE
@@ -90,15 +91,20 @@ def create_reaction_noti(instance, created, **kwargs):
 
     if origin.type == 'CheckIn':
         component = instance.component
-        content = wrap_content(origin.content)
         redirect_url = '/update'
-        noti_type = 'reaction_checkin_noti'
-        Notification.objects.create_or_update_notification(
-            user=user, actor=actor, origin=origin, target=target,
-            noti_type=noti_type, redirect_url=redirect_url,
-            content_en=content, content_ko=content,
+        message_ko, message_en = construct_message(
+            'reaction_checkin_noti',
+            actor.username + "님", None,
+            actor.username, None,
+            1, None, None,
             emoji=target.emoji, component=component,
         )
+        noti = Notification.objects.create(
+            user=user, origin=origin, target=target,
+            message_ko=message_ko, message_en=message_en,
+            redirect_url=redirect_url,
+        )
+        NotificationActor.objects.create(user=actor, notification=noti)
     elif origin.type == 'Comment':
         content = wrap_content(origin.content)
         # reply인 경우 origin.target.target이 root post

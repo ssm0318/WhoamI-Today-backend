@@ -42,7 +42,7 @@ class MissionToday(APIView):
     def get(self, request):
         missions = list(Mission.objects.all().order_by('id'))
         if not missions:
-            return Response({'detail': 'No missions configured.'}, status=503)
+            return Response({'detail': 'No missions available today.', 'unavailable': True}, status=200)
 
         boundary = get_today_la_boundary()
         # Day-of-year of the boundary in its tz-aware form. matches frontend

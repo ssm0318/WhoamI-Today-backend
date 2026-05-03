@@ -452,7 +452,6 @@ class MessageList(generics.ListCreateAPIView):
             )
 
         # Broadcast to both users' chat list so the list page updates
-        print(f"[CHAT] Broadcasting chat list update for room between {user.id} and {connected_user.id}")
         content = _get_message_preview_text(response.data)
         timestamp = response.data.get('created_at', '')
         receiver_unread = chat_room.messages.filter(receiver=connected_user, is_read=False).count()
