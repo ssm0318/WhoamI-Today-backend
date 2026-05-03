@@ -12,18 +12,7 @@ from user_agents import parse
 from adoorback.filters import get_current_request
 
 
-def send_msg_to_slack(
-    url: Optional[str] = None,
-    text: Optional[str] = None,
-    channel: Optional[str] = None,
-    icon_emoji: Optional[str] = None,
-    username: Optional[str] = None,
-    level: str = "INFO",  # 👈 Default level is INFO
-):
-    allowed_levels = {"WARNING", "ERROR", "CRITICAL"}
-    if level.upper() not in allowed_levels:
-        return  # Don't send unimportant levels
-
+def _build_slack_user_context() -> str:
     request = get_current_request()
     user_info = ""
     if request and hasattr(request, "user") and request.user.is_authenticated:
@@ -56,6 +45,23 @@ def send_msg_to_slack(
         except Exception as e:
             user_info += f"\n📦 Body: [ERROR reading data: {e}]"
 
+    return user_info
+
+
+def send_msg_to_slack(
+    url: Optional[str] = None,
+    text: Optional[str] = None,
+    channel: Optional[str] = None,
+    icon_emoji: Optional[str] = None,
+    username: Optional[str] = None,
+    level: str = "INFO",  # 👈 Default level is INFO
+):
+    allowed_levels = {"WARNING", "ERROR", "CRITICAL"}
+    if level.upper() not in allowed_levels:
+        return  # Don't send unimportant levels
+
+    user_info = _build_slack_user_context()
+
     url = url or os.getenv("SLACK_URL")
     channel = channel or os.getenv("SLACK_CHANNEL")
     username = username or os.getenv("SLACK_USERNAME")
@@ -69,6 +75,42 @@ def send_msg_to_slack(
         "channel": channel,
         "username": username,
         "text": f"[{level.upper()}] {text}{user_info}",
+        "icon_emoji": icon_emoji,
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+    except Exception:
+        traceback.print_exc()
+
+
+def send_user_event_to_slack(
+    text: str,
+    channel: Optional[str] = None,
+    icon_emoji: Optional[str] = None,
+    username: Optional[str] = None,
+):
+    """Send a user-driven event (report, survey response, etc.) to Slack.
+
+    Bypasses the level gate in send_msg_to_slack() because these are info-level
+    by design. Uses a distinct '📨 USER EVENT' header so it's visually
+    separable from error alerts in the same channel.
+    """
+    url = os.getenv("SLACK_URL")
+    channel = channel or os.getenv("SLACK_CHANNEL")
+    username = username or os.getenv("SLACK_USERNAME")
+    icon_emoji = icon_emoji or os.getenv("SLACK_ICON")
+
+    if not url:
+        return
+
+    user_info = _build_slack_user_context()
+
+    payload = {
+        "channel": channel,
+        "username": username,
+        "text": f"📨 *USER EVENT*\n{text}{user_info}",
         "icon_emoji": icon_emoji,
     }
 
