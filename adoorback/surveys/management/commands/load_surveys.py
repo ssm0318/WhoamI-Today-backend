@@ -99,6 +99,12 @@ class Command(BaseCommand):
             anchors = {}
         else:
             raise CommandError(f'Unsupported extension: {path.suffix}')
+        # Empty YAML files (placeholder fixtures whose content isn't authored
+        # yet, e.g. sotd.yaml) return `None` from yaml.safe_load. Treat them
+        # as no-ops so an empty file in setup_survey_state doesn't crash.
+        if data is None:
+            self.stdout.write(self.style.SUCCESS(f'Loaded 0 surveys from {path} (empty fixture)'))
+            return
         if not isinstance(data, list):
             raise CommandError('Top-level fixture must be a list of surveys.')
 

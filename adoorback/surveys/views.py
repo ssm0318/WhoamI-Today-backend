@@ -9,10 +9,11 @@ from surveys.aggregation import (
     build_panel_distribution,
     compute_user_percentile,
     group_panels,
+    group_panels_for_survey_level_kind,
 )
 from surveys.models import (
-    CADENCE_DAILY, ScheduledSurvey, Survey, SurveyAnswer, SurveyQuestion,
-    SurveyResponse,
+    CADENCE_DAILY, INPUT_LESS_TYPES, ScheduledSurvey, Survey, SurveyAnswer,
+    SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.scheduling import _today_la_7am, get_survey_index, get_today_daily
@@ -20,6 +21,49 @@ from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
     SurveyResponseInputSerializer, validate_answer_value,
 )
+
+
+def _persist_embedded_data(user, response: SurveyResponse) -> None:
+    """Copy answers from `embedded_data: true` questions into the per-user
+    store, keyed by the question's slug.
+
+    Called inside the submit view's transaction. update_or_create lets a
+    repeatable survey's later submission overwrite an earlier one's value
+    for the same key — the most-recent answer wins, matching how research
+    instruments treat resubmits.
+
+    For `habit_platform` specifically, an additional resolver writes the
+    human-readable label as `<slug>_label` so subsequent surveys can render
+    it via tokens. Other slugs persist their raw value only — explicit
+    label-translation is opt-in per slug here.
+    """
+    flagged_answers = response.answers.filter(question__embedded_data=True).select_related('question')
+    for ans in flagged_answers:
+        slug = ans.question.slug
+        if not slug:
+            continue
+        UserSurveyEmbeddedData.objects.update_or_create(
+            user=user, key=slug,
+            defaults={'value': ans.value, 'source_question': ans.question},
+        )
+        # habit_platform → habit_platform_label resolution (option's label).
+        if slug == 'habit_platform' and isinstance(ans.value, (str, int)):
+            label = _resolve_habit_platform_label(ans.question, ans.value)
+            if label is not None:
+                UserSurveyEmbeddedData.objects.update_or_create(
+                    user=user, key='habit_platform_label',
+                    defaults={'value': label, 'source_question': ans.question},
+                )
+
+
+def _resolve_habit_platform_label(question: SurveyQuestion, value):
+    """Look up the matching SurveyOption's label_en for `value` and return it.
+
+    Returns None when no option matches (e.g. user picked the "other" branch
+    that surfaces `habit_platform_other` as its own free-text question).
+    """
+    opt = question.options.filter(value=value).first()
+    return opt.label_en if opt else None
 
 
 def _bereal_gate(viewer, survey: Survey):
@@ -86,7 +130,11 @@ class SurveyResponseSubmitView(APIView):
             survey = Survey.objects.get(slug=slug)
         except Survey.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        if SurveyResponse.objects.filter(survey=survey, user=request.user).exists():
+        # `repeatable: true` surveys (e.g. anytime_reflection) allow the same
+        # user to submit multiple times — each submission is its own row.
+        if not survey.repeatable and SurveyResponse.objects.filter(
+            survey=survey, user=request.user,
+        ).exists():
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
@@ -118,8 +166,16 @@ class SurveyResponseSubmitView(APIView):
                 response = SurveyResponse.objects.create(user=request.user, survey=survey)
                 for a in ser.validated_data['answers']:
                     question = SurveyQuestion.objects.get(id=a['question_id'], survey=survey)
+                    # display_only blocks accept no value — defensively skip
+                    # if the frontend sends one.
+                    if question.type in INPUT_LESS_TYPES:
+                        continue
                     validate_answer_value(question, a['value'])
                     SurveyAnswer.objects.create(response=response, question=question, value=a['value'])
+                # Persist `embedded_data: true` answers into the per-user
+                # store keyed by question.slug. Subsequent surveys read these
+                # via `{{slug}}` tokens or `serving_condition`.
+                _persist_embedded_data(request.user, response)
         except IntegrityError:
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
@@ -145,9 +201,20 @@ class SurveyResultsView(APIView):
         ids = compute_responder_ids(request.user, survey)
         viewer_response = SurveyResponse.objects.filter(survey=survey, user=request.user).first()
 
+        # Survey-level result_kind (scale_score_histogram /
+        # slider_histogram_paired) overrides per-question grouping. Each
+        # variant returns its own panel layout, but every panel shares the
+        # render path below — only the question grouping differs.
+        if survey.result_kind:
+            panels = group_panels_for_survey_level_kind(survey)
+            forced_kind = survey.result_kind
+        else:
+            panels = group_panels(survey)
+            forced_kind = None
+
         panels_payload = []
-        for group_key, questions in group_panels(survey):
-            panel_kind = questions[0].effective_result_kind
+        for group_key, questions in panels:
+            panel_kind = forced_kind or questions[0].effective_result_kind
             eligibility = compute_panel_eligibility(request.user, survey, panel_kind, ids)
 
             payload = {

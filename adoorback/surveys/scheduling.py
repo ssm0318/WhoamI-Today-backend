@@ -9,7 +9,14 @@ from zoneinfo import ZoneInfo
 from django.db.models import Exists, OuterRef, Q, Subquery
 from django.utils import timezone
 
-from surveys.models import CADENCE_DAILY, ScheduledSurvey, SurveyResponse
+from surveys.models import (
+    CADENCE_DAILY, ScheduledSurvey, SurveyResponse, UserSurveyEmbeddedData,
+)
+
+
+# Saturdays = weekday 5, Sundays = weekday 6. Weekend skipping: standard
+# SOTD surveys are not served on these days; daily_base diary continues.
+_WEEKEND_DAYS = frozenset({5, 6})
 
 
 def _today_la_7am():
@@ -31,27 +38,106 @@ def _annotate_user_response(qs, user):
     )
 
 
+def _user_embedded_data(user) -> dict:
+    """Snapshot of the user's embedded-data store as a plain dict.
+
+    Used by `_skip_for_serving_condition` to evaluate the survey's skip rule
+    without re-querying for every row in a multi-row check.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return {}
+    return dict(
+        UserSurveyEmbeddedData.objects.filter(user=user).values_list('key', 'value')
+    )
+
+
+def _skip_for_serving_condition(survey, user_data: dict) -> bool:
+    """True when the survey's `serving_condition` matches the user's
+    embedded data and the survey should NOT be served.
+
+    Form: `{"skip_if_user_embedded_data": {<key>: <value>, ...}}`. Skip
+    fires only when EVERY (key, value) pair matches. Any missing key, or
+    any mismatch, means the survey is served as usual.
+    """
+    rule = (survey.serving_condition or {}).get('skip_if_user_embedded_data')
+    if not isinstance(rule, dict) or not rule:
+        return False
+    for key, expected in rule.items():
+        if user_data.get(key) != expected:
+            return False
+    return True
+
+
+def _routes_to_user(survey, user) -> bool:
+    """True when the survey is currently routable to this user.
+
+    Used by the dispatch layer to swap version-suffixed surveys based on the
+    user's `user_group`. Slugs ending with `_w` go to W-first users; slugs
+    ending with `_q` go to Q-first users; un-suffixed slugs route to all.
+
+    Convention is `mid_study_w` / `mid_study_q` and `post_study_w` /
+    `post_study_q`. Other slug suffixes are ignored.
+    """
+    slug = survey.slug
+    user_group = getattr(user, 'user_group', '') or ''
+    if slug.endswith('_w'):
+        return user_group == 'group_w_first'
+    if slug.endswith('_q'):
+        return user_group == 'group_q_first'
+    return True
+
+
+def _is_weekend_skipped(scheduled, today) -> bool:
+    """True when this scheduled row is a SOTD-style daily that should be
+    skipped on weekends.
+
+    `daily_base` (the every-day diary) is exempt — research design is to keep
+    the daily diary running through the weekend even when assessment SOTDs
+    pause. Other daily rows are skipped on Sat/Sun.
+    """
+    if scheduled.cadence != CADENCE_DAILY:
+        return False
+    if scheduled.survey.slug == 'daily_base':
+        return False
+    return today.weekday() in _WEEKEND_DAYS
+
+
 def get_today_daily(user):
     """Return today's daily ScheduledSurvey for `user`, or None.
 
+    Filtering layers (after the basic cadence + date match):
+      1. Version routing — surveys with `_w` / `_q` slug suffix only route
+         to the user's matching `user_group`. Today's daily can be either
+         a single un-suffixed survey (most common) or one of a w/q pair
+         where the schedule has both rows on the same date.
+      2. Weekend skip — non-`daily_base` daily SOTDs are not served on
+         Sat/Sun.
+      3. `serving_condition.skip_if_user_embedded_data` — surveys whose
+         skip rule matches the user's embedded data are not returned.
+
     Returns the row regardless of whether the user has answered — the
     SurveyOfTheDay card on /share renders an answered-state UI ("Done /
-    View results") once user_has_responded flips true. Hiding the card
-    after answering led to confusion ("did I do it? was it submitted?")
-    and a stale-cache window where users could navigate back into the
-    answer form and hit a 409.
+    View results") once user_has_responded flips true.
     """
     today = _today_la_7am()
-    return (
+    candidates = list(
         _annotate_user_response(
             ScheduledSurvey.objects.filter(
                 cadence=CADENCE_DAILY, window_start=today,
             ),
             user,
-        )
-        .select_related('survey')
-        .first()
+        ).select_related('survey')
     )
+    user_data = _user_embedded_data(user)
+    for sched in candidates:
+        if not _routes_to_user(sched.survey, user):
+            continue
+        if _is_weekend_skipped(sched, today):
+            continue
+        if _skip_for_serving_condition(sched.survey, user_data):
+            continue
+        return sched
+    return None
 
 
 def get_survey_index(user):
@@ -64,6 +150,10 @@ def get_survey_index(user):
 
     Expired-and-hidden rows (window closed, allow_late=False, not answered —
     i.e. missed dailies) appear in NONE of the buckets and are never returned.
+
+    Rows are also filtered to honor version routing (slugs ending `_w` /
+    `_q` route to matching user_group only), weekend skip (non-daily_base
+    dailies skipped on Sat/Sun), and `serving_condition` (skip rule).
     """
     today = _today_la_7am()
     qs = _annotate_user_response(
@@ -84,8 +174,26 @@ def get_survey_index(user):
     )
     completed = list(qs.filter(user_answered=True))
 
+    user_data = _user_embedded_data(user)
+
+    def _filter(rows):
+        out = []
+        for sched in rows:
+            if not _routes_to_user(sched.survey, user):
+                continue
+            if _is_weekend_skipped(sched, today):
+                continue
+            if _skip_for_serving_condition(sched.survey, user_data):
+                continue
+            out.append(sched)
+        return out
+
     return {
-        'available_now': available,
-        'late_but_accepted': late,
-        'completed': completed,
+        'available_now': _filter(available),
+        'late_but_accepted': _filter(late),
+        # Completed rows aren't filtered by serving_condition / weekend —
+        # the user already answered, so they should still see the entry in
+        # their archive. Version routing IS applied (a Q user shouldn't
+        # see a W-only completion in their list, even if they somehow have one).
+        'completed': [s for s in completed if _routes_to_user(s.survey, user)],
     }

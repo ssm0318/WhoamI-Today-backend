@@ -47,11 +47,18 @@ class SurveyModelTests(TestCase):
                 window_start=d, window_end=d, allow_late=False,
             )
 
-    def test_response_unique_per_user_per_survey(self):
+    def test_response_uniqueness_handled_at_view_level(self):
+        # The unique-per-(user, survey) DB constraint was dropped to support
+        # `repeatable: true` surveys (anytime_reflection-style ongoing
+        # feedback). The view's submit handler enforces single-submit
+        # semantics for non-repeatable surveys — see
+        # SubmitViewExtensionsTests.test_non_repeatable_survey_returns_409_on_resubmit.
         s = Survey.objects.create(slug='s5', title_en='T', title_ko='T')
         SurveyResponse.objects.create(user=self.user, survey=s)
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            SurveyResponse.objects.create(user=self.user, survey=s)
+        # Creating a second row at the model level no longer crashes — the
+        # data layer accepts it; the view layer is what blocks duplicates.
+        SurveyResponse.objects.create(user=self.user, survey=s)
+        self.assertEqual(SurveyResponse.objects.filter(user=self.user, survey=s).count(), 2)
 
     def test_answer_unique_per_response_per_question(self):
         s = Survey.objects.create(slug='s6', title_en='T', title_ko='T')

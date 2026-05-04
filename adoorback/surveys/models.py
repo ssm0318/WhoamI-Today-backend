@@ -416,9 +416,12 @@ class SurveyResponse(AdoorTimestampedModel):
     submitted_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['user', 'survey'], name='unique_response_per_user_per_survey'),
-        ]
+        # No DB-level uniqueness on (user, survey): repeatable surveys
+        # (anytime_reflection-style) intentionally allow multiple rows per
+        # user. The view-level check in SurveyResponseSubmitView enforces
+        # the single-submit semantics for non-repeatable surveys, so the
+        # data layer doesn't need a partial constraint that's awkward to
+        # express in Postgres (would require a FK-dependent expression).
         indexes = [
             models.Index(fields=['survey', 'user']),
         ]
