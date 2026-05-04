@@ -879,11 +879,13 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
         check_in = self.check_in(obj)
         if not check_in:
             return False
-        effective_vis = self._component_visibility(check_in, visibility_field, updated_at_field)
-        if effective_vis == 'only_me':
-            user = self.context.get('request', None).user
-            return user == obj  # Only visible to the owner
-        return True
+        request = self.context.get('request')
+        viewer = request.user if request is not None else None
+        if viewer is None or not viewer.is_authenticated:
+            return False
+        return viewer_sees_check_in_component(
+            check_in, obj, viewer, visibility_field, updated_at_field
+        )
 
     def get_thought(self, obj):
         if not self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):

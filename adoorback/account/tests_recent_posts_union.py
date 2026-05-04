@@ -16,6 +16,7 @@ from rest_framework.test import APIRequestFactory, APITestCase
 
 from account.models import Connection
 from account.serializers import FriendListSerializer
+from check_in.models import CheckIn, Song
 from note.models import Note
 from qna.models import Question, Response
 
@@ -264,6 +265,42 @@ class FriendsListRecentPostsIntegrationTests(APITestCase):
         data = self._get_friend_data()
         ids = [p['id'] for p in data['recent_posts']]
         self.assertNotIn(note.id, ids)
+
+    def test_check_in_component_visibility_matches_profile_endpoint(self):
+        """Friend list must not expose components hidden on the profile endpoint."""
+        CheckIn.objects.create(
+            user=self.friend,
+            is_active=True,
+            visibility=['friends'],
+            social_battery='fully_charged',
+            battery_visibility='close_friends',
+            mood=['🙂'],
+            mood_visibility='close_friends',
+            thought='visible to regular friends',
+            thought_visibility='friends',
+            song_visibility='close_friends',
+        )
+        Song.objects.create(
+            user=self.friend,
+            track_id='spotify:track:hidden',
+            is_active=True,
+        )
+
+        list_data = self._get_friend_data()
+        profile_response = self.client.get(f'/api/user/{self.friend.username}/profile/')
+
+        self.assertEqual(profile_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_data['social_battery'], None)
+        self.assertEqual(profile_response.data['check_in']['social_battery'], None)
+        self.assertEqual(list_data['mood'], None)
+        self.assertEqual(profile_response.data['check_in']['mood'], [])
+        self.assertEqual(list_data['thought'], 'visible to regular friends')
+        self.assertEqual(
+            profile_response.data['check_in']['thought'],
+            'visible to regular friends',
+        )
+        self.assertEqual(list_data['track_id'], None)
+        self.assertEqual(profile_response.data['check_in']['track_id'], '')
 
     def test_union_of_recent_and_unread(self):
         """Both a recent-read note and an old-unread note should appear."""
