@@ -26,8 +26,11 @@ from surveys.models import (
     NA_SENTINEL,
     RESULT_AGGREGATED_LIKERT,
     RESULT_OPTION_COUNTS,
+    RESULT_SCALE_SCORE_HISTOGRAM,
     RESULT_SLIDER_HISTOGRAM,
+    RESULT_SLIDER_HISTOGRAM_PAIRED,
     RESULT_WORDCLOUD,
+    SLIDER,
     Survey,
     SurveyAnswer,
     SurveyQuestion,
@@ -308,12 +311,200 @@ class SliderHistogramStrategy(AggregationStrategy):
         }
 
 
+class ScaleScoreHistogramStrategy(AggregationStrategy):
+    """Whole-survey summary score → histogram of all responders' scores.
+
+    Activated when `survey.result_kind == 'scale_score_histogram'`. The view
+    layer wraps the entire survey in a single synthetic panel and dispatches
+    here, bypassing the per-question grouping. Score per response comes from
+    `surveys.scoring.score_response`, which honors `survey.score_formula` if
+    set (e.g. rsq_brief_weighted) and otherwise applies the default sum-with-
+    reverse formula.
+    """
+
+    kind = RESULT_SCALE_SCORE_HISTOGRAM
+
+    def build(self, survey, questions, responder_ids, viewer_id):
+        # Local import — registry imports models which imports translation
+        # which imports models, so module-level import would cycle.
+        from surveys.scoring import score_response
+
+        responses = (
+            SurveyResponse.objects
+            .filter(survey=survey, user_id__in=responder_ids)
+            .prefetch_related('answers__question')
+        )
+        scores: list[int] = []
+        user_score: Optional[int] = None
+        for r in responses:
+            s = score_response(survey, r)
+            if s is not None:
+                scores.append(s)
+        # Viewer's own score queried separately so operator viewers (filtered
+        # out of responder_ids by privacy.compute_responder_ids) still see
+        # their own score highlighted on the histogram. Mirrors the pattern
+        # in OptionCounts/SliderHistogram strategies.
+        viewer_resp = (
+            SurveyResponse.objects
+            .filter(survey=survey, user_id=viewer_id)
+            .prefetch_related('answers__question')
+            .first()
+        )
+        if viewer_resp is not None:
+            user_score = score_response(survey, viewer_resp)
+
+        if not scores:
+            return {
+                'kind': self.kind,
+                'min_score': None,
+                'max_score': None,
+                'bins': [],
+                'mean': None,
+                'median': None,
+                'user_score': user_score,
+            }
+
+        min_score = min(scores)
+        max_score = max(scores)
+        counter = Counter(scores)
+        bins = [
+            {'score': i, 'count': counter.get(i, 0)}
+            for i in range(min_score, max_score + 1)
+        ]
+        return {
+            'kind': self.kind,
+            'min_score': min_score,
+            'max_score': max_score,
+            'bins': bins,
+            'mean': round(sum(scores) / len(scores), 2),
+            'median': float(median(scores)),
+            'user_score': user_score,
+        }
+
+
+class SliderHistogramPairedStrategy(AggregationStrategy):
+    """2D circumplex for two slider questions sharing a result_group.
+
+    Surveys with `result_kind = 'slider_histogram_paired'` route here. The
+    panel must contain exactly two slider questions; their values for each
+    responder form an (x, y) point. The frontend renders the points as a
+    scatter plot, optionally with a density overlay.
+
+    Mirrors the user_choice/user_value pattern from OptionCounts: builds the
+    population dataset from `responder_ids` (operators excluded) and the
+    viewer's own (x, y) separately so it can be highlighted regardless.
+    """
+
+    kind = RESULT_SLIDER_HISTOGRAM_PAIRED
+
+    def build(self, survey, questions, responder_ids, viewer_id):
+        sliders = [q for q in questions if q.type == SLIDER]
+        if len(sliders) < 2:
+            # Degenerate panel — can't form (x, y) pairs.
+            return {
+                'kind': self.kind,
+                'x_question_id': sliders[0].id if sliders else None,
+                'y_question_id': None,
+                'x_min': None,
+                'x_max': None,
+                'y_min': None,
+                'y_max': None,
+                'points': [],
+                'user_point': None,
+            }
+        qx, qy = sliders[0], sliders[1]
+        # Pair answers by response_id — only count responses that have
+        # values for BOTH sliders. Single-axis answers can't plot.
+        x_answers = {
+            ans.response_id: int(ans.value)
+            for ans in SurveyAnswer.objects.filter(
+                question=qx, response__user_id__in=responder_ids,
+            )
+            if ans.value is not None
+        }
+        y_answers = {
+            ans.response_id: int(ans.value)
+            for ans in SurveyAnswer.objects.filter(
+                question=qy, response__user_id__in=responder_ids,
+            )
+            if ans.value is not None
+        }
+        points = [
+            {'x': x_answers[rid], 'y': y_answers[rid]}
+            for rid in x_answers
+            if rid in y_answers
+        ]
+        # Viewer's own point — separate query so operator viewers see their
+        # own point even when excluded from population aggregation.
+        user_point = None
+        viewer_x = SurveyAnswer.objects.filter(
+            question=qx, response__user_id=viewer_id,
+        ).values_list('value', flat=True).first()
+        viewer_y = SurveyAnswer.objects.filter(
+            question=qy, response__user_id=viewer_id,
+        ).values_list('value', flat=True).first()
+        if viewer_x is not None and viewer_y is not None:
+            user_point = {'x': int(viewer_x), 'y': int(viewer_y)}
+        return {
+            'kind': self.kind,
+            'x_question_id': qx.id,
+            'y_question_id': qy.id,
+            'x_min': qx.slider_min_value,
+            'x_max': qx.slider_max_value,
+            'y_min': qy.slider_min_value,
+            'y_max': qy.slider_max_value,
+            'points': points,
+            'user_point': user_point,
+        }
+
+
 STRATEGIES: dict[str, AggregationStrategy] = {
     RESULT_AGGREGATED_LIKERT: AggregatedLikertStrategy(),
     RESULT_OPTION_COUNTS: OptionCountsStrategy(),
     RESULT_WORDCLOUD: WordcloudStrategy(),
     RESULT_SLIDER_HISTOGRAM: SliderHistogramStrategy(),
+    RESULT_SCALE_SCORE_HISTOGRAM: ScaleScoreHistogramStrategy(),
+    RESULT_SLIDER_HISTOGRAM_PAIRED: SliderHistogramPairedStrategy(),
 }
+
+
+def group_panels_for_survey_level_kind(
+    survey: Survey,
+) -> list[tuple[str, list[SurveyQuestion]]]:
+    """Build the panel list when `survey.result_kind` is set on the Survey
+    rather than per-question.
+
+    - `scale_score_histogram` → ONE synthetic panel containing every
+      non-hidden, scorable question. The strategy computes a single summary
+      score per response, so per-question grouping is irrelevant.
+    - `slider_histogram_paired` → ONE panel per `result_group` that
+      contains 2+ slider questions. Each pair becomes a separate 2D plot.
+
+    Returns the same shape as `group_panels` so callers can switch on
+    `survey.result_kind` once and reuse the existing per-panel rendering
+    pipeline.
+    """
+    questions = [
+        q for q in survey.questions.order_by('order')
+        if not q.result_hidden and q.type not in INPUT_LESS_TYPES
+    ]
+    if survey.result_kind == RESULT_SCALE_SCORE_HISTOGRAM:
+        return [('__survey__', questions)] if questions else []
+    if survey.result_kind == RESULT_SLIDER_HISTOGRAM_PAIRED:
+        groups: dict[str, list[SurveyQuestion]] = {}
+        order: list[str] = []
+        for q in questions:
+            if q.type != SLIDER:
+                continue
+            key = q.result_group or '__auto__:slider_paired'
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(q)
+        # Filter to groups with 2+ sliders — single-slider groups can't pair.
+        return [(k, groups[k]) for k in order if len(groups[k]) >= 2]
+    # Fallback (shouldn't happen — caller checks survey.result_kind first).
+    return []
 
 
 def group_panels(survey: Survey) -> list[tuple[str, list[SurveyQuestion]]]:

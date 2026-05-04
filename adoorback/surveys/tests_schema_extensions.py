@@ -26,16 +26,23 @@ from django.test import TestCase
 from surveys.aggregation import (
     AggregatedLikertStrategy,
     OptionCountsStrategy,
+    ScaleScoreHistogramStrategy,
+    SliderHistogramPairedStrategy,
     SliderHistogramStrategy,
     _likert_range,
     group_panels,
+    group_panels_for_survey_level_kind,
 )
 from surveys.management.commands.load_surveys import (
     _preprocess_yaml_text,
     _rewrite_merge_key_to_include,
     _wrap_top_level_anchor_blocks,
 )
+from surveys.scheduling import get_survey_index, get_today_daily
+from surveys.serializers import SurveyDetailSerializer
+from surveys.tokens import build_token_map, substitute
 from surveys.models import (
+    CADENCE_DAILY,
     DISPLAY_ONLY,
     LIKERT_3,
     LIKERT_5,
@@ -46,7 +53,10 @@ from surveys.models import (
     RESULT_AGGREGATED_LIKERT,
     RESULT_OPTION_COUNTS,
     RESULT_SCALE_SCORE_HISTOGRAM,
+    RESULT_SLIDER_HISTOGRAM_PAIRED,
+    ScheduledSurvey,
     SINGLE_CHOICE,
+    SLIDER,
     Survey,
     SurveyAnswer,
     SurveyOption,
@@ -499,6 +509,345 @@ class LoadSurveysIncludeTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Survey-level result kinds: scale_score_histogram + slider_histogram_paired
+# ---------------------------------------------------------------------------
+class SurveyLevelResultKindTests(TestCase):
+    def setUp(self):
+        self.viewer = User.objects.create(username='svl', email='svl@x.com')
+
+    def test_scale_score_histogram_groups_all_scorable_questions(self):
+        s = Survey.objects.create(
+            slug='ssh', title_en='S', title_ko='S',
+            result_kind=RESULT_SCALE_SCORE_HISTOGRAM,
+        )
+        # Mix display_only (skipped), likert_5 (counted), and a hidden question.
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=DISPLAY_ONLY, required=False,
+            content_en='intro', prompt_en='', prompt_ko='',
+        )
+        SurveyQuestion.objects.create(
+            survey=s, order=2, type=LIKERT_5, slug='a',
+            prompt_en='p', prompt_ko='p',
+        )
+        SurveyQuestion.objects.create(
+            survey=s, order=3, type=LIKERT_5, slug='b',
+            prompt_en='p', prompt_ko='p',
+        )
+        SurveyQuestion.objects.create(
+            survey=s, order=4, type=LIKERT_5, slug='hidden',
+            prompt_en='p', prompt_ko='p', result_hidden=True,
+        )
+        panels = group_panels_for_survey_level_kind(s)
+        self.assertEqual(len(panels), 1)
+        group_key, qs = panels[0]
+        self.assertEqual(group_key, '__survey__')
+        # display_only and result_hidden are filtered out; the two scorable
+        # likert questions remain.
+        self.assertEqual([q.slug for q in qs], ['a', 'b'])
+
+    def test_scale_score_histogram_strategy_builds_histogram(self):
+        s = Survey.objects.create(
+            slug='ssh2', title_en='S', title_ko='S',
+            result_kind=RESULT_SCALE_SCORE_HISTOGRAM,
+        )
+        q1 = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, slug='a',
+            prompt_en='p', prompt_ko='p',
+        )
+        q2 = SurveyQuestion.objects.create(
+            survey=s, order=2, type=LIKERT_5, slug='b',
+            prompt_en='p', prompt_ko='p',
+        )
+        # Two responders: viewer with score 4+5=9, another with 3+3=6.
+        u2 = User.objects.create(username='svl2', email='svl2@x.com')
+        for u, v1, v2 in [(self.viewer, 4, 5), (u2, 3, 3)]:
+            r = SurveyResponse.objects.create(user=u, survey=s)
+            SurveyAnswer.objects.create(response=r, question=q1, value=v1)
+            SurveyAnswer.objects.create(response=r, question=q2, value=v2)
+
+        out = ScaleScoreHistogramStrategy().build(
+            s, [q1, q2], [self.viewer.id, u2.id], self.viewer.id,
+        )
+        self.assertEqual(out['min_score'], 6)
+        self.assertEqual(out['max_score'], 9)
+        self.assertEqual(out['user_score'], 9)
+        # Bins span 6..9 — only 6 and 9 have count 1, others 0.
+        scored = {b['score']: b['count'] for b in out['bins']}
+        self.assertEqual(scored, {6: 1, 7: 0, 8: 0, 9: 1})
+
+    def test_slider_histogram_paired_strategy_pairs_two_sliders(self):
+        s = Survey.objects.create(
+            slug='shp', title_en='S', title_ko='S',
+            result_kind=RESULT_SLIDER_HISTOGRAM_PAIRED,
+        )
+        qx = SurveyQuestion.objects.create(
+            survey=s, order=1, type=SLIDER, slug='valence',
+            prompt_en='p', prompt_ko='p',
+            slider_min_value=0, slider_max_value=100, result_group='mood',
+        )
+        qy = SurveyQuestion.objects.create(
+            survey=s, order=2, type=SLIDER, slug='arousal',
+            prompt_en='p', prompt_ko='p',
+            slider_min_value=0, slider_max_value=100, result_group='mood',
+        )
+        r = SurveyResponse.objects.create(user=self.viewer, survey=s)
+        SurveyAnswer.objects.create(response=r, question=qx, value=70)
+        SurveyAnswer.objects.create(response=r, question=qy, value=40)
+
+        out = SliderHistogramPairedStrategy().build(
+            s, [qx, qy], [self.viewer.id], self.viewer.id,
+        )
+        self.assertEqual(out['x_min'], 0)
+        self.assertEqual(out['x_max'], 100)
+        self.assertEqual(out['user_point'], {'x': 70, 'y': 40})
+        self.assertEqual(out['points'], [{'x': 70, 'y': 40}])
+
+    def test_slider_histogram_paired_strategy_skips_unpaired_responses(self):
+        """A response that has only the X-slider answered (no Y) is excluded —
+        we can't plot a half-pair."""
+        s = Survey.objects.create(slug='shp2', title_en='S', title_ko='S')
+        qx = SurveyQuestion.objects.create(
+            survey=s, order=1, type=SLIDER, slug='vx',
+            prompt_en='p', prompt_ko='p',
+            slider_min_value=0, slider_max_value=10, result_group='m',
+        )
+        qy = SurveyQuestion.objects.create(
+            survey=s, order=2, type=SLIDER, slug='vy',
+            prompt_en='p', prompt_ko='p',
+            slider_min_value=0, slider_max_value=10, result_group='m',
+        )
+        u2 = User.objects.create(username='svl3', email='svl3@x.com')
+        # u2: only x answered.
+        r2 = SurveyResponse.objects.create(user=u2, survey=s)
+        SurveyAnswer.objects.create(response=r2, question=qx, value=5)
+        # viewer: full pair.
+        r1 = SurveyResponse.objects.create(user=self.viewer, survey=s)
+        SurveyAnswer.objects.create(response=r1, question=qx, value=3)
+        SurveyAnswer.objects.create(response=r1, question=qy, value=7)
+
+        out = SliderHistogramPairedStrategy().build(
+            s, [qx, qy], [self.viewer.id, u2.id], self.viewer.id,
+        )
+        # Only the viewer's full pair is returned.
+        self.assertEqual(out['points'], [{'x': 3, 'y': 7}])
+
+
+# ---------------------------------------------------------------------------
+# Scheduling: serving_condition + version routing + weekend skip
+# ---------------------------------------------------------------------------
+class SchedulingFiltersTests(TestCase):
+    def setUp(self):
+        from datetime import date as _date
+        # Pin a known weekday for the daily window. Pick a Wednesday (May 6,
+        # 2026) so we can also run a separate Saturday test.
+        self.today = _date(2026, 5, 6)  # Wednesday
+        self.user_w = User.objects.create(
+            username='w', email='w@x.com', user_group='group_w_first',
+        )
+        self.user_q = User.objects.create(
+            username='q', email='q@x.com', user_group='group_q_first',
+        )
+
+    def _schedule(self, survey, day, seq, cadence=CADENCE_DAILY):
+        return ScheduledSurvey.objects.create(
+            survey=survey, cadence=cadence,
+            window_start=day, window_end=day,
+            allow_late=False, sequence_index=seq,
+        )
+
+    def test_version_routing_w_user_only_sees_w_survey(self):
+        from unittest.mock import patch
+
+        sw = Survey.objects.create(slug='mid_study_w', title_en='W', title_ko='W')
+        sq = Survey.objects.create(slug='mid_study_q', title_en='Q', title_ko='Q')
+        SurveyQuestion.objects.create(survey=sw, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        SurveyQuestion.objects.create(survey=sq, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        self._schedule(sw, self.today, seq=1001)
+        self._schedule(sq, self.today, seq=1002)
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            res = get_survey_index(self.user_w)
+            slugs_w = [r.survey.slug for r in res['available_now']]
+        self.assertEqual(slugs_w, ['mid_study_w'])
+
+    def test_version_routing_q_user_only_sees_q_survey(self):
+        from unittest.mock import patch
+
+        sw = Survey.objects.create(slug='post_study_w', title_en='W', title_ko='W')
+        sq = Survey.objects.create(slug='post_study_q', title_en='Q', title_ko='Q')
+        SurveyQuestion.objects.create(survey=sw, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        SurveyQuestion.objects.create(survey=sq, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        self._schedule(sw, self.today, seq=1003)
+        self._schedule(sq, self.today, seq=1004)
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            res = get_survey_index(self.user_q)
+            slugs_q = [r.survey.slug for r in res['available_now']]
+        self.assertEqual(slugs_q, ['post_study_q'])
+
+    def test_weekend_skip_for_non_daily_base_dailies(self):
+        from datetime import date as _date
+        from unittest.mock import patch
+
+        saturday = _date(2026, 5, 9)  # Saturday
+        sotd = Survey.objects.create(slug='sotd_d05_rsq', title_en='S', title_ko='S')
+        diary = Survey.objects.create(slug='daily_base', title_en='D', title_ko='D')
+        SurveyQuestion.objects.create(survey=sotd, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        SurveyQuestion.objects.create(survey=diary, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        self._schedule(sotd, saturday, seq=2001)
+        self._schedule(diary, saturday, seq=2002)
+        with patch('surveys.scheduling._today_la_7am', return_value=saturday):
+            res = get_survey_index(self.user_w)
+            slugs = sorted(r.survey.slug for r in res['available_now'])
+        # SOTD is hidden on Saturday; daily_base survives.
+        self.assertEqual(slugs, ['daily_base'])
+
+    def test_serving_condition_skips_when_user_data_matches(self):
+        from unittest.mock import patch
+
+        s = Survey.objects.create(
+            slug='sotd_d15_shi', title_en='S', title_ko='S',
+            serving_condition={
+                'skip_if_user_embedded_data': {'habit_platform': 'none'},
+            },
+        )
+        SurveyQuestion.objects.create(survey=s, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        self._schedule(s, self.today, seq=3001)
+        # User picked "none" → skip rule fires.
+        UserSurveyEmbeddedData.objects.create(
+            user=self.user_w, key='habit_platform', value='none',
+        )
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            res = get_survey_index(self.user_w)
+        self.assertEqual(res['available_now'], [])
+
+    def test_serving_condition_keeps_when_user_data_differs(self):
+        from unittest.mock import patch
+
+        s = Survey.objects.create(
+            slug='sotd_d15_shi', title_en='S', title_ko='S',
+            serving_condition={
+                'skip_if_user_embedded_data': {'habit_platform': 'none'},
+            },
+        )
+        SurveyQuestion.objects.create(survey=s, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        self._schedule(s, self.today, seq=3002)
+        UserSurveyEmbeddedData.objects.create(
+            user=self.user_w, key='habit_platform', value='instagram',
+        )
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            res = get_survey_index(self.user_w)
+            slugs = [r.survey.slug for r in res['available_now']]
+        self.assertEqual(slugs, ['sotd_d15_shi'])
+
+    def test_get_today_daily_picks_routed_survey_for_w_user(self):
+        from unittest.mock import patch
+
+        sw = Survey.objects.create(slug='mid_study_w', title_en='W', title_ko='W')
+        sq = Survey.objects.create(slug='mid_study_q', title_en='Q', title_ko='Q')
+        SurveyQuestion.objects.create(survey=sw, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        SurveyQuestion.objects.create(survey=sq, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        self._schedule(sw, self.today, seq=4001)
+        self._schedule(sq, self.today, seq=4002)
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            picked = get_today_daily(self.user_w)
+        self.assertIsNotNone(picked)
+        self.assertEqual(picked.survey.slug, 'mid_study_w')
+
+
+# ---------------------------------------------------------------------------
+# Token substitution
+# ---------------------------------------------------------------------------
+class TokenSubstitutionTests(TestCase):
+    def test_substitute_replaces_known_tokens(self):
+        out = substitute(
+            'Welcome to {{phase_label}} ({{phase_window}})',
+            {'phase_label': 'Phase 1', 'phase_window': 'May 4-17'},
+        )
+        self.assertEqual(out, 'Welcome to Phase 1 (May 4-17)')
+
+    def test_substitute_leaves_unknown_tokens_literal(self):
+        out = substitute('hi {{nope}}', {'phase': 'P1'})
+        self.assertEqual(out, 'hi {{nope}}')
+
+    def test_substitute_handles_whitespace_inside_braces(self):
+        out = substitute('hi {{ name }}', {'name': 'world'})
+        self.assertEqual(out, 'hi world')
+
+    def test_substitute_passthrough_on_empty_or_non_string(self):
+        self.assertEqual(substitute('', {'a': 'b'}), '')
+        self.assertIsNone(substitute(None, {'a': 'b'}))
+
+    def test_build_token_map_merges_survey_and_user(self):
+        # `User.objects.create` produces an authenticated User instance —
+        # is_authenticated is a property True when the user isn't anonymous,
+        # which a real User from the DB always is.
+        u = User.objects.create(username='tk', email='tk@x.com')
+        s = Survey.objects.create(
+            slug='tk', title_en='T', title_ko='T',
+            tokens={'phase_label': 'Phase 1'},
+        )
+        UserSurveyEmbeddedData.objects.create(
+            user=u, key='habit_platform_label', value='Instagram',
+        )
+        out = build_token_map(s, viewer=u)
+        self.assertEqual(out['phase_label'], 'Phase 1')
+        self.assertEqual(out['habit_platform_label'], 'Instagram')
+
+    def test_build_token_map_survey_wins_on_collision(self):
+        u = User.objects.create(username='tk2', email='tk2@x.com')
+        s = Survey.objects.create(
+            slug='tk2', title_en='T', title_ko='T',
+            tokens={'name': 'survey_value'},
+        )
+        UserSurveyEmbeddedData.objects.create(
+            user=u, key='name', value='user_value',
+        )
+        out = build_token_map(s, viewer=u)
+        self.assertEqual(out['name'], 'survey_value')
+
+    def test_build_token_map_anonymous_viewer(self):
+        from django.contrib.auth.models import AnonymousUser
+        s = Survey.objects.create(
+            slug='anon', title_en='T', title_ko='T',
+            tokens={'phase_label': 'Phase 1'},
+        )
+        out = build_token_map(s, viewer=AnonymousUser())
+        # Anonymous viewers get only the survey-level tokens, not user data.
+        self.assertEqual(out, {'phase_label': 'Phase 1'})
+
+    def test_serializer_substitutes_tokens_in_question_text(self):
+        u = User.objects.create(username='ser', email='ser@x.com')
+        s = Survey.objects.create(
+            slug='ser', title_en='T', title_ko='T',
+            tokens={'phase_label': 'Phase 1'},
+        )
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5,
+            prompt_en='How was {{phase_label}}?',
+            prompt_ko='어땠나요 {{phase_label}}?',
+            description_en='Reflecting on {{phase_label}}',
+            description_ko='',
+        )
+        from rest_framework.test import APIRequestFactory
+        request = APIRequestFactory().get('/')
+        request.user = u
+        data = SurveyDetailSerializer(s, context={'request': request}).data
+        q = data['questions'][0]
+        self.assertEqual(q['prompt_en'], 'How was Phase 1?')
+        self.assertEqual(q['prompt_ko'], '어땠나요 Phase 1?')
+        self.assertEqual(q['description_en'], 'Reflecting on Phase 1')
+
+
+# ---------------------------------------------------------------------------
 # YAML preprocessor: top-level anchor wrap + merge-key → _include rewrite
 # ---------------------------------------------------------------------------
 class YamlPreprocessorTests(TestCase):
@@ -609,6 +958,148 @@ class SurveyOptionStringValuesTests(TestCase):
         counts = {o['value']: o['count'] for o in out['options']}
         self.assertEqual(counts, {'yes': 0, 'no': 0, 'maybe': 1})
         self.assertEqual(out['user_choice'], 'maybe')
+
+
+# ---------------------------------------------------------------------------
+# Submit view: repeatable + embedded_data persistence + likert_5_na N/A
+# ---------------------------------------------------------------------------
+class SubmitViewExtensionsTests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+
+        self.user = User.objects.create(username='sb', email='sb@x.com')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_repeatable_survey_allows_multiple_submits(self):
+        s = Survey.objects.create(
+            slug='r', title_en='R', title_ko='R', repeatable=True,
+        )
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        # Schedule it as anytime so the open-window check passes.
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='anytime',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=5001,
+        )
+        url = f'/api/surveys/{s.slug}/responses/'
+        for _ in range(2):
+            r = self.client.post(
+                url, data={'answers': [{'question_id': q.id, 'value': 3}]},
+                format='json',
+            )
+            self.assertEqual(r.status_code, 201)
+        # Two distinct SurveyResponse rows for the same user.
+        self.assertEqual(SurveyResponse.objects.filter(user=self.user, survey=s).count(), 2)
+
+    def test_non_repeatable_survey_returns_409_on_resubmit(self):
+        s = Survey.objects.create(slug='nr', title_en='N', title_ko='N')
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='anytime',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=5002,
+        )
+        url = f'/api/surveys/{s.slug}/responses/'
+        r1 = self.client.post(
+            url, data={'answers': [{'question_id': q.id, 'value': 3}]},
+            format='json',
+        )
+        r2 = self.client.post(
+            url, data={'answers': [{'question_id': q.id, 'value': 4}]},
+            format='json',
+        )
+        self.assertEqual(r1.status_code, 201)
+        self.assertEqual(r2.status_code, 409)
+
+    def test_likert_5_na_accepts_null_value(self):
+        s = Survey.objects.create(slug='na_s', title_en='N', title_ko='N')
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5_NA, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='anytime',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=5003,
+        )
+        r = self.client.post(
+            f'/api/surveys/{s.slug}/responses/',
+            data={'answers': [{'question_id': q.id, 'value': None}]},
+            format='json',
+        )
+        self.assertEqual(r.status_code, 201)
+        ans = SurveyAnswer.objects.get(response__user=self.user, question=q)
+        self.assertIsNone(ans.value)
+
+    def test_embedded_data_signal_persists_flagged_answers(self):
+        s = Survey.objects.create(slug='emb', title_en='E', title_ko='E')
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=SINGLE_CHOICE,
+            prompt_en='p', prompt_ko='p',
+            slug='habit_platform', embedded_data=True,
+        )
+        SurveyOption.objects.create(
+            question=q, order=1, value='instagram',
+            label_en='Instagram', label_ko='Instagram',
+        )
+        SurveyOption.objects.create(
+            question=q, order=2, value='tiktok',
+            label_en='TikTok', label_ko='틱톡',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='anytime',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=5004,
+        )
+        r = self.client.post(
+            f'/api/surveys/{s.slug}/responses/',
+            data={'answers': [{'question_id': q.id, 'value': 'instagram'}]},
+            format='json',
+        )
+        self.assertEqual(r.status_code, 201)
+        # The raw value AND the human-readable label were both persisted.
+        rows = {
+            row.key: row.value
+            for row in UserSurveyEmbeddedData.objects.filter(user=self.user)
+        }
+        self.assertEqual(rows.get('habit_platform'), 'instagram')
+        self.assertEqual(rows.get('habit_platform_label'), 'Instagram')
+
+    def test_display_only_question_in_payload_is_skipped(self):
+        s = Survey.objects.create(slug='dpo_sub', title_en='D', title_ko='D')
+        intro = SurveyQuestion.objects.create(
+            survey=s, order=1, type=DISPLAY_ONLY, required=False,
+            content_en='hi', prompt_en='', prompt_ko='',
+        )
+        real = SurveyQuestion.objects.create(
+            survey=s, order=2, type=LIKERT_5,
+            prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='anytime',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=5005,
+        )
+        r = self.client.post(
+            f'/api/surveys/{s.slug}/responses/',
+            data={'answers': [
+                # display_only block somehow shows up in the payload — must
+                # be silently skipped, not crash the submit.
+                {'question_id': intro.id, 'value': 'whatever'},
+                {'question_id': real.id, 'value': 4},
+            ]},
+            format='json',
+        )
+        self.assertEqual(r.status_code, 201)
+        # Only the real question got a SurveyAnswer row.
+        self.assertEqual(
+            SurveyAnswer.objects.filter(response__user=self.user, response__survey=s).count(),
+            1,
+        )
 
 
 # ---------------------------------------------------------------------------
