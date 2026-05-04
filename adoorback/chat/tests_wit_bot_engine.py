@@ -56,11 +56,10 @@ class EngineDispatchTests(TestCase):
     def _bot_replies(self):
         return Message.objects.filter(chat_room=self.room, sender=self.bot)
 
-    def _add_friend_for_alice(self):
+    def _add_friend_for_alice(self, choice='friend'):
         from account.models import Connection
         bob = User.objects.create_user(username='bob', email='bob@e.com', password='x')
         smaller, larger = (self.alice, bob) if self.alice.id < bob.id else (bob, self.alice)
-        choice = 'friend'
         Connection.objects.create(
             user1=smaller, user2=larger,
             user1_choice=choice, user2_choice=choice,
@@ -210,6 +209,13 @@ class EngineDispatchTests(TestCase):
     def test_friend_with_connection_advances_to_widget(self):
         self._enable_push_for_alice()
         self._add_friend_for_alice()
+        self._walk_through_quizzes()
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, 'kickoff_widget')
+
+    def test_close_friend_with_connection_advances_to_widget(self):
+        self._enable_push_for_alice()
+        self._add_friend_for_alice(choice='close_friend')
         self._walk_through_quizzes()
         state = state_mod.get_or_create_state(self.alice)
         self.assertEqual(state.current_intent, 'kickoff_widget')

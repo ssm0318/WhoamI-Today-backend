@@ -352,7 +352,7 @@ def _enter_kickoff_friend(state, user):
 def _check_friend_and_continue(state, user):
     from chat.wit_bot_copy import FRIEND_DONE_BUTTON, FRIEND_MIN_NEEDED_COPY, FRIEND_MIN_OK_COPY
 
-    has_friend = user.friends.exists()
+    has_friend = user.friends.exists() or user.close_friends.exists()
     if has_friend:
         state_mod.set_progress(state, user.current_ver, 'kickoff', {'friend_min': 'ok'})
         return [(t(FRIEND_MIN_OK_COPY, user), None), *_enter_kickoff_widget(state, user)]
