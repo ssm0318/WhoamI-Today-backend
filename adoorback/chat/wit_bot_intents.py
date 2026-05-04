@@ -342,10 +342,12 @@ def kickoff_widget_handler(state, message, user):
 
 
 def _enter_kickoff_complete(state, user):
-    from chat.wit_bot_copy import WRAP_KICKOFF
+    from chat.wit_bot_copy import WC_BTN_RUN_AUDIT, WRAP_KICKOFF
     state_mod.set_intent(state, '', step=0)
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'completed': True})
-    return [(t(WRAP_KICKOFF, user), None)]
+    return [(t(WRAP_KICKOFF, user), card_with_buttons([
+        {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
+    ]))]
 
 
 # ---------- Audit ----------
@@ -376,12 +378,29 @@ def _build_audit_report(user):
     return engaged, missing
 
 
+def _audit_complete_message(user):
+    """Return the (text, payload) tuple for 'audit shows 0 missing' with an
+    inline Take boss quiz button — keeps the CTA at the bottom of the chat
+    scroll where the user's eye lands."""
+    from chat.wit_bot_copy import AUDIT_NOTHING_MISSING, WC_BTN_TAKE_BOSS_QUIZ
+    return (t(AUDIT_NOTHING_MISSING, user), card_with_buttons([
+        {'label': t(WC_BTN_TAKE_BOSS_QUIZ, user), 'payload': 'take_boss_quiz'},
+    ]))
+
+
+def _walkthrough_complete_message(user):
+    """Walkthrough finished — boss quiz unlock CTA inline at the bottom."""
+    from chat.wit_bot_copy import WALKTHROUGH_COMPLETE, WC_BTN_TAKE_BOSS_QUIZ
+    return (t(WALKTHROUGH_COMPLETE, user), card_with_buttons([
+        {'label': t(WC_BTN_TAKE_BOSS_QUIZ, user), 'payload': 'take_boss_quiz'},
+    ]))
+
+
 def audit_handler(state, message, user):
     """Initial entry to audit + branch on user's response."""
     from chat.wit_bot_copy import (
         AUDIT_ALMOST_THERE, AUDIT_BTN_LATER, AUDIT_BTN_LIST, AUDIT_BTN_WALKTHROUGH,
-        AUDIT_HEADER, AUDIT_NOTHING_MISSING, AUDIT_RESULT_TEMPLATE,
-        EXPLORE_LATER, JUST_LIST_INTRO,
+        AUDIT_HEADER, AUDIT_RESULT_TEMPLATE, EXPLORE_LATER, JUST_LIST_INTRO,
     )
 
     payload = (message.bot_payload or {}).get('payload', '')
@@ -392,7 +411,7 @@ def audit_handler(state, message, user):
         _, missing = _build_audit_report(user)
         if not missing:
             state_mod.set_intent(state, '', step=0)
-            return [(t(AUDIT_NOTHING_MISSING, user), None)]
+            return [_audit_complete_message(user)]
         out = [(t(JUST_LIST_INTRO, user), None)]
         for pred in missing:
             out.append(_walkthrough_feature_card(pred, user, mode='list'))
@@ -411,7 +430,7 @@ def audit_handler(state, message, user):
             'last_engaged_count': len(engaged),
             'last_missing_count': 0,
         })
-        return [(t(AUDIT_HEADER, user), None), (t(AUDIT_NOTHING_MISSING, user), None)]
+        return [(t(AUDIT_HEADER, user), None), _audit_complete_message(user)]
 
     lang = getattr(user, 'language', 'en') or 'en'
     nothing_yet = '  (아직 없음)' if lang == 'ko' else '  (nothing yet)'
@@ -476,12 +495,12 @@ def _walkthrough_feature_card(predicate, user, mode='walkthrough'):
 
 
 def _enter_walkthrough(state, user):
-    from chat.wit_bot_copy import AUDIT_NOTHING_MISSING, WALKTHROUGH_INTRO
+    from chat.wit_bot_copy import WALKTHROUGH_INTRO
 
     _, missing = _build_audit_report(user)
     if not missing:
         state_mod.set_intent(state, '', step=0)
-        return [(t(AUDIT_NOTHING_MISSING, user), None)]
+        return [_audit_complete_message(user)]
 
     state_mod.set_intent(state, 'walkthrough', step=0)
     state_mod.set_progress(state, user.current_ver, 'walkthrough', {
@@ -498,7 +517,7 @@ def _enter_walkthrough(state, user):
 
 def walkthrough_handler(state, message, user):
     from chat.wit_bot_copy import (
-        WALKTHROUGH_COMPLETE, WALKTHROUGH_RECHECK_FAIL, WALKTHROUGH_RECHECK_OK,
+        WALKTHROUGH_RECHECK_FAIL, WALKTHROUGH_RECHECK_OK,
     )
     from chat.models import OnboardingEvent
     from chat.wit_bot_predicates import predicate_by_key
@@ -511,7 +530,7 @@ def walkthrough_handler(state, message, user):
 
     if not missing_keys:
         state_mod.set_intent(state, '', step=0)
-        return [(t(WALKTHROUGH_COMPLETE, user), None)]
+        return [_walkthrough_complete_message(user)]
 
     advanced = False
     pre_messages = []  # things to post before the next feature card
@@ -543,7 +562,7 @@ def walkthrough_handler(state, message, user):
 
     if index >= len(missing_keys):
         state_mod.set_intent(state, '', step=0)
-        return pre_messages + [(t(WALKTHROUGH_COMPLETE, user), None)]
+        return pre_messages + [_walkthrough_complete_message(user)]
 
     next_pred = predicate_by_key(missing_keys[index])
     if next_pred is None:
@@ -551,7 +570,7 @@ def walkthrough_handler(state, message, user):
         state_mod.set_progress(state, user.current_ver, 'walkthrough', {'index': index})
         if index >= len(missing_keys):
             state_mod.set_intent(state, '', step=0)
-            return pre_messages + [(t(WALKTHROUGH_COMPLETE, user), None)]
+            return pre_messages + [_walkthrough_complete_message(user)]
         next_pred = predicate_by_key(missing_keys[index])
 
     return pre_messages + [_walkthrough_feature_card(next_pred, user, mode='walkthrough')]
