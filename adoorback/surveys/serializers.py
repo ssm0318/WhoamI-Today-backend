@@ -96,10 +96,15 @@ class SurveyQuestionSerializer(serializers.ModelSerializer):
 
 
 class SurveyMinimalSerializer(serializers.ModelSerializer):
-    """Lightweight Survey shape for the bucketed index (no questions)."""
+    """Lightweight Survey shape for the bucketed index (no questions).
+
+    Surfaces `priority`, `editable`, and `closed` so the frontend index page
+    can sort + render badges (e.g. "Open until closed", "Edit response")
+    without a second round-trip per row.
+    """
     class Meta:
         model = Survey
-        fields = ['slug', 'title_en', 'title_ko']
+        fields = ['slug', 'title_en', 'title_ko', 'priority', 'editable', 'closed']
 
 
 class SurveyDetailSerializer(serializers.ModelSerializer):
@@ -117,6 +122,9 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             # Long-form study extensions:
             'tokens',
             'repeatable',
+            'editable',
+            'closed',
+            'priority',
             'result_kind',
             'questions',
             'user_has_responded',

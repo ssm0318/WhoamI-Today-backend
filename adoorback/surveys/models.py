@@ -183,6 +183,32 @@ class Survey(AdoorTimestampedModel):
             'not served to that user.'
         ),
     )
+    editable = models.BooleanField(
+        default=False,
+        help_text=(
+            'When True, re-submitting REPLACES the existing answers instead of '
+            '409. One SurveyResponse per user, but updateable until the survey '
+            'is closed. Frontend should pre-fill the form with prior answers.'
+        ),
+    )
+    closed = models.BooleanField(
+        default=False,
+        help_text=(
+            'Researcher-only flag. When True, new submissions return 410 (gone). '
+            'Existing responses are preserved. Daily / SOTD surveys naturally '
+            'close at end-of-day via window_end; this flag is for biweekly / '
+            'anytime / endpoint surveys that researchers manually close at '
+            'study end.'
+        ),
+    )
+    priority = models.IntegerField(
+        default=0,
+        help_text=(
+            'Higher = surfaced earlier in the survey index. Convention: '
+            '100 = research-critical (feature_eval, goal_comparison), '
+            '80 = daily / SOTD, 50 = weekly, 40 = mid/post/pre, 20 = anytime.'
+        ),
+    )
 
     class Meta:
         ordering = ['slug']
@@ -396,6 +422,19 @@ class ScheduledSurvey(AdoorTimestampedModel):
     window_end = models.DateField(null=True, blank=True)
     allow_late = models.BooleanField(default=True)
     sequence_index = models.PositiveSmallIntegerField()
+    target_user_group = models.CharField(
+        max_length=32,
+        blank=True,
+        default='',
+        help_text=(
+            "Restrict this row to a single user_group (e.g. 'group_w_first'). "
+            "Empty = all groups (default). Combined with the slug-suffix "
+            "routing in `routes_to_user`, this lets the SAME survey content "
+            "be scheduled twice with different windows per group — useful "
+            "for `feature_eval_w` opening Day 5 for w_first / Day 19 for "
+            "q_first without needing two distinct slugs."
+        ),
+    )
 
     class Meta:
         ordering = ['window_start', 'sequence_index']

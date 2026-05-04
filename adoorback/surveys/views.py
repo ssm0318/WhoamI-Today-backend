@@ -1,5 +1,6 @@
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -141,11 +142,21 @@ class SurveyResponseSubmitView(APIView):
         # wrong variant so research data stays cleanly partitioned.
         if not routes_to_user(survey, request.user):
             return Response(status=status.HTTP_404_NOT_FOUND)
-        # `repeatable: true` surveys (e.g. anytime_reflection) allow the same
-        # user to submit multiple times — each submission is its own row.
-        if not survey.repeatable and SurveyResponse.objects.filter(
-            survey=survey, user=request.user,
-        ).exists():
+        # Researcher-set close flag — survey accepts no new / updated answers.
+        # Existing responses are preserved; this just rejects further submits.
+        if survey.closed:
+            return Response(
+                {'detail': 'This survey has been closed by researchers.'},
+                status=status.HTTP_410_GONE,
+            )
+        # Submit semantics depend on Survey.repeatable + Survey.editable:
+        #   - repeatable=True: each submit creates a new SurveyResponse row.
+        #   - editable=True (and not repeatable): one row per user, but the
+        #     answers are REPLACED on resubmit — caller is editing.
+        #   - default (neither): single submit, 409 on resubmit.
+        existing = SurveyResponse.objects.filter(survey=survey, user=request.user).first()
+        is_edit = bool(existing and survey.editable and not survey.repeatable)
+        if existing and not survey.repeatable and not survey.editable:
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
@@ -174,7 +185,16 @@ class SurveyResponseSubmitView(APIView):
         ser.is_valid(raise_exception=True)
         try:
             with transaction.atomic():
-                response = SurveyResponse.objects.create(user=request.user, survey=survey)
+                if is_edit:
+                    # Edit mode: keep the SurveyResponse row but wipe + replace
+                    # answers. Bumping submitted_at so analyses can see the
+                    # most recent edit time.
+                    response = existing
+                    response.submitted_at = timezone.now()
+                    response.save(update_fields=['submitted_at'])
+                    response.answers.all().delete()
+                else:
+                    response = SurveyResponse.objects.create(user=request.user, survey=survey)
                 for a in ser.validated_data['answers']:
                     question = SurveyQuestion.objects.get(id=a['question_id'], survey=survey)
                     # display_only blocks accept no value — defensively skip
@@ -192,6 +212,38 @@ class SurveyResponseSubmitView(APIView):
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
         return Response({'id': response.id}, status=status.HTTP_201_CREATED)
+
+
+class MyResponseView(APIView):
+    """Return the requesting user's existing answers for this survey, or 404
+    if they haven't submitted yet.
+
+    Used by the frontend to pre-fill the form when editing an `editable`
+    survey. Shape: `{ id, submitted_at, answers: [{ question_id, value }, ...] }`.
+    Routing-blocked surveys return 404 (same as SurveyDetailView).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug):
+        try:
+            survey = Survey.objects.get(slug=slug)
+        except Survey.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if not routes_to_user(survey, request.user):
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        response = SurveyResponse.objects.filter(
+            survey=survey, user=request.user,
+        ).prefetch_related('answers').order_by('-submitted_at').first()
+        if response is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            'id': response.id,
+            'submitted_at': response.submitted_at.isoformat(),
+            'answers': [
+                {'question_id': a.question_id, 'value': a.value}
+                for a in response.answers.all()
+            ],
+        })
 
 
 class SurveyResultsView(APIView):

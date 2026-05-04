@@ -91,6 +91,25 @@ def routes_to_user(survey, user) -> bool:
     return True
 
 
+def schedule_routes_to_user(scheduled, user) -> bool:
+    """True when this scheduled row is visible to `user`.
+
+    Two layers of routing — survey-level (slug-suffix `_w` / `_q`) AND
+    schedule-level (`ScheduledSurvey.target_user_group`). The schedule-level
+    field lets the SAME survey content be scheduled twice with different
+    windows per group (e.g. feature_eval_w opens Day 5 for w_first /
+    Day 19 for q_first), without needing two distinct slugs.
+    """
+    if not routes_to_user(scheduled.survey, user):
+        return False
+    target = getattr(scheduled, 'target_user_group', '') or ''
+    if target:
+        user_group = getattr(user, 'user_group', '') or ''
+        if user_group != target:
+            return False
+    return True
+
+
 # Backward-compat alias. Existing callers in this module still use the
 # private name internally; outside callers should use `routes_to_user`.
 _routes_to_user = routes_to_user
@@ -146,7 +165,7 @@ def get_today_daily(user):
     user_data = _user_embedded_data(user)
     visible = []
     for sched in candidates:
-        if not _routes_to_user(sched.survey, user):
+        if not schedule_routes_to_user(sched, user):
             continue
         if _is_weekend_skipped(sched, today):
             continue
@@ -201,7 +220,7 @@ def get_survey_index(user):
     def _filter(rows):
         out = []
         for sched in rows:
-            if not _routes_to_user(sched.survey, user):
+            if not schedule_routes_to_user(sched, user):
                 continue
             if _is_weekend_skipped(sched, today):
                 continue
@@ -210,12 +229,24 @@ def get_survey_index(user):
             out.append(sched)
         return out
 
+    # Within each bucket, surface the highest-priority surveys first so
+    # users who don't have time for everything see the research-critical
+    # surveys at the top of their list. Tie-break by window_start (earlier
+    # first) then sequence_index for stable ordering.
+    def _by_priority(rows):
+        return sorted(
+            rows,
+            key=lambda s: (-s.survey.priority, s.window_start, s.sequence_index),
+        )
+
     return {
-        'available_now': _filter(available),
-        'late_but_accepted': _filter(late),
+        'available_now': _by_priority(_filter(available)),
+        'late_but_accepted': _by_priority(_filter(late)),
         # Completed rows aren't filtered by serving_condition / weekend —
         # the user already answered, so they should still see the entry in
         # their archive. Version routing IS applied (a Q user shouldn't
         # see a W-only completion in their list, even if they somehow have one).
-        'completed': [s for s in completed if _routes_to_user(s.survey, user)],
+        'completed': _by_priority(
+            [s for s in completed if schedule_routes_to_user(s, user)]
+        ),
     }
