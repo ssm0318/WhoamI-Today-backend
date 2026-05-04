@@ -166,6 +166,8 @@ class ChatRoomSerializer(serializers.ModelSerializer):
             return '멤버가 추가되었어요' if is_ko else 'A member was added'
         if event_type == 'member_left':
             return '멤버가 나갔어요' if is_ko else 'A member left'
+        if event_type == 'wit_welcome_card':
+            return 'WITty 👋' if is_ko else 'WITty 👋'
         return None
 
     def get_last_message_time(self, obj):
