@@ -124,6 +124,12 @@ def get_today_daily(user):
       3. `serving_condition.skip_if_user_embedded_data` — surveys whose
          skip rule matches the user's embedded data are not returned.
 
+    On weekdays of the study window, both daily_base (the diary) AND a
+    SOTD instrument may be scheduled for the same date. The SOTD takes
+    the Survey-of-the-Day card; daily_base still appears in the index
+    and archive but isn't featured. Preference: any non-`daily_base`
+    daily wins over `daily_base` on the same day.
+
     Returns the row regardless of whether the user has answered — the
     SurveyOfTheDay card on /share renders an answered-state UI ("Done /
     View results") once user_has_responded flips true.
@@ -138,6 +144,7 @@ def get_today_daily(user):
         ).select_related('survey')
     )
     user_data = _user_embedded_data(user)
+    visible = []
     for sched in candidates:
         if not _routes_to_user(sched.survey, user):
             continue
@@ -145,8 +152,14 @@ def get_today_daily(user):
             continue
         if _skip_for_serving_condition(sched.survey, user_data):
             continue
-        return sched
-    return None
+        visible.append(sched)
+    if not visible:
+        return None
+    # Prefer any non-`daily_base` row (i.e. an SOTD) on the same day; fall
+    # back to daily_base when no SOTD is scheduled. Stable order so the
+    # answered/unanswered display is consistent across requests.
+    visible.sort(key=lambda s: (s.survey.slug == 'daily_base', s.sequence_index))
+    return visible[0]
 
 
 def get_survey_index(user):

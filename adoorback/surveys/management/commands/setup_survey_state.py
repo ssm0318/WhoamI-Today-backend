@@ -130,15 +130,22 @@ class Command(BaseCommand):
         wq_module = import_module('surveys.migrations.0011_schedule_wq_biweekly')
         wq_module.seed_wq_biweekly(django_apps, None)
 
-        # 4. May 1-3 mock dailies (optional).
+        # 4. Re-seed the 20-row SOTD calendar. Slugs follow `sotd_dNN_*`
+        #    convention; sequence_index = 100 + day_number. Skipped silently
+        #    if no SOTD surveys exist yet (sotd.yaml empty / not loaded).
+        self.stdout.write(self.style.NOTICE('[4] Re-seeding SOTD daily calendar ...'))
+        sotd_module = import_module('surveys.migrations.0013_seed_sotd_schedule')
+        sotd_module.seed_sotd_schedule(django_apps, None)
+
+        # 5. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:
             mock_yaml = FIXTURES_DIR / 'mock_test_today.yaml'
             if not mock_yaml.exists():
                 raise CommandError(f'Required fixture missing: {mock_yaml}')
-            self.stdout.write(self.style.NOTICE(f'[4a] Loading {mock_yaml.name} ...'))
+            self.stdout.write(self.style.NOTICE(f'[5a] Loading {mock_yaml.name} ...'))
             call_command('load_surveys', str(mock_yaml))
 
-            self.stdout.write(self.style.NOTICE('[4b] Scheduling May 1-3 mock dailies ...'))
+            self.stdout.write(self.style.NOTICE('[5b] Scheduling May 1-3 mock dailies ...'))
             for slug, day, seq in MOCK_DAILY_SLOTS:
                 try:
                     survey = Survey.objects.get(slug=slug)
@@ -158,14 +165,14 @@ class Command(BaseCommand):
                 )
                 self.stdout.write(f'    scheduled {slug} on {day} (seq={seq})')
         else:
-            self.stdout.write(self.style.NOTICE('[4] Skipping mock dailies (no --mock-dailies)'))
+            self.stdout.write(self.style.NOTICE('[5] Skipping mock dailies (no --mock-dailies)'))
 
-        # 5. Demo surveys + mock responses (optional, dev-only).
+        # 6. Demo surveys + mock responses (optional, dev-only).
         if opts['include_demos']:
-            self.stdout.write(self.style.NOTICE('[5] Seeding demo question-type surveys ...'))
+            self.stdout.write(self.style.NOTICE('[6] Seeding demo question-type surveys ...'))
             call_command('seed_question_type_demos', email=opts['demo_email'])
         else:
-            self.stdout.write(self.style.NOTICE('[5] Skipping demos (no --include-demos)'))
+            self.stdout.write(self.style.NOTICE('[6] Skipping demos (no --include-demos)'))
 
         self.stdout.write(self.style.SUCCESS(
             f'Done. Surveys={Survey.objects.count()} '

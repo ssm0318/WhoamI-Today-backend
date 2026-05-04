@@ -1103,6 +1103,60 @@ class SubmitViewExtensionsTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# SOTD scheduling: prefer SOTD over daily_base on the same date
+# ---------------------------------------------------------------------------
+class TodayDailyPrefersSotdTests(TestCase):
+    def setUp(self):
+        from datetime import date as _date
+
+        self.today = _date(2026, 5, 5)  # Tuesday — sotd_d02 day per spec
+        self.user = User.objects.create(
+            username='sotd_pref', email='sp@x.com', user_group='group_w_first',
+        )
+
+    def test_sotd_takes_priority_over_daily_base(self):
+        from unittest.mock import patch
+
+        diary = Survey.objects.create(slug='daily_base', title_en='D', title_ko='D')
+        sotd = Survey.objects.create(slug='sotd_d02_rsds', title_en='S', title_ko='S')
+        SurveyQuestion.objects.create(survey=diary, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        SurveyQuestion.objects.create(survey=sotd, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        # Both scheduled on the same date; daily_base seq=2 (lower), sotd seq=102.
+        ScheduledSurvey.objects.create(
+            survey=diary, cadence=CADENCE_DAILY, sequence_index=2,
+            window_start=self.today, window_end=self.today, allow_late=False,
+        )
+        ScheduledSurvey.objects.create(
+            survey=sotd, cadence=CADENCE_DAILY, sequence_index=102,
+            window_start=self.today, window_end=self.today, allow_late=False,
+        )
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            picked = get_today_daily(self.user)
+        self.assertIsNotNone(picked)
+        # Without the SOTD-preference, default ordering by sequence_index
+        # would return daily_base (seq=2 < seq=102). The preference flips
+        # the SOTD to the front.
+        self.assertEqual(picked.survey.slug, 'sotd_d02_rsds')
+
+    def test_daily_base_returned_when_no_sotd_scheduled(self):
+        from unittest.mock import patch
+
+        diary = Survey.objects.create(slug='daily_base', title_en='D', title_ko='D')
+        SurveyQuestion.objects.create(survey=diary, order=1, type=LIKERT_5,
+                                      prompt_en='p', prompt_ko='p')
+        ScheduledSurvey.objects.create(
+            survey=diary, cadence=CADENCE_DAILY, sequence_index=3,
+            window_start=self.today, window_end=self.today, allow_late=False,
+        )
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            picked = get_today_daily(self.user)
+        self.assertIsNotNone(picked)
+        self.assertEqual(picked.survey.slug, 'daily_base')
+
+
+# ---------------------------------------------------------------------------
 # Study schedule shift: May 3 → May 4 (migration 0012)
 # ---------------------------------------------------------------------------
 class StudyScheduleMay4Tests(TestCase):
