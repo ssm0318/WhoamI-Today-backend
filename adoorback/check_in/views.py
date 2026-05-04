@@ -595,7 +595,7 @@ class ArchiveEntryAcknowledgments(generics.ListAPIView):
         return UserMinimalSerializer
 
     def get_queryset(self):
-        entry = get_object_or_404(CheckInComponentEntry, pk=self.kwargs['pk'], is_pinned=True)
+        entry = get_object_or_404(CheckInComponentEntry, pk=self.kwargs['pk'])
         viewer = self.request.user
         if viewer != entry.owner:
             raise exceptions.PermissionDenied("Only the entry owner can view acknowledgments.")
