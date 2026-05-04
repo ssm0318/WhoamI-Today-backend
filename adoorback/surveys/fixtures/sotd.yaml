@@ -6,14 +6,14 @@
 # user's score marked.
 #
 # Surveys in this batch:
-#   day02_rsds        — Self-disclosure propensity (RSDS-10)
+#   sotd_d02_rsds        — Self-disclosure propensity (RSDS-10)
 #   day03_iscs_bond   — Bonding social capital (Williams ISCS, 10 items)
-#   day04_iscs_bridge — Bridging social capital (Williams ISCS, 10 items)
-#   day05_rsq         — Rejection sensitivity (RSQ-Brief, 8 situations × 2)
-#   day06_singelis_ind — Self-construal: independent (Singelis SCS, 12 items)
-#   day07_singelis_int — Self-construal: interdependent (Singelis SCS, 12 items)
-#   day08_woodAS      — Authenticity (Wood AS, 12 items)
-#   day09_ucla8       — Loneliness (UCLA-8)
+#   sotd_d04_iscs_bridge — Bridging social capital (Williams ISCS, 10 items)
+#   sotd_d05_rsq         — Rejection sensitivity (RSQ-Brief, 8 situations × 2)
+#   sotd_d08_singelis_ind — Self-construal: independent (Singelis SCS, 12 items)
+#   sotd_d09_singelis_int — Self-construal: interdependent (Singelis SCS, 12 items)
+#   sotd_d10_woodAS      — Authenticity (Wood AS, 12 items)
+#   sotd_d11_ucla8       — Loneliness (UCLA-8)
 #
 # All 8 surveys:
 #   - friend_visible: false (private trait data)
@@ -47,7 +47,7 @@
 # Survey-level field added: `score_components`
 #   - Optional. If present, declares which item slugs feed into the score.
 #     If absent, all likert_* items in the survey are summed.
-#   - Used in day05_rsq (which has a derivation rule across paired items)
+#   - Used in sotd_d05_rsq (which has a derivation rule across paired items)
 #     and could be used in day03/day04 if you ever bundle multiple ISCS
 #     subscales into one survey.
 #
@@ -66,7 +66,7 @@
 # Items 4 and 8 are reverse-scored.
 # Higher score = greater general willingness to self-disclose.
 
-- slug: day02_rsds
+- slug: sotd_d02_rsds
   type: likert_5
   title:
     en: "How openly do you tend to share?"
@@ -177,7 +177,7 @@
 # (close, emotional, support-providing ties).
 # Higher score = stronger bonding ties in your network.
 
-- slug: day03_iscs_bond
+- slug: sotd_d03_iscs_bond
   type: likert_5
   title:
     en: "How close are your closest people?"
@@ -288,7 +288,7 @@
 # (broader, weaker ties — exposure to different perspectives, networking).
 # Higher score = stronger bridging ties.
 
-- slug: day04_iscs_bridge
+- slug: sotd_d04_iscs_bridge
   type: likert_5
   title:
     en: "How wide is your world?"
@@ -401,7 +401,7 @@
 # This requires a derived score formula — see implementation note.
 # Higher score = higher rejection sensitivity.
 
-- slug: day05_rsq
+- slug: sotd_d05_rsq
   type: likert_6
   title:
     en: "How do you feel about asking for things?"
@@ -695,7 +695,7 @@
 # Higher score = stronger independent self-construal (self defined by
 # personal traits, achievements, autonomy from others).
 
-- slug: day06_singelis_ind
+- slug: sotd_d08_singelis_ind
   type: likert_7
   title:
     en: "How much does the 'individual you' show up?"
@@ -824,7 +824,7 @@
 # Higher score = stronger interdependent self-construal (self defined
 # through relationships, group memberships, social context).
 
-- slug: day07_singelis_int
+- slug: sotd_d09_singelis_int
   type: likert_7
   title:
     en: "How much does the 'connected you' show up?"
@@ -954,7 +954,7 @@
 # authentic living (4 items), accepting external influence (4 items, reverse).
 # All items scored such that higher total = greater authenticity.
 
-- slug: day08_woodAS
+- slug: sotd_d10_woodAS
   type: likert_7
   title:
     en: "How true to yourself do you feel?"
@@ -1087,7 +1087,7 @@
 # undesirable), per user instruction all results are shown. Interpretation
 # text is written carefully to normalize the construct.
 
-- slug: day09_ucla8
+- slug: sotd_d11_ucla8
   type: likert_4
   title:
     en: "How connected have you been feeling?"
