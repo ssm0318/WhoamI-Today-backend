@@ -12,15 +12,15 @@ from chat.wit_bot_copy import (
     WC_BTN_RESUME, WC_BTN_RESUME_ONBOARDING, WC_BTN_RUN_AUDIT,
     WC_BTN_START_ONBOARDING, WC_BTN_START_VERSION_Q, WC_BTN_START_VERSION_W,
     WC_BTN_TAKE_BOSS_QUIZ, WC_DEFAULT_SILENT, WC_KICKOFF_DONE_PRE_AUDIT,
-    WC_MID_FLOW, WC_POST_SWAP_Q, WC_POST_SWAP_W, WC_PRE_WINDOW,
+    WC_MID_FLOW, WC_POST_SWAP_Q, WC_POST_SWAP_W,
     WC_TIME_TO_ONBOARD_Q, WC_TIME_TO_ONBOARD_W, t,
 )
 from chat.wit_bot_payloads import card_with_buttons
 
 
-# Study windows (PST). Hardcoded to match
-# surveys/migrations/0004_seed_study_schedule.py + spec timeline.
-V1_WINDOW_START = timezone.make_aware(datetime(2026, 5, 4, 0, 0))
+# V2_WINDOW_START still tracks the "see you May 18 for the swap" silent state
+# once a V1 participant has finished everything. The bot has NO date-based
+# gating for starting onboarding — participants can begin any time.
 V2_WINDOW_START = timezone.make_aware(datetime(2026, 5, 18, 0, 0))
 
 
@@ -56,32 +56,35 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             'intro': t(WC_AUDIT_IN_PROGRESS, user),
         }
 
-    # Kickoff complete → audit CTA (until V1 fully done)
-    if completed and version == 'version_w' and now < V2_WINDOW_START:
+    # Kickoff complete → audit / boss-quiz CTAs (V2_WINDOW_START still tracks the
+    # "see you May 18 for the swap" silent state once the participant has finished
+    # everything for V1).
+    if completed and version == 'version_w':
         audit = progress.get('audit', {})
         last_missing = audit.get('last_missing_count')
         final_quiz = progress.get('final_quiz', {})
         passed_final = final_quiz.get('passed', False)
 
-        if passed_final:
+        if passed_final and now < V2_WINDOW_START:
             return {
                 'kind': 'card',
                 'intro': t(WC_BOSS_PASSED_PRE_SWAP, user),
                 'buttons': [],
             }
-        if last_missing == 0:
+        if not passed_final and last_missing == 0:
             return {
                 **card_with_buttons([
                     {'label': t(WC_BTN_TAKE_BOSS_QUIZ, user), 'payload': 'take_boss_quiz'},
                 ]),
                 'intro': t(WC_AUDIT_DONE_PRE_BOSS, user),
             }
-        return {
-            **card_with_buttons([
-                {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
-            ]),
-            'intro': t(WC_KICKOFF_DONE_PRE_AUDIT, user),
-        }
+        if not passed_final:
+            return {
+                **card_with_buttons([
+                    {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
+                ]),
+                'intro': t(WC_KICKOFF_DONE_PRE_AUDIT, user),
+            }
 
     # Post-swap detection: prior version's kickoff is complete, this version's isn't.
     other_version = 'version_q' if version == 'version_w' else 'version_w'
@@ -102,16 +105,8 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             'intro': intro,
         }
 
-    # Pre-window
-    if now < V1_WINDOW_START and not completed:
-        return {
-            'kind': 'card',
-            'intro': t(WC_PRE_WINDOW, user),
-            'buttons': [],
-        }
-
-    # Window is open, kickoff not started (fresh user, no prior version progress)
-    if not kickoff and now >= V1_WINDOW_START:
+    # Kickoff not started — always offer Start, no date gate.
+    if not kickoff:
         intro_value = WC_TIME_TO_ONBOARD_Q if version == 'version_q' else WC_TIME_TO_ONBOARD_W
         return {
             **card_with_buttons([

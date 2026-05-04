@@ -21,11 +21,12 @@ class WelcomeCardTests(TestCase):
     def _set_now(self, year, month, day):
         return timezone.make_aware(datetime(year, month, day, 12, 0))
 
-    def test_pre_window_shows_no_button(self):
-        payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 5, 3))
-        self.assertEqual(payload['kind'], 'card')
-        self.assertEqual(payload.get('buttons', []), [])
-        self.assertIn('see you', payload['intro'].lower())
+    def test_no_date_gate_shows_start_anytime(self):
+        """No date-window gating — Start onboarding shows whenever kickoff is empty."""
+        # Way before any window
+        payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 4, 15))
+        labels = [b['label'] for b in payload['buttons']]
+        self.assertIn('Start onboarding', labels)
 
     def test_window_open_shows_start_button(self):
         payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 5, 4))
