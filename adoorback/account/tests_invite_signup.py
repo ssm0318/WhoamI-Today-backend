@@ -51,6 +51,19 @@ class InviteOnlySignupTests(APITestCase):
             ).exists()
         )
 
+    def test_inviter_can_be_looked_up_by_invite_code(self):
+        self.inviter.invite_code = 'ABC12345'
+        self.inviter.save(update_fields=['invite_code'])
+
+        response = self.client.post('/api/user/signup/inviter-username/', {
+            'invite_code': self.inviter.invite_code,
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['inviter_id'], self.inviter.id)
+        self.assertEqual(response.data['username'], self.inviter.username)
+        self.assertEqual(response.data['invite_code'], self.inviter.invite_code)
+
     def test_invited_user_cannot_post_until_inviter_accepts(self):
         new_user = User.objects.create_user(
             username='new_user',

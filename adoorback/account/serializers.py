@@ -275,7 +275,7 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
                   'has_changed_pw', 'unread_message_cnt', 'is_public',
-                  'friend_count', 'username_history', 'recent_posts',
+                  'friend_count', 'username_history', 'recent_posts', 'invite_code',
                   'can_publish', 'invite_status', 'invited_from_detail']
         extra_kwargs = {'password': {'write_only': True}, 'username_history': {'read_only': True}}
 
@@ -388,7 +388,13 @@ class UserInviterEmailBirthDateSerializer(serializers.Serializer):
 
 
 class UserInviterUsernameSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    username = serializers.CharField(required=False, allow_blank=True)
+    invite_code = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs.get('username') and not attrs.get('invite_code'):
+            raise serializers.ValidationError("username or invite_code is required.")
+        return attrs
 
 
 class UserProfileSerializer(UserMinimalSerializer):

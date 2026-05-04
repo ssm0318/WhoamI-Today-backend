@@ -444,14 +444,19 @@ class UserInviterUsernameCheck(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        invited_username = serializer.validated_data.get('username').strip()
+        invited_username = serializer.validated_data.get('username', '').strip()
+        invite_code = serializer.validated_data.get('invite_code', '').strip()
         try:
-            inviter = User.objects.get(username=invited_username)
+            if invite_code:
+                inviter = User.objects.get(invite_code=invite_code)
+            else:
+                inviter = User.objects.get(username=invited_username)
         except ObjectDoesNotExist:
             raise InvalidInviterUsername()
 
         response_data = {
-            'username': invited_username,
+            'username': inviter.username,
+            'invite_code': inviter.invite_code,
             'inviter_id': inviter.id,
             'user_group': inviter.user_group,
             'current_ver': inviter.current_ver,
