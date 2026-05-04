@@ -322,7 +322,9 @@ def _enter_kickoff_push(state, user):
 
 def _check_push_and_continue(state, user):
     from custom_fcm.models import CustomFCMDevice
-    from chat.wit_bot_copy import PUSH_DONE_BUTTON, PUSH_NOTIF_OFF_COPY, PUSH_NOTIF_ON_COPY
+    from chat.wit_bot_copy import (
+        PUSH_DONE_BUTTON, PUSH_NOTIF_OFF_COPY, PUSH_NOTIF_ON_COPY, PUSH_OPEN_SETTINGS_BUTTON,
+    )
 
     has_device = CustomFCMDevice.objects.filter(user=user, active=True).exists()
     if has_device:
@@ -331,6 +333,7 @@ def _check_push_and_continue(state, user):
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'push_notif': 'asked'})
     return [(t(PUSH_NOTIF_OFF_COPY, user), card_with_buttons([
+        {'label': t(PUSH_OPEN_SETTINGS_BUTTON, user), 'navigate_to': '/settings/daily-noti-setting'},
         {'label': t(PUSH_DONE_BUTTON, user), 'payload': 'kickoff_push_done'},
     ]))]
 

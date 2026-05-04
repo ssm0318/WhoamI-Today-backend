@@ -264,6 +264,11 @@ PUSH_DONE_BUTTON = {
     'ko': '완료 — 켰어',
 }
 
+PUSH_OPEN_SETTINGS_BUTTON = {
+    'en': 'Take me to notification settings',
+    'ko': '알림 설정으로 데려가줘',
+}
+
 FRIEND_MIN_NEEDED_COPY = {
     'en': (
         "You don't have a friend yet on the app. Add at least one — they don't "
