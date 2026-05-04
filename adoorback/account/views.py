@@ -1158,12 +1158,13 @@ class CurrentUserDetail(generics.RetrieveUpdateAPIView):
             if 'username' in self.request.data:
                 new_username = serializer.validated_data.get('username')
                 old_username = self.request.user.username
-                # check if @ or . is included in username
-                if '@' in new_username or '.' in new_username:
-                    raise InvalidUsername()
-                # check if username exceeds 20 letters
-                if len(new_username) > 20:
-                    raise LongUsername()
+                if new_username != old_username:
+                    # check if @ or . is included in username
+                    if '@' in new_username or '.' in new_username:
+                        raise InvalidUsername()
+                    # check if username exceeds 20 letters
+                    if len(new_username) > 20:
+                        raise LongUsername()
 
             persona_str = self.request.data.get('persona') or self.request.data.get('user_personas')
             interest_str = self.request.data.get('interest') or self.request.data.get('user_interests') or self.request.data.get('user_interest')
