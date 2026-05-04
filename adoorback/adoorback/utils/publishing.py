@@ -14,6 +14,20 @@ def can_publish(user):
     return user.is_connected(inviter)
 
 
+def invite_status(user):
+    if not user or not user.is_authenticated:
+        return 'none'
+    if user.is_superuser:
+        return 'none'
+
+    inviter = getattr(user, 'invited_from', None)
+    if inviter is None:
+        return 'none'
+    if user.is_connected(inviter):
+        return 'accepted'
+    return 'pending'
+
+
 def ensure_can_publish(user):
     if not can_publish(user):
         raise PermissionDenied(

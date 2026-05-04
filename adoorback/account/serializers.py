@@ -17,6 +17,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
     VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona, CustomChip, CHIP_CATEGORY_CHOICES, \
     FriendEvaluation, RELATIONSHIP_TYPE_CHOICES, VersionSwitchRequest
+from adoorback.utils.publishing import can_publish, invite_status
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -174,6 +175,9 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
     chips_by_category = serializers.SerializerMethodField(read_only=True)
     custom_chips = serializers.SerializerMethodField(read_only=True)
     recent_posts = serializers.SerializerMethodField(read_only=True)
+    can_publish = serializers.SerializerMethodField(read_only=True)
+    invite_status = serializers.SerializerMethodField(read_only=True)
+    invited_from_detail = serializers.SerializerMethodField(read_only=True)
 
     def get_chips_by_category(self, obj):
         """Return user's interests grouped by category."""
@@ -186,6 +190,17 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
     def get_custom_chips(self, obj):
         """Return user's custom chips."""
         return CustomChipSerializer(obj.custom_chips.all(), many=True).data
+
+    def get_can_publish(self, obj):
+        return can_publish(obj)
+
+    def get_invite_status(self, obj):
+        return invite_status(obj)
+
+    def get_invited_from_detail(self, obj):
+        if obj.invited_from is None:
+            return None
+        return UserMinimalSerializer(obj.invited_from).data
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -260,7 +275,8 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
                   'has_changed_pw', 'unread_message_cnt', 'is_public',
-                  'friend_count', 'username_history', 'recent_posts']
+                  'friend_count', 'username_history', 'recent_posts',
+                  'can_publish', 'invite_status', 'invited_from_detail']
         extra_kwargs = {'password': {'write_only': True}, 'username_history': {'read_only': True}}
 
 
