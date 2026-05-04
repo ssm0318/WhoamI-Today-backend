@@ -389,6 +389,7 @@ class MessageList(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         from chat.wit_admin import is_wit_admin
+        from chat.wit_bot import is_wit_bot
 
         user = self.request.user
         try:
@@ -403,9 +404,15 @@ class MessageList(generics.ListCreateAPIView):
         # persona, the per-user operator proxy chats, and the operator blast
         # rooms are all known operational surfaces — friend-consent rules don't
         # apply. See docs/superpowers/specs/2026-04-25-wit-admin-chat-hotfix-design.md.
-        is_wit_admin_surface = (
+        # wit_bot also gets the same carve-out: it's a single bot account that
+        # talks to participants on both versions, and version-isolation would
+        # otherwise 403 every Q user out of the onboarding flow since wit_bot
+        # is created with current_ver=version_w.
+        is_system_bot_surface = (
             is_wit_admin(user)
             or is_wit_admin(connected_user)
+            or is_wit_bot(user)
+            or is_wit_bot(connected_user)
             or ChatRoom.objects.filter(
                 (Q(user1=user, user2=connected_user) | Q(user1=connected_user, user2=user)),
             ).filter(
@@ -414,10 +421,10 @@ class MessageList(generics.ListCreateAPIView):
         )
 
         # Version isolation: block messaging across different versions
-        if not is_wit_admin_surface and user.current_ver != connected_user.current_ver:
+        if not is_system_bot_surface and user.current_ver != connected_user.current_ver:
             raise exceptions.PermissionDenied("Cannot message users on a different version.")
 
-        if not is_wit_admin_surface and not user.is_connected(connected_user):
+        if not is_system_bot_surface and not user.is_connected(connected_user):
             req = ChatRequest.objects.filter(
                 Q(requester=user, requestee=connected_user) |
                 Q(requester=connected_user, requestee=user)
