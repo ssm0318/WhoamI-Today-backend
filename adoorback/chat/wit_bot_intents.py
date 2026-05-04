@@ -73,10 +73,10 @@ def _kickoff_welcome_intro(user):
 # ---------- kickoff_welcome ----------
 
 def kickoff_welcome_handler(state, message, user):
-    payload = (message.bot_payload or {}).get('payload')
-    if payload == 'kickoff_welcome_continue':
-        return _enter_kickoff_quiz_1(state, user)
-    return _kickoff_welcome_intro(user)
+    """At the very first step, ANY input (let's go button, resume button,
+    or free text) advances to Quiz 1. Avoids the infinite re-prompt loop
+    where the welcome card's Resume button kept re-rendering the intro."""
+    return _enter_kickoff_quiz_1(state, user)
 
 
 # ---------- kickoff_quiz_1 (multi-select study requirements) ----------

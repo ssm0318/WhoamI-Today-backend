@@ -32,12 +32,12 @@ def t(value, user_or_lang):
 
 WELCOME_INTRO = {
     'en': (
-        "Hi there! I'm WITty ha. ha. ha. that was a joke. *adjusts non-existent tie*\n"
+        "Hi there! I'm WITty ha. ha. ha.\n"
         "I'm here to walk you through everything for the study.\n"
         "ready?"
     ),
     'ko': (
-        "안녕! 나는 WITty야 하. 하. 하. 농담이야. *없는 넥타이 매만지는 중*\n"
+        "안녕! 나는 WITty야 하. 하. 하.\n"
         "연구 관련된 거 다 같이 살펴보려고 왔어.\n"
         "준비됐어?"
     ),

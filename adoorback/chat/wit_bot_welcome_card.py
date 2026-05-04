@@ -36,8 +36,17 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
     kickoff = progress.get('kickoff', {})
     completed = kickoff.get('completed', False)
 
-    # Mid-kickoff (intent set but not yet idle) — takes priority over date checks
-    # so a participant who started early can resume.
+    # Mid-kickoff (intent set but not yet idle). At kickoff_welcome specifically,
+    # the inline welcome message already has the 'let's go' button, so a duplicate
+    # Resume CTA in the welcome card just creates noise. Silence the card there.
+    # For deeper kickoff steps (quiz_2/quiz_3/setup checks), Resume is useful as
+    # a way back if the inline card scrolls off.
+    if state.current_intent == 'kickoff_welcome':
+        return {
+            'kind': 'card',
+            'intro': t(WC_MID_FLOW, user),
+            'buttons': [],
+        }
     if state.current_intent.startswith('kickoff_') and state.current_intent != 'kickoff_complete':
         return {
             **card_with_buttons([

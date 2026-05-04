@@ -227,14 +227,26 @@ class EngineDispatchTests(TestCase):
     # ---------- Task 15 — welcome card refresh ----------
 
     def test_welcome_card_refreshes_on_user_message(self):
+        """After kickoff_welcome_continue → state is in kickoff_quiz_1, so
+        the welcome card shows a Resume CTA (not silenced by the kickoff_welcome
+        special case)."""
         self._send_choice('start_onboarding')
+        self._send_choice('kickoff_welcome_continue')
         welcome_msgs = Message.objects.filter(
             chat_room=self.room, event_type='wit_welcome_card',
         )
         self.assertEqual(welcome_msgs.count(), 1)
-        # CTA should now be Resume since we're mid-flow
         labels = [b['label'] for b in welcome_msgs.first().bot_payload['buttons']]
         self.assertIn('Resume onboarding', labels)
+
+    def test_welcome_card_silent_during_kickoff_welcome(self):
+        """At kickoff_welcome the inline 'let's go' button is enough; the
+        welcome card stays silent (no buttons) to avoid duplicate CTAs."""
+        self._send_choice('start_onboarding')
+        welcome_msg = Message.objects.filter(
+            chat_room=self.room, event_type='wit_welcome_card',
+        ).first()
+        self.assertEqual(welcome_msg.bot_payload.get('buttons', []), [])
 
     # ---------- V1.1 — Audit handler ----------
 
