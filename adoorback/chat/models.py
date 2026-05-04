@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from safedelete.models import SafeDeleteModel, SOFT_DELETE_CASCADE
 
-from account.models import OverwriteStorage
+from account.models import OverwriteStorage, VERSION_CHOICES
 from adoorback.models import AdoorTimestampedModel
 from adoorback.utils.helpers import wrap_content
 from notification.models import Notification, NotificationActor
@@ -725,3 +725,45 @@ def dispatch_wit_bot_engine(created, instance, **kwargs):
 
     from chat.wit_bot_engine import handle_user_message
     handle_user_message(instance)
+
+
+class OnboardingScreenshot(AdoorTimestampedModel):
+    """Async-reviewed screenshot uploaded during wit_bot onboarding setup checks.
+
+    Kicks off in 'pending' state when a participant uploads. Admin reviews via
+    Django admin. Approve/reject triggers a DM back to the participant via the
+    post-save signal in chat/signals.py.
+    """
+    KIND_CHOICES = (('widget', 'Widgets'),)
+    STATUS_CHOICES = (
+        ('pending', 'Pending review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
+    user = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE,
+        related_name='onboarding_screenshots',
+    )
+    version = models.CharField(max_length=16, choices=VERSION_CHOICES)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    message = models.ForeignKey(
+        Message, on_delete=models.CASCADE, related_name='onboarding_screenshots',
+    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(
+        get_user_model(), on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='onboarding_screenshot_reviews',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.CharField(max_length=200, blank=True, default='')
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'kind', 'status']),
+            models.Index(fields=['status']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} {self.kind} screenshot ({self.status})"
