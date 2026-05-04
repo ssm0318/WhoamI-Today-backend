@@ -393,10 +393,12 @@ class EngineDispatchTests(TestCase):
         self.assertIn('participation requirement', latest.content.lower())
 
     def test_wit_question_returns_easter_egg(self):
-        from chat.wit_bot_copy import WIT_REPLIES
+        from chat.wit_bot_copy import WIT_REPLIES, t
         self._send_text('wit?')
         latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
-        self.assertIn(latest.content, WIT_REPLIES)
+        # Reply must be one of the WIT_REPLIES variants in the user's language
+        all_variants = {t(r, lang) for r in WIT_REPLIES for lang in ('en', 'ko')}
+        self.assertIn(latest.content, all_variants)
 
     def test_who_am_i_returns_canned(self):
         self._send_text('who am i')
@@ -464,6 +466,40 @@ class EngineDispatchTests(TestCase):
         labels = [b['label'] for b in welcome_msg.bot_payload['buttons']]
         self.assertIn('Start version Q onboarding', labels)
         self.assertIn('swap', welcome_msg.bot_payload['intro'].lower())
+
+    # ---------- V1.3.2 — Korean localization ----------
+
+    def test_korean_user_gets_korean_welcome_intro(self):
+        self.alice.language = 'ko'
+        self.alice.save(update_fields=['language'])
+        self._send_choice('start_onboarding')
+        # WELCOME_INTRO Korean variant has '하. 하. 하.'
+        replies = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at')
+        intro_reply = replies.filter(content__contains='하. 하. 하.').first()
+        self.assertIsNotNone(intro_reply, msg=f'Expected Korean intro; got {[r.content for r in replies[:3]]}')
+
+    def test_korean_user_gets_korean_audit_buttons(self):
+        self.alice.language = 'ko'
+        self.alice.save(update_fields=['language'])
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        latest_card = self._bot_replies().exclude(
+            event_type='wit_welcome_card',
+        ).filter(bot_payload__kind='card').order_by('-created_at').first()
+        self.assertIsNotNone(latest_card)
+        labels = [b['label'] for b in latest_card.bot_payload['buttons']]
+        # At least one Korean label present
+        self.assertTrue(
+            any('하나씩' in l or '리스트' in l for l in labels),
+            msg=f'Expected Korean audit buttons; got {labels}',
+        )
+
+    def test_english_user_unchanged(self):
+        # Default language, English copy still works
+        self._send_choice('start_onboarding')
+        replies = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at')
+        intro_reply = replies.filter(content__contains='ha. ha. ha.').first()
+        self.assertIsNotNone(intro_reply)
 
     # ---------- Task 13 — kickoff_widget ----------
 

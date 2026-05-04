@@ -10,6 +10,7 @@ Flow:
 from __future__ import annotations
 
 from chat import wit_bot_state as state_mod
+from chat.wit_bot_copy import t
 from chat.wit_bot_payloads import card_with_buttons, multi_select, upload_request
 
 
@@ -22,7 +23,7 @@ def idle_handler(state, message, user):
 
     if payload == 'start_onboarding':
         state_mod.set_intent(state, 'kickoff_welcome', step=0)
-        return _kickoff_welcome_intro()
+        return _kickoff_welcome_intro(user)
 
     if payload == 'resume_onboarding':
         handler = HANDLERS.get(state.current_intent, idle_handler)
@@ -37,32 +38,35 @@ def idle_handler(state, message, user):
         return final_quiz_handler(state, message, user)
 
     if payload and payload.startswith('faq:'):
-        return _faq_answer(payload.split(':', 1)[1])
+        return _faq_answer(payload.split(':', 1)[1], user)
 
     # Text-triggered easter eggs / commands
     if text in ('faq', 'help me', 'questions'):
-        return _faq_menu()
+        return _faq_menu(user)
     if text in ('wit?', 'wit', 'witty?'):
-        return _wit_reply()
+        return _wit_reply(user)
     if text == 'who am i':
         from chat.wit_bot_copy import WHO_AM_I_REPLY
-        return [(WHO_AM_I_REPLY, None)]
+        return [(t(WHO_AM_I_REPLY, user), None)]
     if text == 'help':
         from chat.wit_bot_copy import HELP_REPLY
-        return [(HELP_REPLY, None)]
+        return [(t(HELP_REPLY, user), None)]
     if '🐈' in text or '🐱' in text:
         from chat.wit_bot_copy import CAT_REPLY
-        return [(CAT_REPLY, None)]
+        return [(t(CAT_REPLY, user), None)]
 
-    return [
-        ("not sure what that was. try the welcome card up top, or type `wit?`.", None),
-    ]
+    lang = getattr(user, 'language', 'en') or 'en'
+    if lang == 'ko':
+        nudge = "잘 모르겠는 입력이야. 위 카드 사용하거나 `wit?` 쳐봐."
+    else:
+        nudge = "not sure what that was. try the welcome card up top, or type `wit?`."
+    return [(nudge, None)]
 
 
-def _kickoff_welcome_intro():
-    from chat.wit_bot_copy import WELCOME_INTRO
-    return [(WELCOME_INTRO, card_with_buttons([
-        {'label': "let's go", 'payload': 'kickoff_welcome_continue'},
+def _kickoff_welcome_intro(user):
+    from chat.wit_bot_copy import LETS_GO, WELCOME_INTRO
+    return [(t(WELCOME_INTRO, user), card_with_buttons([
+        {'label': t(LETS_GO, user), 'payload': 'kickoff_welcome_continue'},
     ]))]
 
 
@@ -71,23 +75,31 @@ def _kickoff_welcome_intro():
 def kickoff_welcome_handler(state, message, user):
     payload = (message.bot_payload or {}).get('payload')
     if payload == 'kickoff_welcome_continue':
-        return _enter_kickoff_quiz_1(state)
-    return _kickoff_welcome_intro()
+        return _enter_kickoff_quiz_1(state, user)
+    return _kickoff_welcome_intro(user)
 
 
 # ---------- kickoff_quiz_1 (multi-select study requirements) ----------
 
-def _enter_kickoff_quiz_1(state):
+def _quiz_1_options_for_user(user):
+    from chat.wit_bot_copy import QUIZ_1_STUDY_REQUIREMENTS as q
+    return [
+        {'value': o['value'], 'label': t(o['label'], user)}
+        for o in q['options']
+    ]
+
+
+def _enter_kickoff_quiz_1(state, user):
     from chat.wit_bot_copy import QUIZ_1_STUDY_REQUIREMENTS as q
     state_mod.set_intent(state, 'kickoff_quiz_1', step=0)
-    payload = multi_select(intent='kickoff_quiz_1', options=q['options'])
-    return [(q['prompt'], payload)]
+    payload = multi_select(intent='kickoff_quiz_1', options=_quiz_1_options_for_user(user))
+    return [(t(q['prompt'], user), payload)]
 
 
 def kickoff_quiz_1_handler(state, message, user):
     payload = message.bot_payload or {}
     if payload.get('kind') != 'multi_select_response' or payload.get('intent') != 'kickoff_quiz_1':
-        return _enter_kickoff_quiz_1(state)
+        return _enter_kickoff_quiz_1(state, user)
 
     from chat.wit_bot_copy import QUIZ_1_STUDY_REQUIREMENTS as q
     selected = set(payload.get('selected', []))
@@ -102,40 +114,48 @@ def kickoff_quiz_1_handler(state, message, user):
 
     score = (correct_selected + correct_omitted) / (correct_total + incorrect_total)
 
-    lines = ["here's how you did:"]
+    lang = getattr(user, 'language', 'en') or 'en'
+    header = "결과:" if lang == 'ko' else "here's how you did:"
+    score_label = "점수" if lang == 'ko' else "score"
+    label_missed = "놓침" if lang == 'ko' else "MISSED"
+    label_wrong = "오답" if lang == 'ko' else "WRONG"
+
+    lines = [header]
     for o in q['options']:
         was_selected = o['value'] in selected
+        loc_label = t(o['label'], user)
+        loc_explanation = t(o.get('explanation', ''), user)
         if o['correct'] and was_selected:
-            lines.append(f"  ✓ {o['label']}")
+            lines.append(f"  ✓ {loc_label}")
         elif o['correct'] and not was_selected:
-            lines.append(f"  ✗ MISSED — {o['label']}: {o.get('explanation', '')}")
+            lines.append(f"  ✗ {label_missed} — {loc_label}: {loc_explanation}")
         elif not o['correct'] and was_selected:
-            lines.append(f"  ✗ WRONG — {o['label']}: {o.get('explanation', '')}")
-    lines.append(f"\nscore: {int(score * 100)}%")
+            lines.append(f"  ✗ {label_wrong} — {loc_label}: {loc_explanation}")
+    lines.append(f"\n{score_label}: {int(score * 100)}%")
     reveal = "\n".join(lines)
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {
         'quiz_1': {'score': score, 'selected': list(selected)},
     })
 
-    return [(reveal, None), *_enter_kickoff_quiz_2(state)]
+    return [(reveal, None), *_enter_kickoff_quiz_2(state, user)]
 
 
 # ---------- kickoff_quiz_2 (single-select swap timing) ----------
 
-def _enter_kickoff_quiz_2(state):
+def _enter_kickoff_quiz_2(state, user):
     from chat.wit_bot_copy import QUIZ_2_SWAP_TIMING as q
     state_mod.set_intent(state, 'kickoff_quiz_2', step=0)
     payload = card_with_buttons([
-        {'label': o['label'], 'payload': f"q2:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q2:{o['value']}"} for o in q['options']
     ])
-    return [(q['prompt'], payload)]
+    return [(t(q['prompt'], user), payload)]
 
 
 def kickoff_quiz_2_handler(state, message, user):
     payload = (message.bot_payload or {}).get('payload', '')
     if not payload.startswith('q2:'):
-        return _enter_kickoff_quiz_2(state)
+        return _enter_kickoff_quiz_2(state, user)
 
     from chat.wit_bot_copy import QUIZ_2_SWAP_TIMING as q
     chosen_value = payload.split(':', 1)[1]
@@ -148,30 +168,32 @@ def kickoff_quiz_2_handler(state, message, user):
     if chosen and chosen['correct']:
         quiz_state['correct'] = True
         state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_2': quiz_state})
-        return [(q['reveal_correct'], None), *_enter_kickoff_quiz_3(state)]
+        return [(t(q['reveal_correct'], user), None), *_enter_kickoff_quiz_3(state, user)]
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_2': quiz_state})
     payload = card_with_buttons([
-        {'label': o['label'], 'payload': f"q2:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q2:{o['value']}"} for o in q['options']
     ])
-    return [(q['reveal_wrong'], None), ("try again:", payload)]
+    lang = getattr(user, 'language', 'en') or 'en'
+    retry_label = "다시 해봐:" if lang == 'ko' else "try again:"
+    return [(t(q['reveal_wrong'], user), None), (retry_label, payload)]
 
 
 # ---------- kickoff_quiz_3 (single-select surveys location) ----------
 
-def _enter_kickoff_quiz_3(state):
+def _enter_kickoff_quiz_3(state, user):
     from chat.wit_bot_copy import QUIZ_3_SURVEYS_LOCATION as q
     state_mod.set_intent(state, 'kickoff_quiz_3', step=0)
     payload = card_with_buttons([
-        {'label': o['label'], 'payload': f"q3:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q3:{o['value']}"} for o in q['options']
     ])
-    return [(q['prompt'], payload)]
+    return [(t(q['prompt'], user), payload)]
 
 
 def kickoff_quiz_3_handler(state, message, user):
     payload = (message.bot_payload or {}).get('payload', '')
     if not payload.startswith('q3:'):
-        return _enter_kickoff_quiz_3(state)
+        return _enter_kickoff_quiz_3(state, user)
 
     from chat.wit_bot_copy import QUIZ_3_SURVEYS_LOCATION as q
     chosen_value = payload.split(':', 1)[1]
@@ -184,13 +206,15 @@ def kickoff_quiz_3_handler(state, message, user):
     if chosen and chosen['correct']:
         quiz_state['correct'] = True
         state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_3': quiz_state})
-        return [(q['reveal_correct'], None), *_enter_kickoff_push(state, user)]
+        return [(t(q['reveal_correct'], user), None), *_enter_kickoff_push(state, user)]
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_3': quiz_state})
     payload = card_with_buttons([
-        {'label': o['label'], 'payload': f"q3:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q3:{o['value']}"} for o in q['options']
     ])
-    return [(q['reveal_wrong'], None), ("try again:", payload)]
+    lang = getattr(user, 'language', 'en') or 'en'
+    retry_label = "다시 해봐:" if lang == 'ko' else "try again:"
+    return [(t(q['reveal_wrong'], user), None), (retry_label, payload)]
 
 
 # ---------- kickoff_push (FCM check) ----------
@@ -202,16 +226,16 @@ def _enter_kickoff_push(state, user):
 
 def _check_push_and_continue(state, user):
     from custom_fcm.models import CustomFCMDevice
-    from chat.wit_bot_copy import PUSH_NOTIF_ON_COPY, PUSH_NOTIF_OFF_COPY
+    from chat.wit_bot_copy import PUSH_DONE_BUTTON, PUSH_NOTIF_OFF_COPY, PUSH_NOTIF_ON_COPY
 
     has_device = CustomFCMDevice.objects.filter(user=user, active=True).exists()
     if has_device:
         state_mod.set_progress(state, user.current_ver, 'kickoff', {'push_notif': 'ok'})
-        return [(PUSH_NOTIF_ON_COPY, None), *_enter_kickoff_friend(state, user)]
+        return [(t(PUSH_NOTIF_ON_COPY, user), None), *_enter_kickoff_friend(state, user)]
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'push_notif': 'asked'})
-    return [(PUSH_NOTIF_OFF_COPY, card_with_buttons([
-        {'label': "Done — they're on now", 'payload': 'kickoff_push_done'},
+    return [(t(PUSH_NOTIF_OFF_COPY, user), card_with_buttons([
+        {'label': t(PUSH_DONE_BUTTON, user), 'payload': 'kickoff_push_done'},
     ]))]
 
 
@@ -227,16 +251,16 @@ def _enter_kickoff_friend(state, user):
 
 
 def _check_friend_and_continue(state, user):
-    from chat.wit_bot_copy import FRIEND_MIN_OK_COPY, FRIEND_MIN_NEEDED_COPY
+    from chat.wit_bot_copy import FRIEND_DONE_BUTTON, FRIEND_MIN_NEEDED_COPY, FRIEND_MIN_OK_COPY
 
     has_friend = user.friends.exists()
     if has_friend:
         state_mod.set_progress(state, user.current_ver, 'kickoff', {'friend_min': 'ok'})
-        return [(FRIEND_MIN_OK_COPY, None), *_enter_kickoff_widget(state, user)]
+        return [(t(FRIEND_MIN_OK_COPY, user), None), *_enter_kickoff_widget(state, user)]
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'friend_min': 'asked'})
-    return [(FRIEND_MIN_NEEDED_COPY, card_with_buttons([
-        {'label': 'Done — added one', 'payload': 'kickoff_friend_done'},
+    return [(t(FRIEND_MIN_NEEDED_COPY, user), card_with_buttons([
+        {'label': t(FRIEND_DONE_BUTTON, user), 'payload': 'kickoff_friend_done'},
     ]))]
 
 
@@ -255,14 +279,13 @@ def _enter_kickoff_widget(state, user):
     if OnboardingScreenshot.objects.filter(
         user=user, kind='widget', status__in=['approved', 'pending'],
     ).exists():
-        # Re-using the V1 widget shot — skip directly to complete.
         state_mod.set_progress(state, user.current_ver, 'kickoff', {
             'widget_screenshot': {'status': 'reused_from_prior'},
         })
         return _enter_kickoff_complete(state, user)
 
     state_mod.set_intent(state, 'kickoff_widget', step=0)
-    return [(WIDGET_PROMPT_COPY, upload_request(context='widget'))]
+    return [(t(WIDGET_PROMPT_COPY, user), upload_request(context='widget'))]
 
 
 def kickoff_widget_handler(state, message, user):
@@ -285,14 +308,14 @@ def kickoff_widget_handler(state, message, user):
     state_mod.set_progress(state, user.current_ver, 'kickoff', {
         'widget_screenshot': {'status': 'pending', 'message_id': message.id},
     })
-    return [(WIDGET_RECEIVED_COPY, None), *_enter_kickoff_complete(state, user)]
+    return [(t(WIDGET_RECEIVED_COPY, user), None), *_enter_kickoff_complete(state, user)]
 
 
 def _enter_kickoff_complete(state, user):
     from chat.wit_bot_copy import WRAP_KICKOFF
     state_mod.set_intent(state, '', step=0)
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'completed': True})
-    return [(WRAP_KICKOFF, None)]
+    return [(t(WRAP_KICKOFF, user), None)]
 
 
 # ---------- Audit ----------
@@ -326,29 +349,28 @@ def _build_audit_report(user):
 def audit_handler(state, message, user):
     """Initial entry to audit + branch on user's response."""
     from chat.wit_bot_copy import (
-        AUDIT_HEADER, AUDIT_RESULT_TEMPLATE, AUDIT_NOTHING_MISSING,
+        AUDIT_BTN_LATER, AUDIT_BTN_LIST, AUDIT_BTN_WALKTHROUGH,
+        AUDIT_HEADER, AUDIT_NOTHING_MISSING, AUDIT_RESULT_TEMPLATE,
         EXPLORE_LATER, JUST_LIST_INTRO,
     )
-    from chat.wit_bot_payloads import card_with_buttons
 
     payload = (message.bot_payload or {}).get('payload', '')
 
-    # Branch on follow-up choice
     if payload == 'audit_walkthrough':
         return _enter_walkthrough(state, user)
     if payload == 'audit_just_list':
         _, missing = _build_audit_report(user)
         if not missing:
             state_mod.set_intent(state, '', step=0)
-            return [(AUDIT_NOTHING_MISSING, None)]
-        out = [(JUST_LIST_INTRO, None)]
+            return [(t(AUDIT_NOTHING_MISSING, user), None)]
+        out = [(t(JUST_LIST_INTRO, user), None)]
         for pred in missing:
-            out.append(_walkthrough_feature_card(pred, mode='list'))
+            out.append(_walkthrough_feature_card(pred, user, mode='list'))
         state_mod.set_intent(state, '', step=0)
         return out
     if payload == 'audit_later':
         state_mod.set_intent(state, '', step=0)
-        return [(EXPLORE_LATER, None)]
+        return [(t(EXPLORE_LATER, user), None)]
 
     # Default: fresh audit run
     engaged, missing = _build_audit_report(user)
@@ -359,11 +381,14 @@ def audit_handler(state, message, user):
             'last_engaged_count': len(engaged),
             'last_missing_count': 0,
         })
-        return [(AUDIT_HEADER, None), (AUDIT_NOTHING_MISSING, None)]
+        return [(t(AUDIT_HEADER, user), None), (t(AUDIT_NOTHING_MISSING, user), None)]
 
-    engaged_lines = "\n".join(f"  ✓ {p.display_name}" for p in engaged) or "  (nothing yet)"
+    lang = getattr(user, 'language', 'en') or 'en'
+    nothing_yet = '  (아직 없음)' if lang == 'ko' else '  (nothing yet)'
+
+    engaged_lines = "\n".join(f"  ✓ {p.display_name}" for p in engaged) or nothing_yet
     missing_lines = "\n".join(f"  ⏳ {p.display_name}" for p in missing)
-    body = AUDIT_RESULT_TEMPLATE.format(
+    body = t(AUDIT_RESULT_TEMPLATE, user).format(
         engaged_count=len(engaged),
         engaged_list=engaged_lines,
         missing_count=len(missing),
@@ -375,38 +400,39 @@ def audit_handler(state, message, user):
     })
 
     return [
-        (AUDIT_HEADER, None),
+        (t(AUDIT_HEADER, user), None),
         (body, card_with_buttons([
-            {'label': 'Walk me through them', 'payload': 'audit_walkthrough'},
-            {'label': 'Just give me the list', 'payload': 'audit_just_list'},
-            {'label': "I'll explore, audit me later", 'payload': 'audit_later'},
+            {'label': t(AUDIT_BTN_WALKTHROUGH, user), 'payload': 'audit_walkthrough'},
+            {'label': t(AUDIT_BTN_LIST, user), 'payload': 'audit_just_list'},
+            {'label': t(AUDIT_BTN_LATER, user), 'payload': 'audit_later'},
         ])),
     ]
 
 
 # ---------- Walkthrough ----------
 
-def _walkthrough_feature_card(predicate, mode='walkthrough'):
-    """Build a deep_link_card for one feature.
-
-    mode='walkthrough' → 3 buttons: Take me there / Mark as done / Skip
-    mode='list' → 1 button: Take me there
-    """
-    from chat.wit_bot_payloads import card_with_buttons
+def _walkthrough_feature_card(predicate, user, mode='walkthrough'):
+    """Build a deep_link_card for one feature."""
+    from chat.wit_bot_copy import (
+        WALKTHROUGH_MARK_DONE, WALKTHROUGH_SKIP, WALKTHROUGH_TAKE_ME_THERE,
+    )
 
     text = f"**{predicate.display_name}**\n{predicate.description}"
 
     buttons = []
     if predicate.deep_link:
-        buttons.append({'label': 'Take me there', 'navigate_to': predicate.deep_link})
+        buttons.append({
+            'label': t(WALKTHROUGH_TAKE_ME_THERE, user),
+            'navigate_to': predicate.deep_link,
+        })
 
     if mode == 'walkthrough':
         buttons.append({
-            'label': 'Mark as done',
+            'label': t(WALKTHROUGH_MARK_DONE, user),
             'payload': f'walkthrough_done:{predicate.feature_key}',
         })
         buttons.append({
-            'label': 'Skip for now',
+            'label': t(WALKTHROUGH_SKIP, user),
             'payload': f'walkthrough_skip:{predicate.feature_key}',
         })
 
@@ -414,12 +440,12 @@ def _walkthrough_feature_card(predicate, mode='walkthrough'):
 
 
 def _enter_walkthrough(state, user):
-    from chat.wit_bot_copy import WALKTHROUGH_INTRO, AUDIT_NOTHING_MISSING
+    from chat.wit_bot_copy import AUDIT_NOTHING_MISSING, WALKTHROUGH_INTRO
 
     _, missing = _build_audit_report(user)
     if not missing:
         state_mod.set_intent(state, '', step=0)
-        return [(AUDIT_NOTHING_MISSING, None)]
+        return [(t(AUDIT_NOTHING_MISSING, user), None)]
 
     state_mod.set_intent(state, 'walkthrough', step=0)
     state_mod.set_progress(state, user.current_ver, 'walkthrough', {
@@ -429,8 +455,8 @@ def _enter_walkthrough(state, user):
 
     first = missing[0]
     return [
-        (WALKTHROUGH_INTRO, None),
-        _walkthrough_feature_card(first, mode='walkthrough'),
+        (t(WALKTHROUGH_INTRO, user), None),
+        _walkthrough_feature_card(first, user, mode='walkthrough'),
     ]
 
 
@@ -447,9 +473,8 @@ def walkthrough_handler(state, message, user):
 
     if not missing_keys:
         state_mod.set_intent(state, '', step=0)
-        return [(WALKTHROUGH_COMPLETE, None)]
+        return [(t(WALKTHROUGH_COMPLETE, user), None)]
 
-    # Process current feature's response
     advanced = False
     if payload.startswith('walkthrough_done:'):
         feature_key = payload.split(':', 1)[1]
@@ -465,30 +490,27 @@ def walkthrough_handler(state, message, user):
         index += 1
         state_mod.set_progress(state, user.current_ver, 'walkthrough', {'index': index})
 
-    # If done, wrap up
     if index >= len(missing_keys):
         state_mod.set_intent(state, '', step=0)
-        return [(WALKTHROUGH_COMPLETE, None)]
+        return [(t(WALKTHROUGH_COMPLETE, user), None)]
 
-    # Otherwise, send next feature card
     next_pred = predicate_by_key(missing_keys[index])
     if next_pred is None:
-        # Skip stale entries
         index += 1
         state_mod.set_progress(state, user.current_ver, 'walkthrough', {'index': index})
         if index >= len(missing_keys):
             state_mod.set_intent(state, '', step=0)
-            return [(WALKTHROUGH_COMPLETE, None)]
+            return [(t(WALKTHROUGH_COMPLETE, user), None)]
         next_pred = predicate_by_key(missing_keys[index])
 
-    return [_walkthrough_feature_card(next_pred, mode='walkthrough')]
+    return [_walkthrough_feature_card(next_pred, user, mode='walkthrough')]
 
 
 # ---------- Boss quiz (end-of-version final exam) ----------
 
-def _build_final_quiz_options(version):
-    """Build quiz options dynamically. Real-in-version → correct;
-    real-only-in-other → incorrect distractor; absurd bank → incorrect.
+def _build_final_quiz_options(version, user):
+    """Build quiz options dynamically for the given user's language.
+    Real-in-version → correct; real-only-in-other → distractor; absurd → fake.
     """
     import random
     from chat.wit_bot_copy import ABSURD_FEATURES
@@ -512,10 +534,9 @@ def _build_final_quiz_options(version):
             })
 
     for ab in ABSURD_FEATURES:
-        slug = ab.lower().replace(' ', '_').replace('-', '_')
         options.append({
-            'value': f'absurd:{slug}',
-            'label': ab,
+            'value': f'absurd:{ab["value"]}',
+            'label': t(ab['label'], user),
             'correct': False,
         })
 
@@ -525,9 +546,8 @@ def _build_final_quiz_options(version):
 
 def _enter_final_quiz(state, user):
     from chat.wit_bot_copy import BOSS_QUIZ_INTRO
-    from chat.wit_bot_payloads import multi_select
 
-    options = _build_final_quiz_options(user.current_ver)
+    options = _build_final_quiz_options(user.current_ver, user)
 
     prog = state_mod.progress_for(state, user.current_ver)
     fq = prog.get('final_quiz', {})
@@ -542,11 +562,14 @@ def _enter_final_quiz(state, user):
         'attempt_number': len(attempts) + 1,
     })
 
-    return [(BOSS_QUIZ_INTRO, multi_select(intent='final_quiz', options=options))]
+    return [(t(BOSS_QUIZ_INTRO, user), multi_select(intent='final_quiz', options=options))]
 
 
 def final_quiz_handler(state, message, user):
-    from chat.wit_bot_copy import BOSS_QUIZ_PASS_TEMPLATE, BOSS_QUIZ_FAIL_TEMPLATE
+    from chat.wit_bot_copy import (
+        BOSS_QUIZ_FAIL_TEMPLATE, BOSS_QUIZ_MISSED, BOSS_QUIZ_PASS_TEMPLATE,
+        BOSS_QUIZ_WRONG_ABSURD, BOSS_QUIZ_WRONG_DISTRACTOR,
+    )
 
     payload = message.bot_payload or {}
     if payload.get('kind') != 'multi_select_response' or payload.get('intent') != 'final_quiz':
@@ -577,65 +600,62 @@ def final_quiz_handler(state, message, user):
             'final_score': score,
         })
         state_mod.set_intent(state, '', step=0)
-        return [(BOSS_QUIZ_PASS_TEMPLATE.format(score=int(score * 100)), None)]
+        return [(t(BOSS_QUIZ_PASS_TEMPLATE, user).format(score=int(score * 100)), None)]
 
     # Fail — reveal wrong + retry
     wrong_lines = []
     for o in saved_options:
         was_selected = o['value'] in selected
         if o['correct'] and not was_selected:
-            wrong_lines.append(
-                f"  ✗ MISSED — {o['label']}: that IS in your version, you should have selected it"
-            )
+            wrong_lines.append('  ✗ ' + t(BOSS_QUIZ_MISSED, user).format(label=o['label']))
         elif not o['correct'] and was_selected:
-            origin = (
-                "from the OTHER version" if o['value'].startswith('distractor:')
-                else "completely made up"
+            tmpl = (
+                BOSS_QUIZ_WRONG_DISTRACTOR if o['value'].startswith('distractor:')
+                else BOSS_QUIZ_WRONG_ABSURD
             )
-            wrong_lines.append(
-                f"  ✗ WRONG — {o['label']}: not in your version ({origin})"
-            )
+            wrong_lines.append('  ✗ ' + t(tmpl, user).format(label=o['label']))
 
-    reveal = BOSS_QUIZ_FAIL_TEMPLATE.format(
+    lang = getattr(user, 'language', 'en') or 'en'
+    fallback = '  (어쨌든 다시 제출해 봐)' if lang == 'ko' else '  (somehow none — tap Submit again)'
+    reveal = t(BOSS_QUIZ_FAIL_TEMPLATE, user).format(
         score=int(score * 100),
-        wrong_lines='\n'.join(wrong_lines) if wrong_lines else '  (somehow none — tap Submit again)',
+        wrong_lines='\n'.join(wrong_lines) if wrong_lines else fallback,
     )
 
     state_mod.set_progress(state, user.current_ver, 'final_quiz', {
         'attempts_history': attempts_history,
     })
 
-    # Auto re-enter for retry
     return [(reveal, None), *_enter_final_quiz(state, user)]
 
 
 # ---------- FAQ ----------
 
-def _faq_menu():
+def _faq_menu(user):
     from chat.wit_bot_copy import FAQ_ENTRIES, FAQ_MENU_INTRO
-    from chat.wit_bot_payloads import card_with_buttons
 
     return [(
-        FAQ_MENU_INTRO,
+        t(FAQ_MENU_INTRO, user),
         card_with_buttons([
-            {'label': e['question'], 'payload': f'faq:{e["key"]}'} for e in FAQ_ENTRIES
+            {'label': t(e['question'], user), 'payload': f'faq:{e["key"]}'}
+            for e in FAQ_ENTRIES
         ]),
     )]
 
 
-def _faq_answer(faq_key):
+def _faq_answer(faq_key, user):
     from chat.wit_bot_copy import FAQ_ENTRIES
 
     entry = next((e for e in FAQ_ENTRIES if e['key'] == faq_key), None)
     if entry is None:
-        return _faq_menu()
-    return [(entry['answer'], None)]
+        return _faq_menu(user)
+    return [(t(entry['answer'], user), None)]
 
 
-def _wit_reply():
+def _wit_reply(user):
     import random
     from chat.wit_bot_copy import WIT_REPLIES
-    return [(random.choice(WIT_REPLIES), None)]
+    return [(t(random.choice(WIT_REPLIES), user), None)]
 
 
 # ---------- Dispatch table ----------

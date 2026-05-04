@@ -15,7 +15,7 @@ def notify_participant_on_review(sender, instance, created, **kwargs):
 
     from chat.wit_bot import ensure_wit_bot_user
     from chat.wit_admin import _ordered_pair
-    from chat.wit_bot_copy import WIDGET_APPROVED_DM, WIDGET_REJECTED_DM_TEMPLATE
+    from chat.wit_bot_copy import WIDGET_APPROVED_DM, WIDGET_REJECTED_DM_TEMPLATE, t
 
     bot = ensure_wit_bot_user()
     u1, u2 = _ordered_pair(instance.user, bot)
@@ -23,16 +23,19 @@ def notify_participant_on_review(sender, instance, created, **kwargs):
     if room is None:
         return
 
+    user = instance.user
     if instance.status == 'approved':
         Message.objects.create(
-            chat_room=room, sender=bot, receiver=instance.user,
-            content=WIDGET_APPROVED_DM,
+            chat_room=room, sender=bot, receiver=user,
+            content=t(WIDGET_APPROVED_DM, user),
         )
     elif instance.status == 'rejected':
+        lang = getattr(user, 'language', 'en') or 'en'
+        no_reason = '어드민이 사유를 안 적었어' if lang == 'ko' else 'admin gave no reason'
         Message.objects.create(
-            chat_room=room, sender=bot, receiver=instance.user,
-            content=WIDGET_REJECTED_DM_TEMPLATE.format(
-                reason=instance.rejection_reason or 'admin gave no reason'
+            chat_room=room, sender=bot, receiver=user,
+            content=t(WIDGET_REJECTED_DM_TEMPLATE, user).format(
+                reason=instance.rejection_reason or no_reason
             ),
         )
         from chat import wit_bot_state as state_mod

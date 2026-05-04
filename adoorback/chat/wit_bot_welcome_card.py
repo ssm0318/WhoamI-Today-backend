@@ -7,6 +7,14 @@ from typing import Any
 from django.utils import timezone
 
 from chat import wit_bot_state as state_mod
+from chat.wit_bot_copy import (
+    WC_AUDIT_DONE_PRE_BOSS, WC_AUDIT_IN_PROGRESS, WC_BOSS_PASSED_PRE_SWAP,
+    WC_BTN_RESUME, WC_BTN_RESUME_ONBOARDING, WC_BTN_RUN_AUDIT,
+    WC_BTN_START_ONBOARDING, WC_BTN_START_VERSION_Q, WC_BTN_START_VERSION_W,
+    WC_BTN_TAKE_BOSS_QUIZ, WC_DEFAULT_SILENT, WC_KICKOFF_DONE_PRE_AUDIT,
+    WC_MID_FLOW, WC_POST_SWAP_Q, WC_POST_SWAP_W, WC_PRE_WINDOW,
+    WC_TIME_TO_ONBOARD_Q, WC_TIME_TO_ONBOARD_W, t,
+)
 from chat.wit_bot_payloads import card_with_buttons
 
 
@@ -17,7 +25,8 @@ V2_WINDOW_START = timezone.make_aware(datetime(2026, 5, 18, 0, 0))
 
 
 def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
-    """Return a `bot_payload` dict reflecting the user's current onboarding state."""
+    """Return a `bot_payload` dict reflecting the user's current onboarding state.
+    Localized to user.language."""
     if now is None:
         now = timezone.now()
 
@@ -32,19 +41,19 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
     if state.current_intent.startswith('kickoff_') and state.current_intent != 'kickoff_complete':
         return {
             **card_with_buttons([
-                {'label': 'Resume onboarding', 'payload': 'resume_onboarding'},
+                {'label': t(WC_BTN_RESUME_ONBOARDING, user), 'payload': 'resume_onboarding'},
             ]),
-            'intro': 'we were in the middle of something.',
+            'intro': t(WC_MID_FLOW, user),
         }
 
     # Mid-walkthrough — offer to resume the audit
     if state.current_intent in ('audit', 'walkthrough'):
         return {
             **card_with_buttons([
-                {'label': 'Resume', 'payload': 'resume_onboarding'},
-                {'label': 'Run audit', 'payload': 'run_audit'},
+                {'label': t(WC_BTN_RESUME, user), 'payload': 'resume_onboarding'},
+                {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
             ]),
-            'intro': "audit in progress. resume or rerun?",
+            'intro': t(WC_AUDIT_IN_PROGRESS, user),
         }
 
     # Kickoff complete → audit CTA (until V1 fully done)
@@ -57,60 +66,63 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
         if passed_final:
             return {
                 'kind': 'card',
-                'intro': "you survived. see you May 18 for the swap.",
+                'intro': t(WC_BOSS_PASSED_PRE_SWAP, user),
                 'buttons': [],
             }
         if last_missing == 0:
             return {
                 **card_with_buttons([
-                    {'label': 'Take the boss quiz', 'payload': 'take_boss_quiz'},
+                    {'label': t(WC_BTN_TAKE_BOSS_QUIZ, user), 'payload': 'take_boss_quiz'},
                 ]),
-                'intro': "audit done. final quiz time?",
+                'intro': t(WC_AUDIT_DONE_PRE_BOSS, user),
             }
         return {
             **card_with_buttons([
-                {'label': 'Run audit', 'payload': 'run_audit'},
+                {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
             ]),
-            'intro': "kickoff done. tap **Run audit** when you've explored more.",
+            'intro': t(WC_KICKOFF_DONE_PRE_AUDIT, user),
         }
 
     # Post-swap detection: prior version's kickoff is complete, this version's isn't.
-    # Fires regardless of date — once V1 is done and current_ver flipped, the V2
-    # CTA should be visible immediately.
     other_version = 'version_q' if version == 'version_w' else 'version_w'
     other_progress = state_mod.progress_for(state, other_version)
     other_kickoff_done = other_progress.get('kickoff', {}).get('completed', False)
 
     if other_kickoff_done and not kickoff:
-        version_label = 'version Q' if version == 'version_q' else 'version W'
+        if version == 'version_q':
+            cta_label = t(WC_BTN_START_VERSION_Q, user)
+            intro = t(WC_POST_SWAP_Q, user)
+        else:
+            cta_label = t(WC_BTN_START_VERSION_W, user)
+            intro = t(WC_POST_SWAP_W, user)
         return {
             **card_with_buttons([
-                {'label': f'Start {version_label} onboarding', 'payload': 'start_onboarding'},
+                {'label': cta_label, 'payload': 'start_onboarding'},
             ]),
-            'intro': f"the swap happened. you're now on {version_label}.\nready for round 2?",
+            'intro': intro,
         }
 
     # Pre-window
     if now < V1_WINDOW_START and not completed:
         return {
             'kind': 'card',
-            'intro': "i'll be here when the study starts on May 4 — see you then 👋",
+            'intro': t(WC_PRE_WINDOW, user),
             'buttons': [],
         }
 
     # Window is open, kickoff not started (fresh user, no prior version progress)
     if not kickoff and now >= V1_WINDOW_START:
-        version_label = 'version Q' if version == 'version_q' else 'version W'
+        intro_value = WC_TIME_TO_ONBOARD_Q if version == 'version_q' else WC_TIME_TO_ONBOARD_W
         return {
             **card_with_buttons([
-                {'label': 'Start onboarding', 'payload': 'start_onboarding'},
+                {'label': t(WC_BTN_START_ONBOARDING, user), 'payload': 'start_onboarding'},
             ]),
-            'intro': f"time to onboard. you're on {version_label}.",
+            'intro': t(intro_value, user),
         }
 
     # Default: silent
     return {
         'kind': 'card',
-        'intro': "all good. see you when needed.",
+        'intro': t(WC_DEFAULT_SILENT, user),
         'buttons': [],
     }
