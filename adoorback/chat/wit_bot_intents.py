@@ -151,10 +151,13 @@ def kickoff_welcome_handler(state, message, user):
 # ---------- kickoff_quiz_1 (multi-select study requirements) ----------
 
 def _quiz_1_options_for_user(user):
+    import random
     from chat.wit_bot_copy import QUIZ_1_STUDY_REQUIREMENTS as q
+    shuffled = list(q['options'])
+    random.shuffle(shuffled)
     return [
         {'value': o['value'], 'label': t(o['label'], user)}
-        for o in q['options']
+        for o in shuffled
     ]
 
 
@@ -225,10 +228,13 @@ def kickoff_quiz_1_handler(state, message, user):
 # ---------- kickoff_quiz_2 (single-select swap timing) ----------
 
 def _enter_kickoff_quiz_2(state, user):
+    import random
     from chat.wit_bot_copy import QUIZ_2_SWAP_TIMING as q
     state_mod.set_intent(state, 'kickoff_quiz_2', step=0)
+    shuffled = list(q['options'])
+    random.shuffle(shuffled)
     payload = card_with_buttons([
-        {'label': t(o['label'], user), 'payload': f"q2:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q2:{o['value']}"} for o in shuffled
     ])
     return [(t(q['prompt'], user), payload)]
 
@@ -252,21 +258,27 @@ def kickoff_quiz_2_handler(state, message, user):
         return [(t(q['reveal_correct'], user), None), *_enter_kickoff_quiz_3(state, user)]
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_2': quiz_state})
+    import random
+    shuffled = list(q['options'])
+    random.shuffle(shuffled)
     payload = card_with_buttons([
-        {'label': t(o['label'], user), 'payload': f"q2:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q2:{o['value']}"} for o in shuffled
     ])
     lang = getattr(user, 'language', 'en') or 'en'
-    retry_label = "다시 해봐:" if lang == 'ko' else "try again:"
+    retry_label = "다시 해봐:" if lang == 'ko' else "Try again:"
     return [(t(q['reveal_wrong'], user), None), (retry_label, payload)]
 
 
 # ---------- kickoff_quiz_3 (single-select surveys location) ----------
 
 def _enter_kickoff_quiz_3(state, user):
+    import random
     from chat.wit_bot_copy import QUIZ_3_SURVEYS_LOCATION as q
     state_mod.set_intent(state, 'kickoff_quiz_3', step=0)
+    shuffled = list(q['options'])
+    random.shuffle(shuffled)
     payload = card_with_buttons([
-        {'label': t(o['label'], user), 'payload': f"q3:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q3:{o['value']}"} for o in shuffled
     ])
     return [(t(q['prompt'], user), payload)]
 
@@ -290,11 +302,14 @@ def kickoff_quiz_3_handler(state, message, user):
         return [(t(q['reveal_correct'], user), None), *_enter_kickoff_push(state, user)]
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_3': quiz_state})
+    import random
+    shuffled = list(q['options'])
+    random.shuffle(shuffled)
     payload = card_with_buttons([
-        {'label': t(o['label'], user), 'payload': f"q3:{o['value']}"} for o in q['options']
+        {'label': t(o['label'], user), 'payload': f"q3:{o['value']}"} for o in shuffled
     ])
     lang = getattr(user, 'language', 'en') or 'en'
-    retry_label = "다시 해봐:" if lang == 'ko' else "try again:"
+    retry_label = "다시 해봐:" if lang == 'ko' else "Try again:"
     return [(t(q['reveal_wrong'], user), None), (retry_label, payload)]
 
 
