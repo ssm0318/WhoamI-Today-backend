@@ -1668,6 +1668,68 @@ class FriendList(generics.ListAPIView):
                 friend for friend in friends if not User.user_read(user, friend)
             ]
             self._qs = sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
+        elif query_type == 'check_in_updates':
+            from check_in.models import CheckInComponentEntry
+
+            friends = friends.exclude(id__in=user.hidden.all())
+            friend_ids = list(friends.values_list('id', flat=True))
+            latest_entry_updated_at_by_friend_id = {}
+            live_entries_by_friend_id = {}
+            live_entries = (
+                CheckInComponentEntry.objects
+                .filter(owner_id__in=friend_ids, superseded_at__isnull=True)
+                .only('owner_id', 'component', 'data', 'updated_at')
+            )
+            for entry in live_entries:
+                live_entries_by_friend_id.setdefault(entry.owner_id, []).append(entry)
+
+            component_visibility_fields = {
+                'battery': ('battery_visibility', 'battery_updated_at'),
+                'mood': ('mood_visibility', 'mood_updated_at'),
+                'song': ('song_visibility', 'song_updated_at'),
+                'thought': ('thought_visibility', 'thought_updated_at'),
+            }
+
+            def entry_has_content(entry):
+                data = entry.data or {}
+                if entry.component == 'battery':
+                    return bool((data.get('social_battery') or '').strip())
+                if entry.component == 'mood':
+                    return any((m or '').strip() for m in data.get('mood') or [])
+                if entry.component == 'thought':
+                    return bool((data.get('thought') or '').strip())
+                if entry.component == 'song':
+                    return bool((data.get('track_id') or '').strip())
+                return False
+
+            for friend in friends:
+                check_in = user.can_access_check_in(friend)
+                if not check_in:
+                    continue
+                for entry in live_entries_by_friend_id.get(friend.id, []):
+                    fields = component_visibility_fields.get(entry.component)
+                    if not fields:
+                        continue
+                    visibility_field, updated_at_field = fields
+                    if not viewer_sees_check_in_component(
+                        check_in, friend, user, visibility_field, updated_at_field
+                    ):
+                        continue
+                    if not entry_has_content(entry):
+                        continue
+                    prev = latest_entry_updated_at_by_friend_id.get(friend.id)
+                    if prev is None or entry.updated_at > prev:
+                        latest_entry_updated_at_by_friend_id[friend.id] = entry.updated_at
+
+            def latest_check_in_update(friend):
+                return latest_entry_updated_at_by_friend_id.get(friend.id)
+
+            friends_with_updates = [
+                friend for friend in friends
+                if latest_check_in_update(friend) is not None
+            ]
+
+            self._qs = sorted(friends_with_updates, key=latest_check_in_update, reverse=True)
         elif query_type == 'favorites':
             self._qs = user.favorites.all().order_by('username')
         elif query_type == 'hidden':
@@ -1702,7 +1764,7 @@ class FriendList(generics.ListAPIView):
 
     def _build_batch_context(self, ctx, friend_ids):
         from collections import defaultdict
-        from check_in.models import CheckIn, Song, Poke
+        from check_in.models import CheckIn, CheckInComponentEntry, Song, Poke
         from chat.models import ChatRoom, Message
         from note.models import Note
         from qna.models import Response as QnaResponse
@@ -1725,6 +1787,7 @@ class FriendList(generics.ListAPIView):
                 'content_report_keys': set(),
                 'pokes_by_receiver': {},
                 'pinned_count_by_friend_id': {},
+                'live_check_in_entries_by_user_id': {},
             })
             return
 
@@ -1800,6 +1863,17 @@ class FriendList(generics.ListAPIView):
             if _is_audience(ci.user_id, ci.visibility, ci.pk, ct_ci.id, ci.created_at):
                 visible_check_in_by_user_id[ci.user_id] = ci
         ctx['visible_check_in_by_user_id'] = visible_check_in_by_user_id
+
+        live_check_in_entries_by_user_id = defaultdict(dict)
+        live_entries = (
+            CheckInComponentEntry.objects
+            .filter(owner_id__in=friend_ids, superseded_at__isnull=True)
+            .only('owner_id', 'component', 'data', 'visibility', 'updated_at')
+            .order_by('owner_id', 'component', '-created_at')
+        )
+        for entry in live_entries:
+            live_check_in_entries_by_user_id[entry.owner_id].setdefault(entry.component, entry)
+        ctx['live_check_in_entries_by_user_id'] = live_check_in_entries_by_user_id
 
         # 6. Active songs
         ctx['active_song_by_user_id'] = {
@@ -1886,8 +1960,6 @@ class FriendList(generics.ListAPIView):
         # Python, reusing the same helpers that drive the single-user
         # pinned endpoint. Only fields required for the filter are
         # selected so the scan is cheap even for heavy users.
-        from check_in.models import CheckInComponentEntry
-
         pinned_rows = CheckInComponentEntry.objects.filter(
             owner_id__in=friend_ids,
             is_pinned=True,
