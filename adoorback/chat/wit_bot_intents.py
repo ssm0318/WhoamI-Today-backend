@@ -333,7 +333,7 @@ def _check_push_and_continue(state, user):
 
     state_mod.set_progress(state, user.current_ver, 'kickoff', {'push_notif': 'asked'})
     return [(t(PUSH_NOTIF_OFF_COPY, user), card_with_buttons([
-        {'label': t(PUSH_OPEN_SETTINGS_BUTTON, user), 'navigate_to': '/settings/daily-noti-setting'},
+        {'label': t(PUSH_OPEN_SETTINGS_BUTTON, user), 'navigate_to': '/settings'},
         {'label': t(PUSH_DONE_BUTTON, user), 'payload': 'kickoff_push_done'},
     ]))]
 
