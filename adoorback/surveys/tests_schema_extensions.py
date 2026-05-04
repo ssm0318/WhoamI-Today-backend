@@ -1514,6 +1514,88 @@ class EditableIndexBucketingTests(TestCase):
         self.assertIn('eb_closed', comp_slugs)
 
 
+class ResearchInstrumentResultsHiddenTests(TestCase):
+    """Research-integrity policy: surveys that gather **opinions on the
+    platform** (or the wellbeing/connection outcomes the platform is
+    supposed to affect) must NOT expose aggregate results during the
+    study window — seeing others' responses would anchor what
+    participants think about the platform.
+
+    SOTDs are excluded from this policy: they are trait measures
+    (HEXACO personality, UCLA loneliness, RSDS self-disclosure, etc.)
+    that don't ask about WIT, so the score-histogram engagement design
+    stays. Daily_base is the platform feature itself.
+
+    Regression test for the June 1 audit follow-up.
+    """
+
+    # Slugs that MUST stay hidden during the study. Pre/mid/post study,
+    # feature evals, weekly reflections — everything that asks "how is
+    # WIT going" or measures the wellbeing/connection outcomes.
+    REQUIRED_HIDDEN_SLUGS = (
+        'pre_study',
+        'mid_study', 'mid_study_w', 'mid_study_q',
+        'post_study', 'post_study_w', 'post_study_q',
+        'feature_eval_w',
+        'goal_comparison_p1', 'goal_comparison_p2',
+        'study_endpoint',
+        'anytime_reflection',
+        'week1_reflection', 'week2_reflection',
+        'week3_reflection', 'week4_reflection',
+    )
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+        from pathlib import Path
+
+        # Load the actual study fixtures so we test the live YAML, not a
+        # mock. Catches any future YAML edit that re-exposes a platform-
+        # opinion survey.
+        fixtures_dir = Path(__file__).parent / 'fixtures'
+        for name in ('study_2026q2.yaml', 'sotd.yaml', 'pre.yaml', 'endpoint.yaml'):
+            path = fixtures_dir / name
+            if path.exists():
+                call_command('load_surveys', str(path))
+
+    def test_listed_research_instruments_have_results_hidden(self):
+        for slug in self.REQUIRED_HIDDEN_SLUGS:
+            survey = Survey.objects.filter(slug=slug).first()
+            if survey is None:
+                continue  # YAML may not define every variant; skip absent.
+            self.assertTrue(
+                survey.results_hidden,
+                f'{slug!r} must have results_hidden=True (platform-opinion survey)',
+            )
+
+    def test_sotd_instruments_remain_visible(self):
+        """SOTDs are trait measures, not platform opinions — the score
+        histogram is part of the engagement design and should be shared."""
+        sotds = Survey.objects.filter(slug__startswith='sotd_d')
+        self.assertGreater(sotds.count(), 0, 'no SOTD surveys loaded')
+        for survey in sotds:
+            self.assertFalse(
+                survey.results_hidden,
+                f'{survey.slug!r} should have results_hidden=False (trait scale)',
+            )
+
+    def test_results_endpoint_returns_404_for_hidden_research_instrument(self):
+        """End-to-end: even if a participant guesses the URL, the results
+        endpoint refuses to render aggregates for a hidden survey."""
+        from rest_framework.test import APIClient
+
+        u = User.objects.create(username='ri_user', email='ri@x.com')
+        client = APIClient()
+        client.force_authenticate(user=u)
+        # Pick a survey that's definitely hidden (pre_study from fixtures).
+        survey = Survey.objects.filter(slug='pre_study').first()
+        if survey is None:
+            self.skipTest('pre_study not in fixtures')
+        self.assertTrue(survey.results_hidden)
+        r = client.get(f'/api/surveys/{survey.slug}/results/')
+        self.assertEqual(r.status_code, 404)
+
+
 # ---------------------------------------------------------------------------
 # UserSurveyEmbeddedData model basics
 # ---------------------------------------------------------------------------

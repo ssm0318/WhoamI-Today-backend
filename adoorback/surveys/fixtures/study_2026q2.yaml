@@ -16,10 +16,13 @@
     en: "Pre-study survey"
     ko: "사전 설문"
   description:
-    en: "Welcome! A few quick questions before we start. We'll share tomorrow what your friends and the WhoamI Today community answered, plus how your responses compare. Friend-level results unlock once you have 5+ close connections."
-    ko: "환영합니다! 시작하기 전에 짧은 질문 몇 가지 드릴게요. 내일은 친구들과 WhoamI Today 커뮤니티의 응답, 그리고 본인의 응답이 어떻게 비교되는지 보여드릴게요. 친구 단위 결과는 가까운 친구가 5명 이상일 때 공개됩니다."
+    en: "Welcome! A few quick questions before we start. Your responses stay private — we don't share aggregate results back during the study so they don't influence later answers."
+    ko: "환영합니다! 시작하기 전에 짧은 질문 몇 가지 드릴게요. 응답은 비공개이며, 이후 답변에 영향을 주지 않도록 연구 기간 중에는 다른 참가자들의 응답 결과를 공유하지 않습니다."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — baseline measurement. Aggregates would anchor
+  # mid_study / post_study responses, so results stay hidden for the
+  # duration of the study.
+  results_hidden: true
   questions:
     - order: 1
       prompt:
@@ -147,10 +150,12 @@
     en: "Week 1 reflection"
     ko: "1주차 회고"
   description:
-    en: "Looking back on the past week. Tomorrow we'll share what the community said."
-    ko: "지난 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
+    en: "Looking back on the past week. Your responses stay private during the study so aggregates don't influence later weeks."
+    ko: "지난 한 주를 돌아봐 주세요. 다음 주차 응답에 영향을 주지 않도록 연구 기간 중에는 응답 결과를 공유하지 않습니다."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — wellbeing + connection outcomes. Hidden to
+  # avoid anchoring subsequent weeks' responses on aggregate norms.
+  results_hidden: true
   questions:
     - order: 1
       prompt:
@@ -183,10 +188,12 @@
     en: "Week 2 reflection"
     ko: "2주차 회고"
   description:
-    en: "Looking back on the past week. Tomorrow we'll share what the community said."
-    ko: "지난 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
+    en: "Looking back on the past week. Your responses stay private during the study so aggregates don't influence later weeks."
+    ko: "지난 한 주를 돌아봐 주세요. 다음 주차 응답에 영향을 주지 않도록 연구 기간 중에는 응답 결과를 공유하지 않습니다."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — wellbeing + connection outcomes. Hidden to
+  # avoid anchoring subsequent weeks' responses on aggregate norms.
+  results_hidden: true
   questions:
     - order: 1
       prompt:
@@ -219,10 +226,12 @@
     en: "Week 3 reflection"
     ko: "3주차 회고"
   description:
-    en: "Looking back on the past week. Tomorrow we'll share what the community said."
-    ko: "지난 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
+    en: "Looking back on the past week. Your responses stay private during the study so aggregates don't influence later weeks."
+    ko: "지난 한 주를 돌아봐 주세요. 다음 주차 응답에 영향을 주지 않도록 연구 기간 중에는 응답 결과를 공유하지 않습니다."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — wellbeing + connection outcomes. Hidden to
+  # avoid anchoring subsequent weeks' responses on aggregate norms.
+  results_hidden: true
   questions:
     - order: 1
       prompt:
@@ -255,10 +264,12 @@
     en: "Week 4 reflection"
     ko: "4주차 회고"
   description:
-    en: "Looking back on the final week. Tomorrow we'll share what the community said."
-    ko: "마지막 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
+    en: "Looking back on the final week. Your responses stay private — aggregates are released after the study ends."
+    ko: "마지막 한 주를 돌아봐 주세요. 응답은 비공개이며, 전체 결과는 연구 종료 후 공개됩니다."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — final wellbeing + connection measurement.
+  # Hidden during study; aggregates released post-study.
+  results_hidden: true
   questions:
     - order: 1
       prompt:
