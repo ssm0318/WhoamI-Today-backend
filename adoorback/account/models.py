@@ -924,6 +924,10 @@ class DiscoverFeed(AdoorTimestampedModel):
         ('mutual_traits', 'Mutual Traits'),
         ('anonymous', 'Anonymous'),
         ('random', 'Random'),
+        ('yesterday_mission', 'Yesterday Mission'),
+        ('yesterday_question', 'Yesterday Question'),
+        ('yesterday_post', 'Yesterday Post'),
+        ('recommended', 'Recommended Post'),
     )
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     sort_order = models.IntegerField(default=0)
@@ -955,6 +959,10 @@ class DiscoverFeedMusic(AdoorTimestampedModel):
         ('mutual_traits', 'Mutual Traits'),
         ('anonymous', 'Anonymous'),
         ('random', 'Random'),
+        ('yesterday_mission', 'Yesterday Mission'),
+        ('yesterday_question', 'Yesterday Question'),
+        ('yesterday_post', 'Yesterday Post'),
+        ('recommended', 'Recommended Post'),
     )
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     sort_order = models.IntegerField(default=0)

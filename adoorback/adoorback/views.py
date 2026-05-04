@@ -89,7 +89,13 @@ class MissionAttempts(generics.ListAPIView):
             share_type=ShareType.MISSION,
             **_mission_note_filter(mission),
             author__current_ver=user.current_ver,
-        ).select_related('author').prefetch_related(
+        )
+
+        if self.request.query_params.get('discover') == 'true':
+            friend_ids = set(user.friend_ids + user.close_friend_ids)
+            notes = notes.exclude(author_id__in=friend_ids | {user.id})
+
+        notes = notes.select_related('author').prefetch_related(
             'images',
             'videos',
             'readers',

@@ -15,9 +15,9 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction, IntegrityError
-from django.db.models import Q, Case, When, Value, IntegerField, Count
+from django.db.models import Q, Case, When, Value, IntegerField, Count, Max
 from django.db.models.functions import Lower
-from django.http import HttpResponse, HttpResponseNotAllowed, Http404
+from django.http import HttpResponse, HttpResponseNotAllowed, Http404, JsonResponse as DjangoResponse
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
@@ -38,6 +38,9 @@ from safedelete.models import SOFT_DELETE_CASCADE
 
 from .email import email_manager
 from .models import Subscription, Connection, AppSession, DiscoverFeed, DiscoverFeedMusic, Persona, Interest
+from adoorback.models import Mission
+from check_in.models import Song, CheckIn
+from adoorback.serializers import MissionSerializer
 from custom_fcm.models import CustomFCMDevice
 from account.models import FriendRequest, BlockRec, CustomChip, FriendEvaluation, VersionSwitchRequest
 from account.serializers import (CurrentUserSerializer, CurrentUserSignupSerializer, \
@@ -59,16 +62,17 @@ from account.view_as import (
     resolve_shadow_viewer, tier_allows_post,
 )
 from adoorback.utils.content_types import get_generic_relation_type, get_friend_request_type
+from adoorback.utils.mission_day import get_today_la_boundary
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail, InvalidInviterUsername, ConflictError
 from adoorback.utils.validators import adoor_exception_handler
-from note.models import Note
+from note.models import Note, ShareType
 from note.feed_grouping import group_note_entries, serialize_mission_grouped_notes, serialize_note_entries
 from note.serializers import NoteSerializer
 from notification.models import NotificationActor
 from qna.models import ResponseRequest
 from qna.models import Question, Response as _Response
-from qna.serializers import ResponseSerializer, DailyQuestionSerializer
+from qna.serializers import ResponseSerializer, DailyQuestionSerializer, QuestionBaseSerializer
 from qna.serializers import GroupedResponseRequestSerializer, ResponseSerializer
 from account.models import CHIP_CATEGORY_CHOICES, CHIP_CATEGORY_DESCRIPTIONS, CHIPS_BY_CATEGORY, ALL_CHIP_NAMES
 from tracking.utils import clean_session_key
@@ -1664,6 +1668,68 @@ class FriendList(generics.ListAPIView):
                 friend for friend in friends if not User.user_read(user, friend)
             ]
             self._qs = sorted(friends_with_updates, key=lambda x: x.most_recent_update(user), reverse=True)
+        elif query_type == 'check_in_updates':
+            from check_in.models import CheckInComponentEntry
+
+            friends = friends.exclude(id__in=user.hidden.all())
+            friend_ids = list(friends.values_list('id', flat=True))
+            latest_entry_updated_at_by_friend_id = {}
+            live_entries_by_friend_id = {}
+            live_entries = (
+                CheckInComponentEntry.objects
+                .filter(owner_id__in=friend_ids, superseded_at__isnull=True)
+                .only('owner_id', 'component', 'data', 'updated_at')
+            )
+            for entry in live_entries:
+                live_entries_by_friend_id.setdefault(entry.owner_id, []).append(entry)
+
+            component_visibility_fields = {
+                'battery': ('battery_visibility', 'battery_updated_at'),
+                'mood': ('mood_visibility', 'mood_updated_at'),
+                'song': ('song_visibility', 'song_updated_at'),
+                'thought': ('thought_visibility', 'thought_updated_at'),
+            }
+
+            def entry_has_content(entry):
+                data = entry.data or {}
+                if entry.component == 'battery':
+                    return bool((data.get('social_battery') or '').strip())
+                if entry.component == 'mood':
+                    return any((m or '').strip() for m in data.get('mood') or [])
+                if entry.component == 'thought':
+                    return bool((data.get('thought') or '').strip())
+                if entry.component == 'song':
+                    return bool((data.get('track_id') or '').strip())
+                return False
+
+            for friend in friends:
+                check_in = user.can_access_check_in(friend)
+                if not check_in:
+                    continue
+                for entry in live_entries_by_friend_id.get(friend.id, []):
+                    fields = component_visibility_fields.get(entry.component)
+                    if not fields:
+                        continue
+                    visibility_field, updated_at_field = fields
+                    if not viewer_sees_check_in_component(
+                        check_in, friend, user, visibility_field, updated_at_field
+                    ):
+                        continue
+                    if not entry_has_content(entry):
+                        continue
+                    prev = latest_entry_updated_at_by_friend_id.get(friend.id)
+                    if prev is None or entry.updated_at > prev:
+                        latest_entry_updated_at_by_friend_id[friend.id] = entry.updated_at
+
+            def latest_check_in_update(friend):
+                return latest_entry_updated_at_by_friend_id.get(friend.id)
+
+            friends_with_updates = [
+                friend for friend in friends
+                if latest_check_in_update(friend) is not None
+            ]
+
+            self._qs = sorted(friends_with_updates, key=latest_check_in_update, reverse=True)
         elif query_type == 'favorites':
             self._qs = user.favorites.all().order_by('username')
         elif query_type == 'hidden':
@@ -1698,7 +1764,7 @@ class FriendList(generics.ListAPIView):
 
     def _build_batch_context(self, ctx, friend_ids):
         from collections import defaultdict
-        from check_in.models import CheckIn, Song, Poke
+        from check_in.models import CheckIn, CheckInComponentEntry, Song, Poke
         from chat.models import ChatRoom, Message
         from note.models import Note
         from qna.models import Response as QnaResponse
@@ -1721,6 +1787,7 @@ class FriendList(generics.ListAPIView):
                 'content_report_keys': set(),
                 'pokes_by_receiver': {},
                 'pinned_count_by_friend_id': {},
+                'live_check_in_entries_by_user_id': {},
             })
             return
 
@@ -1796,6 +1863,17 @@ class FriendList(generics.ListAPIView):
             if _is_audience(ci.user_id, ci.visibility, ci.pk, ct_ci.id, ci.created_at):
                 visible_check_in_by_user_id[ci.user_id] = ci
         ctx['visible_check_in_by_user_id'] = visible_check_in_by_user_id
+
+        live_check_in_entries_by_user_id = defaultdict(dict)
+        live_entries = (
+            CheckInComponentEntry.objects
+            .filter(owner_id__in=friend_ids, superseded_at__isnull=True)
+            .only('owner_id', 'component', 'data', 'visibility', 'updated_at')
+            .order_by('owner_id', 'component', '-created_at')
+        )
+        for entry in live_entries:
+            live_check_in_entries_by_user_id[entry.owner_id].setdefault(entry.component, entry)
+        ctx['live_check_in_entries_by_user_id'] = live_check_in_entries_by_user_id
 
         # 6. Active songs
         ctx['active_song_by_user_id'] = {
@@ -1882,8 +1960,6 @@ class FriendList(generics.ListAPIView):
         # Python, reusing the same helpers that drive the single-user
         # pinned endpoint. Only fields required for the filter are
         # selected so the scan is cheap even for heavy users.
-        from check_in.models import CheckInComponentEntry
-
         pinned_rows = CheckInComponentEntry.objects.filter(
             owner_id__in=friend_ids,
             is_pinned=True,
@@ -3002,115 +3078,355 @@ class DiscoverFeedPagination(PageNumberPagination):
     page_size = 10
 
 
-class DiscoverFeedView(generics.ListAPIView):
+class DiscoverFeedView(APIView):
     permission_classes = [IsAuthenticated]
-    pagination_class = DiscoverFeedPagination
 
     def get_exception_handler(self):
         return adoor_exception_handler
 
-    def get_queryset(self):
-        user = self.request.user
+    def _json_safe(self, value):
+        if isinstance(value, set):
+            return list(value)
+        if isinstance(value, list):
+            return [self._json_safe(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._json_safe(item) for item in value]
+        if isinstance(value, dict):
+            return {key: self._json_safe(item) for key, item in value.items()}
+        return value
 
-        now = timezone.now()
-        last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
+    def _latest_batch_time(self, user):
+        feed_time = DiscoverFeed.objects.filter(user=user).aggregate(
+            max_time=Max('created_at'))['max_time']
+        music_time = DiscoverFeedMusic.objects.filter(user=user).aggregate(
+            max_time=Max('created_at'))['max_time']
+        timestamps = [value for value in (feed_time, music_time) if value]
+        return max(timestamps) if timestamps else None
 
-        # Check if the 7 AM PDT boundary has been crossed since last feed
-        from zoneinfo import ZoneInfo
-        la_tz = ZoneInfo('America/Los_Angeles')
-        now_la = now.astimezone(la_tz)
-        current_day = (now_la - timedelta(hours=7)).date()
+    def _digest_excluded_author_ids(self, user):
+        friend_ids = set(user.friend_ids + user.close_friend_ids)
+        blocked_ids = set(user.user_report_blocked_ids)
+        return friend_ids | blocked_ids | {user.id}
 
-        needs_new_feed = False
-        if not last_feed:
-            needs_new_feed = True
-        else:
-            last_feed_la = last_feed.created_at.astimezone(la_tz)
-            last_feed_day = (last_feed_la - timedelta(hours=7)).date()
-            if current_day > last_feed_day:
-                needs_new_feed = True
+    def _is_digest_post_visible(self, post, user, excluded_author_ids):
+        author = getattr(post, 'author', None)
+        if not author:
+            return False
+        if author.id in excluded_author_ids:
+            return False
+        if author.is_superuser:
+            return False
+        if author.current_ver != user.current_ver:
+            return False
+        if 'public' not in (post.visibility or []):
+            return False
+        return post.is_audience(user)
 
-        # Temporary: one-time regeneration at PDT 9AM on May 2, 2026 (new discover logic deploy)
-        if not needs_new_feed and last_feed:
-            from datetime import datetime
-            override_time = datetime(2026, 5, 2, 9, 0, 0, tzinfo=la_tz)
-            if now_la >= override_time and last_feed.created_at.astimezone(la_tz) < override_time:
-                needs_new_feed = True
+    def _is_digest_song_visible(self, song, user, excluded_author_ids):
+        author = getattr(song, 'user', None)
+        if not author:
+            return False
+        if not song.is_active:
+            return False
+        if author.id in excluded_author_ids:
+            return False
+        if author.is_superuser:
+            return False
+        if author.current_ver != user.current_ver:
+            return False
 
-        if needs_new_feed:
-            self.generate_new_feed(user)
-            last_feed = DiscoverFeed.objects.filter(user=user).order_by('-created_at').first()
-
-        if not last_feed:
-            return DiscoverFeed.objects.none()
-
-        # Always return all items — filtering is done client-side using the category field
-        latest_timestamp = last_feed.created_at
-        queryset = DiscoverFeed.objects.filter(
-            user=user,
-            created_at=latest_timestamp
-        ).select_related('response', 'response__author', 'response__question', 'note', 'note__author')
-
-        # Version isolation: exclude items whose author is on a different version
-        queryset = queryset.exclude(
-            Q(response__isnull=False) & ~Q(response__author__current_ver=user.current_ver)
-        ).exclude(
-            Q(note__isnull=False) & ~Q(note__author__current_ver=user.current_ver)
+        active_check_in = CheckIn.objects.filter(user=author, is_active=True).first()
+        if not active_check_in:
+            return False
+        if not active_check_in.is_audience(user):
+            return False
+        return viewer_sees_check_in_component(
+            active_check_in, author, user, 'song_visibility', 'song_updated_at'
         )
 
-        queryset = queryset.order_by('id')
+    def _yesterday_digest_objects(self, now=None):
+        yesterday_boundary = get_today_la_boundary(now=now) - timedelta(days=1)
+        yesterday_day_of_year = yesterday_boundary.timetuple().tm_yday
+        missions = list(Mission.objects.all().order_by('id'))
+        yesterday_mission_obj = missions[yesterday_day_of_year % len(missions)] if missions else None
+        yesterday_question_obj = Question.objects.filter(
+            selected_dates__contains=[yesterday_boundary.date()]
+        ).first()
+        return yesterday_mission_obj, yesterday_question_obj
 
-        return queryset
+    def get(self, request):
+        user = request.user
+        
+        # Determine 6-hour boundary (PDT: 7am, 1pm, 7pm, 1am)
+        la_tz = ZoneInfo('America/Los_Angeles')
+        now_la = timezone.now().astimezone(la_tz)
+        
+        hour = now_la.hour
+        if hour >= 19:
+            boundary_hour = 19
+        elif hour >= 13:
+            boundary_hour = 13
+        elif hour >= 7:
+            boundary_hour = 7
+        else:
+            boundary_hour = 1
+
+        recent_boundary = now_la.replace(hour=boundary_hour, minute=0, second=0, microsecond=0)
+        if hour < 1:
+            recent_boundary -= timedelta(days=1)
+            recent_boundary = recent_boundary.replace(hour=19) # previous day 7pm
+
+        latest_batch_time = self._latest_batch_time(user)
+        needs_new_feed = False
+        if not latest_batch_time:
+            needs_new_feed = True
+        else:
+            last_feed_la = latest_batch_time.astimezone(la_tz)
+            if last_feed_la < recent_boundary:
+                needs_new_feed = True
+                
+        if needs_new_feed:
+            self.generate_new_feed(user, batch_time=timezone.now())
+
+        # Fetch from DiscoverFeed and DiscoverFeedMusic
+        latest_timestamp = self._latest_batch_time(user)
+        context = {'request': request}
+        yesterday_mission_obj, yesterday_question_obj = self._yesterday_digest_objects()
+            
+        if not latest_timestamp:
+            return DjangoResponse(self._json_safe({
+                "yesterday_mission": {
+                    "mission": MissionSerializer(yesterday_mission_obj, context=context).data if yesterday_mission_obj else None,
+                    "posts": []
+                },
+                "yesterday_question": {
+                    "question": QuestionBaseSerializer(yesterday_question_obj, context=context).data if yesterday_question_obj else None,
+                    "responses": []
+                },
+                "yesterday_music": {"tracks": []},
+                "recommended_posts": []
+            }))
+            
+        feeds = DiscoverFeed.objects.filter(user=user, created_at=latest_timestamp).select_related(
+            'response', 'response__author', 'response__question', 'note', 'note__author')
+            
+        # Structure
+        yesterday_mission_posts = []
+        yesterday_question_responses = []
+        recommended_posts = []
+        excluded_author_ids = self._digest_excluded_author_ids(user)
+        
+        for feed in feeds:
+            if (
+                feed.category == 'yesterday_mission'
+                and feed.note
+                and self._is_digest_post_visible(feed.note, user, excluded_author_ids)
+            ):
+                yesterday_mission_posts.append(feed.note)
+            elif (
+                feed.category == 'yesterday_question'
+                and feed.response
+                and self._is_digest_post_visible(feed.response, user, excluded_author_ids)
+            ):
+                yesterday_question_responses.append(feed.response)
+            elif feed.category in ('yesterday_post', 'recommended'):
+                if (
+                    feed.note
+                    and self._is_digest_post_visible(feed.note, user, excluded_author_ids)
+                ):
+                    feed.note._mutual_friends_count = feed.sort_order # We can abuse sort_order to store mutual friends? Or just compute it on the fly?
+                    # Actually, if we compute it on the fly during API fetch, we don't need to hack DB schema.
+                    recommended_posts.append(feed.note)
+                elif (
+                    feed.response
+                    and self._is_digest_post_visible(feed.response, user, excluded_author_ids)
+                ):
+                    recommended_posts.append(feed.response)
+
+        # Music
+        music_feeds = list(DiscoverFeedMusic.objects.filter(user=user, created_at=latest_timestamp).select_related('song', 'song__user'))
+        random.shuffle(music_feeds)
+        music_songs = [
+            mf.song for mf in music_feeds
+            if self._is_digest_song_visible(mf.song, user, excluded_author_ids)
+        ]
+
+        # Inject mutual traits/friends to recommended posts
+        user_friends = set(user.connected_user_ids)
+        user_interests = set(user.user_interests.values_list('id', flat=True))
+        user_personas = set(user.user_personas.values_list('id', flat=True))
+        
+        # Serialize recommended posts
+        recommended_serialized = []
+        for post in recommended_posts:
+            author = post.author
+            author_friends = set(author.connected_user_ids)
+            mutual_friends_count = len(user_friends.intersection(author_friends))
+            
+            author_interests = set(author.user_interests.values_list('id', flat=True))
+            author_personas = set(author.user_personas.values_list('id', flat=True))
+            mutual_traits_count = len(user_interests.intersection(author_interests)) + len(user_personas.intersection(author_personas))
+            
+            if isinstance(post, Note):
+                data = NoteSerializer(post, context=context).data
+            else:
+                data = ResponseSerializer(post, context=context).data
+                
+            data['mutual_friends_count'] = mutual_friends_count
+            data['mutual_traits_count'] = mutual_traits_count
+            data['is_recommended'] = True # to allow frontend to hide timestamp
+            recommended_serialized.append(data)
+
+        # Music manual serialization
+        songs_data = []
+        for song in music_songs:
+            songs_data.append({
+                'id': song.id,
+                'track_id': song.track_id,
+                'created_at': song.created_at,
+                'user': {
+                    'id': song.user.id,
+                    'username': song.user.username,
+                    'profile_pic': song.user.profile_pic,
+                    'url': f"/users/{song.user.username}",
+                    'profile_image': song.user.profile_image.url if song.user.profile_image else None,
+                }
+            })
+
+        return DjangoResponse(self._json_safe({
+            "yesterday_mission": {
+                "mission": MissionSerializer(yesterday_mission_obj, context=context).data if yesterday_mission_obj else None,
+                "posts": NoteSerializer(yesterday_mission_posts, many=True, context=context).data
+            },
+            "yesterday_question": {
+                "question": QuestionBaseSerializer(yesterday_question_obj, context=context).data if yesterday_question_obj else None,
+                "responses": ResponseSerializer(yesterday_question_responses, many=True, context=context).data
+            },
+            "yesterday_music": {
+                "tracks": songs_data
+            },
+            "recommended_posts": recommended_serialized
+        }))
 
     @transaction.atomic
-    def generate_new_feed(self, user):        
-        batch_time = timezone.now()
-
+    def generate_new_feed(self, user, batch_time):        
+        # Clear old feeds from DB? Not strictly necessary if we query by latest_timestamp, but keeps DB small
+        DiscoverFeed.objects.filter(user=user).delete()
+        DiscoverFeedMusic.objects.filter(user=user).delete()
+        
         friend_ids = set(user.friend_ids + user.close_friend_ids)
         blocked_ids = set(user.user_report_blocked_ids)
         exclude_ids = friend_ids | blocked_ids | {user.id}
 
-        # --- NEW SIMPLIFIED LOGIC: show all posts before 7 AM PDT cutoff ---
-        from zoneinfo import ZoneInfo
         la_tz = ZoneInfo('America/Los_Angeles')
         now_la = batch_time.astimezone(la_tz)
-        today_7am_la = now_la.replace(hour=7, minute=0, second=0, microsecond=0)
-        if now_la.hour < 7:
-            cutoff_la = today_7am_la - timedelta(days=1)
-        else:
-            cutoff_la = today_7am_la
+        today_7am_la = get_today_la_boundary(now=batch_time)
+        yesterday_7am_la = today_7am_la - timedelta(days=1)
+        
+        yesterday_day_of_year = yesterday_7am_la.timetuple().tm_yday
+        missions = list(Mission.objects.all().order_by('id'))
+        yesterday_mission_obj = missions[yesterday_day_of_year % len(missions)] if missions else None
+        yesterday_question_obj = Question.objects.filter(selected_dates__contains=[yesterday_7am_la.date()]).first()
 
-        responses = list(_Response.objects.filter(
+        # All responses & notes by non-friends with public visibility
+        all_responses = list(_Response.objects.filter(
             author__current_ver=user.current_ver,
             visibility__contains=['public'],
-            created_at__lt=cutoff_la,
+            created_at__lt=today_7am_la,
         ).exclude(author_id__in=exclude_ids).exclude(author__is_superuser=True))
 
-        notes = list(Note.objects.filter(
+        all_notes = list(Note.objects.filter(
             author__current_ver=user.current_ver,
             visibility__contains=['public'],
-            created_at__lt=cutoff_la,
+            created_at__lt=today_7am_la,
         ).exclude(author_id__in=exclude_ids).exclude(author__is_superuser=True))
 
-        all_posts = sorted(responses + notes, key=attrgetter('created_at'), reverse=True)
+        yesterday_mission_posts = []
+        yesterday_question_responses = []
+        yesterday_other_posts = []
+        older_curated_posts = []
 
-        for i, obj in enumerate(all_posts):
-            response_obj = obj if isinstance(obj, _Response) else None
-            note_obj = obj if isinstance(obj, Note) else None
-            DiscoverFeed.objects.create(
-                user=user,
-                response=response_obj,
-                note=note_obj,
-                category='discover',
-                created_at=batch_time,
-                sort_order=i
-            )
+        for obj in all_responses:
+            if not obj.is_audience(user): continue
+            
+            if obj.created_at >= yesterday_7am_la:
+                if yesterday_question_obj and obj.question_id == yesterday_question_obj.id:
+                    yesterday_question_responses.append(obj)
+                else:
+                    yesterday_other_posts.append(obj)
+            else:
+                older_curated_posts.append(obj)
+                
+        for obj in all_notes:
+            if not obj.is_audience(user): continue
+            
+            if obj.created_at >= yesterday_7am_la:
+                # Is it yesterday's mission?
+                if obj.share_type == ShareType.MISSION and yesterday_mission_obj and (obj.mission_prompt == yesterday_mission_obj.prompt or getattr(obj, 'mission_id', None) == yesterday_mission_obj.id):
+                    yesterday_mission_posts.append(obj)
+                else:
+                    yesterday_other_posts.append(obj)
+            else:
+                older_curated_posts.append(obj)
 
-        from check_in.models import Song, CheckIn as CheckInModel
+        # Algorithm for Curated Fill
+        # We need to fill up to 10 recommended posts. 
+        # But wait, the user said: "무조건 어제꺼는 다 포함하고, 그다음에 curated 만 해서 최대 개수가 10개라는 거야. 그니까 [어제꺼] + [최대 10개의 추천셋]"
+        # Ah! So "어제꺼" is ALL yesterday's posts (excluding mission/question ones), plus UP TO 10 older curated posts.
+        # Score older curated posts
+        user_friends = set(user.connected_user_ids)
+        user_interests = set(user.user_interests.values_list('id', flat=True))
+        user_personas = set(user.user_personas.values_list('id', flat=True))
+        
+        scored_older_posts = []
+        for post in older_curated_posts:
+            author = post.author
+            author_friends = set(author.connected_user_ids)
+            mutual_friends_count = len(user_friends.intersection(author_friends))
+            
+            author_interests = set(author.user_interests.values_list('id', flat=True))
+            author_personas = set(author.user_personas.values_list('id', flat=True))
+            mutual_traits_count = len(user_interests.intersection(author_interests)) + len(user_personas.intersection(author_personas))
+            
+            score = (mutual_friends_count * 2) + mutual_traits_count
+            
+            # Recency bonus: max 10 points decaying over 30 days
+            age_days = (now_la - post.created_at.astimezone(la_tz)).days
+            recency_bonus = max(0, 10 - (age_days / 3.0))
+            
+            total_score = score + recency_bonus
+            scored_older_posts.append((total_score, post))
+            
+        scored_older_posts.sort(key=lambda x: x[0], reverse=True)
+        top_10_older = [p[1] for p in scored_older_posts[:10]]
+        
+        recommended_posts = yesterday_other_posts + top_10_older
+        # Shuffle recommended? The user said "6시간마다 랜덤 셔플되면 좋겠어." for the posts in the digest.
+        random.shuffle(recommended_posts)
+
+        # Persist everything
+        idx = 0
+        for post in yesterday_mission_posts:
+            DiscoverFeed.objects.create(user=user, note=post, category='yesterday_mission', created_at=batch_time, sort_order=idx)
+            idx += 1
+            
+        for post in yesterday_question_responses:
+            DiscoverFeed.objects.create(user=user, response=post, category='yesterday_question', created_at=batch_time, sort_order=idx)
+            idx += 1
+            
+        for post in recommended_posts:
+            response_obj = post if isinstance(post, _Response) else None
+            note_obj = post if isinstance(post, Note) else None
+            cat = 'yesterday_post' if post in yesterday_other_posts else 'recommended'
+            DiscoverFeed.objects.create(user=user, response=response_obj, note=note_obj, category=cat, created_at=batch_time, sort_order=idx)
+            idx += 1
+
+        # Yesterday's Music
         music_candidates = Song.objects.filter(
             is_active=True,
             user__current_ver=user.current_ver,
-            created_at__lt=cutoff_la,
+            created_at__lt=today_7am_la,
+            created_at__gte=yesterday_7am_la
         ).exclude(user_id__in=exclude_ids).exclude(
             user__is_superuser=True
         ).select_related('user').order_by('-created_at')
@@ -3118,7 +3434,7 @@ class DiscoverFeedView(generics.ListAPIView):
         music_songs = []
         for song in music_candidates:
             author = song.user
-            active_check_in = CheckInModel.objects.filter(user=author, is_active=True).first()
+            active_check_in = CheckIn.objects.filter(user=author, is_active=True).first()
             if not active_check_in:
                 continue
             if not active_check_in.is_audience(user):
@@ -3131,405 +3447,9 @@ class DiscoverFeedView(generics.ListAPIView):
 
         for idx, song in enumerate(music_songs):
             DiscoverFeedMusic.objects.create(
-                user=user,
-                song=song,
-                category='discover',
-                sort_order=idx,
-                created_at=batch_time,
+                user=user, song=song, category='yesterday_music', sort_order=idx, created_at=batch_time
             )
 
-        return  # Skip original logic below
-
-        # --- ORIGINAL DISCOVER LOGIC (kept for future restoration) ---
-        feed_items = []  # List of (object, category)
-
-        # Helper to get candidates (only public visibility for non-friend discover)
-        def get_candidates(author_ids, limit=None):
-            # Responses — only public posts
-            responses = _Response.objects.filter(
-                author_id__in=author_ids, visibility__contains=['public']
-            ).exclude(readers=user).order_by('-created_at')
-            if limit:
-                responses = responses[:limit]
-
-            # Notes — only public posts
-            notes = Note.objects.filter(
-                author_id__in=author_ids, visibility__contains=['public']
-            ).exclude(readers=user).order_by('-created_at')
-            if limit:
-                notes = notes[:limit]
-
-            # Combine and sort
-            combined = sorted(chain(responses, notes), key=attrgetter('created_at'), reverse=True)
-
-            # Filter by permission (is_audience)
-            valid_candidates = []
-            count = 0
-            for obj in combined:
-                if obj.is_audience(user):
-                    valid_candidates.append(obj)
-                    count += 1
-                if limit and count >= limit:
-                    break
-            return valid_candidates
-
-        # 1, 2, 3. Collect candidates for Mutual Friends, Mutual Traits, and Strangers
-
-        # Mutual Friends Candidates (same version only)
-        user_friends = user.connected_users.filter(current_ver=user.current_ver)
-        user_friend_ids = set(user_friends.values_list('id', flat=True))
-        mutual_friend_potential_ids = set()
-        for friend in user_friends:
-            friend_of_friend_ids = set(friend.connected_users.filter(
-                current_ver=user.current_ver
-            ).values_list('id', flat=True))
-            mutual_friend_potential_ids.update(friend_of_friend_ids)
-        mf_ids = mutual_friend_potential_ids - user_friend_ids - exclude_ids
-
-        mf_candidates = get_candidates(mf_ids, limit=20)
-
-        # Mutual Traits Candidates — only public-visibility categories for
-        # both the current user and the matched user.
-        user_public_cats = {
-            cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
-            if getattr(user, f"{cat_key}_visibility", 'public') == 'public'
-        }
-        trait_q = Q()
-        for cat_key in user_public_cats:
-            cat_interest_ids = list(user.user_interests.filter(
-                category=cat_key
-            ).values_list('id', flat=True))
-            if cat_interest_ids:
-                trait_q |= Q(
-                    user_interests__id__in=cat_interest_ids,
-                    **{f"{cat_key}_visibility": 'public'}
-                )
-        if getattr(user, 'online_persona_visibility', 'public') == 'public':
-            user_persona_ids = list(user.user_personas.values_list('id', flat=True))
-            if user_persona_ids:
-                trait_q |= Q(
-                    user_personas__id__in=user_persona_ids,
-                    online_persona_visibility='public'
-                )
-        if trait_q:
-            trait_ids = set(User.objects.filter(
-                trait_q,
-                current_ver=user.current_ver
-            ).exclude(id__in=exclude_ids).values_list('id', flat=True))
-        else:
-            trait_ids = set()
-
-        trait_candidates = get_candidates(trait_ids, limit=20)
-
-        # Strangers (No Mutual) Candidates
-        stranger_ids = set(User.objects.filter(
-            current_ver=user.current_ver
-        ).exclude(
-            id__in=exclude_ids | mutual_friend_potential_ids | trait_ids
-        ).exclude(is_superuser=True).values_list('id', flat=True))
-        
-        stranger_candidates = get_candidates(stranger_ids, limit=20)
-
-        category_candidates = [
-            (mf_candidates, 'mutual_friends'),
-            (trait_candidates, 'mutual_traits'),
-            (stranger_candidates, 'anonymous')
-        ]
-        
-        existing_obj_ids = {(type(item[0]), item[0].id) for item in feed_items}
-        
-        # Step 1: Ensure at least 1 from each category (if exists)
-        for candidates, category_name in category_candidates:
-            while candidates:
-                cand = candidates.pop(0)
-                if (type(cand), cand.id) not in existing_obj_ids:
-                    feed_items.append((cand, category_name))
-                    existing_obj_ids.add((type(cand), cand.id))
-                    break
-
-        # Step 2: If still less than 10, fill more in round-robin fashion
-        while len(feed_items) < 10:
-            added_in_round = False
-            for candidates, category_name in category_candidates:
-                if len(feed_items) >= 10:
-                    break
-
-                while candidates:
-                    cand = candidates.pop(0)
-                    if (type(cand), cand.id) not in existing_obj_ids:
-                        feed_items.append((cand, category_name))
-                        existing_obj_ids.add((type(cand), cand.id))
-                        added_in_round = True
-                        break
-            
-            if not added_in_round:
-                break
-
-        # 5. Fallback: Fill up to 10 random posts (from any non-friends) if still not enough
-        if len(feed_items) < 10:
-            # Random Response — only public
-            random_responses = list(_Response.objects.filter(
-                visibility__contains=['public'],
-                author__current_ver=user.current_ver
-            ).exclude(
-                author_id__in=exclude_ids
-            ).exclude(readers=user).order_by('-created_at')[:50])
-
-            # Random Note — only public
-            random_notes = list(Note.objects.filter(
-                visibility__contains=['public'],
-                author__current_ver=user.current_ver
-            ).exclude(
-                author_id__in=exclude_ids
-            ).exclude(readers=user).order_by('-created_at')[:50])
-
-            random_potentials = random_responses + random_notes
-            random.shuffle(random_potentials) # Shuffle candidates for random selection
-            
-            for obj in random_potentials:
-                if len(feed_items) >= 10:
-                    break
-                if (type(obj), obj.id) not in existing_obj_ids and obj.is_audience(user):
-                    feed_items.append((obj, 'random'))
-                    existing_obj_ids.add((type(obj), obj.id))
-
-        # Sort by created_at descending (Newest first)
-        feed_items.sort(key=lambda x: x[0].created_at, reverse=True)
-
-        # Save to DiscoverFeed
-        for i, (obj, category) in enumerate(feed_items):
-            response = obj if isinstance(obj, _Response) else None
-            note = obj if isinstance(obj, Note) else None
-            
-            DiscoverFeed.objects.create(
-                user=user,
-                response=response,
-                note=note,
-                category=category,
-                created_at=batch_time,
-                sort_order=i
-            )
-
-        # Generate music tracks for discover feed (respect check-in + song_visibility)
-        from check_in.models import Song, CheckIn as CheckInModel
-        music_candidates = Song.objects.filter(
-            is_active=True,
-            user__current_ver=user.current_ver,
-        ).exclude(
-            user_id__in=exclude_ids
-        ).select_related('user').order_by('-created_at')[:40]
-
-        music_songs = []
-        for song in music_candidates:
-            if len(music_songs) >= 10:
-                break
-            author = song.user
-            active_check_in = CheckInModel.objects.filter(user=author, is_active=True).first()
-            if not active_check_in:
-                continue
-            if not active_check_in.is_audience(user):
-                continue
-            if not viewer_sees_check_in_component(
-                active_check_in, author, user, 'song_visibility', 'song_updated_at'
-            ):
-                continue
-            music_songs.append(song)
-
-        for idx, song in enumerate(music_songs):
-            # Determine category based on author
-            author_id = song.user_id
-            if author_id in mf_ids:
-                cat = 'mutual_friends'
-            elif author_id in trait_ids:
-                cat = 'mutual_traits'
-            else:
-                cat = 'random'
-
-            DiscoverFeedMusic.objects.create(
-                user=user,
-                song=song,
-                category=cat,
-                sort_order=idx,
-                created_at=batch_time,
-            )
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        
-        feed_objects = page if page is not None else queryset
-        
-        responses = []
-        notes = []
-        for item in feed_objects:
-            if item.response:
-                responses.append(item.response)
-            elif item.note:
-                notes.append(item.note)
-
-        # Re-validate access: filter out items no longer accessible
-        # (visibility changed, author blocked, or content reported since feed generation)
-        notes = [n for n in notes if n.is_audience(request.user)]
-        responses = [r for r in responses if r.is_audience(request.user)]
-
-        # Mark as read
-        if responses:
-            request.user.read_responses.add(*responses)
-        if notes:
-            request.user.read_notes.add(*notes)
-
-        # Serialize
-        resp_data_map = {}
-        if responses:
-            serializer = ResponseSerializer(responses, many=True, context={'request': request})
-            resp_data_map = {d['id']: d for d in serializer.data}
-            
-        note_data_map = {}
-        if notes:
-            serializer = NoteSerializer(notes, many=True, context={'request': request})
-            note_data_map = {d['id']: d for d in serializer.data}
-
-        # --- Injection Logic ---
-        req_user = request.user
-        req_user_friends = set(req_user.friend_ids + req_user.close_friend_ids)
-        req_user_public_cats = {
-            cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
-            if getattr(req_user, f"{cat_key}_visibility", 'public') == 'public'
-        }
-        req_user_interests = set(req_user.user_interests.filter(
-            category__in=req_user_public_cats
-        ).values_list('id', flat=True))
-        req_user_persona_public = getattr(req_user, 'online_persona_visibility', 'public') == 'public'
-        req_user_personas = set(req_user.user_personas.values_list('id', flat=True)) if req_user_persona_public else set()
-
-        results = []
-        pending_note_entries = []
-
-        def flush_note_entries():
-            nonlocal pending_note_entries
-            if pending_note_entries:
-                results.extend(group_note_entries(pending_note_entries, wrap_notes=True))
-                pending_note_entries = []
-
-        for item in feed_objects:
-            author = item.response.author if item.response else item.note.author
-
-            mut_friends = 0
-            mut_interests = 0
-            mut_personas = 0
-
-            if req_user != author:
-                author_friends = set(author.friend_ids + author.close_friend_ids)
-                author_public_cats = {
-                    cat_key for cat_key, _ in CHIP_CATEGORY_CHOICES
-                    if getattr(author, f"{cat_key}_visibility", 'public') == 'public'
-                }
-                author_interests = set(author.user_interests.filter(
-                    category__in=author_public_cats
-                ).values_list('id', flat=True))
-
-                mut_friends = len(req_user_friends & author_friends)
-                mut_interests = len(req_user_interests & author_interests)
-                author_persona_public = getattr(author, 'online_persona_visibility', 'public') == 'public'
-                if req_user_persona_public and author_persona_public:
-                    author_personas = set(author.user_personas.values_list('id', flat=True))
-                    mut_personas = len(req_user_personas & author_personas)
-
-            if item.response:
-                flush_note_entries()
-                data = resp_data_map.get(item.response.id)
-                if data:
-                    if 'author_detail' in data and isinstance(data['author_detail'], dict):
-                        data['author_detail']['mutual_friend_count'] = mut_friends
-                        data['author_detail']['mutual_interest_count'] = mut_interests
-                        data['author_detail']['mutual_persona_count'] = mut_personas
-                    results.append({
-                        "type": "Response",
-                        "category": item.category,
-                        "body": data
-                    })
-            elif item.note:
-                data = note_data_map.get(item.note.id)
-                if data:
-                    data = dict(data)
-                    if 'author_detail' in data and isinstance(data['author_detail'], dict):
-                        data['author_detail']['mutual_friend_count'] = mut_friends
-                        data['author_detail']['mutual_interest_count'] = mut_interests
-                        data['author_detail']['mutual_persona_count'] = mut_personas
-                    pending_note_entries.extend(
-                        serialize_note_entries(
-                            [item.note],
-                            context=self.get_serializer_context(),
-                            data_by_note_id={item.note.id: data},
-                            extra_by_note_id={item.note.id: {'category': item.category}},
-                        )
-                    )
-
-        flush_note_entries()
-
-        # Inject Daily Question
-        from qna.models import Question
-        
-        daily_questions_qs = Question.objects.daily_questions(request.user)
-        daily_question = daily_questions_qs.order_by('?').first()
-
-        if daily_question:
-            q_data = DailyQuestionSerializer(daily_question).data
-            q_card = {
-                "type": "Question",
-                "body": q_data
-            }
-            # Insert at 2nd (idx 1) or 3rd (idx 2)
-            # If empty, just append.
-            if not results:
-                results.append(q_card)
-            else:
-                q_idx = random.choice([1, 2])
-                results.insert(min(len(results), q_idx), q_card)
-        
-        # Build music_tracks for the first page only
-        music_tracks_data = []
-        request_page = request.query_params.get('page', '1')
-        if str(request_page) == '1' or request_page is None:
-            # Get the latest batch timestamp for this user's discover feed music
-            latest_music = DiscoverFeedMusic.objects.filter(
-                user=request.user
-            ).order_by('-created_at').first()
-
-            if latest_music:
-                music_items = DiscoverFeedMusic.objects.filter(
-                    user=request.user,
-                    created_at=latest_music.created_at,
-                    song__user__current_ver=request.user.current_ver,
-                ).select_related('song', 'song__user').order_by('sort_order')
-
-                for item in music_items:
-                    song = item.song
-                    author = song.user
-                    music_tracks_data.append({
-                        'id': item.id,
-                        'user': {
-                            'id': author.id,
-                            'username': author.username,
-                            'profile_pic': author.profile_pic or None,
-                            'url': f'/api/user/{author.id}/',
-                            'profile_image': author.profile_image.url if author.profile_image else None,
-                        },
-                        'track_id': song.track_id,
-                        'created_at': item.created_at.isoformat(),
-                    })
-
-        if page is not None:
-            response = self.get_paginated_response(results)
-            if music_tracks_data:
-                response.data['music_tracks'] = music_tracks_data
-            return response
-
-        # If not paginated, return wrapped structure
-        resp_data = {"results": results}
-        if music_tracks_data:
-            resp_data['music_tracks'] = music_tracks_data
-        return Response(resp_data)
 
 
 

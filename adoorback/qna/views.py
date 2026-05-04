@@ -322,7 +322,13 @@ class QuestionResponses(generics.ListAPIView):
         responses = Response.objects.filter(
             question=question,
             author__current_ver=user.current_ver,
-        ).select_related(
+        )
+
+        if self.request.query_params.get('discover') == 'true':
+            friend_ids = set(user.friend_ids + user.close_friend_ids)
+            responses = responses.exclude(author_id__in=friend_ids | {user.id})
+
+        responses = responses.select_related(
             'author',
             'question',
         ).prefetch_related(

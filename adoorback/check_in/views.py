@@ -181,6 +181,95 @@ def _find_recent_check_in_noti(subscriber_id, actor):
     ).order_by('-notification_updated_at').first()
 
 
+# check-in 필드명 → Poke.component_type 역매핑
+POKE_COMPONENT_TO_CONTENT = {
+    'battery': 'social_battery',
+    'mood': 'mood',
+    'thought': 'thought',
+    'song': 'song',
+}
+
+POKE_COMPONENT_LABELS_KO = {
+    'song': '노래',
+    'mood': '기분',
+    'thought': '한마디',
+    'battery': '소셜 배터리',
+}
+POKE_COMPONENT_LABELS_EN = {
+    'song': 'song',
+    'mood': 'mood',
+    'thought': 'thought snippet',
+    'battery': 'social battery',
+}
+
+
+def notify_poke_senders(check_in, changed_components):
+    """핑 발신자에게 응답 알림 전송 (version_w only, 첫 번째 응답에만).
+
+    changed_components: check-in 필드명 리스트 (예: ['mood', 'social_battery'])
+    """
+    from notification.models import Notification, NotificationActor
+    from account.models import Subscription
+    from adoorback.utils.content_types import get_check_in_type
+
+    user = check_in.user
+    if user.current_ver != 'version_w':
+        return
+
+    changed_poke_types = [
+        poke_type for poke_type, content_field in POKE_COMPONENT_TO_CONTENT.items()
+        if content_field in changed_components
+    ]
+    if not changed_poke_types:
+        return
+
+    blocked_ids = user.user_report_blocked_ids
+    check_in_ct = get_check_in_type()
+
+    pending_pokes = Poke.objects.filter(
+        receiver=user,
+        component_type__in=changed_poke_types,
+        responded_at__isnull=True,
+    ).select_related('sender')
+
+    now = timezone.now()
+    for poke in pending_pokes:
+        sender = poke.sender
+
+        # 첫 응답으로 마크 — 이후 업로드에서 재발동 방지
+        Poke.objects.filter(pk=poke.pk).update(responded_at=now)
+
+        if sender.id in blocked_ids:
+            continue
+
+        # A가 이미 B의 해당 컴포넌트를 구독 중이면 구독 알림이 따로 가므로 생략
+        if Subscription.objects.filter(
+            subscriber=sender,
+            subscribed_to=user,
+            content_type=check_in_ct,
+            subscription_type=poke.component_type,
+        ).exists():
+            continue
+
+        content_field = POKE_COMPONENT_TO_CONTENT[poke.component_type]
+        vis_field, updated_field = CONTENT_TO_VISIBILITY[content_field]
+        if not viewer_sees_check_in_component(check_in, user, sender, vis_field, updated_field):
+            continue
+
+        label_ko = POKE_COMPONENT_LABELS_KO[poke.component_type]
+        label_en = POKE_COMPONENT_LABELS_EN[poke.component_type]
+
+        noti = Notification.objects.create(
+            user=sender,
+            origin=user,
+            target=poke,
+            message_ko=f"{user.username}님이 회원님의 핑에 응답해서 {label_ko}을(를) 업데이트했어요!",
+            message_en=f"{user.username} updated their {label_en} in response to your ping!",
+            redirect_url=f"/users/{user.username}",
+        )
+        NotificationActor.objects.create(user=user, notification=noti)
+
+
 class CurrentCheckIn(generics.ListCreateAPIView):
     """
     Get current active check-in of request user or create a new check-in.
@@ -219,12 +308,14 @@ class CurrentCheckIn(generics.ListCreateAPIView):
                 has_song = Song.objects.filter(user=current_user, is_active=True).exists()
                 if _has_visible_content(existing_checkin, has_song):
                     notify_check_in_subscribers(existing_checkin, changed_components=changed)
+                notify_poke_senders(existing_checkin, changed_components=changed)
         else:
             # Create new check-in
             serializer.save(user=current_user, is_active=True)
             has_song = Song.objects.filter(user=current_user, is_active=True).exists()
             if _has_visible_content(serializer.instance, has_song):
                 notify_check_in_subscribers(serializer.instance)
+            notify_poke_senders(serializer.instance, changed_components=list(CONTENT_TO_VISIBILITY.keys()))
 
         return Response(serializer.data)
 
@@ -514,6 +605,7 @@ class CurrentSong(generics.ListCreateAPIView):
         active_check_in = CheckIn.objects.filter(user=current_user, is_active=True).first()
         if active_check_in:
             notify_check_in_subscribers(active_check_in, changed_components=['song'])
+            notify_poke_senders(active_check_in, changed_components=['song'])
 
         return Response(serializer.data)
 
