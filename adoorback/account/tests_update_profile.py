@@ -54,6 +54,32 @@ class UserProfileUpdateTest(TestCase):
         expected_url = f"/users/{new_username}"
         self.assertEqual(noti.redirect_url, expected_url)
 
+    def test_profile_update_accepts_unchanged_username(self):
+        response = self.client.patch(self.url, {
+            'username': self.user.username,
+            'bio': 'Updated bio',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'old_username')
+        self.assertEqual(self.user.bio, 'Updated bio')
+
+    def test_profile_update_accepts_unchanged_legacy_email_username(self):
+        self.user.username = 'legacy@example.com'
+        self.user.username_history = ['legacy@example.com']
+        self.user.save()
+
+        response = self.client.patch(self.url, {
+            'username': 'legacy@example.com',
+            'bio': 'Updated bio',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'legacy@example.com')
+        self.assertEqual(self.user.bio, 'Updated bio')
+
     def test_profile_visibility_update_and_view(self):
         # User updates visibility preferences to 'friends' (per-field 4-way enum)
         update_data = {
