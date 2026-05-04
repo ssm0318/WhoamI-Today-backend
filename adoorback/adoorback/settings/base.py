@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'translate.apps.TranslateConfig',
     'surveys.apps.SurveysConfig',
     'custom_fcm',
+    'study_admin.apps.StudyAdminConfig',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -114,6 +115,7 @@ CRON_CLASSES = [
     "account.cron.SendDailyWhoAmINotiCronJob",
     "account.cron.AutoCloseSessionsCronJob",
     "account.cron.SendDailySurveyNotiCronJob",
+    "account.cron.CrossoverPhaseFlipCronJob",
     "check_in.cron.ExpireCheckInsCronJob",
 ]
 
@@ -279,6 +281,11 @@ TRACK_IGNORE_STATUS_CODES = [400, 404, 403, 405, 410, 500]
 
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 os.makedirs(LOG_DIR, exist_ok=True)
+
+# Shared secret for the study-admin engagement-summary endpoint. Set on
+# both the deployed backend and the local Streamlit dashboard. Empty
+# string disables the endpoint (returns 403 for any request).
+STUDY_ADMIN_TOKEN = os.environ.get('STUDY_ADMIN_TOKEN', '')
 
 LOGGING = {
     'version': 1,
