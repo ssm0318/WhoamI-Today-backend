@@ -1103,6 +1103,72 @@ class SubmitViewExtensionsTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# View-layer routing: Detail / Submit / Results return 404 for off-route users
+# ---------------------------------------------------------------------------
+class ViewRoutingTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_w = User.objects.create(
+            username='vrw', email='vrw@x.com', user_group='group_w_first',
+        )
+        cls.user_q = User.objects.create(
+            username='vrq', email='vrq@x.com', user_group='group_q_first',
+        )
+        cls.sw = Survey.objects.create(slug='mid_study_w', title_en='W', title_ko='W')
+        cls.sq = Survey.objects.create(slug='mid_study_q', title_en='Q', title_ko='Q')
+        SurveyQuestion.objects.create(
+            survey=cls.sw, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        SurveyQuestion.objects.create(
+            survey=cls.sq, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+
+    def _client(self, user):
+        from rest_framework.test import APIClient
+        c = APIClient()
+        c.force_authenticate(user=user)
+        return c
+
+    def test_detail_blocks_w_user_from_q_survey(self):
+        r = self._client(self.user_w).get('/api/surveys/mid_study_q/')
+        self.assertEqual(r.status_code, 404)
+
+    def test_detail_allows_q_user_for_q_survey(self):
+        r = self._client(self.user_q).get('/api/surveys/mid_study_q/')
+        self.assertEqual(r.status_code, 200)
+
+    def test_detail_allows_unsuffixed_for_any_user(self):
+        s = Survey.objects.create(slug='daily_base', title_en='D', title_ko='D')
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        for u in (self.user_w, self.user_q):
+            r = self._client(u).get('/api/surveys/daily_base/')
+            self.assertEqual(r.status_code, 200)
+
+    def test_submit_blocks_off_route_user(self):
+        from datetime import date as _date
+
+        ScheduledSurvey.objects.create(
+            survey=self.sw, cadence='biweekly', window_start=_date(2026, 1, 1),
+            window_end=_date(2030, 1, 1), allow_late=True, sequence_index=99,
+        )
+        r = self._client(self.user_q).post(
+            '/api/surveys/mid_study_w/responses/',
+            data={'answers': []}, format='json',
+        )
+        self.assertEqual(r.status_code, 404)
+
+    def test_results_blocks_off_route_user(self):
+        # results_hidden=True would also 404; explicitly set False so we
+        # know it's the routing check that's firing.
+        self.sw.results_hidden = False
+        self.sw.save()
+        r = self._client(self.user_q).get('/api/surveys/mid_study_w/results/')
+        self.assertEqual(r.status_code, 404)
+
+
+# ---------------------------------------------------------------------------
 # UserSurveyEmbeddedData model basics
 # ---------------------------------------------------------------------------
 class UserSurveyEmbeddedDataTests(TestCase):

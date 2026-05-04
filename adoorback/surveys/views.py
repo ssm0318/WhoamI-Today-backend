@@ -16,7 +16,9 @@ from surveys.models import (
     SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
-from surveys.scheduling import _today_la_7am, get_survey_index, get_today_daily
+from surveys.scheduling import (
+    _today_la_7am, get_survey_index, get_today_daily, routes_to_user,
+)
 from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
     SurveyResponseInputSerializer, validate_answer_value,
@@ -118,6 +120,11 @@ class SurveyDetailView(APIView):
             survey = Survey.objects.get(slug=slug)
         except Survey.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        # Route version-suffixed slugs by user_group — direct URL access to
+        # the wrong variant returns 404 so the schema mirror's "this slug
+        # exists" doesn't leak through. Same predicate as the index queries.
+        if not routes_to_user(survey, request.user):
+            return Response(status=status.HTTP_404_NOT_FOUND)
         ser = SurveyDetailSerializer(survey, context={'request': request})
         return Response(ser.data)
 
@@ -129,6 +136,10 @@ class SurveyResponseSubmitView(APIView):
         try:
             survey = Survey.objects.get(slug=slug)
         except Survey.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        # Same routing check as SurveyDetailView — block submissions to the
+        # wrong variant so research data stays cleanly partitioned.
+        if not routes_to_user(survey, request.user):
             return Response(status=status.HTTP_404_NOT_FOUND)
         # `repeatable: true` surveys (e.g. anytime_reflection) allow the same
         # user to submit multiple times — each submission is its own row.
@@ -190,6 +201,9 @@ class SurveyResultsView(APIView):
         try:
             survey = Survey.objects.get(slug=slug)
         except Survey.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        # Hide off-route variants so a w-first user can't peek at q results.
+        if not routes_to_user(survey, request.user):
             return Response(status=status.HTTP_404_NOT_FOUND)
         if survey.results_hidden:
             # Treat hidden surveys as if they have no results page at all.

@@ -68,7 +68,7 @@ def _skip_for_serving_condition(survey, user_data: dict) -> bool:
     return True
 
 
-def _routes_to_user(survey, user) -> bool:
+def routes_to_user(survey, user) -> bool:
     """True when the survey is currently routable to this user.
 
     Used by the dispatch layer to swap version-suffixed surveys based on the
@@ -77,6 +77,10 @@ def _routes_to_user(survey, user) -> bool:
 
     Convention is `mid_study_w` / `mid_study_q` and `post_study_w` /
     `post_study_q`. Other slug suffixes are ignored.
+
+    Public so view-layer routing (SurveyDetailView, SurveyResponseSubmitView)
+    can apply the same predicate as the index/today-daily queries — keeps
+    direct-URL access aligned with the natural flow.
     """
     slug = survey.slug
     user_group = getattr(user, 'user_group', '') or ''
@@ -85,6 +89,11 @@ def _routes_to_user(survey, user) -> bool:
     if slug.endswith('_q'):
         return user_group == 'group_q_first'
     return True
+
+
+# Backward-compat alias. Existing callers in this module still use the
+# private name internally; outside callers should use `routes_to_user`.
+_routes_to_user = routes_to_user
 
 
 def _is_weekend_skipped(scheduled, today) -> bool:
