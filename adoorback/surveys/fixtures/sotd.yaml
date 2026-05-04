@@ -1,0 +1,2637 @@
+# ============================================================================
+# BATCH 1 — SOTD DAYS 2–9 (Tier-1 Trait Moderators)
+# ============================================================================
+# Eight surveys, one per study day. Each survey is self-contained: a complete
+# subscale that yields one summary score, displayed as a histogram with the
+# user's score marked.
+#
+# Surveys in this batch:
+#   day02_rsds        — Self-disclosure propensity (RSDS-10)
+#   day03_iscs_bond   — Bonding social capital (Williams ISCS, 10 items)
+#   day04_iscs_bridge — Bridging social capital (Williams ISCS, 10 items)
+#   day05_rsq         — Rejection sensitivity (RSQ-Brief, 8 situations × 2)
+#   day06_singelis_ind — Self-construal: independent (Singelis SCS, 12 items)
+#   day07_singelis_int — Self-construal: interdependent (Singelis SCS, 12 items)
+#   day08_woodAS      — Authenticity (Wood AS, 12 items)
+#   day09_ucla8       — Loneliness (UCLA-8)
+#
+# All 8 surveys:
+#   - friend_visible: false (private trait data)
+#   - results_hidden: false (results shown to participant via summary score
+#     histogram with their score marked)
+#   - cadence: daily, single-day window matching study day
+#
+# ============================================================================
+# IMPLEMENTATION NOTES FOR CLAUDE CODE
+# ============================================================================
+#
+# NEW result_kind: `scale_score_histogram`
+#   - Operates at the SURVEY level, not per-question
+#   - Computes a single summary score per submission by summing all
+#     `likert_*` items in the survey, applying `reverse_scored: true`
+#     transformation where flagged
+#   - Renders one panel per survey: a histogram of all participants'
+#     total scores, with the current user's score marked by a vertical
+#     line / dot
+#   - Optional `interpretation` text at survey level explains what
+#     higher/lower scores mean
+#   - Items with result_hidden: true at the question level are still
+#     INCLUDED in score computation but not shown individually anywhere
+#
+# Survey-level field added: `result_kind: scale_score_histogram`
+#   - When present at survey level, individual question result_kind values
+#     are ignored on the results page; only the scale-score histogram shows
+#   - Per-question result_hidden still controls whether items appear in
+#     downstream analyses or admin views
+#
+# Survey-level field added: `score_components`
+#   - Optional. If present, declares which item slugs feed into the score.
+#     If absent, all likert_* items in the survey are summed.
+#   - Used in day05_rsq (which has a derivation rule across paired items)
+#     and could be used in day03/day04 if you ever bundle multiple ISCS
+#     subscales into one survey.
+#
+# Score interpretation per scale (for `interpretation` field):
+#   See each survey's interpretation text below. All summary scores are
+#   reported as raw sums (not normed); higher/lower interpretations are
+#   in the survey-level interpretation text.
+#
+# ============================================================================
+
+
+# ============================================================================
+# DAY 2 — RSDS (Self-Disclosure Propensity, 10-item short)
+# ============================================================================
+# Source: Wheeless Revealer-Concealer Self-Disclosure Scale, short form.
+# Items 4 and 8 are reverse-scored.
+# Higher score = greater general willingness to self-disclose.
+
+- slug: day02_rsds
+  type: likert_5
+  title:
+    en: "How openly do you tend to share?"
+  description:
+    en: "Today's question is about how you generally share things with people in your life — outside of WIT, in any context. There's no right answer."
+  interpretation:
+    en: "Higher scores mean you tend to share openly and in detail. Lower scores mean you tend to keep things more private. Neither is better — both reflect different ways of relating."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: rsds_1
+      type: likert_5
+      prompt:
+        en: "When I share with others, I usually share for a long time at once."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: rsds_2
+      type: likert_5
+      prompt:
+        en: "My statements about myself are usually quite long."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: rsds_3
+      type: likert_5
+      prompt:
+        en: "Once I get started, my self-disclosures last a long time."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: rsds_4
+      type: likert_5
+      prompt:
+        en: "I do not often share information about myself."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 5
+      slug: rsds_5
+      type: likert_5
+      prompt:
+        en: "I usually share what I really feel and think."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: rsds_6
+      type: likert_5
+      prompt:
+        en: "When I share things, I usually share things that are personal."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: rsds_7
+      type: likert_5
+      prompt:
+        en: "I usually share intimate, personal things about myself."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: rsds_8
+      type: likert_5
+      prompt:
+        en: "I usually keep my personal feelings to myself."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 9
+      slug: rsds_9
+      type: likert_5
+      prompt:
+        en: "When I share something, I let others know exactly how I feel about it."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: rsds_10
+      type: likert_5
+      prompt:
+        en: "When I share, I am consciously willing to reveal personal information about myself."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 3 — ISCS BONDING (Internet Social Capital Scale, bonding subscale)
+# ============================================================================
+# Source: Williams (2006). 10 items measuring bonding social capital
+# (close, emotional, support-providing ties).
+# Higher score = stronger bonding ties in your network.
+
+- slug: day03_iscs_bond
+  type: likert_5
+  title:
+    en: "How close are your closest people?"
+  description:
+    en: "Today's questions are about your closest relationships — the people you actually rely on. Think about your circle in general, not WIT specifically."
+  interpretation:
+    en: "Higher scores mean you have strong, emotionally close ties — people you can lean on. Lower scores mean your support network is thinner or less close. Both are common; neither is better."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: iscs_bond_1
+      type: likert_5
+      prompt:
+        en: "There are several people I trust to help solve my problems."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: iscs_bond_2
+      type: likert_5
+      prompt:
+        en: "If I needed an emergency loan of $500, I know someone I can turn to."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: iscs_bond_3
+      type: likert_5
+      prompt:
+        en: "There is someone I can turn to for advice about making very important decisions."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: iscs_bond_4
+      type: likert_5
+      prompt:
+        en: "There is no one I feel comfortable talking to about intimate personal problems."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 5
+      slug: iscs_bond_5
+      type: likert_5
+      prompt:
+        en: "When I feel lonely, there are several people I can talk to."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: iscs_bond_6
+      type: likert_5
+      prompt:
+        en: "If I needed to, most of the people I know would be good job references for me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: iscs_bond_7
+      type: likert_5
+      prompt:
+        en: "The people I'm close with would put their reputation on the line for me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: iscs_bond_8
+      type: likert_5
+      prompt:
+        en: "The people I'm close with would help me fight an injustice."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: iscs_bond_9
+      type: likert_5
+      prompt:
+        en: "I do not know people well enough to get them to do anything important."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 10
+      slug: iscs_bond_10
+      type: likert_5
+      prompt:
+        en: "The people I'm close with and I want the same things from life."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 4 — ISCS BRIDGING (Internet Social Capital Scale, bridging subscale)
+# ============================================================================
+# Source: Williams (2006). 10 items measuring bridging social capital
+# (broader, weaker ties — exposure to different perspectives, networking).
+# Higher score = stronger bridging ties.
+
+- slug: day04_iscs_bridge
+  type: likert_5
+  title:
+    en: "How wide is your world?"
+  description:
+    en: "Today's questions are about the wider network of people in your life — not just close friends, but classmates, coworkers, acquaintances, anyone you cross paths with."
+  interpretation:
+    en: "Higher scores mean your network exposes you to a wide range of people and perspectives. Lower scores mean your social world is smaller or more concentrated. Both have their own benefits."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: iscs_bridge_1
+      type: likert_5
+      prompt:
+        en: "Interacting with people in my broader network makes me interested in things that happen outside of my town."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: iscs_bridge_2
+      type: likert_5
+      prompt:
+        en: "Interacting with people in my broader network makes me want to try new things."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: iscs_bridge_3
+      type: likert_5
+      prompt:
+        en: "Interacting with people in my broader network makes me interested in what people unlike me are thinking."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: iscs_bridge_4
+      type: likert_5
+      prompt:
+        en: "Talking with people in my broader network makes me curious about other places in the world."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 5
+      slug: iscs_bridge_5
+      type: likert_5
+      prompt:
+        en: "Interacting with people in my broader network makes me feel like part of a larger community."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: iscs_bridge_6
+      type: likert_5
+      prompt:
+        en: "Interacting with people in my broader network makes me feel connected to the bigger picture."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: iscs_bridge_7
+      type: likert_5
+      prompt:
+        en: "Interacting with people in my broader network reminds me that everyone in the world is connected."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: iscs_bridge_8
+      type: likert_5
+      prompt:
+        en: "I am willing to spend time to support general community activities."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: iscs_bridge_9
+      type: likert_5
+      prompt:
+        en: "Interacting with people in my broader network gives me new people to talk to."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: iscs_bridge_10
+      type: likert_5
+      prompt:
+        en: "Through my broader network, I come into contact with new people all the time."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 5 — RSQ-Brief (Rejection Sensitivity Questionnaire, 8 situations)
+# ============================================================================
+# Source: Berenson et al. (2009) RSQ-Brief / Adult RSQ-9 short form.
+# Each situation has TWO items: anxiety/concern + expected acceptance.
+# Score per situation = anxiety × (7 − expectation), summed across situations.
+# This requires a derived score formula — see implementation note.
+# Higher score = higher rejection sensitivity.
+
+- slug: day05_rsq
+  type: likert_6
+  title:
+    en: "How do you feel about asking for things?"
+  description:
+    en: "Today's questions describe situations where you might ask someone for something, and how you'd feel about it. There are no right answers — go with your gut."
+  interpretation:
+    en: "Higher scores mean you tend to anticipate rejection more strongly when asking things of others. Lower scores mean you generally expect things to go fine. Neither is better — both are normal ways of approaching social situations."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+  score_formula: "rsq_brief_weighted"
+
+  questions:
+    - order: 1
+      slug: rsq_situation_1_intro
+      type: display_only
+      content:
+        en: "**Situation 1.** You ask your boyfriend/girlfriend or a person you've been dating to move in with you."
+
+    - order: 2
+      slug: rsq_1_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over how the person would respond?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 3
+      slug: rsq_1_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would want to."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+    - order: 4
+      slug: rsq_situation_2_intro
+      type: display_only
+      content:
+        en: "**Situation 2.** You ask a friend if they can do you a big favor."
+
+    - order: 5
+      slug: rsq_2_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over how the person would respond?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 6
+      slug: rsq_2_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would willingly do this favor."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+    - order: 7
+      slug: rsq_situation_3_intro
+      type: display_only
+      content:
+        en: "**Situation 3.** You ask your parents or another family member for a loan to help you through a difficult financial time."
+
+    - order: 8
+      slug: rsq_3_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over their response?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 9
+      slug: rsq_3_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would help me as much as they can."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+    - order: 10
+      slug: rsq_situation_4_intro
+      type: display_only
+      content:
+        en: "**Situation 4.** After a bitter argument, you ask your significant other (or a close friend) if you can both work things out."
+
+    - order: 11
+      slug: rsq_4_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over their response?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 12
+      slug: rsq_4_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would want to work things out with me."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+    - order: 13
+      slug: rsq_situation_5_intro
+      type: display_only
+      content:
+        en: "**Situation 5.** You ask someone in class if you can borrow their notes."
+
+    - order: 14
+      slug: rsq_5_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over their response?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 15
+      slug: rsq_5_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would willingly let me borrow their notes."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+    - order: 16
+      slug: rsq_situation_6_intro
+      type: display_only
+      content:
+        en: "**Situation 6.** You call your boyfriend/girlfriend (or close friend) after a bitter argument and tell them you want to see them."
+
+    - order: 17
+      slug: rsq_6_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over their response?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 18
+      slug: rsq_6_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would want to see me."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+    - order: 19
+      slug: rsq_situation_7_intro
+      type: display_only
+      content:
+        en: "**Situation 7.** You ask a friend if they want to go away with you for the weekend."
+
+    - order: 20
+      slug: rsq_7_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over their response?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 21
+      slug: rsq_7_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would want to go."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+    - order: 22
+      slug: rsq_situation_8_intro
+      type: display_only
+      content:
+        en: "**Situation 8.** You ask your parents (or someone close to you) for help in deciding what programs to apply to."
+
+    - order: 23
+      slug: rsq_8_concern
+      type: likert_6
+      prompt:
+        en: "How concerned or anxious would you be over their response?"
+      options:
+        - { order: 1, value: 1, label: { en: "Very unconcerned" } }
+        - { order: 2, value: 2, label: { en: "Unconcerned" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unconcerned" } }
+        - { order: 4, value: 4, label: { en: "Somewhat concerned" } }
+        - { order: 5, value: 5, label: { en: "Concerned" } }
+        - { order: 6, value: 6, label: { en: "Very concerned" } }
+      reverse_scored: false
+
+    - order: 24
+      slug: rsq_8_expect
+      type: likert_6
+      prompt:
+        en: "I would expect that they would want to help me."
+      options:
+        - { order: 1, value: 1, label: { en: "Very unlikely" } }
+        - { order: 2, value: 2, label: { en: "Unlikely" } }
+        - { order: 3, value: 3, label: { en: "Somewhat unlikely" } }
+        - { order: 4, value: 4, label: { en: "Somewhat likely" } }
+        - { order: 5, value: 5, label: { en: "Likely" } }
+        - { order: 6, value: 6, label: { en: "Very likely" } }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 6 — SINGELIS SCS, INDEPENDENT SELF-CONSTRUAL (12 items)
+# ============================================================================
+# Source: Singelis (1994) Self-Construal Scale. Independent subscale.
+# Higher score = stronger independent self-construal (self defined by
+# personal traits, achievements, autonomy from others).
+
+- slug: day06_singelis_ind
+  type: likert_7
+  title:
+    en: "How much does the 'individual you' show up?"
+  description:
+    en: "Today's questions are about how you tend to think of yourself in relation to others. Please rate how much each statement reflects how you usually feel."
+  interpretation:
+    en: "Higher scores mean you tend to define yourself primarily through your individual qualities, choices, and goals. Tomorrow we'll ask the flip side: how you define yourself through relationships."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: scs_ind_1
+      type: likert_7
+      prompt:
+        en: "I'd rather say 'No' directly than risk being misunderstood."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: scs_ind_2
+      type: likert_7
+      prompt:
+        en: "Speaking up during a class (or meeting) is not a problem for me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: scs_ind_3
+      type: likert_7
+      prompt:
+        en: "Having a lively imagination is important to me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: scs_ind_4
+      type: likert_7
+      prompt:
+        en: "I am comfortable with being singled out for praise or rewards."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 5
+      slug: scs_ind_5
+      type: likert_7
+      prompt:
+        en: "I am the same person at home that I am at school (or work)."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: scs_ind_6
+      type: likert_7
+      prompt:
+        en: "Being able to take care of myself is a primary concern for me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: scs_ind_7
+      type: likert_7
+      prompt:
+        en: "I act the same way no matter who I am with."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: scs_ind_8
+      type: likert_7
+      prompt:
+        en: "I feel comfortable using someone's first name soon after I meet them, even when they are much older than I am."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: scs_ind_9
+      type: likert_7
+      prompt:
+        en: "I prefer to be direct and forthright when dealing with people I've just met."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: scs_ind_10
+      type: likert_7
+      prompt:
+        en: "I enjoy being unique and different from others in many respects."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 11
+      slug: scs_ind_11
+      type: likert_7
+      prompt:
+        en: "My personal identity, independent of others, is very important to me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 12
+      slug: scs_ind_12
+      type: likert_7
+      prompt:
+        en: "I value being in good health above everything."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 7 — SINGELIS SCS, INTERDEPENDENT SELF-CONSTRUAL (12 items)
+# ============================================================================
+# Source: Singelis (1994). Interdependent subscale.
+# Higher score = stronger interdependent self-construal (self defined
+# through relationships, group memberships, social context).
+
+- slug: day07_singelis_int
+  type: likert_7
+  title:
+    en: "How much does the 'connected you' show up?"
+  description:
+    en: "Today's questions are the flip side of yesterday's — about how much you tend to define yourself through your relationships and social context."
+  interpretation:
+    en: "Higher scores mean you tend to define yourself through your relationships, groups, and social context. Lower scores mean you tend to think of yourself more independently of those things. Both are normal and culturally shaped."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: scs_int_1
+      type: likert_7
+      prompt:
+        en: "I have respect for the authority figures with whom I interact."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: scs_int_2
+      type: likert_7
+      prompt:
+        en: "It is important for me to maintain harmony within my group."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: scs_int_3
+      type: likert_7
+      prompt:
+        en: "My happiness depends on the happiness of those around me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: scs_int_4
+      type: likert_7
+      prompt:
+        en: "I would offer my seat in a bus to my professor (or boss)."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 5
+      slug: scs_int_5
+      type: likert_7
+      prompt:
+        en: "I respect people who are modest about themselves."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: scs_int_6
+      type: likert_7
+      prompt:
+        en: "I will sacrifice my self-interest for the benefit of the group I am in."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: scs_int_7
+      type: likert_7
+      prompt:
+        en: "I often have the feeling that my relationships with others are more important than my own accomplishments."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: scs_int_8
+      type: likert_7
+      prompt:
+        en: "I should take into consideration my parents' advice when making education/career plans."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: scs_int_9
+      type: likert_7
+      prompt:
+        en: "It is important to me to respect decisions made by the group."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: scs_int_10
+      type: likert_7
+      prompt:
+        en: "I will stay in a group if they need me, even when I am not happy with the group."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 11
+      slug: scs_int_11
+      type: likert_7
+      prompt:
+        en: "If my brother or sister fails, I feel responsible."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 12
+      slug: scs_int_12
+      type: likert_7
+      prompt:
+        en: "Even when I strongly disagree with group members, I avoid an argument."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 8 — WOOD AS (Authenticity Scale, 12 items)
+# ============================================================================
+# Source: Wood, Linley, Maltby, Baliousis, & Joseph (2008). Three subscales:
+# self-alienation (4 items, reverse-scored toward authenticity),
+# authentic living (4 items), accepting external influence (4 items, reverse).
+# All items scored such that higher total = greater authenticity.
+
+- slug: day08_woodAS
+  type: likert_7
+  title:
+    en: "How true to yourself do you feel?"
+  description:
+    en: "Today's questions are about how you experience being yourself in everyday life — how aligned what you do, feel, and say with who you actually are."
+  interpretation:
+    en: "Higher scores reflect a stronger sense of acting in line with who you really are. Lower scores reflect more friction between your inner experience and how you present yourself or what you do. Both are common; this can shift over time and across contexts."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: was_self_alien_1
+      type: likert_7
+      prompt:
+        en: "I don't know how I really feel inside."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+    - order: 2
+      slug: was_authentic_living_1
+      type: likert_7
+      prompt:
+        en: "I think it is better to be yourself, than to be popular."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: false
+
+    - order: 3
+      slug: was_external_1
+      type: likert_7
+      prompt:
+        en: "I usually do what other people tell me to do."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+    - order: 4
+      slug: was_self_alien_2
+      type: likert_7
+      prompt:
+        en: "I always feel I need to do what others expect me to do."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+    - order: 5
+      slug: was_authentic_living_2
+      type: likert_7
+      prompt:
+        en: "Other people influence me greatly."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+    - order: 6
+      slug: was_external_2
+      type: likert_7
+      prompt:
+        en: "I feel as if I don't know myself very well."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+    - order: 7
+      slug: was_self_alien_3
+      type: likert_7
+      prompt:
+        en: "I always stand by what I believe in."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: false
+
+    - order: 8
+      slug: was_authentic_living_3
+      type: likert_7
+      prompt:
+        en: "I am true to myself in most situations."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: false
+
+    - order: 9
+      slug: was_external_3
+      type: likert_7
+      prompt:
+        en: "I feel out of touch with the 'real me'."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+    - order: 10
+      slug: was_self_alien_4
+      type: likert_7
+      prompt:
+        en: "I live in accordance with my values and beliefs."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: false
+
+    - order: 11
+      slug: was_authentic_living_4
+      type: likert_7
+      prompt:
+        en: "I feel alienated from myself."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+    - order: 12
+      slug: was_external_4
+      type: likert_7
+      prompt:
+        en: "I feel that I have to do what others expect of me."
+      low_label:  { en: "Does not describe me at all" }
+      high_label: { en: "Describes me very well" }
+      reverse_scored: true
+
+
+# ============================================================================
+# DAY 9 — UCLA-8 (Loneliness Scale, 8-item short form)
+# ============================================================================
+# Source: Hays & DiMatteo (1987) ULS-8 short form of UCLA Loneliness Scale.
+# Items 3 and 6 are reverse-scored.
+# Higher score = greater loneliness.
+#
+# Note: even though this has a "drawback framing" (loneliness is generally
+# undesirable), per user instruction all results are shown. Interpretation
+# text is written carefully to normalize the construct.
+
+- slug: day09_ucla8
+  type: likert_4
+  title:
+    en: "How connected have you been feeling?"
+  description:
+    en: "Today's questions are about how connected to other people you've been feeling lately. Loneliness comes and goes for everyone — there's no right answer."
+  interpretation:
+    en: "Higher scores reflect stronger feelings of disconnection lately. Lower scores reflect feeling more connected. These feelings move around a lot in normal life — what you score today isn't a permanent thing about you."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: ucla8_1
+      type: likert_4
+      prompt:
+        en: "I lack companionship."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: false
+
+    - order: 2
+      slug: ucla8_2
+      type: likert_4
+      prompt:
+        en: "There is no one I can turn to."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: false
+
+    - order: 3
+      slug: ucla8_3
+      type: likert_4
+      prompt:
+        en: "I am an outgoing person."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: true
+
+    - order: 4
+      slug: ucla8_4
+      type: likert_4
+      prompt:
+        en: "I feel left out."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: false
+
+    - order: 5
+      slug: ucla8_5
+      type: likert_4
+      prompt:
+        en: "I feel isolated from others."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: false
+
+    - order: 6
+      slug: ucla8_6
+      type: likert_4
+      prompt:
+        en: "I can find companionship when I want it."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: true
+
+    - order: 7
+      slug: ucla8_7
+      type: likert_4
+      prompt:
+        en: "I am unhappy being so withdrawn."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: false
+
+    - order: 8
+      slug: ucla8_8
+      type: likert_4
+      prompt:
+        en: "People are around me but not with me."
+      options:
+        - { order: 1, value: 1, label: { en: "Never" } }
+        - { order: 2, value: 2, label: { en: "Rarely" } }
+        - { order: 3, value: 3, label: { en: "Sometimes" } }
+        - { order: 4, value: 4, label: { en: "Often" } }
+      reverse_scored: false
+
+# ============================================================================
+# BATCH 2 — SOTD DAYS 12–15
+# ============================================================================
+# Surveys in this batch:
+#   day12_ntb    — Need to Belong (Leary et al., 10 items)
+#   day15_shi    — Self-Report Habit Index for nominated platform (12 items)
+#   day16_hexaco_hh — HEXACO-60 Honesty-Humility facet (10 items)
+#   day17_hexaco_em — HEXACO-60 Emotionality facet (10 items)
+#
+# Calendar mapping (per the agreed schedule):
+#   Study day 12 = Fri May 15 (NTB; mid_study published same day)
+#   Study day 15 = Mon May 18 (SHI)
+#   Study day 16 = Tue May 19 (HEXACO H-H)
+#   Study day 17 = Wed May 20 (HEXACO Emotionality)
+#
+# All surveys:
+#   - friend_visible: false
+#   - results_hidden: false
+#   - result_kind: scale_score_histogram (one summary score per scale)
+#
+# ============================================================================
+# IMPLEMENTATION NOTES FOR CLAUDE CODE
+# ============================================================================
+#
+# NEW feature for SHI: token substitution from user-level embedded data.
+#   - The pre-study `habit_platform` answer is stored as user embedded data.
+#   - In day15_shi, item prompts use {{habit_platform_label}} which the
+#     scheduler resolves at render time per user (e.g., "Instagram",
+#     "TikTok", "Discord").
+#   - Token resolution lookup table (built from pre-study response):
+#       value             → label
+#       "instagram"       → "Instagram"
+#       "tiktok"          → "TikTok"
+#       "discord"         → "Discord"
+#       "reddit"          → "Reddit"
+#       "snapchat"        → "Snapchat"
+#       "twitter"         → "Twitter / X"
+#       "facebook"        → "Facebook"
+#       "bereal"          → "BeReal"
+#       "threads"         → "Threads"
+#       "imessage"        → "iMessage / SMS"
+#       "other"           → user's free-text from `habit_platform_other`
+#       "none"            → fall back to "social media" (see graceful fallback
+#                            note below)
+#
+# Graceful fallback for SHI:
+#   If user picked "none" in pre-study habit_platform, day15_shi should
+#   either:
+#   (a) Skip serving day15_shi to that user entirely
+#   (b) Substitute "social media" as the label and ask in general terms
+#   Recommend (a). The slot becomes a free day for that user (no SOTD).
+#
+# HEXACO scoring:
+#   Each HEXACO-60 facet has 10 items with mixed reverse-scoring.
+#   Following Ashton & Lee (2009) HEXACO-60 published key.
+#
+# ============================================================================
+
+
+# ============================================================================
+# DAY 12 — NEED TO BELONG (Leary, Kelly, Cottrell, & Schreindorfer, 2013)
+# ============================================================================
+# 10 items. Items 1, 3, 7 reverse-scored.
+# Higher score = stronger need to belong.
+
+- slug: sotd_d12_ntb
+  type: likert_5
+  title:
+    en: "How much does belonging matter to you?"
+  description:
+    en: "Today's questions are about how much you generally care about being included and accepted by others."
+  interpretation:
+    en: "Higher scores reflect a stronger general drive to be included, liked, and connected. Lower scores reflect being more comfortable on your own or less invested in group acceptance. Both are normal."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: ntb_1
+      type: likert_5
+      prompt:
+        en: "If other people don't seem to accept me, I don't let it bother me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 2
+      slug: ntb_2
+      type: likert_5
+      prompt:
+        en: "I try hard not to do things that will make other people avoid or reject me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: ntb_3
+      type: likert_5
+      prompt:
+        en: "I seldom worry about whether other people care about me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 4
+      slug: ntb_4
+      type: likert_5
+      prompt:
+        en: "I need to feel that there are people I can turn to in times of need."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 5
+      slug: ntb_5
+      type: likert_5
+      prompt:
+        en: "I want other people to accept me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: ntb_6
+      type: likert_5
+      prompt:
+        en: "I do not like being alone."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: ntb_7
+      type: likert_5
+      prompt:
+        en: "Being apart from my friends for long periods of time does not bother me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 8
+      slug: ntb_8
+      type: likert_5
+      prompt:
+        en: "I have a strong need to belong."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: ntb_9
+      type: likert_5
+      prompt:
+        en: "It bothers me a great deal when I am not included in other people's plans."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: ntb_10
+      type: likert_5
+      prompt:
+        en: "My feelings are easily hurt when I feel that others do not accept me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 15 — SELF-REPORT HABIT INDEX (Verplanken & Orbell, 2003)
+# ============================================================================
+# 12 items, all positively keyed (no reverse-scoring).
+# Higher score = stronger habitual use of the nominated platform.
+#
+# Personalized: {{habit_platform_label}} substituted from pre-study.
+# If user picked "none" in pre-study, this survey is NOT served.
+
+- slug: sotd_d15_shi
+  type: likert_7
+  title:
+    en: "How automatic is {{habit_platform_label}} for you?"
+  description:
+    en: "These questions are about your usage of {{habit_platform_label}}, the platform you said feels most automatic for you. Don't think too hard — just go with what feels true."
+  interpretation:
+    en: "Higher scores mean using {{habit_platform_label}} is heavily automatic for you — you do it without much conscious decision. Lower scores mean using it stays more deliberate. Both are common; deeply automatic use isn't necessarily bad, but it's worth being aware of."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+  serving_condition:
+    skip_if_user_embedded_data:
+      habit_platform: "none"
+
+  questions:
+    - order: 1
+      slug: shi_intro
+      type: display_only
+      content:
+        en: "Thinking about your usage of **{{habit_platform_label}}**: opening it up, scrolling through it, posting to it, messaging on it, etc."
+
+    - order: 2
+      slug: shi_1
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I do frequently."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: shi_2
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I do automatically."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: shi_3
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I do without having to consciously remember."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 5
+      slug: shi_4
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something that makes me feel weird if I don't do it."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: shi_5
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I do without thinking."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: shi_6
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something that would require effort not to do."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: shi_7
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something that belongs to my daily routine."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: shi_8
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I start doing before I realize I'm doing it."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: shi_9
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I would find hard not to do."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 11
+      slug: shi_10
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I have no need to think about doing."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 12
+      slug: shi_11
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something that's typically 'me'."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 13
+      slug: shi_12
+      type: likert_7
+      prompt:
+        en: "Using {{habit_platform_label}} is something I have been doing for a long time."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 16 — HEXACO-60 HONESTY-HUMILITY FACET (10 items)
+# ============================================================================
+# Source: Ashton & Lee (2009) HEXACO-60.
+# Higher score = greater honesty-humility (less manipulative, less greedy,
+# more sincere, more modest).
+
+- slug: sotd_d16_hexaco_hh
+  type: likert_5
+  title:
+    en: "How sincere is your default mode?"
+  description:
+    en: "Today's questions are about your general approach to honesty in dealing with others — money, status, getting your way."
+  interpretation:
+    en: "Higher scores reflect a more straightforward, modest, non-manipulative approach to others. Lower scores reflect being more comfortable bending the truth or playing strategically when it's useful. Most people fall somewhere in the middle."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: hexaco_hh_1
+      type: likert_5
+      prompt:
+        en: "I wouldn't use flattery to get a raise or promotion at work, even if I thought it would succeed."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: hexaco_hh_2
+      type: likert_5
+      prompt:
+        en: "If I knew that I could never get caught, I would be willing to steal a million dollars."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 3
+      slug: hexaco_hh_3
+      type: likert_5
+      prompt:
+        en: "Having a lot of money is not especially important to me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: hexaco_hh_4
+      type: likert_5
+      prompt:
+        en: "I think that I am entitled to more respect than the average person is."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 5
+      slug: hexaco_hh_5
+      type: likert_5
+      prompt:
+        en: "If I want something from someone, I will laugh at that person's worst jokes."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 6
+      slug: hexaco_hh_6
+      type: likert_5
+      prompt:
+        en: "I would never accept a bribe, even if it were very large."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: hexaco_hh_7
+      type: likert_5
+      prompt:
+        en: "I would like to live in a very expensive, high-class neighborhood."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 8
+      slug: hexaco_hh_8
+      type: likert_5
+      prompt:
+        en: "I want people to know that I am an important person of high status."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 9
+      slug: hexaco_hh_9
+      type: likert_5
+      prompt:
+        en: "I wouldn't pretend to like someone just to get that person to do favors for me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: hexaco_hh_10
+      type: likert_5
+      prompt:
+        en: "I'd be tempted to use counterfeit money, if I were sure I could get away with it."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+
+# ============================================================================
+# DAY 17 — HEXACO-60 EMOTIONALITY FACET (10 items)
+# ============================================================================
+# Higher score = more emotional reactivity, anxiety, sentimental attachment,
+# need for support.
+
+- slug: sotd_d17_hexaco_em
+  type: likert_5
+  title:
+    en: "How emotionally reactive are you?"
+  description:
+    en: "Today's questions are about how much emotion shows up in your day-to-day reactions to things — fear, anxiety, sentimentality, need for support."
+  interpretation:
+    en: "Higher scores reflect being emotionally responsive, easily moved, and more attached to people you care about. Lower scores reflect being more emotionally steady or self-contained. Both have advantages — high reactivity makes you tuned in to others, low reactivity helps you stay calm under pressure."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: hexaco_em_1
+      type: likert_5
+      prompt:
+        en: "I would feel afraid if I had to travel in bad weather conditions."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: hexaco_em_2
+      type: likert_5
+      prompt:
+        en: "I sometimes can't help worrying about little things."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: hexaco_em_3
+      type: likert_5
+      prompt:
+        en: "When I suffer from a painful experience, I need someone to make me feel comfortable."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: hexaco_em_4
+      type: likert_5
+      prompt:
+        en: "I feel like crying when I see other people crying."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 5
+      slug: hexaco_em_5
+      type: likert_5
+      prompt:
+        en: "I don't mind doing jobs that involve dangerous work."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 6
+      slug: hexaco_em_6
+      type: likert_5
+      prompt:
+        en: "Even in an emergency I wouldn't feel like panicking."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 7
+      slug: hexaco_em_7
+      type: likert_5
+      prompt:
+        en: "I feel strong emotions when someone close to me is going away for a long time."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: hexaco_em_8
+      type: likert_5
+      prompt:
+        en: "I remain unemotional even in situations where most people get very sentimental."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 9
+      slug: hexaco_em_9
+      type: likert_5
+      prompt:
+        en: "I rarely discuss my problems with other people."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 10
+      slug: hexaco_em_10
+      type: likert_5
+      prompt:
+        en: "When I'm in pain, I become impatient and need attention from those around me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+# ============================================================================
+# BATCH 3 — SOTD DAYS 18–23 (Remaining HEXACO-60 facets)
+# ============================================================================
+# Surveys in this batch:
+#   sotd_d18_hexaco_ex — HEXACO-60 Extraversion (10 items)
+#   sotd_d19_hexaco_ag — HEXACO-60 Agreeableness (10 items)
+#   sotd_d22_hexaco_co — HEXACO-60 Conscientiousness (10 items)
+#   sotd_d23_hexaco_op — HEXACO-60 Openness (10 items)
+#
+# Calendar mapping:
+#   Study day 18 = Thu May 21 (HEXACO Extraversion)
+#   Study day 19 = Fri May 22 (HEXACO Agreeableness)
+#   Study day 22 = Mon May 25 (HEXACO Conscientiousness)
+#   Study day 23 = Tue May 26 (HEXACO Openness)
+#
+# All surveys:
+#   - friend_visible: false
+#   - results_hidden: false
+#   - result_kind: scale_score_histogram (one summary score per facet)
+#
+# All four facets follow the same structure as days 16–17 (HEXACO H-H and
+# Emotionality). 10 items each, mixed reverse-scoring per the published
+# Ashton & Lee (2009) HEXACO-60 key.
+# ============================================================================
+
+
+# ============================================================================
+# DAY 18 — HEXACO-60 EXTRAVERSION FACET (10 items)
+# ============================================================================
+# Higher score = more sociable, lively, expressive, comfortable being central
+# in social situations.
+
+- slug: sotd_d18_hexaco_ex
+  type: likert_5
+  title:
+    en: "How energized are you by being around people?"
+  description:
+    en: "Today's questions are about how you tend to act and feel in social situations — being around groups, expressing yourself, leading versus following."
+  interpretation:
+    en: "Higher scores reflect being sociable, lively, and energized by interaction. Lower scores reflect preferring quieter contexts, smaller groups, or solitude. Both are common; this isn't a measure of likability or social skill."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: hexaco_ex_1
+      type: likert_5
+      prompt:
+        en: "I feel reasonably satisfied with myself overall."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: hexaco_ex_2
+      type: likert_5
+      prompt:
+        en: "I feel that I am an unpopular person."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 3
+      slug: hexaco_ex_3
+      type: likert_5
+      prompt:
+        en: "When I'm in a group of people, I'm often the one who speaks on behalf of the group."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: hexaco_ex_4
+      type: likert_5
+      prompt:
+        en: "I sometimes feel that I am a worthless person."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 5
+      slug: hexaco_ex_5
+      type: likert_5
+      prompt:
+        en: "I rarely express my opinions in group meetings."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 6
+      slug: hexaco_ex_6
+      type: likert_5
+      prompt:
+        en: "On most days, I feel cheerful and optimistic."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: hexaco_ex_7
+      type: likert_5
+      prompt:
+        en: "In social situations, I'm usually the one who makes the first move."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: hexaco_ex_8
+      type: likert_5
+      prompt:
+        en: "The first thing that I always do in a new place is to make friends."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: hexaco_ex_9
+      type: likert_5
+      prompt:
+        en: "I prefer jobs that involve active social interaction to those that involve working alone."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: hexaco_ex_10
+      type: likert_5
+      prompt:
+        en: "Most people are more upbeat and dynamic than I generally am."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+
+# ============================================================================
+# DAY 19 — HEXACO-60 AGREEABLENESS FACET (10 items)
+# ============================================================================
+# Higher score = more forgiving, gentle, flexible, patient with others.
+
+- slug: sotd_d19_hexaco_ag
+  type: likert_5
+  title:
+    en: "How easy is it for you to let things go?"
+  description:
+    en: "Today's questions are about how you tend to handle conflict, disagreement, and other people's flaws — your default response when someone gets on your nerves."
+  interpretation:
+    en: "Higher scores reflect being patient, forgiving, and willing to compromise. Lower scores reflect being more direct, willing to push back, and quicker to hold a grudge. Both have their place — high agreeableness keeps relationships smooth, but low agreeableness helps you stand your ground."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: hexaco_ag_1
+      type: likert_5
+      prompt:
+        en: "I rarely hold a grudge, even against people who have badly wronged me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: hexaco_ag_2
+      type: likert_5
+      prompt:
+        en: "My attitude toward people who have treated me badly is 'forgive and forget'."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: hexaco_ag_3
+      type: likert_5
+      prompt:
+        en: "People sometimes tell me that I am too critical of others."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 4
+      slug: hexaco_ag_4
+      type: likert_5
+      prompt:
+        en: "I am usually quite flexible in my opinions when people disagree with me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 5
+      slug: hexaco_ag_5
+      type: likert_5
+      prompt:
+        en: "I tend to be lenient in judging other people."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: hexaco_ag_6
+      type: likert_5
+      prompt:
+        en: "People think of me as someone who has a quick temper."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 7
+      slug: hexaco_ag_7
+      type: likert_5
+      prompt:
+        en: "Most people tend to get angry more quickly than I do."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: hexaco_ag_8
+      type: likert_5
+      prompt:
+        en: "I find it hard to compromise with people when I really think I'm right."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 9
+      slug: hexaco_ag_9
+      type: likert_5
+      prompt:
+        en: "Even when people make a lot of mistakes, I rarely say anything negative."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: hexaco_ag_10
+      type: likert_5
+      prompt:
+        en: "I find it hard to fully forgive someone who has done something mean to me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+
+# ============================================================================
+# DAY 22 — HEXACO-60 CONSCIENTIOUSNESS FACET (10 items)
+# ============================================================================
+# Higher score = more organized, diligent, careful, perfectionistic.
+
+- slug: sotd_d22_hexaco_co
+  type: likert_5
+  title:
+    en: "How organized is your default mode?"
+  description:
+    en: "Today's questions are about how you tend to handle work, planning, attention to detail, and following through."
+  interpretation:
+    en: "Higher scores reflect being organized, careful, and diligent. Lower scores reflect being more spontaneous, flexible, or willing to leave things rough. Neither is better — high conscientiousness gets things done; low conscientiousness adapts more easily to change."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: hexaco_co_1
+      type: likert_5
+      prompt:
+        en: "I plan ahead and organize things, to avoid scrambling at the last minute."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 2
+      slug: hexaco_co_2
+      type: likert_5
+      prompt:
+        en: "I often push myself very hard when trying to achieve a goal."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: hexaco_co_3
+      type: likert_5
+      prompt:
+        en: "When working on something, I don't pay much attention to small details."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 4
+      slug: hexaco_co_4
+      type: likert_5
+      prompt:
+        en: "I make decisions based on the feeling of the moment rather than on careful thought."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 5
+      slug: hexaco_co_5
+      type: likert_5
+      prompt:
+        en: "When working, I sometimes have difficulties due to being disorganized."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 6
+      slug: hexaco_co_6
+      type: likert_5
+      prompt:
+        en: "I do only the minimum amount of work needed to get by."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 7
+      slug: hexaco_co_7
+      type: likert_5
+      prompt:
+        en: "I always try to be accurate in my work, even at the expense of time."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: hexaco_co_8
+      type: likert_5
+      prompt:
+        en: "People often call me a perfectionist."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: hexaco_co_9
+      type: likert_5
+      prompt:
+        en: "I make a lot of mistakes because I don't think before I act."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 10
+      slug: hexaco_co_10
+      type: likert_5
+      prompt:
+        en: "I prefer to do whatever comes to mind, rather than stick to a plan."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+
+# ============================================================================
+# DAY 23 — HEXACO-60 OPENNESS TO EXPERIENCE FACET (10 items)
+# ============================================================================
+# Higher score = more curious, imaginative, drawn to art and unconventional
+# ideas.
+
+- slug: sotd_d23_hexaco_op
+  type: likert_5
+  title:
+    en: "How drawn are you to the unfamiliar?"
+  description:
+    en: "Today's questions are about how you respond to novelty — new ideas, art, unconventional things, and topics outside your usual range."
+  interpretation:
+    en: "Higher scores reflect being curious, imaginative, and drawn to new or unusual things. Lower scores reflect preferring the familiar, practical, and tried-and-true. Both have value — high openness explores; low openness stays grounded."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: hexaco_op_1
+      type: likert_5
+      prompt:
+        en: "I would be quite bored by a visit to an art gallery."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 2
+      slug: hexaco_op_2
+      type: likert_5
+      prompt:
+        en: "I'm interested in learning about the history and politics of other countries."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: hexaco_op_3
+      type: likert_5
+      prompt:
+        en: "I would enjoy creating a work of art, such as a novel, a song, or a painting."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: hexaco_op_4
+      type: likert_5
+      prompt:
+        en: "I think that paying attention to radical ideas is a waste of time."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 5
+      slug: hexaco_op_5
+      type: likert_5
+      prompt:
+        en: "If I had the opportunity, I would like to attend a classical music concert."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: hexaco_op_6
+      type: likert_5
+      prompt:
+        en: "I find it boring to discuss philosophy."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 7
+      slug: hexaco_op_7
+      type: likert_5
+      prompt:
+        en: "I like people who have unconventional views."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 8
+      slug: hexaco_op_8
+      type: likert_5
+      prompt:
+        en: "I would like a job that requires following a routine rather than being creative."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 9
+      slug: hexaco_op_9
+      type: likert_5
+      prompt:
+        en: "I've never really enjoyed looking through an encyclopedia."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: true
+
+    - order: 10
+      slug: hexaco_op_10
+      type: likert_5
+      prompt:
+        en: "People have often told me that I have a good imagination."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+# ============================================================================
+# BATCH 4 — SOTD DAYS 1, 24, 25, 26 (Closing surveys)
+# ============================================================================
+# Surveys in this batch:
+#   sotd_d01_honeymoon  — Day-1 first-impressions snapshot
+#   sotd_d24_ceii       — CEI-II curiosity (10 items)
+#   sotd_d25_iuipc      — IUIPC privacy concern short (10 items)
+#   sotd_d26_transition — End-of-study reflection + transition
+#
+# Calendar mapping:
+#   Study day 1  = Mon May 4  (Honeymoon snapshot)
+#   Study day 24 = Wed May 27 (CEI-II curiosity)
+#   Study day 25 = Thu May 28 (IUIPC privacy)
+#   Study day 26 = Fri May 29 (Transition; post_study published same day)
+#
+# All surveys:
+#   - friend_visible: false
+#   - results_hidden: false (results shown except for items flagged with
+#     result_hidden: true at the question level — i.e., free-text reflection)
+#
+# Result kinds vary:
+#   - sotd_d01: option_counts + wordcloud (no scale score)
+#   - sotd_d24: scale_score_histogram (CEI-II is a single-score scale)
+#   - sotd_d25: scale_score_histogram (IUIPC short, single score)
+#   - sotd_d26: option_counts + wordcloud (reflection, not a scale)
+#
+# ============================================================================
+# IMPLEMENTATION NOTES FOR CLAUDE CODE
+# ============================================================================
+#
+# No new schema features needed. All features used here are introduced in
+# prior batches (free_text with min_length, single_choice, multi_choice,
+# scale_score_histogram, display_only).
+#
+# Note on sotd_d26 vs post_study: The day-26 Friday SOTD is a SHORT
+# reflection (~5 min). The post_study survey is published on the SAME day
+# (Friday May 29) and stays open through Sunday May 31, taking ~17–30 min.
+# These are intentionally complementary — d26 captures gut reactions that
+# may not survive the longer post_study reflection.
+#
+# ============================================================================
+
+
+# ============================================================================
+# DAY 1 — HONEYMOON SNAPSHOT (Mon May 4)
+# ============================================================================
+# Goal: light first-day item that surfaces gut reactions before users develop
+# a frame of reference. Friendly digest material for day 2.
+# Designed to take ~2 minutes.
+
+- slug: sotd_d01_honeymoon
+  type: single_choice
+  title:
+    en: "First impressions"
+  description:
+    en: "Welcome to the first day on WIT. A quick check-in on what stuck out — good, weird, surprising, anything."
+  interpretation:
+    en: "Tomorrow's digest will show what surprised people most about their first day, and which features got the strongest first reactions."
+  friend_visible: false
+  results_hidden: false
+
+  questions:
+    - order: 1
+      slug: honeymoon_first_impression
+      type: single_choice
+      prompt:
+        en: "If you had to describe your first day on WIT in one word, which one fits best?"
+      options:
+        - { order: 1, value: "curious",      label: { en: "Curious" } }
+        - { order: 2, value: "fun",          label: { en: "Fun" } }
+        - { order: 3, value: "calm",         label: { en: "Calm" } }
+        - { order: 4, value: "confused",     label: { en: "Confused" } }
+        - { order: 5, value: "awkward",      label: { en: "Awkward" } }
+        - { order: 6, value: "refreshing",   label: { en: "Refreshing" } }
+        - { order: 7, value: "lonely",       label: { en: "Lonely" } }
+        - { order: 8, value: "overwhelmed",  label: { en: "Overwhelmed" } }
+        - { order: 9, value: "neutral",      label: { en: "Neutral / haven't formed an impression yet" } }
+      result_kind: option_counts
+
+    - order: 2
+      slug: honeymoon_compared_to
+      type: single_choice
+      prompt:
+        en: "How does WIT feel compared to other social apps you use?"
+      options:
+        - { order: 1, value: "very_similar",     label: { en: "Very similar to what I'm used to" } }
+        - { order: 2, value: "somewhat_similar", label: { en: "Somewhat similar" } }
+        - { order: 3, value: "somewhat_diff",    label: { en: "Somewhat different" } }
+        - { order: 4, value: "very_diff",        label: { en: "Very different" } }
+        - { order: 5, value: "too_early",        label: { en: "Too early to say" } }
+      result_kind: option_counts
+
+    - order: 3
+      slug: honeymoon_surprised_by
+      type: free_text
+      prompt:
+        en: "What surprised you about WIT on your first day, if anything?"
+      placeholder:
+        en: "Could be a feature, a small detail, the look, how it felt — anything."
+      min_length: 15
+      required: false
+      result_kind: wordcloud
+      result_hidden: false
+
+    - order: 4
+      slug: honeymoon_first_friend_action
+      type: single_choice
+      prompt:
+        en: "Have you connected with at least one friend on WIT yet?"
+      options:
+        - { order: 1, value: "yes_several", label: { en: "Yes, several" } }
+        - { order: 2, value: "yes_one",     label: { en: "Yes, at least one" } }
+        - { order: 3, value: "trying",      label: { en: "Trying to but haven't yet" } }
+        - { order: 4, value: "not_yet",     label: { en: "Not yet" } }
+      result_kind: option_counts
+
+
+# ============================================================================
+# DAY 24 — CEI-II CURIOSITY (Curiosity and Exploration Inventory-II)
+# ============================================================================
+# Source: Kashdan et al. (2009). 10 items, two subscales (Stretching and
+# Embracing) but standard practice scores all 10 as a single total.
+# All items positively keyed (no reverse-scoring).
+# Higher score = greater general curiosity / exploration tendency.
+
+- slug: sotd_d24_ceii
+  type: likert_5
+  title:
+    en: "How drawn are you to the new and uncertain?"
+  description:
+    en: "Today's questions are about how you respond to novelty and uncertainty in everyday life — situations where you don't quite know what's coming."
+  interpretation:
+    en: "Higher scores reflect being drawn to new experiences and comfortable not knowing how things will turn out. Lower scores reflect preferring familiar territory and predictable outcomes. Both are reasonable; high curiosity helps you discover, low curiosity helps you stay grounded."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: ceii_1
+      type: likert_5
+      prompt:
+        en: "I actively seek as much information as I can in new situations."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 2
+      slug: ceii_2
+      type: likert_5
+      prompt:
+        en: "I am the type of person who really enjoys the uncertainty of everyday life."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 3
+      slug: ceii_3
+      type: likert_5
+      prompt:
+        en: "I am at my best when doing something that is complex or challenging."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 4
+      slug: ceii_4
+      type: likert_5
+      prompt:
+        en: "Everywhere I go, I am out looking for new things or experiences."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 5
+      slug: ceii_5
+      type: likert_5
+      prompt:
+        en: "I view challenging situations as an opportunity to grow and learn."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 6
+      slug: ceii_6
+      type: likert_5
+      prompt:
+        en: "I like to do things that are a little frightening."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 7
+      slug: ceii_7
+      type: likert_5
+      prompt:
+        en: "I am always looking for experiences that challenge how I think about myself and the world."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 8
+      slug: ceii_8
+      type: likert_5
+      prompt:
+        en: "I prefer jobs that are excitingly unpredictable."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 9
+      slug: ceii_9
+      type: likert_5
+      prompt:
+        en: "I frequently seek out opportunities to challenge myself and grow as a person."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+    - order: 10
+      slug: ceii_10
+      type: likert_5
+      prompt:
+        en: "I am the kind of person who embraces unfamiliar people, events, and places."
+      low_label:  { en: "Very slightly or not at all" }
+      high_label: { en: "Extremely" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 25 — IUIPC SHORT (Internet Users' Information Privacy Concerns)
+# ============================================================================
+# Source: Malhotra, Kim, & Agarwal (2004). 10-item short form covering three
+# subscales (Control, Awareness, Collection). All items positively keyed.
+# Higher score = greater privacy concern.
+
+- slug: sotd_d25_iuipc
+  type: likert_7
+  title:
+    en: "How much do you care about online privacy?"
+  description:
+    en: "Today's questions are about how you generally feel about online services collecting and using your information."
+  interpretation:
+    en: "Higher scores reflect being more concerned about how online services handle your personal information. Lower scores reflect being more relaxed about it. Both are common positions, and they don't necessarily reflect privacy behavior — people who score lower may still take privacy seriously, and vice versa."
+  friend_visible: false
+  results_hidden: false
+  result_kind: scale_score_histogram
+
+  questions:
+    - order: 1
+      slug: iuipc_intro
+      type: display_only
+      content:
+        en: "These questions are about online services in general (apps, websites, platforms) — not WIT specifically."
+
+    # CONTROL subscale (3 items)
+    - order: 2
+      slug: iuipc_control_1
+      type: likert_7
+      prompt:
+        en: "Consumer online privacy is really a matter of consumers' right to exercise control and autonomy over decisions about how their information is collected, used, and shared."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 3
+      slug: iuipc_control_2
+      type: likert_7
+      prompt:
+        en: "Consumer control of personal information lies at the heart of consumer privacy."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 4
+      slug: iuipc_control_3
+      type: likert_7
+      prompt:
+        en: "I believe that online privacy is invaded when control is lost or unwillingly reduced as a result of a marketing transaction."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    # AWARENESS subscale (3 items)
+    - order: 5
+      slug: iuipc_awareness_1
+      type: likert_7
+      prompt:
+        en: "Companies seeking information online should disclose the way the data are collected, processed, and used."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 6
+      slug: iuipc_awareness_2
+      type: likert_7
+      prompt:
+        en: "A good consumer online privacy policy should have a clear and conspicuous disclosure."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 7
+      slug: iuipc_awareness_3
+      type: likert_7
+      prompt:
+        en: "It is very important to me that I am aware and knowledgeable about how my personal information will be used."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    # COLLECTION subscale (4 items)
+    - order: 8
+      slug: iuipc_collection_1
+      type: likert_7
+      prompt:
+        en: "It usually bothers me when online companies ask me for personal information."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 9
+      slug: iuipc_collection_2
+      type: likert_7
+      prompt:
+        en: "When online companies ask me for personal information, I sometimes think twice before providing it."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 10
+      slug: iuipc_collection_3
+      type: likert_7
+      prompt:
+        en: "It bothers me to give personal information to so many online companies."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+    - order: 11
+      slug: iuipc_collection_4
+      type: likert_7
+      prompt:
+        en: "I am concerned that online companies are collecting too much personal information about me."
+      low_label:  { en: "Strongly disagree" }
+      high_label: { en: "Strongly agree" }
+      reverse_scored: false
+
+
+# ============================================================================
+# DAY 26 — END-OF-STUDY REFLECTION + TRANSITION (Fri May 29)
+# ============================================================================
+# Goal: short reflection capturing gut reactions BEFORE the longer post_study
+# survey (also published this Friday) is completed.
+# Designed to take ~5 minutes.
+
+- slug: sotd_d26_transition
+  type: single_choice
+  title:
+    en: "Looking back at the month"
+  description:
+    en: "You've been on WIT for almost a month now. A few quick reflections — your fuller post-study survey was also just published, and it'll go deeper. This one is just gut reactions."
+  interpretation:
+    en: "Tomorrow's digest will show how the cohort summarized the month — favorite features, biggest changes, what people thought about social media in general after this experience."
+  friend_visible: false
+  results_hidden: false
+
+  questions:
+    - order: 1
+      slug: transition_one_word
+      type: single_choice
+      prompt:
+        en: "If you had to describe your month on WIT in one word, which fits best?"
+      options:
+        - { order: 1, value: "refreshing",   label: { en: "Refreshing" } }
+        - { order: 2, value: "calm",         label: { en: "Calm" } }
+        - { order: 3, value: "fun",          label: { en: "Fun" } }
+        - { order: 4, value: "lonely",       label: { en: "Lonely" } }
+        - { order: 5, value: "awkward",      label: { en: "Awkward" } }
+        - { order: 6, value: "boring",       label: { en: "Boring" } }
+        - { order: 7, value: "meaningful",   label: { en: "Meaningful" } }
+        - { order: 8, value: "frustrating",  label: { en: "Frustrating" } }
+        - { order: 9, value: "experimental", label: { en: "Experimental" } }
+        - { order: 10, value: "neutral",     label: { en: "Neutral" } }
+      result_kind: option_counts
+
+    - order: 2
+      slug: transition_first_word_compare
+      type: display_only
+      content:
+        en: "Earlier this month, on day 1, we asked you the same question. Your tomorrow's digest will compare how the cohort's words shifted between day 1 and now."
+
+    - order: 3
+      slug: transition_keep_using
+      type: single_choice
+      prompt:
+        en: "If WIT stayed available after this study, would you keep using it?"
+      options:
+        - { order: 1, value: "definitely_yes", label: { en: "Definitely yes" } }
+        - { order: 2, value: "probably_yes",   label: { en: "Probably yes" } }
+        - { order: 3, value: "maybe",          label: { en: "Maybe" } }
+        - { order: 4, value: "probably_no",    label: { en: "Probably not" } }
+        - { order: 5, value: "definitely_no",  label: { en: "Definitely not" } }
+      result_kind: option_counts
+
+    - order: 4
+      slug: transition_changed_view
+      type: single_choice
+      prompt:
+        en: "Has using WIT changed how you think about social media in general?"
+      options:
+        - { order: 1, value: "yes_a_lot",      label: { en: "Yes, a lot" } }
+        - { order: 2, value: "yes_a_little",   label: { en: "Yes, a little" } }
+        - { order: 3, value: "not_really",     label: { en: "Not really" } }
+        - { order: 4, value: "no",             label: { en: "No" } }
+      result_kind: option_counts
+
+    - order: 5
+      slug: transition_changed_view_text
+      type: free_text
+      prompt:
+        en: "If yes — what changed in how you think about social media?"
+      placeholder:
+        en: "A specific shift, even a small one, is more useful than a general statement."
+      min_length: 20
+      required: false
+      result_kind: wordcloud
+      conditional_display:
+        depends_on: transition_changed_view
+        show_when_value_in: ["yes_a_lot", "yes_a_little"]
+
+    - order: 6
+      slug: transition_one_thing_keep
+      type: free_text
+      prompt:
+        en: "If you could keep one thing about WIT and bring it to other apps you use, what would it be?"
+      placeholder:
+        en: "A feature, a behavior, a vibe — anything."
+      min_length: 15
+      required: false
+      result_kind: wordcloud
+
+    - order: 7
+      slug: transition_outro
+      type: display_only
+      content:
+        en: "**Thanks for these gut reactions.** Your full post-study survey is also published today — it'll go deeper into specific features and the goal-by-goal breakdown. Take your time with it; it can stay open through Sunday."
