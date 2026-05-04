@@ -51,7 +51,7 @@ class ResponseSerializer(AdoorBaseSerializer):
     current_user_reaction_id_list = serializers.SerializerMethodField(read_only=True)
     like_reaction_user_sample = serializers.SerializerMethodField(read_only=True)
     visibility = serializers.MultipleChoiceField(
-        choices=['public', 'friends', 'close_friends'],
+        choices=['public', 'friends', 'close_friends', 'only_me'],
         required=True
     )
     def validate_visibility(self, value):
