@@ -79,13 +79,6 @@ def _has_subscription(user):
     return Subscription.objects.filter(subscriber=user).exists()
 
 
-def _has_granular_subscription(user):
-    from account.models import Subscription
-    return Subscription.objects.filter(
-        subscriber=user, subscription_type__isnull=False,
-    ).exists()
-
-
 def _has_like(user):
     from like.models import Like
     return Like.objects.filter(user=user).exists()
@@ -180,15 +173,6 @@ def _make_event_predicate(event_key: str):
 PREDICATES: list[FeaturePredicate] = [
     # ---- Goal 1: Cultivate deepening connections ----
     FeaturePredicate(
-        feature_key='daily_question_view',
-        versions={'version_w', 'version_q'},
-        display_name="View today's daily question",
-        description="Tap into Questions and see what today's question is.",
-        deep_link='/questions',
-        kind='event',
-        is_engaged=_make_event_predicate('daily_question_viewed'),
-    ),
-    FeaturePredicate(
         feature_key='daily_question_answer',
         versions={'version_w', 'version_q'},
         display_name='Answer a daily question',
@@ -256,15 +240,6 @@ PREDICATES: list[FeaturePredicate] = [
         is_engaged=_make_event_predicate('chat_close_friends_filter_toggled'),
     ),
     FeaturePredicate(
-        feature_key='granular_subscription',
-        versions={'version_w'},
-        display_name='Granularly subscribe to a friend',
-        description='Pick which components of a friend you want notifications about.',
-        deep_link=None,
-        kind='db',
-        is_engaged=_has_granular_subscription,
-    ),
-    FeaturePredicate(
         feature_key='subscribe_bell',
         versions={'version_w', 'version_q'},
         display_name='Tap the subscribe bell on a friend',
@@ -277,7 +252,7 @@ PREDICATES: list[FeaturePredicate] = [
     # ---- Goal 5: Clarity of sharing norms ----
     FeaturePredicate(
         feature_key='mission_of_day',
-        versions={'version_w', 'version_q'},
+        versions={'version_w'},
         display_name='Post for Mission of the Day',
         description='Tap the daily mission and submit a post.',
         deep_link='/share',
@@ -286,7 +261,7 @@ PREDICATES: list[FeaturePredicate] = [
     ),
     FeaturePredicate(
         feature_key='photo_of_day',
-        versions={'version_w', 'version_q'},
+        versions={'version_w'},
         display_name='Post a Photo of the Day',
         description='Pick a photo, crop it, write a caption, share.',
         deep_link='/share',
@@ -296,7 +271,7 @@ PREDICATES: list[FeaturePredicate] = [
     FeaturePredicate(
         feature_key='checkin_battery',
         versions={'version_w'},
-        display_name='Set a battery check-in',
+        display_name='Set a social battery check-in',
         description='How social are you feeling? 0–100 with an emoji.',
         deep_link='/update',
         kind='db',
@@ -383,7 +358,7 @@ PREDICATES: list[FeaturePredicate] = [
     ),
     FeaturePredicate(
         feature_key='view_as',
-        versions={'version_w', 'version_q'},
+        versions={'version_w'},
         display_name='Use "View as…" on your profile',
         description="See how your profile looks to a specific friend or audience. Tap **Take me there** → tap the picker at the top to switch perspectives.",
         deep_link='/my/view-as',
@@ -392,9 +367,9 @@ PREDICATES: list[FeaturePredicate] = [
     ),
     FeaturePredicate(
         feature_key='apply_privacy_past',
-        versions={'version_w', 'version_q'},
+        versions={'version_w'},
         display_name='Apply privacy change to past posts',
-        description="Upgrade a friend to close-friend and apply to past posts too.",
+        description="When you upgrade a friend to close-friend, also apply the new visibility to past posts.",
         deep_link='/friends',
         kind='db',
         is_engaged=_has_apply_past_posts,
@@ -436,15 +411,6 @@ PREDICATES: list[FeaturePredicate] = [
         deep_link='/my',
         kind='event',
         is_engaged=_make_event_predicate('my_tab_opened'),
-    ),
-    FeaturePredicate(
-        feature_key='highlight_question',
-        versions={'version_q'},
-        display_name='Tap a Highlight Question in Discover',
-        description="Q's discover surface featured questions — tap one to read the thread.",
-        deep_link='/discover',
-        kind='event',
-        is_engaged=_make_event_predicate('highlight_question_detail_tapped'),
     ),
 ]
 
