@@ -51,11 +51,21 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
     if completed and version == 'version_w' and now < V2_WINDOW_START:
         audit = progress.get('audit', {})
         last_missing = audit.get('last_missing_count')
-        if last_missing == 0:
+        final_quiz = progress.get('final_quiz', {})
+        passed_final = final_quiz.get('passed', False)
+
+        if passed_final:
             return {
                 'kind': 'card',
-                'intro': "you've tried everything. see you May 18 for the swap.",
+                'intro': "you survived. see you May 18 for the swap.",
                 'buttons': [],
+            }
+        if last_missing == 0:
+            return {
+                **card_with_buttons([
+                    {'label': 'Take the boss quiz', 'payload': 'take_boss_quiz'},
+                ]),
+                'intro': "audit done. final quiz time?",
             }
         return {
             **card_with_buttons([

@@ -182,3 +182,133 @@ EXPLORE_LATER = (
     "ok — i'll be silent. "
     "use **Run audit** when you want me to re-check."
 )
+
+# ---------- Boss quiz (end-of-version final) ----------
+
+BOSS_QUIZ_INTRO = (
+    "final boss quiz time. *cracks non-existent knuckles*\n"
+    "select EVERY feature that's actually in YOUR version. "
+    "some are decoys from the OTHER version. some are completely made up. "
+    "need ≥80% to pass. unlimited retries. you've got this."
+)
+
+BOSS_QUIZ_PASS_TEMPLATE = (
+    "🦉✨  YOU SURVIVED. {score}% — passed.\n"
+    "*hands over participation gold star*\n"
+    "nothing else from me until the next milestone. enjoy the silence."
+)
+
+BOSS_QUIZ_FAIL_TEMPLATE = (
+    "{score}%. need 80%. close, but no participation gold star yet.\n"
+    "here's what went wrong:\n{wrong_lines}\n\n"
+    "*adjusts non-existent monocle*\nlet's go again."
+)
+
+# Made-up features that don't exist in either version. Used as the absurd
+# decoy bank for the boss quiz.
+ABSURD_FEATURES = [
+    'Reels',
+    'Video filters',
+    '2-minute timer',
+    'Voice channel',
+    'Karaoke mode',
+]
+
+# ---------- FAQ ----------
+
+FAQ_MENU_INTRO = (
+    "what do you want to know? tap one. (or type `wit?` if you're bored.)"
+)
+
+FAQ_ENTRIES = [
+    {
+        'key': 'add_friends',
+        'question': 'Can I add friends not in the study?',
+        'answer': (
+            "yes. add anyone. their experience may differ since they won't "
+            "be on a research version, but it's totally fine."
+        ),
+    },
+    {
+        'key': 'after_study',
+        'question': 'What happens to the app after the study?',
+        'answer': (
+            "data freezes after May 31. there's a short tail period for "
+            "access — admin will announce the exact date."
+        ),
+    },
+    {
+        'key': 'missed_window',
+        'question': 'What if I miss something during my mandatory window?',
+        'answer': (
+            "tap **Call admin** in the welcome card up top. "
+            "we'll figure it out together."
+        ),
+    },
+    {
+        'key': 'switch_version',
+        'question': 'How do I switch versions early?',
+        'answer': (
+            "you can't via me. there's a separate VersionSwitchRequest flow — "
+            "talk to admin if you genuinely need it (rare)."
+        ),
+    },
+    {
+        'key': 'why_widget',
+        'question': 'Why does WITty want a screenshot of my widgets?',
+        'answer': (
+            "widget installation is a participation requirement. "
+            "we can't auto-detect widgets on your phone, "
+            "so the screenshot is the proof."
+        ),
+    },
+    {
+        'key': 'why_notifs',
+        'question': 'Why do I have to keep notifications on?',
+        'answer': (
+            "surveys + study reminders depend on push delivery. "
+            "without them you'll miss things and your data won't be complete."
+        ),
+    },
+    {
+        'key': 'what_witty_does',
+        'question': 'What does WITty actually do?',
+        'answer': (
+            "mostly worry about you. sometimes try to make you laugh. "
+            "run audits. be a small confused owl. 🦉"
+        ),
+    },
+    {
+        'key': 'delete_data',
+        'question': 'Can I delete my data?',
+        'answer': "yes — contact admin.",
+    },
+]
+
+# ---------- Easter eggs / playful ----------
+
+WIT_REPLIES = [
+    "i'm fine. why? do i look like i'm not fine. *adjusts non-existent collar*",
+    "if a participant pings a check-in in the forest and no one is around to see it, did the participant ping?",
+    "sometimes i think about owls. is that weird?",
+    "i ate a math problem for breakfast. it didn't agree with me.",
+    "*makes a small owl noise* (i don't actually know what owls sound like)",
+    "the secret is there is no secret. the second secret is that one's free.",
+    "*adjusts non-existent tie* status: trying my best.",
+    "i would tell you a joke about UDP but you might not get it. ha. ha. ha.",
+    "i could be doing anything right now. but i'm here. *looks meaningfully into middle distance*",
+    "wit? me? *blushes*",
+    "today's vibe: cautious optimism with a side of confused.",
+    "i just learned what a treadmill is. seems unkind.",
+]
+
+CAT_REPLY = "a cat. ok. i acknowledge the cat. *bows respectfully*"
+WHO_AM_I_REPLY = "a participant in WhoamI Today, that's who. (also a person.)"
+HELP_REPLY = (
+    "things you can do:\n"
+    "  • **Run audit** — see your feature progress\n"
+    "  • `faq` — frequently asked things\n"
+    "  • `wit?` — talk to me\n"
+    "  • **Call admin** (button) — escalate to a real human\n"
+    "i'll be silent otherwise."
+)

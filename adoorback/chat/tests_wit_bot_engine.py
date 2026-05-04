@@ -319,6 +319,100 @@ class EngineDispatchTests(TestCase):
         prog = state_mod.progress_for(state, 'version_w')
         self.assertEqual(prog['walkthrough']['index'], 1)
 
+    # ---------- V1.2.1 — Boss quiz ----------
+
+    def test_take_boss_quiz_enters_final_quiz(self):
+        self._complete_kickoff()
+        self._send_choice('take_boss_quiz')
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, 'final_quiz')
+        latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
+        self.assertEqual(latest.bot_payload.get('kind'), 'multi_select')
+        self.assertEqual(latest.bot_payload.get('intent'), 'final_quiz')
+
+    def test_boss_quiz_perfect_score_passes(self):
+        self._complete_kickoff()
+        self._send_choice('take_boss_quiz')
+        state = state_mod.get_or_create_state(self.alice)
+        prog = state_mod.progress_for(state, 'version_w')
+        # Submit only the correct ones
+        correct_values = [
+            o['value'] for o in prog['final_quiz']['current_options']
+            if o['correct']
+        ]
+        Message.objects.create(
+            chat_room=self.room, sender=self.alice, receiver=self.bot,
+            content='boss-quiz submit',
+            bot_payload={
+                'kind': 'multi_select_response',
+                'intent': 'final_quiz',
+                'selected': correct_values,
+            },
+        )
+        state.refresh_from_db()
+        prog = state_mod.progress_for(state, 'version_w')
+        self.assertTrue(prog['final_quiz']['passed'])
+        self.assertEqual(state.current_intent, '')  # back to idle
+
+    def test_boss_quiz_below_threshold_retries(self):
+        self._complete_kickoff()
+        self._send_choice('take_boss_quiz')
+        state = state_mod.get_or_create_state(self.alice)
+        prog = state_mod.progress_for(state, 'version_w')
+        options = prog['final_quiz']['current_options']
+        # Select all options (will be wrong on the incorrect ones)
+        Message.objects.create(
+            chat_room=self.room, sender=self.alice, receiver=self.bot,
+            content='all-selected',
+            bot_payload={
+                'kind': 'multi_select_response',
+                'intent': 'final_quiz',
+                'selected': [o['value'] for o in options],
+            },
+        )
+        state.refresh_from_db()
+        # Still in final_quiz (re-entered for retry)
+        self.assertEqual(state.current_intent, 'final_quiz')
+        prog = state_mod.progress_for(state, 'version_w')
+        self.assertFalse(prog['final_quiz'].get('passed', False))
+        self.assertEqual(len(prog['final_quiz']['attempts_history']), 1)
+
+    # ---------- V1.2.2 — FAQ + easter eggs ----------
+
+    def test_faq_text_shows_menu(self):
+        self._send_text('faq')
+        latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
+        self.assertEqual(latest.bot_payload.get('kind'), 'card')
+        labels = [b['label'] for b in latest.bot_payload.get('buttons', [])]
+        self.assertTrue(any('friends' in l.lower() for l in labels))
+
+    def test_faq_button_returns_answer(self):
+        self._send_text('faq')
+        self._send_choice('faq:why_widget')
+        latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
+        self.assertIn('participation requirement', latest.content.lower())
+
+    def test_wit_question_returns_easter_egg(self):
+        from chat.wit_bot_copy import WIT_REPLIES
+        self._send_text('wit?')
+        latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
+        self.assertIn(latest.content, WIT_REPLIES)
+
+    def test_who_am_i_returns_canned(self):
+        self._send_text('who am i')
+        latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
+        self.assertIn('participant', latest.content.lower())
+
+    def test_help_returns_command_list(self):
+        self._send_text('help')
+        latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
+        self.assertIn('run audit', latest.content.lower())
+
+    def test_cat_emoji_returns_cat_reply(self):
+        self._send_text('🐈')
+        latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
+        self.assertIn('cat', latest.content.lower())
+
     # ---------- Task 13 — kickoff_widget ----------
 
     def test_widget_screenshot_creates_record_and_completes(self):

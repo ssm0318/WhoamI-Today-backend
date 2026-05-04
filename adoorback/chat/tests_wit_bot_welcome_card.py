@@ -47,11 +47,21 @@ class WelcomeCardTests(TestCase):
         labels = [b['label'] for b in payload['buttons']]
         self.assertIn('Run audit', labels)
 
-    def test_audit_complete_shows_no_button_pre_swap(self):
-        """After audit confirms 0 missing, button disappears."""
+    def test_audit_complete_shows_take_boss_quiz_cta(self):
+        """After audit confirms 0 missing but boss quiz not yet passed, show Take boss quiz."""
         state = state_mod.get_or_create_state(self.alice)
         state_mod.set_progress(state, 'version_w', 'kickoff', {'completed': True})
         state_mod.set_progress(state, 'version_w', 'audit', {'last_missing_count': 0})
+        payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 5, 5))
+        labels = [b['label'] for b in payload['buttons']]
+        self.assertIn('Take the boss quiz', labels)
+
+    def test_boss_quiz_passed_shows_no_button_pre_swap(self):
+        """After boss quiz passes, no button — silent until May 18."""
+        state = state_mod.get_or_create_state(self.alice)
+        state_mod.set_progress(state, 'version_w', 'kickoff', {'completed': True})
+        state_mod.set_progress(state, 'version_w', 'audit', {'last_missing_count': 0})
+        state_mod.set_progress(state, 'version_w', 'final_quiz', {'passed': True})
         payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 5, 5))
         self.assertEqual(payload.get('buttons', []), [])
         self.assertIn('May 18', payload['intro'])

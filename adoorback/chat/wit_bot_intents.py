@@ -18,6 +18,7 @@ from chat.wit_bot_payloads import card_with_buttons, multi_select, upload_reques
 def idle_handler(state, message, user):
     """Default when no intent is active. Routes special payloads, else nudges."""
     payload = (message.bot_payload or {}).get('payload')
+    text = (message.content or '').strip().lower()
 
     if payload == 'start_onboarding':
         state_mod.set_intent(state, 'kickoff_welcome', step=0)
@@ -30,6 +31,28 @@ def idle_handler(state, message, user):
     if payload == 'run_audit':
         state_mod.set_intent(state, 'audit', step=0)
         return audit_handler(state, message, user)
+
+    if payload == 'take_boss_quiz':
+        state_mod.set_intent(state, 'final_quiz', step=0)
+        return final_quiz_handler(state, message, user)
+
+    if payload and payload.startswith('faq:'):
+        return _faq_answer(payload.split(':', 1)[1])
+
+    # Text-triggered easter eggs / commands
+    if text in ('faq', 'help me', 'questions'):
+        return _faq_menu()
+    if text in ('wit?', 'wit', 'witty?'):
+        return _wit_reply()
+    if text == 'who am i':
+        from chat.wit_bot_copy import WHO_AM_I_REPLY
+        return [(WHO_AM_I_REPLY, None)]
+    if text == 'help':
+        from chat.wit_bot_copy import HELP_REPLY
+        return [(HELP_REPLY, None)]
+    if '🐈' in text or '🐱' in text:
+        from chat.wit_bot_copy import CAT_REPLY
+        return [(CAT_REPLY, None)]
 
     return [
         ("not sure what that was. try the welcome card up top, or type `wit?`.", None),
@@ -448,6 +471,160 @@ def walkthrough_handler(state, message, user):
     return [_walkthrough_feature_card(next_pred, mode='walkthrough')]
 
 
+# ---------- Boss quiz (end-of-version final exam) ----------
+
+def _build_final_quiz_options(version):
+    """Build quiz options dynamically. Real-in-version → correct;
+    real-only-in-other → incorrect distractor; absurd bank → incorrect.
+    """
+    import random
+    from chat.wit_bot_copy import ABSURD_FEATURES
+    from chat.wit_bot_predicates import PREDICATES
+
+    other_version = 'version_q' if version == 'version_w' else 'version_w'
+    options = []
+
+    for p in PREDICATES:
+        if version in p.versions:
+            options.append({
+                'value': f'real:{p.feature_key}',
+                'label': p.display_name,
+                'correct': True,
+            })
+        elif other_version in p.versions:
+            options.append({
+                'value': f'distractor:{p.feature_key}',
+                'label': p.display_name,
+                'correct': False,
+            })
+
+    for ab in ABSURD_FEATURES:
+        slug = ab.lower().replace(' ', '_').replace('-', '_')
+        options.append({
+            'value': f'absurd:{slug}',
+            'label': ab,
+            'correct': False,
+        })
+
+    random.shuffle(options)
+    return options
+
+
+def _enter_final_quiz(state, user):
+    from chat.wit_bot_copy import BOSS_QUIZ_INTRO
+    from chat.wit_bot_payloads import multi_select
+
+    options = _build_final_quiz_options(user.current_ver)
+
+    prog = state_mod.progress_for(state, user.current_ver)
+    fq = prog.get('final_quiz', {})
+    attempts = fq.get('attempts_history', [])
+
+    state_mod.set_intent(state, 'final_quiz', step=0)
+    state_mod.set_progress(state, user.current_ver, 'final_quiz', {
+        'current_options': [
+            {'value': o['value'], 'label': o['label'], 'correct': o['correct']}
+            for o in options
+        ],
+        'attempt_number': len(attempts) + 1,
+    })
+
+    return [(BOSS_QUIZ_INTRO, multi_select(intent='final_quiz', options=options))]
+
+
+def final_quiz_handler(state, message, user):
+    from chat.wit_bot_copy import BOSS_QUIZ_PASS_TEMPLATE, BOSS_QUIZ_FAIL_TEMPLATE
+
+    payload = message.bot_payload or {}
+    if payload.get('kind') != 'multi_select_response' or payload.get('intent') != 'final_quiz':
+        return _enter_final_quiz(state, user)
+
+    prog = state_mod.progress_for(state, user.current_ver)
+    fq = prog.get('final_quiz', {})
+    saved_options = fq.get('current_options', [])
+    if not saved_options:
+        return _enter_final_quiz(state, user)
+
+    selected = set(payload.get('selected', []))
+
+    correct_count = sum(
+        1 for o in saved_options
+        if (o['value'] in selected) == bool(o['correct'])
+    )
+    total = len(saved_options)
+    score = correct_count / total if total else 0.0
+
+    attempts_history = fq.get('attempts_history', [])
+    attempts_history.append({'score': score, 'selected': list(selected)})
+
+    if score >= 0.8:
+        state_mod.set_progress(state, user.current_ver, 'final_quiz', {
+            'attempts_history': attempts_history,
+            'passed': True,
+            'final_score': score,
+        })
+        state_mod.set_intent(state, '', step=0)
+        return [(BOSS_QUIZ_PASS_TEMPLATE.format(score=int(score * 100)), None)]
+
+    # Fail — reveal wrong + retry
+    wrong_lines = []
+    for o in saved_options:
+        was_selected = o['value'] in selected
+        if o['correct'] and not was_selected:
+            wrong_lines.append(
+                f"  ✗ MISSED — {o['label']}: that IS in your version, you should have selected it"
+            )
+        elif not o['correct'] and was_selected:
+            origin = (
+                "from the OTHER version" if o['value'].startswith('distractor:')
+                else "completely made up"
+            )
+            wrong_lines.append(
+                f"  ✗ WRONG — {o['label']}: not in your version ({origin})"
+            )
+
+    reveal = BOSS_QUIZ_FAIL_TEMPLATE.format(
+        score=int(score * 100),
+        wrong_lines='\n'.join(wrong_lines) if wrong_lines else '  (somehow none — tap Submit again)',
+    )
+
+    state_mod.set_progress(state, user.current_ver, 'final_quiz', {
+        'attempts_history': attempts_history,
+    })
+
+    # Auto re-enter for retry
+    return [(reveal, None), *_enter_final_quiz(state, user)]
+
+
+# ---------- FAQ ----------
+
+def _faq_menu():
+    from chat.wit_bot_copy import FAQ_ENTRIES, FAQ_MENU_INTRO
+    from chat.wit_bot_payloads import card_with_buttons
+
+    return [(
+        FAQ_MENU_INTRO,
+        card_with_buttons([
+            {'label': e['question'], 'payload': f'faq:{e["key"]}'} for e in FAQ_ENTRIES
+        ]),
+    )]
+
+
+def _faq_answer(faq_key):
+    from chat.wit_bot_copy import FAQ_ENTRIES
+
+    entry = next((e for e in FAQ_ENTRIES if e['key'] == faq_key), None)
+    if entry is None:
+        return _faq_menu()
+    return [(entry['answer'], None)]
+
+
+def _wit_reply():
+    import random
+    from chat.wit_bot_copy import WIT_REPLIES
+    return [(random.choice(WIT_REPLIES), None)]
+
+
 # ---------- Dispatch table ----------
 
 HANDLERS = {
@@ -461,4 +638,5 @@ HANDLERS = {
     'kickoff_widget': kickoff_widget_handler,
     'audit': audit_handler,
     'walkthrough': walkthrough_handler,
+    'final_quiz': final_quiz_handler,
 }
