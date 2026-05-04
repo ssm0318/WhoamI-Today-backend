@@ -413,6 +413,58 @@ class EngineDispatchTests(TestCase):
         latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
         self.assertIn('cat', latest.content.lower())
 
+    # ---------- V1.2.3 — Version-swap re-onboarding ----------
+
+    def test_widget_skip_when_prior_version_already_submitted(self):
+        """V2 kickoff: if V1 widget shot exists (approved or pending), skip widget step."""
+        from chat.models import OnboardingScreenshot
+        # Pretend V1 was completed and a widget shot exists
+        msg = Message.objects.create(
+            chat_room=self.room, sender=self.alice, receiver=self.bot,
+            content='v1 widget',
+        )
+        OnboardingScreenshot.objects.create(
+            user=self.alice, version='version_w', kind='widget',
+            message=msg, status='approved',
+        )
+        # Simulate version swap
+        self.alice.current_ver = 'version_q'
+        self.alice.save(update_fields=['current_ver'])
+
+        # Set up V2 prerequisites and walk through quizzes 1-3 + push + friend
+        self._enable_push_for_alice()
+        self._add_friend_for_alice()
+        self._walk_through_quizzes()
+
+        # State should land at idle (kickoff_complete) without prompting widget
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, '')
+        prog = state_mod.progress_for(state, 'version_q')
+        self.assertTrue(prog['kickoff']['completed'])
+        self.assertEqual(
+            prog['kickoff']['widget_screenshot']['status'],
+            'reused_from_prior',
+        )
+
+    def test_post_swap_welcome_card_acknowledges_swap(self):
+        """After V1 kickoff complete, when user.current_ver flips to Q,
+        welcome card greets the swap and offers V2 kickoff."""
+        # Mark V1 complete
+        state = state_mod.get_or_create_state(self.alice)
+        state_mod.set_progress(state, 'version_w', 'kickoff', {'completed': True})
+        # Flip to V2
+        self.alice.current_ver = 'version_q'
+        self.alice.save(update_fields=['current_ver'])
+
+        # Trigger welcome card refresh by sending a message
+        self._send_text('hi')
+        welcome_msg = Message.objects.filter(
+            chat_room=self.room, event_type='wit_welcome_card',
+        ).order_by('-created_at').first()
+        labels = [b['label'] for b in welcome_msg.bot_payload['buttons']]
+        self.assertIn('Start version Q onboarding', labels)
+        self.assertIn('swap', welcome_msg.bot_payload['intro'].lower())
+
     # ---------- Task 13 — kickoff_widget ----------
 
     def test_widget_screenshot_creates_record_and_completes(self):

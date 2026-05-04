@@ -247,7 +247,20 @@ def kickoff_friend_handler(state, message, user):
 # ---------- kickoff_widget (screenshot collection) ----------
 
 def _enter_kickoff_widget(state, user):
+    """Prompt for widget screenshot. If user already has an approved or
+    pending widget shot from a prior version's kickoff, skip and complete."""
+    from chat.models import OnboardingScreenshot
     from chat.wit_bot_copy import WIDGET_PROMPT_COPY
+
+    if OnboardingScreenshot.objects.filter(
+        user=user, kind='widget', status__in=['approved', 'pending'],
+    ).exists():
+        # Re-using the V1 widget shot — skip directly to complete.
+        state_mod.set_progress(state, user.current_ver, 'kickoff', {
+            'widget_screenshot': {'status': 'reused_from_prior'},
+        })
+        return _enter_kickoff_complete(state, user)
+
     state_mod.set_intent(state, 'kickoff_widget', step=0)
     return [(WIDGET_PROMPT_COPY, upload_request(context='widget'))]
 

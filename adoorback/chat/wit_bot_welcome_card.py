@@ -74,6 +74,22 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             'intro': "kickoff done. tap **Run audit** when you've explored more.",
         }
 
+    # Post-swap detection: prior version's kickoff is complete, this version's isn't.
+    # Fires regardless of date — once V1 is done and current_ver flipped, the V2
+    # CTA should be visible immediately.
+    other_version = 'version_q' if version == 'version_w' else 'version_w'
+    other_progress = state_mod.progress_for(state, other_version)
+    other_kickoff_done = other_progress.get('kickoff', {}).get('completed', False)
+
+    if other_kickoff_done and not kickoff:
+        version_label = 'version Q' if version == 'version_q' else 'version W'
+        return {
+            **card_with_buttons([
+                {'label': f'Start {version_label} onboarding', 'payload': 'start_onboarding'},
+            ]),
+            'intro': f"the swap happened. you're now on {version_label}.\nready for round 2?",
+        }
+
     # Pre-window
     if now < V1_WINDOW_START and not completed:
         return {
@@ -82,15 +98,14 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             'buttons': [],
         }
 
-    # Window is open, kickoff not started
+    # Window is open, kickoff not started (fresh user, no prior version progress)
     if not kickoff and now >= V1_WINDOW_START:
         version_label = 'version Q' if version == 'version_q' else 'version W'
-        intro = f"time to onboard. you're on {version_label}."
         return {
             **card_with_buttons([
                 {'label': 'Start onboarding', 'payload': 'start_onboarding'},
             ]),
-            'intro': intro,
+            'intro': f"time to onboard. you're on {version_label}.",
         }
 
     # Default: silent
