@@ -146,13 +146,21 @@ class OptionCountsStrategy(AggregationStrategy):
         answers = SurveyAnswer.objects.filter(
             question=question, response__user_id__in=responder_ids
         ).select_related('response')
+        # Counter keys carry the answer's raw value type — int for ordinal
+        # codes, str for categorical codes (e.g. "yes"/"no"). SurveyOption.value
+        # matches the answer's value type for the same question, so the
+        # counts.get(opt.value) lookup below pulls the right bucket without
+        # any normalization. Skip None — likert_5_na N/A picks shouldn't
+        # land in OptionCountsStrategy in practice, but be defensive.
         for ans in answers:
             v = ans.value
-            if isinstance(v, list):
+            if v is None:
+                pass
+            elif isinstance(v, list):
                 for item in v:
-                    counts[int(item)] += 1
+                    counts[item] += 1
             else:
-                counts[int(v)] += 1
+                counts[v] += 1
             if ans.response.user_id == viewer_id:
                 user_choice = v
         return {

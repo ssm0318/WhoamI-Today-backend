@@ -335,7 +335,18 @@ class SurveyOption(AdoorTimestampedModel):
     question = models.ForeignKey(SurveyQuestion, on_delete=models.CASCADE, related_name='options')
     order = models.PositiveSmallIntegerField()
     label = models.CharField(max_length=160)
-    value = models.IntegerField(help_text='Numeric value used for scoring (likert) or option id (choice).')
+    # JSONField so options can carry either integer codes (1, 2, 3 — typical
+    # for likert + ordinal choices) or string codes ("yes", "minor", "real" —
+    # typical for categorical choices that read better in research exports).
+    # SurveyAnswer.value follows the same shape: choice answers carry the
+    # selected option's value verbatim, so aggregation Counter lookups stay
+    # type-consistent across answer ↔ option.
+    value = models.JSONField(
+        help_text=(
+            'Score code (int for likert / ordinal) or category code (string for '
+            'categorical). Multi-choice answers store a list of these values.'
+        ),
+    )
 
     class Meta:
         ordering = ['question_id', 'order']
