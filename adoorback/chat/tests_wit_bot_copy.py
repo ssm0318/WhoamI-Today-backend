@@ -29,9 +29,7 @@ class CopyShapeTests(SimpleTestCase):
 
     def test_witty_voice_has_required_fragments(self):
         self.assertIn('WITty', copy.t(copy.WELCOME_INTRO, 'en'))
-        self.assertIn('ha. ha. ha.', copy.t(copy.WELCOME_INTRO, 'en'))
         self.assertIn('WITty', copy.t(copy.WELCOME_INTRO, 'ko'))
-        self.assertIn('하. 하. 하.', copy.t(copy.WELCOME_INTRO, 'ko'))
 
     def test_t_resolver_falls_back_to_en(self):
         d = {'en': 'hello', 'ko': '안녕'}

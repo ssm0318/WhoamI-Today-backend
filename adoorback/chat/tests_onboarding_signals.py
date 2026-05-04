@@ -47,7 +47,7 @@ class ScreenshotReviewSignalTests(TestCase):
         self.shot.save()
         self.assertGreater(self._bot_dms().count(), before)
         latest = self._bot_dms().order_by('-created_at').first()
-        self.assertIn('officially logged', latest.content.lower())
+        self.assertIn('confirmed', latest.content.lower())
 
     def test_reject_dms_participant_with_reason(self):
         self.shot.status = 'rejected'

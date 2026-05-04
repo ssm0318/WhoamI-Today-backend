@@ -495,10 +495,11 @@ class EngineDispatchTests(TestCase):
         self.alice.language = 'ko'
         self.alice.save(update_fields=['language'])
         self._send_choice('start_onboarding')
-        # WELCOME_INTRO Korean variant has '하. 하. 하.'
         replies = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at')
-        intro_reply = replies.filter(content__contains='하. 하. 하.').first()
+        # Korean welcome contains '안녕' and '준비됐어'
+        intro_reply = replies.filter(content__contains='안녕').first()
         self.assertIsNotNone(intro_reply, msg=f'Expected Korean intro; got {[r.content for r in replies[:3]]}')
+        self.assertIn('준비', intro_reply.content)
 
     def test_korean_user_gets_korean_audit_buttons(self):
         self.alice.language = 'ko'
@@ -520,8 +521,9 @@ class EngineDispatchTests(TestCase):
         # Default language, English copy still works
         self._send_choice('start_onboarding')
         replies = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at')
-        intro_reply = replies.filter(content__contains='ha. ha. ha.').first()
+        intro_reply = replies.filter(content__contains='WITty').first()
         self.assertIsNotNone(intro_reply)
+        self.assertIn('Ready', intro_reply.content)
 
     # ---------- Task 13 — kickoff_widget ----------
 
