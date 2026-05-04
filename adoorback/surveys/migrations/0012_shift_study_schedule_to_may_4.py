@@ -1,41 +1,31 @@
-# Shift the 4-week study schedule from May 3 → May 4 start.
+# Originally shifted the study schedule from May 3 → May 4 by adding +1
+# day to every study-row's window dates. The shift is now baked into
+# 0004 + 0011's constants directly (May 4 kickoff is the source of truth),
+# so this migration is a NO-OP forward.
 #
-# 0004 hardcodes STUDY_START = May 3 and seeds 37 ScheduledSurvey rows on
-# that calendar. The kickoff date moved to May 4, so we add +1 day to every
-# study row's window_start and window_end. Final dates after this migration:
-#
-#   - daily_base:           May  4 .. May 31  (28 days, sequence 1..28)
-#   - week1_reflection:     May  4 .. May 10
-#   - week2_reflection:     May 11 .. May 17
-#   - week3_reflection:     May 18 .. May 24
-#   - week4_reflection:     May 25 .. May 31
-#   - pre_study:            May  3 (day before kickoff)
-#   - mid_study_w/q:        May 17 (study day 14)
-#   - post_study_w/q:       May 31 (study day 28)
-#   - anytime_reflection:   May  4 .. May 31
-#   - study_endpoint:       opens May 31, no upper bound
-#
-# Scope: ONLY the study-schedule slugs are shifted. Mock dailies (sequence
-# 900-902, slugs `mock_test_*`) and demo schedule rows (sequence 1000+,
-# slugs `demo_*`) are left in place — they're QA / dev fixtures with their
-# own date semantics.
+# History:
+#   - Pre-this-commit: 0012 unconditionally added +1 day. On already-
+#     migrated DBs, dates were correctly shifted to May 4-based.
+#   - This commit: 0004 + 0011's constants now produce May 4-based dates
+#     directly. Re-running their seed functions (setup_survey_state) no
+#     longer un-shifts the calendar.
+#   - 0012's forward = no-op (already-applied prod DBs stay at May 4
+#     dates because 0004 + 0011 now confirm those dates on every re-seed).
+#   - 0012's reverse = subtract 1 day, so a teardown to pre-0012 state
+#     remains possible. Useful for running tests that exercise the
+#     pre-shift path, or for debugging prod migration history.
 from datetime import timedelta
 
 from django.db import migrations
 
 
-# Slug whitelist for the study schedule. Daily rows reuse `daily_base`
-# unless they're a special day (currently none — SPECIAL_DAILY_DAYS in 0004
-# is empty). Weekly / biweekly / anytime / endpoint slugs are explicit.
 STUDY_SLUGS = frozenset({
     'daily_base',
     'week1_reflection', 'week2_reflection', 'week3_reflection', 'week4_reflection',
     'pre_study',
-    # W/Q-suffixed biweekly slugs land here after 0011 runs.
     'mid_study_w', 'mid_study_q',
     'post_study_w', 'post_study_q',
-    # Plus the legacy slugs in case 0011 hasn't run yet on a particular DB.
-    'mid_study', 'post_study',
+    'mid_study', 'post_study',  # legacy slugs from before 0011 split
     'anytime_reflection',
     'study_endpoint',
 })
@@ -44,18 +34,19 @@ ONE_DAY = timedelta(days=1)
 
 
 def shift_forward(apps, schema_editor):
-    """Add 1 day to every study-schedule row's window dates."""
-    ScheduledSurvey = apps.get_model('surveys', 'ScheduledSurvey')
-    rows = ScheduledSurvey.objects.filter(survey__slug__in=STUDY_SLUGS)
-    for row in rows:
-        row.window_start = row.window_start + ONE_DAY
-        if row.window_end is not None:
-            row.window_end = row.window_end + ONE_DAY
-        row.save(update_fields=['window_start', 'window_end'])
+    """No-op. May 4 calendar is now the source of truth in 0004 + 0011."""
 
 
 def shift_backward(apps, schema_editor):
-    """Reverse: subtract 1 day from each study-schedule row."""
+    """Subtract 1 day from every study-schedule row.
+
+    Provided so a full migrate-backwards through 0012 returns the schedule
+    to the pre-shift May 3-based dates. Combined with 0004 + 0011's
+    forward seeds (which now produce May 4-based dates), this means the
+    chain `migrate forward → migrate backward → migrate forward` works
+    correctly: the second forward apply ends up at May 4 dates because
+    0004's constants drive it.
+    """
     ScheduledSurvey = apps.get_model('surveys', 'ScheduledSurvey')
     rows = ScheduledSurvey.objects.filter(survey__slug__in=STUDY_SLUGS)
     for row in rows:

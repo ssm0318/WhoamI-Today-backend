@@ -13,12 +13,14 @@ from datetime import date
 from django.db import migrations
 
 
-# Phase boundary calendar — same as 0004_seed_study_schedule's STUDY_START.
-# Kept here as literals (rather than imported) so the migration is self-
-# contained and won't drift if 0004 is later parameterized.
-PRE_STUDY = date(2026, 5, 2)
-DAY_14 = date(2026, 5, 16)
-DAY_28 = date(2026, 5, 30)
+# Phase boundary calendar — must match 0004_seed_study_schedule's
+# STUDY_START. Source-of-truth for May 4 kickoff lives in 0004; these
+# literals are kept self-contained so this migration's RunPython doesn't
+# import across migration files (Django's apps registry is happy with
+# either, but literals avoid surprises during the historical replay).
+PRE_STUDY = date(2026, 5, 3)    # Day before kickoff
+DAY_14 = date(2026, 5, 17)      # Study day 14 = mid_study
+DAY_28 = date(2026, 5, 31)      # Study day 28 = post_study
 
 
 # (sequence_index, slug, window_start)

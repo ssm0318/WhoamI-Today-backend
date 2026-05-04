@@ -27,13 +27,18 @@ from django.db import migrations
 
 
 # Study calendar (locked).
-PRE_STUDY = date(2026, 5, 2)    # Pre-study survey lives the day before the 28-day period.
-STUDY_START = date(2026, 5, 3)  # Day 1.
-STUDY_END = date(2026, 5, 30)   # Day 28 = STUDY_START + 27 days.
+# Originally May 3 kickoff; shifted to May 4 in 0012. The constants below
+# reflect the post-shift calendar so that fresh DBs and any re-runs of
+# `seed_schedule` (e.g. via setup_survey_state) produce the canonical
+# May 4-based dates directly. 0012's forward operation is now a no-op
+# because the source-of-truth is here.
+PRE_STUDY = date(2026, 5, 3)    # Pre-study survey lives the day before the 28-day period.
+STUDY_START = date(2026, 5, 4)  # Day 1.
+STUDY_END = date(2026, 5, 31)   # Day 28 = STUDY_START + 27 days.
 
 
 def _day(n):
-    """1-indexed study day. _day(1) = May 3, _day(14) = May 16, _day(28) = May 30."""
+    """1-indexed study day. _day(1) = May 4, _day(14) = May 17, _day(28) = May 31."""
     return STUDY_START + timedelta(days=n - 1)
 
 
