@@ -17,6 +17,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from account.models import FriendRequest, BlockRec, Connection, AppSession, \
     VERSION_CHOICES, PERSONA_CHOICES, Interest, Persona, CustomChip, CHIP_CATEGORY_CHOICES, \
     FriendEvaluation, RELATIONSHIP_TYPE_CHOICES, VersionSwitchRequest
+from adoorback.utils.publishing import can_publish, invite_status
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.exceptions import ExistingEmail, ExistingUsername
 from check_in.models import CheckIn
@@ -174,6 +175,9 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
     chips_by_category = serializers.SerializerMethodField(read_only=True)
     custom_chips = serializers.SerializerMethodField(read_only=True)
     recent_posts = serializers.SerializerMethodField(read_only=True)
+    can_publish = serializers.SerializerMethodField(read_only=True)
+    invite_status = serializers.SerializerMethodField(read_only=True)
+    invited_from_detail = serializers.SerializerMethodField(read_only=True)
 
     def get_chips_by_category(self, obj):
         """Return user's interests grouped by category."""
@@ -186,6 +190,17 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
     def get_custom_chips(self, obj):
         """Return user's custom chips."""
         return CustomChipSerializer(obj.custom_chips.all(), many=True).data
+
+    def get_can_publish(self, obj):
+        return can_publish(obj)
+
+    def get_invite_status(self, obj):
+        return invite_status(obj)
+
+    def get_invited_from_detail(self, obj):
+        if obj.invited_from is None:
+            return None
+        return UserMinimalSerializer(obj.invited_from).data
 
     def get_url(self, obj):
         return settings.BASE_URL + reverse('user-detail', kwargs={'username': obj.username})
@@ -260,20 +275,29 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
                   'noti_time', 'noti_period_days',
                   'timezone', 'current_ver', 'user_group', 'user_type',
                   'has_changed_pw', 'unread_message_cnt', 'is_public',
-                  'friend_count', 'username_history', 'recent_posts']
+                  'friend_count', 'username_history', 'recent_posts', 'invite_code',
+                  'can_publish', 'invite_status', 'invited_from_detail']
         extra_kwargs = {'password': {'write_only': True}, 'username_history': {'read_only': True}}
 
 
 class CurrentUserSignupSerializer(CurrentUserSerializer):
-    inviter_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    inviter_id = serializers.IntegerField(write_only=True, required=True, allow_null=False)
 
     def validate(self, attrs):
         # inviter_id is not a User model field; pull it out before parent validate
         # (parent validate constructs User(**attrs) for password validation).
         inviter_id = attrs.pop('inviter_id', None)
+        if not inviter_id:
+            raise serializers.ValidationError({
+                'inviter_id': 'An inviter is required to sign up.'
+            })
         validated = super().validate(attrs)
-        if inviter_id:
-            validated['inviter_id'] = inviter_id
+        inviter = User.objects.filter(id=inviter_id).first()
+        if inviter is None:
+            raise serializers.ValidationError({
+                'inviter_id': 'Inviter not found.'
+            })
+        validated['inviter_id'] = inviter_id
         return validated
 
     @transaction.atomic
@@ -285,26 +309,25 @@ class CurrentUserSignupSerializer(CurrentUserSerializer):
         user.set_password(password)
         user.save()
 
-        inviter = None
-        if inviter_id:
-            inviter = User.objects.filter(id=inviter_id).first()
-
-        if inviter:
-            user.invited_from = inviter
-            user.user_group = inviter.user_group
-            user.current_ver = inviter.current_ver
-        else:
-            # Fallback: assign group/version based on odd/even user ID
-            if user.id % 2 == 1:  # odd
-                user.user_group = 'group_q_first'
-                user.current_ver = 'version_q'
-            else:  # even
-                user.user_group = 'group_w_first'
-                user.current_ver = 'version_w'
+        inviter = User.objects.get(id=inviter_id)
+        user.invited_from = inviter
+        user.user_group = inviter.user_group
+        user.current_ver = inviter.current_ver
 
         # Prevent redirect to password change page
         user.has_changed_pw = True
         user.save()
+
+        if not user.is_connected(inviter):
+            FriendRequest.objects.get_or_create(
+                requester=user,
+                requestee=inviter,
+                defaults={
+                    'accepted': None,
+                    'requester_choice': 'friend',
+                    'requester_update_past_posts': False,
+                },
+            )
 
         return user
 
@@ -365,7 +388,13 @@ class UserInviterEmailBirthDateSerializer(serializers.Serializer):
 
 
 class UserInviterUsernameSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    username = serializers.CharField(required=False, allow_blank=True)
+    invite_code = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs.get('username') and not attrs.get('invite_code'):
+            raise serializers.ValidationError("username or invite_code is required.")
+        return attrs
 
 
 class UserProfileSerializer(UserMinimalSerializer):

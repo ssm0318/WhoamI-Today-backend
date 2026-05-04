@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from adoorback.utils.validators import adoor_exception_handler
 from adoorback.utils.video import validate_video_file, generate_video_thumbnail
+from adoorback.utils.publishing import ensure_can_publish
 
 from account.serializers import serialize_check_in_base_for_viewer, viewer_sees_check_in_component
 
@@ -282,6 +283,7 @@ class CurrentCheckIn(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         current_user = self.request.user
+        ensure_can_publish(current_user)
 
         # Check if there's an active check-in
         existing_checkin = CheckIn.objects.filter(
@@ -576,6 +578,7 @@ class CurrentSong(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         current_user = self.request.user
+        ensure_can_publish(current_user)
 
         # 같은 track_id의 active song이 이미 있으면 skip
         new_track_id = serializer.validated_data.get('track_id', '')
@@ -943,6 +946,7 @@ class CheckInPostFeed(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        ensure_can_publish(self.request.user)
         video_file = self.request.FILES.get('video')
         extra_kwargs = {}
 

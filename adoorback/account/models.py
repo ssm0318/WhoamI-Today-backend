@@ -227,6 +227,10 @@ def default_username_history():
     return []
 
 
+def generate_invite_code():
+    return secrets.token_urlsafe(6).replace('-', '').replace('_', '')[:8]
+
+
 class UserCustomManager(UserManager, SafeDeleteManager):
     _safedelete_visibility = DELETED_INVISIBLE
 
@@ -307,6 +311,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='indirect')
     invited_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, 
                                      related_name="invited_users")
+    invite_code = models.CharField(max_length=12, unique=True, null=True, blank=True, default=generate_invite_code)
     
     is_public = models.BooleanField(default=True)
     has_changed_pw = models.BooleanField(default=False)

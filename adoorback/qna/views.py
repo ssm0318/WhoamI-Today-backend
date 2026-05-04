@@ -16,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 
 from adoorback.utils.exceptions import ExistingResponseRequest, NoSuchQuestion, DeletedQuestion
+from adoorback.utils.publishing import ensure_can_publish
 from adoorback.utils.video import validate_video_file, generate_video_thumbnail
 from adoorback.utils.permissions import IsAuthorOrReadOnly, IsShared, IsNotBlocked
 from adoorback.utils.validators import adoor_exception_handler
@@ -37,6 +38,7 @@ class ResponseCreate(generics.CreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        ensure_can_publish(self.request.user)
         video_file = self.request.FILES.get('video')
         image_file = self.request.FILES.get('image')
 
@@ -286,6 +288,7 @@ class QuestionList(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        ensure_can_publish(self.request.user)
         serializer.save(author=self.request.user)
 
 
