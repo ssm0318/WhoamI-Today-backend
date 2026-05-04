@@ -864,13 +864,20 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
             return None
         return self.context.get('visible_check_in_by_user_id', {}).get(obj.id)
 
+    def _live_check_in_entry(self, obj, component):
+        return self.context.get('live_check_in_entries_by_user_id', {}).get(obj.id, {}).get(component)
+
     def get_check_in_id(self, obj):
         check_in = self.check_in(obj)
         return check_in.id if check_in else None
 
     def get_track_id(self, obj):
-        if not self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
+        entry = self._live_check_in_entry(obj, 'song')
+        if not entry or not self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
             return None
+        entry_track_id = (entry.data or {}).get('track_id')
+        if entry_track_id:
+            return entry_track_id
         song = self.context.get('active_song_by_user_id', {}).get(obj.id)
         return song.track_id if song else None
 
@@ -888,22 +895,22 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
         )
 
     def get_thought(self, obj):
-        if not self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
+        entry = self._live_check_in_entry(obj, 'thought')
+        if not entry or not self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
             return None
-        check_in = self.check_in(obj)
-        return check_in.thought if check_in else None
+        return (entry.data or {}).get('thought')
 
     def get_social_battery(self, obj):
-        if not self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
+        entry = self._live_check_in_entry(obj, 'battery')
+        if not entry or not self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
             return None
-        check_in = self.check_in(obj)
-        return check_in.social_battery if check_in else None
+        return (entry.data or {}).get('social_battery')
 
     def get_mood(self, obj):
-        if not self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
+        entry = self._live_check_in_entry(obj, 'mood')
+        if not entry or not self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
             return None
-        check_in = self.check_in(obj)
-        return check_in.mood if check_in else None
+        return (entry.data or {}).get('mood')
 
     def _component_visibility(self, check_in, visibility_field, updated_at_field):
         """Return component visibility."""
@@ -924,18 +931,30 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
         return self._component_visibility(self.check_in(obj), 'thought_visibility', 'thought_updated_at')
 
     def get_battery_updated_at(self, obj):
+        entry = self._live_check_in_entry(obj, 'battery')
+        if entry:
+            return entry.updated_at.isoformat()
         ci = self.check_in(obj)
         return ci.battery_updated_at.isoformat() if ci and ci.battery_updated_at else None
 
     def get_mood_updated_at(self, obj):
+        entry = self._live_check_in_entry(obj, 'mood')
+        if entry:
+            return entry.updated_at.isoformat()
         ci = self.check_in(obj)
         return ci.mood_updated_at.isoformat() if ci and ci.mood_updated_at else None
 
     def get_song_updated_at(self, obj):
+        entry = self._live_check_in_entry(obj, 'song')
+        if entry:
+            return entry.updated_at.isoformat()
         ci = self.check_in(obj)
         return ci.song_updated_at.isoformat() if ci and ci.song_updated_at else None
 
     def get_thought_updated_at(self, obj):
+        entry = self._live_check_in_entry(obj, 'thought')
+        if entry:
+            return entry.updated_at.isoformat()
         ci = self.check_in(obj)
         return ci.thought_updated_at.isoformat() if ci and ci.thought_updated_at else None
 
@@ -953,19 +972,26 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
         if not check_in:
             return []
         out = []
-        if self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
-            if (getattr(check_in, 'social_battery', None) or '').strip():
+        battery_entry = self._live_check_in_entry(obj, 'battery')
+        if battery_entry and self._is_component_visible(obj, 'battery_visibility', 'battery_updated_at'):
+            if ((battery_entry.data or {}).get('social_battery') or '').strip():
                 out.append('battery')
-        if self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
-            mood = getattr(check_in, 'mood', None) or []
+        mood_entry = self._live_check_in_entry(obj, 'mood')
+        if mood_entry and self._is_component_visible(obj, 'mood_visibility', 'mood_updated_at'):
+            mood = (mood_entry.data or {}).get('mood') or []
             if any((m or '').strip() for m in mood):
                 out.append('mood')
-        if self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
-            if (getattr(check_in, 'thought', None) or '').strip():
+        thought_entry = self._live_check_in_entry(obj, 'thought')
+        if thought_entry and self._is_component_visible(obj, 'thought_visibility', 'thought_updated_at'):
+            if ((thought_entry.data or {}).get('thought') or '').strip():
                 out.append('thought')
-        if self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
-            song = self.context.get('active_song_by_user_id', {}).get(obj.id)
-            if song and (getattr(song, 'track_id', None) or '').strip():
+        song_entry = self._live_check_in_entry(obj, 'song')
+        if song_entry and self._is_component_visible(obj, 'song_visibility', 'song_updated_at'):
+            track_id = (song_entry.data or {}).get('track_id')
+            if not track_id:
+                song = self.context.get('active_song_by_user_id', {}).get(obj.id)
+                track_id = getattr(song, 'track_id', None) if song else None
+            if (track_id or '').strip():
                 out.append('song')
         return out
 
