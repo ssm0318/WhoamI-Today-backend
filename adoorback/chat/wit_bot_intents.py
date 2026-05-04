@@ -704,12 +704,21 @@ def final_quiz_handler(state, message, user):
 
     selected = set(payload.get('selected', []))
 
-    correct_count = sum(
-        1 for o in saved_options
-        if (o['value'] in selected) == bool(o['correct'])
+    # Jaccard similarity over the "correctly selected" set:
+    # score = TP / (TP + FN + FP)
+    # = correctly_selected / (correct_total + incorrectly_selected)
+    # Penalizes both missing real features AND picking decoys/absurd options.
+    # Plain accuracy was too generous — selecting nothing gave credit for
+    # correctly omitting every absurd option, which is trivial.
+    correctly_selected = sum(
+        1 for o in saved_options if o['value'] in selected and o['correct']
     )
-    total = len(saved_options)
-    score = correct_count / total if total else 0.0
+    incorrectly_selected = sum(
+        1 for o in saved_options if o['value'] in selected and not o['correct']
+    )
+    correct_total = sum(1 for o in saved_options if o['correct'])
+    denom = correct_total + incorrectly_selected
+    score = correctly_selected / denom if denom else 0.0
 
     attempts_history = fq.get('attempts_history', [])
     attempts_history.append({'score': score, 'selected': list(selected)})
