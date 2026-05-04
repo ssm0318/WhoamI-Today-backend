@@ -1,0 +1,1314 @@
+# ============================================================================
+# MID-STUDY & POST-STUDY EVALUATION (4 surveys, 1 file)
+# ============================================================================
+# Surveys produced by this file:
+#   1. mid_study_w   — Phase 1 evaluation for users on Ver.W
+#   2. mid_study_q   — Phase 1 evaluation for users on Ver.Q
+#   3. post_study_w  — Phase 2 evaluation for users on Ver.W
+#   4. post_study_q  — Phase 2 evaluation for users on Ver.Q
+#
+# Survey routing happens OUTSIDE this YAML. The scheduling layer maps each
+# (user_id, phase_number) to the user's assigned version and serves the
+# corresponding survey on day 14 (mid) or day 28 (post). No `phase_version`
+# self-report item exists in any of these surveys — version is treated as
+# known ground truth.
+#
+# Friend visibility: OFF for all four surveys
+# Results page: HIDDEN for all four surveys
+#
+# Estimated lengths:
+#   - Ver.W surveys: ~30 min
+#   - Ver.Q surveys: ~17 min
+#
+# Shared structure (anchored, reused across all 4 surveys):
+#   tie_outcomes_block         — 7 items (6 outcomes + 1 new-tie)
+#   global_outcomes_block      — 12 items
+#   goal_outcome_ratings_block — 8 items (one outcome rating per goal,
+#                                shown on BOTH versions)
+#   reflection_block           — 3 items (closer / not-closer free text)
+#   wrapup_block               — 9 items (continue, recommend, like/change,
+#                                difficult, interview, anything else)
+#
+# Version-specific blocks:
+#   ver_w_feature_blocks       — per-feature satisfaction for goals 1–8
+#                                (each goal's features evaluated together)
+#   ver_q_feature_blocks       — per-feature satisfaction for goal 1
+#                                (daily questions, question sending) and
+#                                goal 7 (scrollable Discover feed)
+#
+# Composition pattern (per survey):
+#   §0 intro
+#   §1 tie_outcomes_block          [shared]
+#   §2 global_outcomes_block       [shared]
+#   §3 per-goal blocks:
+#       goal_outcome_ratings_block [shared, one rating per goal]
+#       INTERLEAVED with version-specific feature satisfaction blocks
+#       (only on goals where the version has features)
+#   §4 reflection_block            [shared]
+#   §5 wrapup_block                [shared]
+#
+# IMPORTANT: Because per-goal blocks interleave a shared outcome rating with
+# version-specific features, the §3 section cannot be a single anchor — it's
+# composed survey-by-survey below.
+#
+# ============================================================================
+# IMPLEMENTATION NOTES FOR CLAUDE CODE
+# ============================================================================
+#
+# The four surveys at the bottom of this file each have:
+#   - slug, title, description, tokens (phase_label, phase_window, phase_number)
+#   - questions: a list composed by reference to anchored blocks plus
+#     interleaved per-goal subsequences
+#
+# Order numbers within each survey are assigned at build time by the loader
+# based on list position. Inside each anchored block, the order field is
+# present but should be treated as RELATIVE to the block — the loader
+# renumbers absolutely after composition.
+#
+# All schema features used here are the same as in mid_study/post_study
+# from the prior single-file draft, MINUS conditional_display on every
+# question (since version routing is now handled at the survey-assignment
+# layer).
+#
+# Token substitution {{phase_label}}, {{phase_window}}, {{phase_number}}
+# resolves against each survey's tokens block at render time.
+# ============================================================================
+
+
+# ============================================================================
+# ANCHOR DEFINITIONS — shared building blocks
+# ============================================================================
+
+# Block 1 — Tie-level outcomes (7 items)
+_tie_outcomes_block: &tie_outcomes_block
+  - order: 1
+    slug: tie_block_intro
+    type: display_only
+    content:
+      en: "**Your relationships on WIT during {{phase_label}}.** Think about all the friends you interacted with — old friends, new friends, anyone in between. Answer based on your overall experience over {{phase_window}}."
+
+  - order: 2
+    slug: tie_intimacy
+    type: likert_5
+    prompt:
+      en: "My interactions on WIT during {{phase_label}} made me feel closer to my friends."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: tie_trust
+    type: likert_5
+    prompt:
+      en: "My interactions on WIT during {{phase_label}} made me feel more trusting toward my friends."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 4
+    slug: tie_learn
+    type: likert_5
+    prompt:
+      en: "WIT during {{phase_label}} helped me learn new things about my friends."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 5
+    slug: tie_attention
+    type: likert_5
+    prompt:
+      en: "I felt my posts received attention or responses from friends during {{phase_label}}."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 6
+    slug: tie_reciprocation
+    type: likert_5
+    prompt:
+      en: "When I interacted with friends on WIT during {{phase_label}}, I felt they responded in a meaningful way."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 7
+    slug: tie_repetition
+    type: likert_5
+    prompt:
+      en: "I felt responsible for maintaining respectful and appropriate interactions with friends on WIT during {{phase_label}}."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 8
+    slug: tie_new_closer
+    type: likert_5_na
+    prompt:
+      en: "Through WIT during {{phase_label}}, I felt closer to people I didn't know well before."
+    description:
+      en: "By 'didn't know well' we mean people you'd describe as acquaintances, classmates you weren't close with, friends-of-friends, or new connections."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — I didn't have any such interactions"
+    reverse_scored: false
+    result_hidden: true
+
+
+# Block 2 — Global outcomes (12 items)
+_global_outcomes_block: &global_outcomes_block
+  - order: 1
+    slug: global_block_intro
+    type: display_only
+    content:
+      en: "**Your experience overall during {{phase_label}}.** A few questions about WIT in general during this phase, not specific features."
+
+  - order: 2
+    slug: satisfaction
+    type: likert_5
+    prompt:
+      en: "I was satisfied with my overall experience with WIT during {{phase_label}}."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: initiation_global
+    type: likert_5
+    prompt:
+      en: "I felt comfortable sharing things on WIT during {{phase_label}}."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 4
+    slug: breadth
+    type: likert_5
+    prompt:
+      en: "WIT during {{phase_label}} encouraged me to share about many different topics or types of experiences."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 5
+    slug: depth
+    type: likert_5
+    prompt:
+      en: "Over time during {{phase_label}}, WIT made me comfortable sharing personal thoughts or feelings openly."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 6
+    slug: frequency
+    type: likert_5
+    prompt:
+      en: "WIT during {{phase_label}} encouraged me to share more frequently than I typically would on social media."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 7
+    slug: expression
+    type: likert_5
+    prompt:
+      en: "There were ways available to express interest or appreciation for my friends' posts in ways that I intended."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 8
+    slug: understand_reaction
+    type: likert_5
+    prompt:
+      en: "When friends interacted with my post(s), I clearly understood how they felt based on how they interacted."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 9
+    slug: judge
+    type: likert_5
+    prompt:
+      en: "I felt worried people that saw my posts might judge them negatively (e.g., as boring or uninteresting)."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 10
+    slug: inhibition_global
+    type: likert_5
+    prompt:
+      en: "There were times during {{phase_label}} when I wanted to share things but felt I couldn't."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 11
+    slug: appropriate
+    type: likert_5
+    prompt:
+      en: "During {{phase_label}}, I felt confident that my posts were appropriate for my intended audience."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 12
+    slug: block_management
+    type: likert_5
+    prompt:
+      en: "There were enough options on WIT during {{phase_label}} for me to manage interactions from people I didn't trust or didn't want to engage with."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 13
+    slug: add_friends
+    type: likert_5
+    prompt:
+      en: "I felt the need to add as many friends as I could on WIT during {{phase_label}}."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+
+# ============================================================================
+# PER-GOAL OUTCOME RATINGS (one per goal, shown on BOTH versions)
+# Each is a single anchored item; the survey-level composition decides which
+# version-specific feature block (if any) follows it.
+# ============================================================================
+
+_goal1_outcome: &goal1_outcome
+  order: 1
+  slug: goal1_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT helped me have deeper conversations with friends I already know."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply to my experience"
+  reverse_scored: false
+  result_hidden: true
+
+_goal1_intro: &goal1_intro
+  order: 1
+  slug: goal1_intro
+  type: display_only
+  content:
+    en: "**Goal 1: Cultivating deeper connections.**\n\nOne thing WIT tries to do is help you have richer conversations with people you already know — not just surface-level updates, but actually getting to know each other better."
+
+_goal1_freetext: &goal1_freetext
+  order: 1
+  slug: goal1_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when WIT felt like it was helping you go deeper with someone — or, if it didn't, what got in the way?"
+  placeholder:
+    en: "A specific moment, conversation, or post is more useful than general impressions."
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+_goal2_intro: &goal2_intro
+  order: 1
+  slug: goal2_intro
+  type: display_only
+  content:
+    en: "**Goal 2: Reducing the effort of being present.**\n\nKeeping up with friends online can feel like work — having to react to every post, respond to every message, or appear constantly available."
+
+_goal2_outcome: &goal2_outcome
+  order: 1
+  slug: goal2_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT made being present with friends feel less effortful than other social media."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply"
+  reverse_scored: false
+  result_hidden: true
+
+_goal2_freetext: &goal2_freetext
+  order: 1
+  slug: goal2_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when WIT made keeping up with friends feel easier — or, if it didn't, when did it feel like work?"
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+_goal3_intro: &goal3_intro
+  order: 1
+  slug: goal3_intro
+  type: display_only
+  content:
+    en: "**Goal 3: Making it easier to start casual interactions.**\n\nNot every interaction needs to be a long message or a big comment."
+
+_goal3_outcome: &goal3_outcome
+  order: 1
+  slug: goal3_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT made it easy to start small, casual interactions with friends."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply"
+  reverse_scored: false
+  result_hidden: true
+
+_goal3_freetext: &goal3_freetext
+  order: 1
+  slug: goal3_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when starting a small exchange with someone felt easy on WIT — or, if it didn't, what felt awkward?"
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+_goal4_intro: &goal4_intro
+  order: 1
+  slug: goal4_intro
+  type: display_only
+  content:
+    en: "**Goal 4: Protecting trust with the friends you're already close to.**\n\nWhen platforms push you to interact with everyone equally, it can dilute the closeness you have with the people who actually matter."
+
+_goal4_outcome: &goal4_outcome
+  order: 1
+  slug: goal4_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT helped me preserve the closeness I have with my established friends."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply"
+  reverse_scored: false
+  result_hidden: true
+
+_goal4_freetext: &goal4_freetext
+  order: 1
+  slug: goal4_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when WIT helped protect a close friendship from being diluted — or, if it didn't, when did you feel that closeness was harder to hold onto?"
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+_goal5_intro: &goal5_intro
+  order: 1
+  slug: goal5_intro
+  type: display_only
+  content:
+    en: "**Goal 5: Making it clear what to share and how.**\n\nOn most social media, it's not always obvious what's appropriate to post or how long things will stick around."
+
+_goal5_outcome: &goal5_outcome
+  order: 1
+  slug: goal5_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT made it clear what kinds of things were appropriate to share and how."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply"
+  reverse_scored: false
+  result_hidden: true
+
+_goal5_freetext: &goal5_freetext
+  order: 1
+  slug: goal5_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when WIT made it clear what to share — or, if it didn't, when did you feel uncertain about whether something was appropriate?"
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+_goal6_intro: &goal6_intro
+  order: 1
+  slug: goal6_intro
+  type: display_only
+  content:
+    en: "**Goal 6: Building a sense of community through shared rituals.**\n\nSome things on WIT are designed to feel collective — everyone seeing the same prompts or contributing to the same shared experiences."
+
+_goal6_outcome: &goal6_outcome
+  order: 1
+  slug: goal6_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT made me feel like I was part of something shared with other users."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply"
+  reverse_scored: false
+  result_hidden: true
+
+_goal6_freetext: &goal6_freetext
+  order: 1
+  slug: goal6_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when WIT felt like a shared experience with other people — or, if it didn't, why did it feel like a solo app?"
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+_goal7_intro: &goal7_intro
+  order: 1
+  slug: goal7_intro
+  type: display_only
+  content:
+    en: "**Goal 7: Helping new friendships form.**\n\nMost of WIT is about people you already know, but a few features are designed to surface people you might want to know."
+
+_goal7_outcome: &goal7_outcome
+  order: 1
+  slug: goal7_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT helped me form connections with people I didn't know well before."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply"
+  reverse_scored: false
+  result_hidden: true
+
+_goal7_freetext: &goal7_freetext
+  order: 1
+  slug: goal7_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when you started forming a connection with someone new on WIT — or, if you didn't, what got in the way?"
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+_goal8_intro: &goal8_intro
+  order: 1
+  slug: goal8_intro
+  type: display_only
+  content:
+    en: "**Goal 8: Sharing safely with new or potential connections.**\n\nWhen you don't fully know an audience yet, sharing can feel risky."
+
+_goal8_outcome: &goal8_outcome
+  order: 1
+  slug: goal8_outcome
+  type: likert_5_na
+  prompt:
+    en: "During {{phase_label}}, WIT let me share with new or potential connections without feeling exposed."
+  low_label:  { en: "Strongly disagree" }
+  high_label: { en: "Strongly agree" }
+  na_option:
+    en: "N/A — didn't apply"
+  reverse_scored: false
+  result_hidden: true
+
+_goal8_freetext: &goal8_freetext
+  order: 1
+  slug: goal8_freetext
+  type: free_text
+  prompt:
+    en: "Tell us about a specific moment during {{phase_label}} when WIT made it feel safe to share something with people you didn't fully know — or, if it didn't, when did sharing feel risky?"
+  min_length: 30
+  required: false
+  result_hidden: true
+
+
+# ============================================================================
+# VER.W FEATURE BLOCKS — per-goal, satisfaction ratings only
+# Each block contains the per-feature satisfaction items for one goal.
+# ============================================================================
+
+_goal1_features_w: &goal1_features_w
+  - order: 1
+    slug: goal1_feat_dailyq
+    type: likert_5_na
+    prompt:
+      en: "**Daily questions** — I was satisfied with this feature."
+    description:
+      en: "The daily question prompt that asks you something specific to answer and share."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal1_feat_qsend
+    type: likert_5_na
+    prompt:
+      en: "**Question sending** — I was satisfied with this feature."
+    description:
+      en: "Sending a question to a specific friend, prompting them to share something with you."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal2_features_w: &goal2_features_w
+  - order: 1
+    slug: goal2_feat_browse
+    type: likert_5_na
+    prompt:
+      en: "**Browsing modes** (quiet vs. social mode) — I was satisfied with this feature."
+    description:
+      en: "Being able to browse without others knowing you're active, or signal that you're open to interaction."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal2_feat_chatstatus
+    type: likert_5_na
+    prompt:
+      en: "**Chat status options** — I was satisfied with this feature."
+    description:
+      en: "Setting expectations about how quickly you'll respond to messages."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use or wasn't available"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal3_features_w: &goal3_features_w
+  - order: 1
+    slug: goal3_feat_checkin_reactions
+    type: likert_5_na
+    prompt:
+      en: "**Check-in reactions** (notification-only reactions to others' check-ins) — I was satisfied with this feature."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal3_feat_emoji
+    type: likert_5_na
+    prompt:
+      en: "**Emoji reactions** — I was satisfied with this feature."
+    description:
+      en: "Reacting to a post with a specific emoji rather than a comment."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal3_feat_private
+    type: likert_5_na
+    prompt:
+      en: "**Private comments** — I was satisfied with this feature."
+    description:
+      en: "Comments visible only to the post author and you, instead of going to the chat."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 4
+    slug: goal3_feat_profile_list
+    type: likert_5_na
+    prompt:
+      en: "**Profile-list feed** (people-as-feed view alongside the regular feed) — I was satisfied with this feature."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 5
+    slug: goal3_feat_ping
+    type: likert_5_na
+    prompt:
+      en: "**Ping for check-in** — I was satisfied with this feature."
+    description:
+      en: "Sending a small nudge to a friend asking them to check in."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal4_features_w: &goal4_features_w
+  - order: 1
+    slug: goal4_feat_close_filter
+    type: likert_5_na
+    prompt:
+      en: "**Close-friend filter** (in feed and chats) — I was satisfied with this feature."
+    description:
+      en: "Filtering your feed or chats to show only your close friends."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal4_feat_social_battery
+    type: likert_5_na
+    prompt:
+      en: "**Social battery update after long chats** — I was satisfied with this feature."
+    description:
+      en: "Being prompted to update your social battery after spending time chatting."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal4_feat_granular_sub
+    type: likert_5_na
+    prompt:
+      en: "**Granular subscription to friends** — I was satisfied with this feature."
+    description:
+      en: "Choosing exactly what kinds of activity from a friend you want to be notified about."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal5_features_w: &goal5_features_w
+  - order: 1
+    slug: goal5_feat_posts
+    type: likert_5_na
+    prompt:
+      en: "**Structured posts** (mission of the day, photo of the day, question of the day) — I was satisfied with this feature."
+    description:
+      en: "Daily-cadence post types that give you a specific thing to share."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal5_feat_checkins
+    type: likert_5_na
+    prompt:
+      en: "**Check-ins** (mood, status, song, social battery — 12-hour expiry) — I was satisfied with this feature."
+    description:
+      en: "Lighter, shorter-lived sharing that disappears after 12 hours."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal6_features_w: &goal6_features_w
+  - order: 1
+    slug: goal6_feat_playlist
+    type: likert_5_na
+    prompt:
+      en: "**Shared playlist** — I was satisfied with this feature."
+    description:
+      en: "A playlist contributed to by everyone."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal6_feat_widget
+    type: likert_5_na
+    prompt:
+      en: "**Widget** — I was satisfied with this feature."
+    description:
+      en: "The home-screen widget showing WIT activity."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal6_feat_survey_digest
+    type: likert_5_na
+    prompt:
+      en: "**Survey of the day + daily digest** — I was satisfied with this feature."
+    description:
+      en: "The daily survey question and the next-day digest showing how everyone answered."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 4
+    slug: goal6_feat_mission
+    type: likert_5_na
+    prompt:
+      en: "**Mission of the day** — I was satisfied with this feature."
+    description:
+      en: "A daily prompt or task shared across users."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal7_features_w: &goal7_features_w
+  - order: 1
+    slug: goal7_feat_discover
+    type: likert_5_na
+    prompt:
+      en: "**Discover feed** (limited new content with mutual-friend / trait filters) — I was satisfied with this feature."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal7_feat_nth_degree
+    type: likert_5_na
+    prompt:
+      en: "**Nth-degree connections + mutual interests on profiles** — I was satisfied with this feature."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal7_feat_profile_decoration
+    type: likert_5_na
+    prompt:
+      en: "**Profile decoration** (profile chips, pinned check-ins) — I was satisfied with this feature."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal8_features_w: &goal8_features_w
+  - order: 1
+    slug: goal8_feat_nonpublic
+    type: likert_5_na
+    prompt:
+      en: "**Non-public account with selective public sharing** — I was satisfied with this feature."
+    description:
+      en: "Your account being non-public by default but letting you share specific things publicly."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal8_feat_view_as
+    type: likert_5_na
+    prompt:
+      en: "**View as** (preview your profile as a specific other user would see it) — I was satisfied with this feature."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal8_feat_retroactive
+    type: likert_5_na
+    prompt:
+      en: "**Apply privacy changes to past posts** — I was satisfied with this feature."
+    description:
+      en: "When you change your privacy settings, having those changes apply to things you already posted."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+# ============================================================================
+# VER.Q FEATURE BLOCKS — only goal 1 and goal 7 (the only goals where Ver.Q
+# has features at all). Goal 1 features are shared between versions; goal 7
+# has the scrollable Discover feed which is Ver.Q-specific.
+# ============================================================================
+
+_goal1_features_q: &goal1_features_q
+  - order: 1
+    slug: goal1_feat_dailyq
+    type: likert_5_na
+    prompt:
+      en: "**Daily questions** — I was satisfied with this feature."
+    description:
+      en: "The daily question prompt that asks you something specific to answer and share."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal1_feat_qsend
+    type: likert_5_na
+    prompt:
+      en: "**Question sending** — I was satisfied with this feature."
+    description:
+      en: "Sending a question to a specific friend, prompting them to share something with you."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+_goal7_features_q: &goal7_features_q
+  - order: 1
+    slug: goal7_feat_scrollable_discover
+    type: likert_5_na
+    prompt:
+      en: "**Scrollable Discover feed** — I was satisfied with this feature."
+    description:
+      en: "The scrollable feed of content from people you don't already follow."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    na_option:
+      en: "N/A — didn't use"
+    reverse_scored: false
+    result_hidden: true
+
+
+# ============================================================================
+# REFLECTION + WRAPUP BLOCKS (shared)
+# ============================================================================
+
+_reflection_block: &reflection_block
+  - order: 1
+    slug: closer_block_intro
+    type: display_only
+    content:
+      en: "**A couple of questions about specific friends.** These give us the most useful detail when answers are concrete."
+
+  - order: 2
+    slug: closer_friend
+    type: free_text
+    prompt:
+      en: "Was there a specific friend you felt closer to during {{phase_label}}? If so, what's their current username, and what experiences on WIT do you think helped that happen?"
+    placeholder:
+      en: "Username + a sentence or two on what experiences on WIT contributed."
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: not_closer_friend
+    type: free_text
+    prompt:
+      en: "Was there a friend you weren't able to feel closer to during {{phase_label}}? If so, what's their current username, and why do you think that didn't happen?"
+    placeholder:
+      en: "Username + a sentence or two on why it didn't happen."
+    required: false
+    result_hidden: true
+
+
+_wrapup_block: &wrapup_block
+  - order: 1
+    slug: wrapup_block_intro
+    type: display_only
+    content:
+      en: "**Last few questions.**"
+
+  - order: 2
+    slug: continue_using
+    type: likert_5
+    prompt:
+      en: "I would like to continue using this version of WIT after the research study is over."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 3
+    slug: continue_reason
+    type: free_text
+    prompt:
+      en: "Could you briefly explain the reason for your choice above?"
+    required: false
+    result_hidden: true
+
+  - order: 4
+    slug: recommend
+    type: likert_5
+    prompt:
+      en: "I would recommend WIT during {{phase_label}} to others based on my experience."
+    low_label:  { en: "Strongly disagree" }
+    high_label: { en: "Strongly agree" }
+    reverse_scored: false
+    result_hidden: true
+
+  - order: 5
+    slug: wit_like
+    type: free_text
+    prompt:
+      en: "What is one thing you liked most about WIT during {{phase_label}}?"
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: wit_change
+    type: free_text
+    prompt:
+      en: "What is one thing you would most like to change about WIT during {{phase_label}}?"
+    required: false
+    result_hidden: true
+
+  - order: 7
+    slug: difficult_reason
+    type: free_text
+    prompt:
+      en: "If there were moments during {{phase_label}} that were difficult to share, when did you feel that the most? (Write N/A if not applicable.)"
+    required: false
+    result_hidden: true
+
+  - order: 8
+    slug: interview_willing
+    type: single_choice
+    prompt:
+      en: "Would you be open to being contacted for a short follow-up interview? It would happen later this year and take around 30 minutes."
+    options:
+      - { order: 1, value: "yes",   label: { en: "Yes, sure" } }
+      - { order: 2, value: "maybe", label: { en: "Maybe — depends on timing" } }
+      - { order: 3, value: "no",    label: { en: "No thanks" } }
+    result_hidden: true
+
+  - order: 9
+    slug: anything_else
+    type: free_text
+    prompt:
+      en: "Last question — anything else you'd like to share with us about {{phase_label}}?"
+    required: false
+    result_hidden: true
+
+
+# ============================================================================
+# SURVEY 1 — mid_study_w (Phase 1 evaluation, Ver.W users)
+# ============================================================================
+- slug: mid_study_w
+  type: likert_5
+  title:
+    en: "Looking back: Phase 1"
+  description:
+    en: "Now that you've finished the first half of the study, we'd like to hear what your experience was like. About 30 minutes. Take your time — your answers here are the most important data we collect."
+  friend_visible: false
+  results_hidden: true
+  tokens:
+    phase_label: "Phase 1"
+    phase_window: "the past two weeks"
+    phase_number: 1
+
+  questions:
+    # §1 Tie outcomes
+    - <<: *tie_outcomes_block
+
+    # §2 Global outcomes
+    - <<: *global_outcomes_block
+
+    # §3 Goal blocks (intro + outcome rating + features + free text)
+    - *goal1_intro
+    - *goal1_outcome
+    - <<: *goal1_features_w
+    - *goal1_freetext
+
+    - *goal2_intro
+    - *goal2_outcome
+    - <<: *goal2_features_w
+    - *goal2_freetext
+
+    - *goal3_intro
+    - *goal3_outcome
+    - <<: *goal3_features_w
+    - *goal3_freetext
+
+    - *goal4_intro
+    - *goal4_outcome
+    - <<: *goal4_features_w
+    - *goal4_freetext
+
+    - *goal5_intro
+    - *goal5_outcome
+    - <<: *goal5_features_w
+    - *goal5_freetext
+
+    - *goal6_intro
+    - *goal6_outcome
+    - <<: *goal6_features_w
+    - *goal6_freetext
+
+    - *goal7_intro
+    - *goal7_outcome
+    - <<: *goal7_features_w
+    - *goal7_freetext
+
+    - *goal8_intro
+    - *goal8_outcome
+    - <<: *goal8_features_w
+    - *goal8_freetext
+
+    # §4 Reflection
+    - <<: *reflection_block
+
+    # §5 Wrapup
+    - <<: *wrapup_block
+
+
+# ============================================================================
+# SURVEY 2 — mid_study_q (Phase 1 evaluation, Ver.Q users)
+# ============================================================================
+- slug: mid_study_q
+  type: likert_5
+  title:
+    en: "Looking back: Phase 1"
+  description:
+    en: "Now that you've finished the first half of the study, we'd like to hear what your experience was like. About 17 minutes. Take your time — your answers here are the most important data we collect."
+  friend_visible: false
+  results_hidden: true
+  tokens:
+    phase_label: "Phase 1"
+    phase_window: "the past two weeks"
+    phase_number: 1
+
+  questions:
+    # §1 Tie outcomes
+    - <<: *tie_outcomes_block
+
+    # §2 Global outcomes
+    - <<: *global_outcomes_block
+
+    # §3 Goal blocks — outcome rating for ALL 8 goals (cross-version contrast)
+    # but per-feature satisfaction blocks ONLY where Ver.Q has features
+    - *goal1_intro
+    - *goal1_outcome
+    - <<: *goal1_features_q
+    - *goal1_freetext
+
+    - *goal2_intro
+    - *goal2_outcome
+    - *goal2_freetext
+
+    - *goal3_intro
+    - *goal3_outcome
+    - *goal3_freetext
+
+    - *goal4_intro
+    - *goal4_outcome
+    - *goal4_freetext
+
+    - *goal5_intro
+    - *goal5_outcome
+    - *goal5_freetext
+
+    - *goal6_intro
+    - *goal6_outcome
+    - *goal6_freetext
+
+    - *goal7_intro
+    - *goal7_outcome
+    - <<: *goal7_features_q
+    - *goal7_freetext
+
+    - *goal8_intro
+    - *goal8_outcome
+    - *goal8_freetext
+
+    # §4 Reflection
+    - <<: *reflection_block
+
+    # §5 Wrapup
+    - <<: *wrapup_block
+
+
+# ============================================================================
+# SURVEY 3 — post_study_w (Phase 2 evaluation, Ver.W users)
+# ============================================================================
+- slug: post_study_w
+  type: likert_5
+  title:
+    en: "Looking back: Phase 2"
+  description:
+    en: "You've now finished both halves of the study. This survey asks about the second half (Phase 2) only — we already heard about Phase 1 at the midpoint. About 30 minutes."
+  friend_visible: false
+  results_hidden: true
+  tokens:
+    phase_label: "Phase 2"
+    phase_window: "the second half of the study"
+    phase_number: 2
+
+  questions:
+    - <<: *tie_outcomes_block
+    - <<: *global_outcomes_block
+
+    - *goal1_intro
+    - *goal1_outcome
+    - <<: *goal1_features_w
+    - *goal1_freetext
+
+    - *goal2_intro
+    - *goal2_outcome
+    - <<: *goal2_features_w
+    - *goal2_freetext
+
+    - *goal3_intro
+    - *goal3_outcome
+    - <<: *goal3_features_w
+    - *goal3_freetext
+
+    - *goal4_intro
+    - *goal4_outcome
+    - <<: *goal4_features_w
+    - *goal4_freetext
+
+    - *goal5_intro
+    - *goal5_outcome
+    - <<: *goal5_features_w
+    - *goal5_freetext
+
+    - *goal6_intro
+    - *goal6_outcome
+    - <<: *goal6_features_w
+    - *goal6_freetext
+
+    - *goal7_intro
+    - *goal7_outcome
+    - <<: *goal7_features_w
+    - *goal7_freetext
+
+    - *goal8_intro
+    - *goal8_outcome
+    - <<: *goal8_features_w
+    - *goal8_freetext
+
+    - <<: *reflection_block
+    - <<: *wrapup_block
+
+
+# ============================================================================
+# SURVEY 4 — post_study_q (Phase 2 evaluation, Ver.Q users)
+# ============================================================================
+- slug: post_study_q
+  type: likert_5
+  title:
+    en: "Looking back: Phase 2"
+  description:
+    en: "You've now finished both halves of the study. This survey asks about the second half (Phase 2) only — we already heard about Phase 1 at the midpoint. About 17 minutes."
+  friend_visible: false
+  results_hidden: true
+  tokens:
+    phase_label: "Phase 2"
+    phase_window: "the second half of the study"
+    phase_number: 2
+
+  questions:
+    - <<: *tie_outcomes_block
+    - <<: *global_outcomes_block
+
+    - *goal1_intro
+    - *goal1_outcome
+    - <<: *goal1_features_q
+    - *goal1_freetext
+
+    - *goal2_intro
+    - *goal2_outcome
+    - *goal2_freetext
+
+    - *goal3_intro
+    - *goal3_outcome
+    - *goal3_freetext
+
+    - *goal4_intro
+    - *goal4_outcome
+    - *goal4_freetext
+
+    - *goal5_intro
+    - *goal5_outcome
+    - *goal5_freetext
+
+    - *goal6_intro
+    - *goal6_outcome
+    - *goal6_freetext
+
+    - *goal7_intro
+    - *goal7_outcome
+    - <<: *goal7_features_q
+    - *goal7_freetext
+
+    - *goal8_intro
+    - *goal8_outcome
+    - *goal8_freetext
+
+    - <<: *reflection_block
+    - <<: *wrapup_block

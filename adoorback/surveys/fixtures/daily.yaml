@@ -1,0 +1,295 @@
+# ============================================================================
+# DAILY DIARY (daily_base)
+# ============================================================================
+# Cadence: daily, days 1–28
+# Friend visibility: OFF (entire survey is private — moment reflections, mood,
+#   inhibition signals are not shareable)
+# Results page: ON for the participant only (no friend/close-friend buckets)
+#
+# Item summary (8 items total):
+#   1. initiation        — sharing comfort (1–5, N/A allowed)        [results: shown]
+#   2. reciprocation     — felt seen (1–5, N/A allowed)              [results: shown]
+#   3. repetition        — trust/safety (1–5, N/A allowed)           [results: shown]
+#   4. effort            — emotional labor (1–5, N/A allowed)        [results: HIDDEN — has drawback framing]
+#   5. shared_belonging  — feeling part of something shared (1–5)    [results: shown]
+#   6. mood_valence      — pleasant↔unpleasant (slider 0–100)        [results: shown, grouped]
+#   7. mood_arousal      — energized↔calm (slider 0–100)             [results: shown, grouped]
+#   8. moment_text       — concrete moment free-text                 [results: HIDDEN — private]
+#   9. inhibition_yn     — wanted-to-share-but-didn't (Yes/No)       [results: HIDDEN — has drawback framing]
+#  10. inhibition_text   — why not (free text, conditional on Yes)   [results: HIDDEN — private]
+#
+# Auto-captured (embedded data, not items):
+#   - submission_timestamp
+#   - study_day_index (computed from study_start)
+#   - version (Q or W) — used to gate Ver.W-specific surveys, not in diary itself
+#
+# ============================================================================
+# IMPLEMENTATION NOTES FOR CLAUDE CODE
+# ============================================================================
+# New result_kind needed: `slider_histogram_paired`
+#   - Takes two slider questions sharing a result_group
+#   - Renders as a 2D scatter / circumplex plot (valence × arousal) instead of
+#     two separate histograms. Each user's daily point is plotted; aggregate
+#     shows density. Falls back to two side-by-side `slider_histogram` panels
+#     if 2D rendering isn't ready yet.
+#
+# Inhibition conditional logic:
+#   - inhibition_text only renders when inhibition_yn.value == "yes"
+#   - Implementation: standard conditional-display rule keyed on prior answer
+#
+# N/A handling on likert_5 items (initiation, reciprocation, repetition, effort):
+#   - Render the 5-point Likert plus a 6th "N/A — no relevant interaction" option
+#   - Store N/A as a distinct value (e.g. null or sentinel like -1), NOT recoded
+#   - Aggregation excludes N/A from means; reports N/A rate separately
+#   - This requires extending likert_5 to support an optional na_option flag,
+#     OR creating a new type `likert_5_na`. Recommend the latter for clarity.
+#
+# Free-text minimum length:
+#   - moment_text: enforce min 20 characters (soft warning, not hard block —
+#     participants who genuinely have nothing to say should be able to write
+#     "nothing today" or skip)
+#   - inhibition_text: no minimum (it's already conditional on Yes)
+#
+# Result panels (for /results page):
+#   Panel 1 "Sharing today"     → initiation
+#   Panel 2 "Connection today"  → reciprocation, repetition, shared_belonging
+#   Panel 3 "Mood"              → mood_valence, mood_arousal (paired)
+#   (effort and inhibition items have result_hidden: true and don't appear)
+# ============================================================================
+
+- slug: daily_base
+  type: likert_5
+  title:
+    en: "Today on WIT"
+    ko: "오늘의 WIT"
+  description:
+    en: "A quick check-in on how today went. Most days will look the same — answer based on today only."
+    ko: "오늘 하루가 어땠는지 간단히 체크인하는 시간이에요. 매일 같은 질문이 나올 거예요. 오늘 기준으로만 답해 주세요."
+  interpretation:
+    en: "Your daily check-in shows how your sharing comfort, sense of being seen, and mood shift across the 28 days."
+    ko: "매일의 체크인은 28일 동안 공유 편안함, 인정받는 느낌, 그리고 기분이 어떻게 변하는지를 보여줘요."
+  friend_visible: false
+  results_hidden: false
+
+  questions:
+
+    # ------------------------------------------------------------------------
+    # CORE 1 — Initiation (sharing comfort)
+    # ------------------------------------------------------------------------
+    - order: 1
+      slug: initiation
+      type: likert_5_na
+      prompt:
+        en: "Today, how comfortable did you feel sharing on WIT?"
+        ko: "오늘, WIT에서 무언가를 공유하는 것이 얼마나 편안하게 느껴졌나요?"
+      low_label:
+        en: "Not at all"
+        ko: "전혀 아니에요"
+      high_label:
+        en: "Absolutely"
+        ko: "완전히 그래요"
+      na_option:
+        en: "N/A — no relevant interaction"
+        ko: "해당 없음 — 관련 활동이 없었어요"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: "sharing_today"
+      result_hidden: false
+
+    # ------------------------------------------------------------------------
+    # CORE 2 — Reciprocation (felt seen)
+    # ------------------------------------------------------------------------
+    - order: 2
+      slug: reciprocation
+      type: likert_5_na
+      prompt:
+        en: "Today, how seen or acknowledged did you feel by others on WIT?"
+        ko: "오늘, WIT에서 다른 사람들이 당신을 봐주거나 알아준다는 느낌을 얼마나 받았나요?"
+      low_label:
+        en: "Not at all"
+        ko: "전혀 아니에요"
+      high_label:
+        en: "Absolutely"
+        ko: "완전히 그래요"
+      na_option:
+        en: "N/A — no relevant interaction"
+        ko: "해당 없음 — 관련 활동이 없었어요"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: "connection_today"
+      result_hidden: false
+
+    # ------------------------------------------------------------------------
+    # CORE 3 — Repetition (trust / safety)
+    # ------------------------------------------------------------------------
+    - order: 3
+      slug: repetition
+      type: likert_5_na
+      prompt:
+        en: "How much did you feel a sense of trust or safety with others on WIT today?"
+        ko: "오늘 WIT에서 다른 사람들과 신뢰나 안전감을 얼마나 느꼈나요?"
+      low_label:
+        en: "Not at all"
+        ko: "전혀 아니에요"
+      high_label:
+        en: "Absolutely"
+        ko: "완전히 그래요"
+      na_option:
+        en: "N/A — no relevant interaction"
+        ko: "해당 없음 — 관련 활동이 없었어요"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: "connection_today"
+      result_hidden: false
+
+    # ------------------------------------------------------------------------
+    # NEW 1 — Effort (emotional labor) — goal 2
+    # Result hidden: framing "did this feel effortful" carries a drawback
+    # connotation; we don't share aggregates.
+    # ------------------------------------------------------------------------
+    - order: 4
+      slug: effort
+      type: likert_5_na
+      prompt:
+        en: "Today, did keeping up with friends on WIT feel effortful?"
+        ko: "오늘, WIT에서 친구들과 연결을 유지하는 것이 부담스럽게 느껴졌나요?"
+      low_label:
+        en: "Not at all"
+        ko: "전혀 아니에요"
+      high_label:
+        en: "Very much"
+        ko: "매우 그랬어요"
+      na_option:
+        en: "N/A — no relevant interaction"
+        ko: "해당 없음 — 관련 활동이 없었어요"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # NEW 2 — Shared belonging (community / ritual) — goal 6
+    # ------------------------------------------------------------------------
+    - order: 5
+      slug: shared_belonging
+      type: likert_5
+      prompt:
+        en: "Today, I felt part of something shared on WIT."
+        ko: "오늘, WIT에서 무언가를 함께하고 있다는 느낌을 받았어요."
+      low_label:
+        en: "Strongly disagree"
+        ko: "전혀 그렇지 않아요"
+      high_label:
+        en: "Strongly agree"
+        ko: "매우 그래요"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: "connection_today"
+      result_hidden: false
+
+    # ------------------------------------------------------------------------
+    # MOOD — valence
+    # Paired with arousal under result_group "mood" for circumplex rendering
+    # ------------------------------------------------------------------------
+    - order: 6
+      slug: mood_valence
+      type: slider
+      prompt:
+        en: "Right now, how pleasant or unpleasant do you feel?"
+        ko: "지금 이 순간, 기분이 얼마나 좋거나 안 좋은가요?"
+      low_label:
+        en: "Very unpleasant"
+        ko: "매우 안 좋아요"
+      high_label:
+        en: "Very pleasant"
+        ko: "매우 좋아요"
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram_paired
+      result_group: "mood"
+      result_hidden: false
+
+    # ------------------------------------------------------------------------
+    # MOOD — arousal
+    # ------------------------------------------------------------------------
+    - order: 7
+      slug: mood_arousal
+      type: slider
+      prompt:
+        en: "Right now, how energized or calm do you feel?"
+        ko: "지금 이 순간, 얼마나 활기차거나 차분한가요?"
+      low_label:
+        en: "Very calm / low energy"
+        ko: "매우 차분해요 / 에너지가 낮아요"
+      high_label:
+        en: "Very energized / high energy"
+        ko: "매우 활기차요 / 에너지가 높아요"
+      slider_min_value: 0
+      slider_max_value: 100
+      result_kind: slider_histogram_paired
+      result_group: "mood"
+      result_hidden: false
+
+    # ------------------------------------------------------------------------
+    # MOMENT — concrete reflection (replaces three "when did you feel that
+    # way the most" prompts from the prior diary, which produced many N/As)
+    # ------------------------------------------------------------------------
+    - order: 8
+      slug: moment_text
+      type: free_text
+      prompt:
+        en: "What's one specific moment on WIT today that's still on your mind — good, bad, or weird?"
+        ko: "오늘 WIT에서 있었던 일 중에서 아직도 생각나는 순간이 있나요? 좋은 것, 안 좋은 것, 이상한 것 다 좋아요."
+      placeholder:
+        en: "A specific moment, message, post, or feeling — anything that stuck with you."
+        ko: "특정 순간, 메시지, 게시물, 감정 — 마음에 남아 있는 것이라면 무엇이든 괜찮아요."
+      min_length: 1. 0
+      min_length_warning:
+        en: "A sentence or two helps us a lot — but if there's really nothing today, just write 'nothing today.'"
+        ko: "한두 문장만 적어 주셔도 큰 도움이 돼요. 정말 떠오르는 게 없다면 '오늘은 없어요'라고만 적어 주셔도 괜찮아요."
+      result_kind: wordcloud
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # INHIBITION — binary
+    # Decoupled from `initiation` (you can be comfortable AND still self-censor
+    # for audience reasons; binary captures this independently).
+    # Result hidden: drawback framing.
+    # ------------------------------------------------------------------------
+    - order: 9
+      slug: inhibition_yn
+      type: single_choice
+      prompt:
+        en: "Today, was there anything you wanted to share on WIT but didn't?"
+        ko: "오늘, WIT에서 공유하고 싶었지만 하지 못한 것이 있었나요?"
+      options:
+        - order: 1
+          value: "yes"
+          label:
+            en: "Yes"
+            ko: "네"
+        - order: 2
+          value: "no"
+          label:
+            en: "No"
+            ko: "아니요"
+      result_kind: option_counts
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # INHIBITION — follow-up free text (conditional on Yes)
+    # ------------------------------------------------------------------------
+    - order: 10
+      slug: inhibition_text
+      type: free_text
+      prompt:
+        en: "What was it, and what kept you from sharing?"
+        ko: "어떤 내용이었고, 무엇 때문에 공유하지 못했나요?"
+      placeholder:
+        en: "Doesn't have to be detailed — even one line about what stopped you helps."
+        ko: "자세히 적지 않으셔도 괜찮아요. 무엇이 막았는지 한 줄만 적어 주셔도 도움이 돼요."
+      conditional_display:
+        depends_on: inhibition_yn
+        show_when_value: "yes"
+      required: false
+      result_kind: wordcloud
+      result_hidden: true
