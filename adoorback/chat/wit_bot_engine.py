@@ -99,9 +99,14 @@ def handle_user_message(message):
             ])
             return
 
-        # Dispatch on current intent
-        handler = intents.HANDLERS.get(state.current_intent, intents.idle_handler)
-        replies = handler(state, message, user)
+        # Global commands punch through the current intent. The welcome card
+        # at the top of the chat exposes Run audit / Take boss quiz / Resume
+        # buttons regardless of where the user is — those should always work,
+        # not be eaten by an intent-specific handler.
+        replies = intents.try_global_command(state, message, user)
+        if replies is None:
+            handler = intents.HANDLERS.get(state.current_intent, intents.idle_handler)
+            replies = handler(state, message, user)
 
         # Refresh the welcome card BEFORE posting handler replies, so it
         # lands above the handler's interactive card in the chat. The user's

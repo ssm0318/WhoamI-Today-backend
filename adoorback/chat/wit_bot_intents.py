@@ -14,21 +14,20 @@ from chat.wit_bot_copy import t
 from chat.wit_bot_payloads import card_with_buttons, multi_select, upload_request
 
 
-# ---------- Idle ----------
+# ---------- Global commands ----------
 
-def idle_handler(state, message, user):
-    """Default when no intent is active. Routes special payloads, else nudges."""
-    payload = (message.bot_payload or {}).get('payload')
+def try_global_command(state, message, user):
+    """Handle commands that should work from ANY intent (welcome-card buttons +
+    universal text commands). Returns a list of replies if matched, else None.
+
+    Called by the engine before intent-specific dispatch. This is what makes
+    the welcome card's Run audit / Take boss quiz / Resume buttons work even
+    when the user is mid-quiz or mid-walkthrough.
+    """
+    payload = (message.bot_payload or {}).get('payload', '') or ''
     text = (message.content or '').strip().lower()
 
-    if payload == 'start_onboarding':
-        state_mod.set_intent(state, 'kickoff_welcome', step=0)
-        return _kickoff_welcome_intro(user)
-
-    if payload == 'resume_onboarding':
-        handler = HANDLERS.get(state.current_intent, idle_handler)
-        return handler(state, message, user)
-
+    # Welcome-card button payloads
     if payload == 'run_audit':
         state_mod.set_intent(state, 'audit', step=0)
         return audit_handler(state, message, user)
@@ -37,24 +36,39 @@ def idle_handler(state, message, user):
         state_mod.set_intent(state, 'final_quiz', step=0)
         return final_quiz_handler(state, message, user)
 
+    if payload == 'start_onboarding':
+        state_mod.set_intent(state, 'kickoff_welcome', step=0)
+        return _kickoff_welcome_intro(user)
+
     if payload and payload.startswith('faq:'):
         return _faq_answer(payload.split(':', 1)[1], user)
 
-    # Text-triggered easter eggs / commands
-    if text in ('faq', 'help me', 'questions'):
-        return _faq_menu(user)
-    if text in ('wit?', 'wit', 'witty?'):
-        return _wit_reply(user)
-    if text == 'who am i':
-        from chat.wit_bot_copy import WHO_AM_I_REPLY
-        return [(t(WHO_AM_I_REPLY, user), None)]
-    if text == 'help':
-        from chat.wit_bot_copy import HELP_REPLY
-        return [(t(HELP_REPLY, user), None)]
-    if '🐈' in text or '🐱' in text:
-        from chat.wit_bot_copy import CAT_REPLY
-        return [(t(CAT_REPLY, user), None)]
+    # Text-typed global commands — only fire when no payload (don't eat
+    # button taps that happen to have label='faq' etc.)
+    if not payload:
+        if text in ('faq', 'help me', 'questions'):
+            return _faq_menu(user)
+        if text in ('wit?', 'wit', 'witty?'):
+            return _wit_reply(user)
+        if text == 'who am i':
+            from chat.wit_bot_copy import WHO_AM_I_REPLY
+            return [(t(WHO_AM_I_REPLY, user), None)]
+        if text == 'help':
+            from chat.wit_bot_copy import HELP_REPLY
+            return [(t(HELP_REPLY, user), None)]
+        if '🐈' in text or '🐱' in text:
+            from chat.wit_bot_copy import CAT_REPLY
+            return [(t(CAT_REPLY, user), None)]
 
+    return None
+
+
+# ---------- Idle ----------
+
+def idle_handler(state, message, user):
+    """Default when no intent is active. Global commands have already been
+    handled by `try_global_command` before this is called, so this only deals
+    with the unknown-input nudge."""
     lang = getattr(user, 'language', 'en') or 'en'
     if lang == 'ko':
         nudge = "잘 모르겠는 입력이야. 위 카드 사용하거나 `wit?` 쳐봐."
