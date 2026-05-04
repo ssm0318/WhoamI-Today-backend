@@ -137,15 +137,22 @@ class Command(BaseCommand):
         sotd_module = import_module('surveys.migrations.0013_seed_sotd_schedule')
         sotd_module.seed_sotd_schedule(django_apps, None)
 
-        # 5. May 1-3 mock dailies (optional).
+        # 5. Re-seed the persistent / editable evaluation surveys (feature_eval_w
+        #    and goal_comparison_p1/p2). Endpoint cadence with no window_end —
+        #    researchers manually close them at study end via Survey.closed.
+        self.stdout.write(self.style.NOTICE('[5] Re-seeding persistent evaluation surveys ...'))
+        persistent_module = import_module('surveys.migrations.0015_seed_persistent_eval_surveys')
+        persistent_module.seed_persistent(django_apps, None)
+
+        # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:
             mock_yaml = FIXTURES_DIR / 'mock_test_today.yaml'
             if not mock_yaml.exists():
                 raise CommandError(f'Required fixture missing: {mock_yaml}')
-            self.stdout.write(self.style.NOTICE(f'[5a] Loading {mock_yaml.name} ...'))
+            self.stdout.write(self.style.NOTICE(f'[6a] Loading {mock_yaml.name} ...'))
             call_command('load_surveys', str(mock_yaml))
 
-            self.stdout.write(self.style.NOTICE('[5b] Scheduling May 1-3 mock dailies ...'))
+            self.stdout.write(self.style.NOTICE('[6b] Scheduling May 1-3 mock dailies ...'))
             for slug, day, seq in MOCK_DAILY_SLOTS:
                 try:
                     survey = Survey.objects.get(slug=slug)
@@ -165,14 +172,14 @@ class Command(BaseCommand):
                 )
                 self.stdout.write(f'    scheduled {slug} on {day} (seq={seq})')
         else:
-            self.stdout.write(self.style.NOTICE('[5] Skipping mock dailies (no --mock-dailies)'))
+            self.stdout.write(self.style.NOTICE('[6] Skipping mock dailies (no --mock-dailies)'))
 
-        # 6. Demo surveys + mock responses (optional, dev-only).
+        # 7. Demo surveys + mock responses (optional, dev-only).
         if opts['include_demos']:
-            self.stdout.write(self.style.NOTICE('[6] Seeding demo question-type surveys ...'))
+            self.stdout.write(self.style.NOTICE('[7] Seeding demo question-type surveys ...'))
             call_command('seed_question_type_demos', email=opts['demo_email'])
         else:
-            self.stdout.write(self.style.NOTICE('[6] Skipping demos (no --include-demos)'))
+            self.stdout.write(self.style.NOTICE('[7] Skipping demos (no --include-demos)'))
 
         self.stdout.write(self.style.SUCCESS(
             f'Done. Surveys={Survey.objects.count()} '

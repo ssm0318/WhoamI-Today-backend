@@ -1273,6 +1273,163 @@ class ViewRoutingTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Editable surveys: replace existing answers, my_response endpoint,
+# closed → 410, target_user_group routing, priority sort
+# ---------------------------------------------------------------------------
+class EditableSurveyTests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+
+        self.user = User.objects.create(username='ed', email='ed@x.com')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_resubmit_replaces_existing_answers_when_editable(self):
+        s = Survey.objects.create(
+            slug='ed_s', title_en='E', title_ko='E', editable=True,
+        )
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='endpoint',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=701,
+        )
+        url = f'/api/surveys/{s.slug}/responses/'
+
+        # First submit: 201, value=2
+        r1 = self.client.post(url, data={'answers': [{'question_id': q.id, 'value': 2}]},
+                              format='json')
+        self.assertEqual(r1.status_code, 201)
+        # Second submit: 201 (because editable), value=4 — answer REPLACED
+        r2 = self.client.post(url, data={'answers': [{'question_id': q.id, 'value': 4}]},
+                              format='json')
+        self.assertEqual(r2.status_code, 201)
+        # One response row, one answer row — both updated.
+        self.assertEqual(SurveyResponse.objects.filter(user=self.user, survey=s).count(), 1)
+        ans = SurveyAnswer.objects.get(response__user=self.user, response__survey=s)
+        self.assertEqual(ans.value, 4)
+
+    def test_closed_survey_returns_410_on_submit(self):
+        s = Survey.objects.create(
+            slug='cl_s', title_en='C', title_ko='C', closed=True,
+        )
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='endpoint',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=702,
+        )
+        r = self.client.post(
+            f'/api/surveys/{s.slug}/responses/',
+            data={'answers': [{'question_id': q.id, 'value': 2}]},
+            format='json',
+        )
+        self.assertEqual(r.status_code, 410)
+
+    def test_my_response_returns_404_when_no_response(self):
+        s = Survey.objects.create(slug='mr_s', title_en='M', title_ko='M')
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        r = self.client.get(f'/api/surveys/{s.slug}/my_response/')
+        self.assertEqual(r.status_code, 404)
+
+    def test_my_response_returns_user_answers_for_pre_fill(self):
+        s = Survey.objects.create(
+            slug='mr2_s', title_en='M', title_ko='M', editable=True,
+        )
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='endpoint',
+            window_start=__import__('datetime').date(2026, 1, 1),
+            window_end=None, allow_late=True, sequence_index=703,
+        )
+        # Submit once, then GET my_response.
+        self.client.post(
+            f'/api/surveys/{s.slug}/responses/',
+            data={'answers': [{'question_id': q.id, 'value': 5}]},
+            format='json',
+        )
+        r = self.client.get(f'/api/surveys/{s.slug}/my_response/')
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertIn('id', body)
+        self.assertEqual(body['answers'], [{'question_id': q.id, 'value': 5}])
+
+
+class TargetUserGroupSchedulingTests(TestCase):
+    """ScheduledSurvey.target_user_group restricts a row to one group only."""
+
+    def setUp(self):
+        from datetime import date as _date
+
+        self.today = _date(2026, 5, 8)  # Day 5
+        self.user_w = User.objects.create(
+            username='tg_w', email='tg_w@x.com', user_group='group_w_first',
+        )
+        self.user_q = User.objects.create(
+            username='tg_q', email='tg_q@x.com', user_group='group_q_first',
+        )
+
+    def test_target_group_blocks_other_group(self):
+        from unittest.mock import patch
+
+        s = Survey.objects.create(slug='feature_eval_w', title_en='F', title_ko='F')
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        # One row with target_user_group='group_w_first'
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='endpoint',
+            window_start=self.today, window_end=None,
+            allow_late=True, sequence_index=802,
+            target_user_group='group_w_first',
+        )
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx_w = get_survey_index(self.user_w)
+            idx_q = get_survey_index(self.user_q)
+        slugs_w = {s.survey.slug for s in idx_w['available_now']}
+        slugs_q = {s.survey.slug for s in idx_q['available_now']}
+        self.assertIn('feature_eval_w', slugs_w)
+        self.assertNotIn('feature_eval_w', slugs_q)
+
+
+class PrioritySortTests(TestCase):
+    def setUp(self):
+        from datetime import date as _date
+
+        self.today = _date(2026, 5, 18)
+        self.user = User.objects.create(
+            username='ps', email='ps@x.com', user_group='group_w_first',
+        )
+
+    def test_higher_priority_surveys_surface_first(self):
+        from unittest.mock import patch
+
+        # Three surveys with different priorities, all available now.
+        for slug, prio in [('low_pri', 10), ('high_pri', 100), ('mid_pri', 50)]:
+            s = Survey.objects.create(slug=slug, title_en=slug, title_ko=slug, priority=prio)
+            SurveyQuestion.objects.create(
+                survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+            )
+            ScheduledSurvey.objects.create(
+                survey=s, cadence='anytime',
+                window_start=self.today, window_end=None,
+                allow_late=True, sequence_index={'low_pri': 901, 'high_pri': 902, 'mid_pri': 903}[slug],
+            )
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx = get_survey_index(self.user)
+        slugs = [s.survey.slug for s in idx['available_now']]
+        self.assertEqual(slugs, ['high_pri', 'mid_pri', 'low_pri'])
+
+
+# ---------------------------------------------------------------------------
 # UserSurveyEmbeddedData model basics
 # ---------------------------------------------------------------------------
 class UserSurveyEmbeddedDataTests(TestCase):

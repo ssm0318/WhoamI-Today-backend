@@ -1078,45 +1078,25 @@ _wrapup_block: &wrapup_block
     # §2 Global outcomes
     - <<: *global_outcomes_block
 
-    # §3 Goal blocks (intro + outcome rating + features + free text)
+    # §3 Goal blocks — qualitative reflection only.
+    # Outcome ratings are now in `goal_comparison_p1` (priority 100,
+    # editable, opens Day 15). W feature ratings are now in
+    # `feature_eval_w` (priority 100, editable, opens Day 5 for w_first).
     - *goal1_intro
-    - *goal1_outcome
-    - <<: *goal1_features_w
     - *goal1_freetext
-
     - *goal2_intro
-    - *goal2_outcome
-    - <<: *goal2_features_w
     - *goal2_freetext
-
     - *goal3_intro
-    - *goal3_outcome
-    - <<: *goal3_features_w
     - *goal3_freetext
-
     - *goal4_intro
-    - *goal4_outcome
-    - <<: *goal4_features_w
     - *goal4_freetext
-
     - *goal5_intro
-    - *goal5_outcome
-    - <<: *goal5_features_w
     - *goal5_freetext
-
     - *goal6_intro
-    - *goal6_outcome
-    - <<: *goal6_features_w
     - *goal6_freetext
-
     - *goal7_intro
-    - *goal7_outcome
-    - <<: *goal7_features_w
     - *goal7_freetext
-
     - *goal8_intro
-    - *goal8_outcome
-    - <<: *goal8_features_w
     - *goal8_freetext
 
     # §4 Reflection
@@ -1149,40 +1129,26 @@ _wrapup_block: &wrapup_block
     # §2 Global outcomes
     - <<: *global_outcomes_block
 
-    # §3 Goal blocks — outcome rating for ALL 8 goals (cross-version contrast)
-    # but per-feature satisfaction blocks ONLY where Ver.Q has features
+    # §3 Goal blocks — qualitative reflection + Q feature ratings on the
+    # 2 goals where Ver.Q has features (goals 1, 7). Outcome ratings live
+    # in `goal_comparison_p1` (editable, Day 15).
     - *goal1_intro
-    - *goal1_outcome
     - <<: *goal1_features_q
     - *goal1_freetext
-
     - *goal2_intro
-    - *goal2_outcome
     - *goal2_freetext
-
     - *goal3_intro
-    - *goal3_outcome
     - *goal3_freetext
-
     - *goal4_intro
-    - *goal4_outcome
     - *goal4_freetext
-
     - *goal5_intro
-    - *goal5_outcome
     - *goal5_freetext
-
     - *goal6_intro
-    - *goal6_outcome
     - *goal6_freetext
-
     - *goal7_intro
-    - *goal7_outcome
     - <<: *goal7_features_q
     - *goal7_freetext
-
     - *goal8_intro
-    - *goal8_outcome
     - *goal8_freetext
 
     # §4 Reflection
@@ -1212,44 +1178,24 @@ _wrapup_block: &wrapup_block
     - <<: *tie_outcomes_block
     - <<: *global_outcomes_block
 
+    # §3 Goal blocks — qualitative reflection only.
+    # Outcome ratings → goal_comparison_p2 (editable, opens Day 29).
+    # W feature ratings → feature_eval_w (editable, persistent across phases).
     - *goal1_intro
-    - *goal1_outcome
-    - <<: *goal1_features_w
     - *goal1_freetext
-
     - *goal2_intro
-    - *goal2_outcome
-    - <<: *goal2_features_w
     - *goal2_freetext
-
     - *goal3_intro
-    - *goal3_outcome
-    - <<: *goal3_features_w
     - *goal3_freetext
-
     - *goal4_intro
-    - *goal4_outcome
-    - <<: *goal4_features_w
     - *goal4_freetext
-
     - *goal5_intro
-    - *goal5_outcome
-    - <<: *goal5_features_w
     - *goal5_freetext
-
     - *goal6_intro
-    - *goal6_outcome
-    - <<: *goal6_features_w
     - *goal6_freetext
-
     - *goal7_intro
-    - *goal7_outcome
-    - <<: *goal7_features_w
     - *goal7_freetext
-
     - *goal8_intro
-    - *goal8_outcome
-    - <<: *goal8_features_w
     - *goal8_freetext
 
     - <<: *reflection_block
@@ -1276,39 +1222,156 @@ _wrapup_block: &wrapup_block
     - <<: *tie_outcomes_block
     - <<: *global_outcomes_block
 
+    # §3 Goal blocks — qualitative reflection + Q feature ratings on the
+    # 2 goals where Ver.Q has features (goals 1, 7). Outcome ratings live
+    # in `goal_comparison_p2` (editable, Day 29).
     - *goal1_intro
-    - *goal1_outcome
     - <<: *goal1_features_q
     - *goal1_freetext
-
     - *goal2_intro
-    - *goal2_outcome
     - *goal2_freetext
-
     - *goal3_intro
-    - *goal3_outcome
     - *goal3_freetext
-
     - *goal4_intro
-    - *goal4_outcome
     - *goal4_freetext
-
     - *goal5_intro
-    - *goal5_outcome
     - *goal5_freetext
-
     - *goal6_intro
-    - *goal6_outcome
     - *goal6_freetext
-
     - *goal7_intro
-    - *goal7_outcome
     - <<: *goal7_features_q
     - *goal7_freetext
-
     - *goal8_intro
-    - *goal8_outcome
     - *goal8_freetext
 
     - <<: *reflection_block
     - <<: *wrapup_block
+
+
+# ============================================================================
+# SURVEY 5 — feature_eval_w (W feature evaluation, both groups, persistent)
+# ============================================================================
+# Pulled out of mid_study_w + post_study_q so participants can edit their
+# answers throughout their W phase + after, until researchers manually
+# close the survey at study end. Two ScheduledSurvey rows feed this:
+#   - target_user_group=group_w_first opens Day 5  (May  8) — w_first finishes
+#     enough W experience by then to start rating.
+#   - target_user_group=group_q_first opens Day 19 (May 22) — q_first crosses
+#     into their W phase + 5 days of experience.
+# Both groups share ONE survey + ONE response per user (editable until close).
+- slug: feature_eval_w
+  type: likert_5
+  title:
+    en: "Ver. W feature evaluation"
+  description:
+    en: "Rate how satisfied you were with each Ver. W feature you used. You can come back and edit your answers until the researchers close this survey."
+  friend_visible: false
+  results_hidden: true
+  editable: true
+  priority: 100
+  tokens:
+    phase_label: "Ver. W"
+    phase_window: "your time on Ver. W"
+    phase_number: 0
+
+  questions:
+    - order: 1
+      slug: feature_eval_intro
+      type: display_only
+      content:
+        en: "**Ver. W features.** This evaluation covers all 8 design goals. You don't have to fill it in all at once — your answers save as you go and you can come back to edit them until the researchers close the survey."
+
+    - *goal1_intro
+    - <<: *goal1_features_w
+    - *goal2_intro
+    - <<: *goal2_features_w
+    - *goal3_intro
+    - <<: *goal3_features_w
+    - *goal4_intro
+    - <<: *goal4_features_w
+    - *goal5_intro
+    - <<: *goal5_features_w
+    - *goal6_intro
+    - <<: *goal6_features_w
+    - *goal7_intro
+    - <<: *goal7_features_w
+    - *goal8_intro
+    - <<: *goal8_features_w
+
+
+# ============================================================================
+# SURVEY 6 — goal_comparison_p1 (W vs Q goal comparison, end of Phase 1)
+# ============================================================================
+# All 8 goal-outcome ratings, scoped to the user's Phase 1 experience
+# (W for group_w_first, Q for group_q_first). Opens Day 15 (May 18).
+# Editable until researchers close.
+- slug: goal_comparison_p1
+  type: likert_5
+  title:
+    en: "How did Phase 1 go? (Goal-by-goal)"
+  description:
+    en: "Rate how well WIT helped you with each of the 8 design goals during Phase 1. You can come back and edit until researchers close this survey."
+  friend_visible: false
+  results_hidden: true
+  editable: true
+  priority: 100
+  tokens:
+    phase_label: "Phase 1"
+    phase_window: "the first two weeks"
+    phase_number: 1
+
+  questions:
+    - *goal1_intro
+    - *goal1_outcome
+    - *goal2_intro
+    - *goal2_outcome
+    - *goal3_intro
+    - *goal3_outcome
+    - *goal4_intro
+    - *goal4_outcome
+    - *goal5_intro
+    - *goal5_outcome
+    - *goal6_intro
+    - *goal6_outcome
+    - *goal7_intro
+    - *goal7_outcome
+    - *goal8_intro
+    - *goal8_outcome
+
+
+# ============================================================================
+# SURVEY 7 — goal_comparison_p2 (W vs Q goal comparison, end of Phase 2)
+# ============================================================================
+# Same 8 ratings, scoped to Phase 2 experience. Opens Day 29 (June 1).
+- slug: goal_comparison_p2
+  type: likert_5
+  title:
+    en: "How did Phase 2 go? (Goal-by-goal)"
+  description:
+    en: "Rate how well WIT helped you with each of the 8 design goals during Phase 2. You can come back and edit until researchers close this survey."
+  friend_visible: false
+  results_hidden: true
+  editable: true
+  priority: 100
+  tokens:
+    phase_label: "Phase 2"
+    phase_window: "the second two weeks"
+    phase_number: 2
+
+  questions:
+    - *goal1_intro
+    - *goal1_outcome
+    - *goal2_intro
+    - *goal2_outcome
+    - *goal3_intro
+    - *goal3_outcome
+    - *goal4_intro
+    - *goal4_outcome
+    - *goal5_intro
+    - *goal5_outcome
+    - *goal6_intro
+    - *goal6_outcome
+    - *goal7_intro
+    - *goal7_outcome
+    - *goal8_intro
+    - *goal8_outcome
