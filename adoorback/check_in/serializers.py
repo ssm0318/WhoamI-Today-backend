@@ -130,6 +130,7 @@ class CheckInBaseSerializer(serializers.ModelSerializer):
                   'social_battery', 'thought', 'current_user_read', 'visibility',
                   'battery_visibility', 'mood_visibility', 'song_visibility', 'thought_visibility',
                   'battery_updated_at', 'mood_updated_at', 'song_updated_at', 'thought_updated_at',
+                  'battery_archive_at', 'mood_archive_at', 'song_archive_at', 'thought_archive_at',
                   'track_id']
 
 
@@ -175,6 +176,13 @@ class MyCheckInSerializer(CheckInBaseSerializer):
             'mood_updated_at': {'read_only': True},
             'song_updated_at': {'read_only': True},
             'thought_updated_at': {'read_only': True},
+            # Per-component opt-in auto-archive timestamps. Writable so the
+            # editor can stamp `now() + 24h` (or null) when the user toggles
+            # the "Archive after 24 hours" checkbox.
+            'battery_archive_at': {'required': False, 'allow_null': True},
+            'mood_archive_at': {'required': False, 'allow_null': True},
+            'song_archive_at': {'required': False, 'allow_null': True},
+            'thought_archive_at': {'required': False, 'allow_null': True},
         }
 
     def to_representation(self, instance):

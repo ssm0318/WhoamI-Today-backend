@@ -205,7 +205,7 @@ if 'column_name' not in existing_columns:
 - **CheckIn / Song split:** Song is a separate model from CheckIn. Two API calls: `POST /check_in/` for check-in data, `POST /check_in/song/` for song.
 - **CheckIn fields:** `mood` (JSONField, array of up to 5 emojis), `thought` (CharField, max 88), `social_battery`, per-component visibility fields, per-component `*_updated_at` timestamps.
 - **Per-component visibility:** `battery_visibility`, `mood_visibility`, `song_visibility`, `thought_visibility` with values `public` / `friends` / `close_friends` / `only_me`. Frontend `ComponentVisibility` enum (`src/models/checkIn.ts`) and backend `VISIBILITY_CHOICES` (`check_in/models.py`) MUST match.
-- **Auto-archive:** components with `*_updated_at` > 12 hours ago serialize visibility as `only_me` and data as `null` in the friend API.
+- **Auto-archive:** removed. Components stay visible until the user clears them or the per-component "Archive after 24 hours" opt-in expires (`*_archive_at`). `viewer_sees_check_in_component` filters by visibility + archive only — no implicit time-based hiding.
 - **`CheckInComponentEntry`** (`check_in/models.py:~320–400`): snapshot of one component with its own visibility, JSON `data` payload, plus pin/supersede semantics. Read this before assuming a flat-row design.
 - **Poke component types:** `'battery'`, `'mood'`, `'thought'`, `'song'` — NOT `'status'`.
 

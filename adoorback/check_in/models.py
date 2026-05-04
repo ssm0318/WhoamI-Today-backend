@@ -59,11 +59,19 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
     song_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='public')
     thought_visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default='friends')
 
-    # Per-component update timestamps (for auto-archive after 12h)
+    # Per-component update timestamps (used by clients ordering recent activity).
     battery_updated_at = models.DateTimeField(null=True, blank=True)
     mood_updated_at = models.DateTimeField(null=True, blank=True)
     song_updated_at = models.DateTimeField(null=True, blank=True)
     thought_updated_at = models.DateTimeField(null=True, blank=True)
+
+    # Optional opt-in auto-archive: when set, the component is hidden from
+    # other viewers (and serialized as null) once `now() > *_archive_at`.
+    # Null means no auto-archive — the value persists until the user changes it.
+    battery_archive_at = models.DateTimeField(null=True, blank=True)
+    mood_archive_at = models.DateTimeField(null=True, blank=True)
+    song_archive_at = models.DateTimeField(null=True, blank=True)
+    thought_archive_at = models.DateTimeField(null=True, blank=True)
 
     readers = models.ManyToManyField(User, related_name='read_check_ins')
 

@@ -35,10 +35,20 @@ RECENT_POST_WINDOW = timedelta(hours=24)
 def viewer_sees_check_in_component(check_in, profile_user, viewer, visibility_field, updated_at_field):
     """
     Whether `viewer` may see a check-in component's value on another user's profile.
-    Applies per-component visibility (public / friends / close_friends / only_me).
+    Applies per-component visibility (public / friends / close_friends / only_me) and
+    the optional opt-in auto-archive (`*_archive_at` — derived from the matching
+    visibility field name; viewer sees the component as hidden once that time passes).
     """
     if viewer == profile_user:
         return True
+
+    # Honor the per-component opt-in auto-archive for non-owners. The field is
+    # derived from the visibility field name (battery_visibility -> battery_archive_at).
+    if visibility_field.endswith('_visibility'):
+        archive_field = f"{visibility_field[: -len('_visibility')]}_archive_at"
+        archive_at = getattr(check_in, archive_field, None)
+        if archive_at is not None and timezone.now() >= archive_at:
+            return False
 
     effective_vis = getattr(check_in, visibility_field)
 
