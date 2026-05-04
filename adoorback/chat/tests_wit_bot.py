@@ -178,6 +178,9 @@ class WitBotFastPathTests(TestCase):
         self.assertEqual(before, after, 'bot replies must not create chat notifications')
 
     def test_bot_reply_returned_inline(self):
+        """Engine still posts replies inline. With the new intent dispatch,
+        an unrecognized payload from idle yields the idle nudge. The welcome
+        card refresh also lands as an inline reply."""
         from rest_framework.test import APIRequestFactory, force_authenticate
         from chat.views import MessageList
         factory = APIRequestFactory()
@@ -190,12 +193,12 @@ class WitBotFastPathTests(TestCase):
         force_authenticate(req, user=self.alice)
         resp = MessageList.as_view()(req, pk=self.bot.id)
         self.assertEqual(resp.status_code, 201)
-        from chat.wit_bot_engine import BETA_REPLIES
         bot_replies = resp.data.get('bot_replies') or []
-        self.assertEqual(len(bot_replies), 1)
-        self.assertIn(bot_replies[0]['content'], BETA_REPLIES)
-        self.assertEqual(bot_replies[0]['sender']['username'], 'wit_bot')
-        # Carries the 4-button card.
-        payload = bot_replies[0].get('bot_payload') or {}
-        self.assertEqual(payload.get('kind'), 'card')
-        self.assertEqual(len(payload.get('buttons') or []), 4)
+        # Filter out welcome card refresh replies
+        non_welcome_replies = [
+            r for r in bot_replies if r.get('event_type') != 'wit_welcome_card'
+        ]
+        self.assertEqual(len(non_welcome_replies), 1)
+        self.assertEqual(non_welcome_replies[0]['sender']['username'], 'wit_bot')
+        # Idle handler posts a short nudge — no card.
+        self.assertIn('not sure', non_welcome_replies[0]['content'].lower())

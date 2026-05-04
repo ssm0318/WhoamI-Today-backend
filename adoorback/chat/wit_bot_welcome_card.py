@@ -27,12 +27,14 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
     kickoff = progress.get('kickoff', {})
     completed = kickoff.get('completed', False)
 
-    # Pre-window
-    if now < V1_WINDOW_START and not completed:
+    # Mid-kickoff (intent set but not yet idle) — takes priority over date checks
+    # so a participant who started early can resume.
+    if state.current_intent.startswith('kickoff_') and state.current_intent != 'kickoff_complete':
         return {
-            'kind': 'card',
-            'intro': "i'll be here when the study starts on May 4 — see you then 👋",
-            'buttons': [],
+            **card_with_buttons([
+                {'label': 'Resume onboarding', 'payload': 'resume_onboarding'},
+            ]),
+            'intro': 'we were in the middle of something.',
         }
 
     # V1 complete, waiting for swap
@@ -43,13 +45,12 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             'buttons': [],
         }
 
-    # Mid-kickoff (intent set but not yet idle)
-    if state.current_intent.startswith('kickoff_') and state.current_intent != 'kickoff_complete':
+    # Pre-window
+    if now < V1_WINDOW_START and not completed:
         return {
-            **card_with_buttons([
-                {'label': 'Resume onboarding', 'payload': 'resume_onboarding'},
-            ]),
-            'intro': 'we were in the middle of something.',
+            'kind': 'card',
+            'intro': "i'll be here when the study starts on May 4 — see you then 👋",
+            'buttons': [],
         }
 
     # Window is open, kickoff not started

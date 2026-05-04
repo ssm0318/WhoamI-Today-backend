@@ -114,7 +114,11 @@ class EngineDispatchTests(TestCase):
         self._send_choice('kickoff_welcome_continue')
         state = state_mod.get_or_create_state(self.alice)
         self.assertEqual(state.current_intent, 'kickoff_quiz_1')
-        latest = self._bot_replies().order_by('-created_at').first()
+        # Find the multi_select message (latest non-welcome-card reply)
+        multi_select_msgs = self._bot_replies().exclude(
+            event_type='wit_welcome_card',
+        ).order_by('-created_at')
+        latest = multi_select_msgs.first()
         self.assertEqual(latest.bot_payload.get('kind'), 'multi_select')
         self.assertEqual(latest.bot_payload.get('intent'), 'kickoff_quiz_1')
 
@@ -217,6 +221,20 @@ class EngineDispatchTests(TestCase):
         self._send_choice('kickoff_friend_done')
         state.refresh_from_db()
         self.assertEqual(state.current_intent, 'kickoff_widget')
+
+    # ---------- Task 13 — kickoff_widget ----------
+
+    # ---------- Task 15 — welcome card refresh ----------
+
+    def test_welcome_card_refreshes_on_user_message(self):
+        self._send_choice('start_onboarding')
+        welcome_msgs = Message.objects.filter(
+            chat_room=self.room, event_type='wit_welcome_card',
+        )
+        self.assertEqual(welcome_msgs.count(), 1)
+        # CTA should now be Resume since we're mid-flow
+        labels = [b['label'] for b in welcome_msgs.first().bot_payload['buttons']]
+        self.assertIn('Resume onboarding', labels)
 
     # ---------- Task 13 — kickoff_widget ----------
 

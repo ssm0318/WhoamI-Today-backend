@@ -95,6 +95,7 @@ MESSAGE_EVENT_CHOICES = (
     ('', 'Message'),
     ('member_added', 'Member Added'),
     ('member_left', 'Member Left'),
+    ('wit_welcome_card', 'wit_bot welcome card'),
 )
 
 

@@ -15,6 +15,8 @@ from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
+WELCOME_EVENT_TYPE = 'wit_welcome_card'
+
 
 def _post_replies(room, bot, user, replies):
     """Persist each reply as a Message. Each item: (text, bot_payload | None)."""
@@ -32,10 +34,34 @@ def _post_replies(room, bot, user, replies):
 
 
 def _post_welcome(room, bot, user):
-    """Post the state-aware welcome card. Called from `ensure_wit_bot_room`."""
+    """Post the state-aware welcome card with event_type so refresh can replace it.
+    Called from `ensure_wit_bot_room`."""
+    from chat.models import Message as MessageModel
     from chat.wit_bot_welcome_card import build_welcome_card
     card = build_welcome_card(user)
-    _post_replies(room, bot, user, [(card.get('intro', ''), card)])
+    MessageModel.objects.create(
+        chat_room=room, sender=bot, receiver=user,
+        content=card.get('intro', ''),
+        bot_payload=card,
+        event_type=WELCOME_EVENT_TYPE,
+    )
+
+
+def _refresh_welcome_card(room, bot, user):
+    """Delete any existing wit_welcome_card message and post a fresh one
+    reflecting current state."""
+    from chat.models import Message as MessageModel
+    from chat.wit_bot_welcome_card import build_welcome_card
+    MessageModel.objects.filter(
+        chat_room=room, event_type=WELCOME_EVENT_TYPE,
+    ).delete()
+    card = build_welcome_card(user)
+    MessageModel.objects.create(
+        chat_room=room, sender=bot, receiver=user,
+        content=card.get('intro', ''),
+        bot_payload=card,
+        event_type=WELCOME_EVENT_TYPE,
+    )
 
 
 def handle_user_message(message):
@@ -77,3 +103,6 @@ def handle_user_message(message):
         handler = intents.HANDLERS.get(state.current_intent, intents.idle_handler)
         replies = handler(state, message, user)
         _post_replies(room, bot, user, replies)
+
+        # Refresh welcome card so its CTA reflects new state
+        _refresh_welcome_card(room, bot, user)
