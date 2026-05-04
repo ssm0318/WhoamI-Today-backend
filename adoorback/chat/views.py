@@ -11,7 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from adoorback.utils.alerts import send_msg_to_slack
 from adoorback.utils.validators import adoor_exception_handler
 from django.contrib.contenttypes.models import ContentType
-from .models import Message, ChatRoom, ChatRequest, MessageReaction, GroupReadCursor, MAX_GROUP_MEMBERS, get_or_create_chat_room, get_chat_room
+from .models import Message, ChatRoom, ChatRequest, MessageReaction, GroupReadCursor, MAX_GROUP_MEMBERS, OnboardingEvent, get_or_create_chat_room, get_chat_room
 from .serializers import (
     MessageSerializer, ChatRoomSerializer,
     ChatRequestSerializer, ChatRequestUpdateSerializer,
@@ -1149,3 +1149,39 @@ class GroupMessageList(generics.ListCreateAPIView):
                 pass
 
         return response
+
+
+class OnboardingEventCreate(generics.CreateAPIView):
+    """Frontend mirror of Firebase Analytics events for the wit_bot audit.
+
+    POST /api/chat/onboarding-events/
+    {
+        "event_key": "browse_mode_toggled",
+        "payload": {"new_state": "social"}  # optional
+    }
+
+    Server fills `user` (from session) and `version` (from user.current_ver).
+    Fire-and-forget; returns 201 with the created row.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        event_key = request.data.get('event_key')
+        if not event_key or not isinstance(event_key, str):
+            return Response(
+                {'error': 'event_key is required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload = request.data.get('payload', {}) or {}
+        if not isinstance(payload, dict):
+            return Response(
+                {'error': 'payload must be an object'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        OnboardingEvent.objects.create(
+            user=request.user,
+            version=request.user.current_ver,
+            event_key=event_key[:64],
+            payload=payload,
+        )
+        return Response({'ok': True}, status=status.HTTP_201_CREATED)

@@ -728,6 +728,32 @@ def dispatch_wit_bot_engine(created, instance, **kwargs):
     handle_user_message(instance)
 
 
+class OnboardingEvent(AdoorTimestampedModel):
+    """Frontend-mirrored analytics event for the wit_bot audit.
+
+    Whenever the frontend logs a Firebase Analytics event for a feature that
+    doesn't otherwise touch the DB (browse mode toggle, view-as opened,
+    /feed scroll, etc.), it also POSTs a row here so the audit predicate
+    registry can detect engagement.
+    """
+    user = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE,
+        related_name='onboarding_events',
+    )
+    version = models.CharField(max_length=16, choices=VERSION_CHOICES)
+    event_key = models.CharField(max_length=64)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'event_key']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} {self.event_key}"
+
+
 class OnboardingScreenshot(AdoorTimestampedModel):
     """Async-reviewed screenshot uploaded during wit_bot onboarding setup checks.
 

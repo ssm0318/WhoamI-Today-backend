@@ -21,4 +21,6 @@ urlpatterns = [
     path('requests/sent/', views.ChatRequestSentList.as_view(), name='chat-request-sent-list'),
     path('requests/<int:pk>/respond/', views.ChatRequestUpdate.as_view(), name='chat-request-update'),
     path('requests/to/<int:requestee_id>/cancel/', views.ChatRequestCancel.as_view(), name='chat-request-cancel'),
+    # wit_bot onboarding analytics mirror
+    path('onboarding-events/', views.OnboardingEventCreate.as_view(), name='onboarding-event-create'),
 ]
