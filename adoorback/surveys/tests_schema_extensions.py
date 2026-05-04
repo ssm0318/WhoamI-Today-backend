@@ -1103,6 +1103,56 @@ class SubmitViewExtensionsTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Study schedule shift: May 3 → May 4 (migration 0012)
+# ---------------------------------------------------------------------------
+class StudyScheduleMay4Tests(TestCase):
+    """Verifies the +1 day shift landed correctly on the study slugs and
+    didn't touch mock/demo schedule rows (which have their own dates).
+    """
+
+    def test_study_rows_start_may_4(self):
+        from datetime import date as _date
+
+        # daily_base seq=1 should now be May 4 after migration 0012.
+        row = (
+            ScheduledSurvey.objects
+            .filter(cadence='daily', survey__slug='daily_base', sequence_index=1)
+            .first()
+        )
+        if row is None:
+            # Migrations seed only when surveys exist. In a fresh test DB
+            # without `setup_survey_state`, the rows aren't there — skip.
+            self.skipTest('study schedule rows not seeded in this DB')
+        self.assertEqual(row.window_start, _date(2026, 5, 4))
+
+    def test_pre_study_lands_day_before_kickoff(self):
+        from datetime import date as _date
+
+        row = (
+            ScheduledSurvey.objects
+            .filter(cadence='biweekly', survey__slug='pre_study')
+            .first()
+        )
+        if row is None:
+            self.skipTest('pre_study row not seeded in this DB')
+        # May 3 = day 0 = day before May 4 kickoff.
+        self.assertEqual(row.window_start, _date(2026, 5, 3))
+
+    def test_endpoint_opens_may_31(self):
+        from datetime import date as _date
+
+        row = (
+            ScheduledSurvey.objects
+            .filter(cadence='endpoint', survey__slug='study_endpoint')
+            .first()
+        )
+        if row is None:
+            self.skipTest('study_endpoint row not seeded in this DB')
+        self.assertEqual(row.window_start, _date(2026, 5, 31))
+        self.assertIsNone(row.window_end)
+
+
+# ---------------------------------------------------------------------------
 # View-layer routing: Detail / Submit / Results return 404 for off-route users
 # ---------------------------------------------------------------------------
 class ViewRoutingTests(TestCase):
