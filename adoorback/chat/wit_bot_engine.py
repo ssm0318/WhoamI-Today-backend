@@ -102,7 +102,12 @@ def handle_user_message(message):
         # Dispatch on current intent
         handler = intents.HANDLERS.get(state.current_intent, intents.idle_handler)
         replies = handler(state, message, user)
-        _post_replies(room, bot, user, replies)
 
-        # Refresh welcome card so its CTA reflects new state
+        # Refresh the welcome card BEFORE posting handler replies, so it
+        # lands above the handler's interactive card in the chat. The user's
+        # eye goes to the bottom (where Submit / Take me there / Done lives);
+        # the welcome card up top is a passive state indicator.
+        state.refresh_from_db()
         _refresh_welcome_card(room, bot, user)
+
+        _post_replies(room, bot, user, replies)
