@@ -210,7 +210,7 @@ PREDICATES: list[FeaturePredicate] = [
         feature_key='browse_mode',
         versions={'version_w'},
         display_name='Pick a browsing mode',
-        description='Quiet vs social — set the vibe for your session.',
+        description='Quiet vs social — set the vibe for your session. Look for the prompt on the Discover tab (or tap the eye icon in the header).',
         deep_link='/discover',
         kind='db',
         is_engaged=_has_browse_mode_pick,
@@ -250,7 +250,7 @@ PREDICATES: list[FeaturePredicate] = [
         feature_key='close_friends_filter',
         versions={'version_w'},
         display_name='Use the Close Friends filter in chat',
-        description='Filter your chat list to close friends only.',
+        description="In the chat list, look for the 'Close Friends Only' toggle in the header. Flip it on, then off.",
         deep_link='/chats',
         kind='event',
         is_engaged=_make_event_predicate('chat_close_friends_filter_toggled'),
@@ -340,22 +340,14 @@ PREDICATES: list[FeaturePredicate] = [
         kind='db',
         is_engaged=_has_survey_response,
     ),
-    FeaturePredicate(
-        feature_key='daily_digest',
-        versions={'version_w'},
-        display_name='Open Daily Digest',
-        description="Your daily highlights — visit the Daily Digest tab.",
-        deep_link='/discover',
-        kind='event',
-        is_engaged=_make_event_predicate('daily_digest_opened'),
-    ),
-
     # ---- Goal 7: Support new friendship establishment ----
+    # Note: in Ver. W the Discover tab is labelled "Daily Digest" — it's the
+    # same route + the same engagement signal, so one predicate covers both.
     FeaturePredicate(
         feature_key='discover_visit',
         versions={'version_w', 'version_q'},
-        display_name='Open Discover',
-        description="Browse profile suggestions, mutuals, highlight questions.",
+        display_name='Open Discover / Daily Digest',
+        description="Browse profile suggestions, mutuals, highlight questions. (Ver. W labels this tab Daily Digest.)",
         deep_link='/discover',
         kind='event',
         is_engaged=_make_event_predicate('discover_opened'),
@@ -382,9 +374,9 @@ PREDICATES: list[FeaturePredicate] = [
     # ---- Goal 8: Safe expansion ----
     FeaturePredicate(
         feature_key='non_public_account',
-        versions={'version_w', 'version_q'},
+        versions={'version_q'},
         display_name='Try a non-public account',
-        description="Toggle your account to non-public and see what changes.",
+        description="Toggle your account to non-public and see what changes. Settings → toggle the public/private switch.",
         deep_link='/settings',
         kind='db',
         is_engaged=_is_non_public_account,
@@ -393,7 +385,7 @@ PREDICATES: list[FeaturePredicate] = [
         feature_key='view_as',
         versions={'version_w', 'version_q'},
         display_name='Use "View as…" on your profile',
-        description="See how your profile looks to a specific friend or audience.",
+        description="See how your profile looks to a specific friend or audience. Tap **Take me there** → tap the picker at the top to switch perspectives.",
         deep_link='/my/view-as',
         kind='event',
         is_engaged=_make_event_predicate('view_as_picker_opened'),

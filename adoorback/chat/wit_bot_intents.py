@@ -46,6 +46,10 @@ def try_global_command(state, message, user):
     # Text-typed global commands — only fire when no payload (don't eat
     # button taps that happen to have label='faq' etc.)
     if not payload:
+        # Run audit by typing
+        if text in ('run audit', 'audit', 'run_audit'):
+            state_mod.set_intent(state, 'audit', step=0)
+            return audit_handler(state, message, user)
         if text in ('faq', 'help me', 'questions'):
             return _faq_menu(user)
         if text in ('wit?', 'wit', 'witty?'):
@@ -103,11 +107,12 @@ def _quiz_1_options_for_user(user):
     ]
 
 
-def _enter_kickoff_quiz_1(state, user):
+def _enter_kickoff_quiz_1(state, user, retry_intro=None):
     from chat.wit_bot_copy import QUIZ_1_STUDY_REQUIREMENTS as q
     state_mod.set_intent(state, 'kickoff_quiz_1', step=0)
     payload = multi_select(intent='kickoff_quiz_1', options=_quiz_1_options_for_user(user))
-    return [(t(q['prompt'], user), payload)]
+    prompt = retry_intro if retry_intro else t(q['prompt'], user)
+    return [(prompt, payload)]
 
 
 def kickoff_quiz_1_handler(state, message, user):
@@ -129,8 +134,8 @@ def kickoff_quiz_1_handler(state, message, user):
     score = (correct_selected + correct_omitted) / (correct_total + incorrect_total)
 
     lang = getattr(user, 'language', 'en') or 'en'
-    header = "결과:" if lang == 'ko' else "here's how you did:"
-    score_label = "점수" if lang == 'ko' else "score"
+    header = "결과:" if lang == 'ko' else "Here's how you did:"
+    score_label = "점수" if lang == 'ko' else "Score"
     label_missed = "놓침" if lang == 'ko' else "MISSED"
     label_wrong = "오답" if lang == 'ko' else "WRONG"
 
@@ -148,11 +153,22 @@ def kickoff_quiz_1_handler(state, message, user):
     lines.append(f"\n{score_label}: {int(score * 100)}%")
     reveal = "\n".join(lines)
 
-    state_mod.set_progress(state, user.current_ver, 'kickoff', {
-        'quiz_1': {'score': score, 'selected': list(selected)},
-    })
+    # Track attempt history; require ≥80% to advance.
+    prog = state_mod.progress_for(state, user.current_ver)
+    quiz_state = prog.get('kickoff', {}).get('quiz_1', {'attempts': 0})
+    quiz_state['attempts'] = quiz_state.get('attempts', 0) + 1
+    quiz_state['score'] = score
+    quiz_state['selected'] = list(selected)
 
-    return [(reveal, None), *_enter_kickoff_quiz_2(state, user)]
+    if score >= 0.8:
+        quiz_state['passed'] = True
+        state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_1': quiz_state})
+        return [(reveal, None), *_enter_kickoff_quiz_2(state, user)]
+
+    # Below threshold — show reveal and re-render the same multi-select.
+    state_mod.set_progress(state, user.current_ver, 'kickoff', {'quiz_1': quiz_state})
+    retry_label = "80% 이하야. 다시 해봐:" if lang == 'ko' else "Below 80%. Try again:"
+    return [(reveal, None), *_enter_kickoff_quiz_1(state, user, retry_intro=retry_label)]
 
 
 # ---------- kickoff_quiz_2 (single-select swap timing) ----------
@@ -363,7 +379,7 @@ def _build_audit_report(user):
 def audit_handler(state, message, user):
     """Initial entry to audit + branch on user's response."""
     from chat.wit_bot_copy import (
-        AUDIT_BTN_LATER, AUDIT_BTN_LIST, AUDIT_BTN_WALKTHROUGH,
+        AUDIT_ALMOST_THERE, AUDIT_BTN_LATER, AUDIT_BTN_LIST, AUDIT_BTN_WALKTHROUGH,
         AUDIT_HEADER, AUDIT_NOTHING_MISSING, AUDIT_RESULT_TEMPLATE,
         EXPLORE_LATER, JUST_LIST_INTRO,
     )
@@ -413,14 +429,15 @@ def audit_handler(state, message, user):
         'last_missing_count': len(missing),
     })
 
-    return [
-        (t(AUDIT_HEADER, user), None),
-        (body, card_with_buttons([
-            {'label': t(AUDIT_BTN_WALKTHROUGH, user), 'payload': 'audit_walkthrough'},
-            {'label': t(AUDIT_BTN_LIST, user), 'payload': 'audit_just_list'},
-            {'label': t(AUDIT_BTN_LATER, user), 'payload': 'audit_later'},
-        ])),
-    ]
+    out = [(t(AUDIT_HEADER, user), None)]
+    if len(missing) <= 10:
+        out.append((t(AUDIT_ALMOST_THERE, user).format(n=len(missing)), None))
+    out.append((body, card_with_buttons([
+        {'label': t(AUDIT_BTN_WALKTHROUGH, user), 'payload': 'audit_walkthrough'},
+        {'label': t(AUDIT_BTN_LIST, user), 'payload': 'audit_just_list'},
+        {'label': t(AUDIT_BTN_LATER, user), 'payload': 'audit_later'},
+    ])))
+    return out
 
 
 # ---------- Walkthrough ----------
@@ -428,7 +445,8 @@ def audit_handler(state, message, user):
 def _walkthrough_feature_card(predicate, user, mode='walkthrough'):
     """Build a deep_link_card for one feature."""
     from chat.wit_bot_copy import (
-        WALKTHROUGH_MARK_DONE, WALKTHROUGH_SKIP, WALKTHROUGH_TAKE_ME_THERE,
+        WALKTHROUGH_MARK_DONE, WALKTHROUGH_RECHECK, WALKTHROUGH_SKIP,
+        WALKTHROUGH_TAKE_ME_THERE,
     )
 
     text = f"**{predicate.display_name}**\n{predicate.description}"
@@ -441,6 +459,10 @@ def _walkthrough_feature_card(predicate, user, mode='walkthrough'):
         })
 
     if mode == 'walkthrough':
+        buttons.append({
+            'label': t(WALKTHROUGH_RECHECK, user),
+            'payload': f'walkthrough_recheck:{predicate.feature_key}',
+        })
         buttons.append({
             'label': t(WALKTHROUGH_MARK_DONE, user),
             'payload': f'walkthrough_done:{predicate.feature_key}',
@@ -475,7 +497,9 @@ def _enter_walkthrough(state, user):
 
 
 def walkthrough_handler(state, message, user):
-    from chat.wit_bot_copy import WALKTHROUGH_COMPLETE
+    from chat.wit_bot_copy import (
+        WALKTHROUGH_COMPLETE, WALKTHROUGH_RECHECK_FAIL, WALKTHROUGH_RECHECK_OK,
+    )
     from chat.models import OnboardingEvent
     from chat.wit_bot_predicates import predicate_by_key
 
@@ -490,7 +514,20 @@ def walkthrough_handler(state, message, user):
         return [(t(WALKTHROUGH_COMPLETE, user), None)]
 
     advanced = False
-    if payload.startswith('walkthrough_done:'):
+    pre_messages = []  # things to post before the next feature card
+
+    # Re-check: re-run the predicate. If True, advance silently. If False, stay
+    # and tell the user we still don't see it.
+    if payload.startswith('walkthrough_recheck:'):
+        feature_key = payload.split(':', 1)[1]
+        pred = predicate_by_key(feature_key)
+        if pred and pred.is_engaged(user):
+            pre_messages.append((t(WALKTHROUGH_RECHECK_OK, user), None))
+            advanced = True
+        else:
+            return [(t(WALKTHROUGH_RECHECK_FAIL, user), None)]
+
+    elif payload.startswith('walkthrough_done:'):
         feature_key = payload.split(':', 1)[1]
         OnboardingEvent.objects.create(
             user=user, version=user.current_ver,
@@ -506,7 +543,7 @@ def walkthrough_handler(state, message, user):
 
     if index >= len(missing_keys):
         state_mod.set_intent(state, '', step=0)
-        return [(t(WALKTHROUGH_COMPLETE, user), None)]
+        return pre_messages + [(t(WALKTHROUGH_COMPLETE, user), None)]
 
     next_pred = predicate_by_key(missing_keys[index])
     if next_pred is None:
@@ -514,10 +551,10 @@ def walkthrough_handler(state, message, user):
         state_mod.set_progress(state, user.current_ver, 'walkthrough', {'index': index})
         if index >= len(missing_keys):
             state_mod.set_intent(state, '', step=0)
-            return [(t(WALKTHROUGH_COMPLETE, user), None)]
+            return pre_messages + [(t(WALKTHROUGH_COMPLETE, user), None)]
         next_pred = predicate_by_key(missing_keys[index])
 
-    return [_walkthrough_feature_card(next_pred, user, mode='walkthrough')]
+    return pre_messages + [_walkthrough_feature_card(next_pred, user, mode='walkthrough')]
 
 
 # ---------- Boss quiz (end-of-version final exam) ----------

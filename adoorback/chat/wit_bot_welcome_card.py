@@ -13,7 +13,7 @@ from chat.wit_bot_copy import (
     WC_BTN_START_ONBOARDING, WC_BTN_START_VERSION_Q, WC_BTN_START_VERSION_W,
     WC_BTN_TAKE_BOSS_QUIZ, WC_DEFAULT_SILENT, WC_KICKOFF_DONE_PRE_AUDIT,
     WC_MID_FLOW, WC_POST_SWAP_Q, WC_POST_SWAP_W,
-    WC_TIME_TO_ONBOARD_Q, WC_TIME_TO_ONBOARD_W, t,
+    WC_TIME_TO_ONBOARD_Q, WC_TIME_TO_ONBOARD_W, WC_WALKTHROUGH_IN_PROGRESS, t,
 )
 from chat.wit_bot_payloads import card_with_buttons
 
@@ -55,14 +55,24 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             'intro': t(WC_MID_FLOW, user),
         }
 
-    # Mid-walkthrough — offer to resume the audit
-    if state.current_intent in ('audit', 'walkthrough'):
+    # Audit — Resume + fresh Run audit
+    if state.current_intent == 'audit':
         return {
             **card_with_buttons([
                 {'label': t(WC_BTN_RESUME, user), 'payload': 'resume_onboarding'},
                 {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
             ]),
             'intro': t(WC_AUDIT_IN_PROGRESS, user),
+        }
+
+    # Walkthrough — distinct intro so users don't think we're auditing
+    if state.current_intent == 'walkthrough':
+        return {
+            **card_with_buttons([
+                {'label': t(WC_BTN_RESUME, user), 'payload': 'resume_onboarding'},
+                {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
+            ]),
+            'intro': t(WC_WALKTHROUGH_IN_PROGRESS, user),
         }
 
     # Kickoff complete → audit / boss-quiz CTAs (V2_WINDOW_START still tracks the

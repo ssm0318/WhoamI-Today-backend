@@ -135,14 +135,18 @@ class EngineDispatchTests(TestCase):
         prog = state_mod.progress_for(state, 'version_w')
         self.assertGreaterEqual(prog['kickoff']['quiz_1']['score'], 0.99)
 
-    def test_quiz_1_partial_advances_anyway(self):
+    def test_quiz_1_below_threshold_retries(self):
+        """Quiz 1 requires ≥80% to advance — partial credit re-renders the quiz."""
         self._send_choice('start_onboarding')
         self._send_choice('kickoff_welcome_continue')
         self._send_multi_select_response('kickoff_quiz_1', ['pre_study'])
         state = state_mod.get_or_create_state(self.alice)
-        self.assertEqual(state.current_intent, 'kickoff_quiz_2')
+        # Stayed in kickoff_quiz_1 for retry
+        self.assertEqual(state.current_intent, 'kickoff_quiz_1')
         prog = state_mod.progress_for(state, 'version_w')
-        self.assertLess(prog['kickoff']['quiz_1']['score'], 0.99)
+        self.assertLess(prog['kickoff']['quiz_1']['score'], 0.8)
+        self.assertFalse(prog['kickoff']['quiz_1'].get('passed', False))
+        self.assertEqual(prog['kickoff']['quiz_1']['attempts'], 1)
 
     # ---------- Task 9 — kickoff_quiz_2 ----------
 
