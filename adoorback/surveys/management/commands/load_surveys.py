@@ -1,10 +1,22 @@
 """Load Survey content from a YAML/JSON fixture.
 
-Two YAML extensions are supported on top of stock anchors/aliases:
+Three YAML extensions are supported on top of stock anchors/aliases:
 
   1. The standard `&name` / `*name` for sharing a single mapping.
   2. A custom `_include: <anchor_name>` directive at any list position. The
      loader replaces the entry with the full anchored sequence.
+  3. Two source-text shorthands, applied via a text preprocessor before the
+     YAML parser sees the file:
+       (a) Top-level `_<name>: &<anchor>` mapping entries (anchor definitions
+           sitting alongside top-level survey list items) are auto-wrapped
+           into the standard list-of-mappings form, so authors don't have
+           to manually wrap each anchor as a `- slug: _name\n  questions: &…`
+           holder. The anchor block's content is re-indented to fit.
+       (b) `<<: *<anchor>` — the YAML merge key — is rewritten to
+           `_include: <anchor>` whenever the anchor target is a sequence.
+           Stock YAML's merge key only works on mapping targets; this
+           shorthand makes sequence merging uniform with our `_include`
+           directive.
 
 Example:
 
@@ -35,6 +47,7 @@ treated as anchor-only — never persisted as a Survey. PyYAML keeps the
 anchor live for downstream `*` references, so this is the standard pattern
 for "shared bank, not a survey."
 """
+import re
 from pathlib import Path
 
 import yaml
@@ -76,6 +89,7 @@ class Command(BaseCommand):
             raise CommandError(f'Fixture not found: {path}')
         text = path.read_text(encoding='utf-8')
         if path.suffix in {'.yaml', '.yml'}:
+            text = _preprocess_yaml_text(text)
             anchor_lookup = _load_yaml_with_anchor_lookup(text)
             data = anchor_lookup['data']
             anchors = anchor_lookup['anchors']
@@ -197,6 +211,91 @@ class Command(BaseCommand):
                     f'(positions {seen[slug]} and {idx})'
                 )
             seen[slug] = idx
+
+
+def _preprocess_yaml_text(text: str) -> str:
+    """Apply two source-text rewrites that make the long-form study YAML
+    parse as a uniform list-of-mappings.
+
+    1. Top-level `_<name>: &<anchor>` mapping entries are wrapped as
+       anchor-only Survey list items. The anchor block's content lines are
+       re-indented from 2-space to 4-space depth so they sit under the new
+       `questions:` key.
+    2. `<<: *<anchor>` (the YAML merge key) is rewritten to
+       `_include: <anchor>` so sequence anchors can be spliced via our
+       custom directive — stock YAML merge only works on mapping targets.
+
+    The preprocessor is conservative: it only touches lines that match the
+    exact patterns and otherwise passes the input through unchanged.
+    """
+    text = _wrap_top_level_anchor_blocks(text)
+    text = _rewrite_merge_key_to_include(text)
+    return text
+
+
+_TOP_LEVEL_ANCHOR_RE = re.compile(r'^_(\w+):\s*&(\w+)\s*$')
+
+
+def _wrap_top_level_anchor_blocks(text: str) -> str:
+    """Rewrite top-level `_name: &anchor` blocks as wrapped Survey list items.
+
+    Before:
+        _tie_outcomes_block: &tie_outcomes_block
+          - order: 1
+            ...
+
+    After:
+        - slug: _tie_outcomes_block
+          questions: &tie_outcomes_block
+            - order: 1
+              ...
+
+    The original block's content lines (indented) get an extra 2 spaces
+    prepended so they nest under `questions:` at the same effective depth.
+    """
+    lines = text.split('\n')
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = _TOP_LEVEL_ANCHOR_RE.match(line)
+        if not m:
+            out.append(line)
+            i += 1
+            continue
+        name, anchor = m.groups()
+        out.append(f'- slug: _{name}')
+        out.append(f'  questions: &{anchor}')
+        i += 1
+        # Consume the indented block. A line that's empty OR starts with
+        # whitespace belongs to the block; a non-empty unindented line
+        # ends it.
+        while i < len(lines):
+            block_line = lines[i]
+            if block_line and not block_line[0].isspace():
+                break
+            # Re-indent: original block's leading whitespace + 2 extra spaces
+            # for the new nesting depth. Empty lines pass through unchanged.
+            if block_line:
+                out.append('  ' + block_line)
+            else:
+                out.append(block_line)
+            i += 1
+    return '\n'.join(out)
+
+
+_MERGE_KEY_RE = re.compile(r'(\s)<<:\s*\*(\w+)')
+
+
+def _rewrite_merge_key_to_include(text: str) -> str:
+    """Rewrite `<<: *anchor` to `_include: anchor`.
+
+    The leading whitespace is preserved so indentation stays correct. Stock
+    YAML merge keys (`<<:`) only merge mapping anchors; for our long-form
+    fixtures every `<<:` use is a sequence merge that needs `_include`
+    semantics, so a blanket rewrite is safe within these files.
+    """
+    return _MERGE_KEY_RE.sub(r'\1_include: \2', text)
 
 
 def _load_yaml_with_anchor_lookup(text: str) -> dict:

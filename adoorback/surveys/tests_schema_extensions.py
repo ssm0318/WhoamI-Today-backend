@@ -30,6 +30,11 @@ from surveys.aggregation import (
     _likert_range,
     group_panels,
 )
+from surveys.management.commands.load_surveys import (
+    _preprocess_yaml_text,
+    _rewrite_merge_key_to_include,
+    _wrap_top_level_anchor_blocks,
+)
 from surveys.models import (
     DISPLAY_ONLY,
     LIKERT_3,
@@ -491,6 +496,119 @@ class LoadSurveysIncludeTests(TestCase):
             """)
             with self.assertRaises(CommandError):
                 call_command('load_surveys', str(yml))
+
+
+# ---------------------------------------------------------------------------
+# YAML preprocessor: top-level anchor wrap + merge-key → _include rewrite
+# ---------------------------------------------------------------------------
+class YamlPreprocessorTests(TestCase):
+    def test_top_level_anchor_block_is_wrapped(self):
+        src = textwrap.dedent("""
+            _block: &block
+              - order: 1
+                slug: q1
+
+            - slug: my_survey
+              questions:
+                - _include: block
+        """).strip()
+        out = _wrap_top_level_anchor_blocks(src)
+        # The original `_block: &block` line is replaced with a wrapped
+        # Survey holder.
+        self.assertIn('- slug: _block', out)
+        self.assertIn('  questions: &block', out)
+        # The block's content is re-indented by 2 extra spaces (was at depth
+        # 2, now at depth 4 under `questions:`).
+        self.assertIn('    - order: 1', out)
+        # The unrelated survey list item passes through unchanged.
+        self.assertIn('- slug: my_survey', out)
+
+    def test_merge_key_rewritten_to_include(self):
+        src = textwrap.dedent("""
+            questions:
+              - <<: *shared_block
+              - <<: *another_block
+        """).strip()
+        out = _rewrite_merge_key_to_include(src)
+        self.assertIn('- _include: shared_block', out)
+        self.assertIn('- _include: another_block', out)
+        self.assertNotIn('<<: *', out)
+
+    def test_preprocessor_handles_full_hybrid_format(self):
+        """End-to-end: an author writes top-level anchor mappings + uses
+        `<<: *anchor` for sequence merge. The preprocessed text loads cleanly.
+        """
+        src = textwrap.dedent("""
+            _shared_questions: &shared_questions
+              - order: 1
+                slug: shared_q1
+                type: likert_5
+                prompt: { en: 'sq1' }
+              - order: 2
+                slug: shared_q2
+                type: likert_5
+                prompt: { en: 'sq2' }
+
+            - slug: my_survey
+              title: { en: 'M' }
+              questions:
+                - <<: *shared_questions
+                - { order: 99, slug: extra, type: likert_5, prompt: { en: 'x' } }
+        """).strip()
+        with TemporaryDirectory() as td:
+            path = Path(td) / 'h.yaml'
+            path.write_text(src)
+            call_command('load_surveys', str(path), stdout=StringIO())
+        survey = Survey.objects.get(slug='my_survey')
+        slugs = list(survey.questions.order_by('order').values_list('slug', flat=True))
+        self.assertEqual(slugs, ['shared_q1', 'shared_q2', 'extra'])
+
+    def test_preprocessor_passthrough_when_no_patterns_match(self):
+        """A normal valid YAML (no top-level anchors, no merge keys) is unchanged."""
+        src = textwrap.dedent("""
+            - slug: plain
+              title: { en: 'P' }
+              questions:
+                - { order: 1, slug: q, type: likert_5, prompt: { en: 'p' } }
+        """).strip()
+        self.assertEqual(_preprocess_yaml_text(src), src)
+
+
+# ---------------------------------------------------------------------------
+# SurveyOption.value JSONField — int and string codes both supported
+# ---------------------------------------------------------------------------
+class SurveyOptionStringValuesTests(TestCase):
+    def test_string_valued_option_loads_and_aggregates(self):
+        u = User.objects.create(username='sv', email='sv@x.com')
+        with TemporaryDirectory() as td:
+            tmp = Path(td)
+            yml = _write_yaml(tmp, 'sv.yaml', """
+                - slug: cat_survey
+                  title: { en: 'C' }
+                  questions:
+                    - order: 1
+                      slug: q1
+                      type: single_choice
+                      prompt: { en: 'pick one' }
+                      options:
+                        - { order: 1, value: 'yes',   label: { en: 'Y' } }
+                        - { order: 2, value: 'no',    label: { en: 'N' } }
+                        - { order: 3, value: 'maybe', label: { en: 'M' } }
+            """)
+            call_command('load_surveys', str(yml), stdout=StringIO())
+        s = Survey.objects.get(slug='cat_survey')
+        opts = list(s.questions.first().options.order_by('order'))
+        self.assertEqual([o.value for o in opts], ['yes', 'no', 'maybe'])
+
+        # Submit an answer with the string value and confirm aggregation
+        # buckets it under the matching option.
+        q = s.questions.first()
+        r = SurveyResponse.objects.create(user=u, survey=s)
+        SurveyAnswer.objects.create(response=r, question=q, value='maybe')
+        out = OptionCountsStrategy().build(s, [q], [u.id], u.id)
+        counts = {o['value']: o['count'] for o in out['options']}
+        self.assertEqual(counts, {'yes': 0, 'no': 0, 'maybe': 1})
+        self.assertEqual(out['user_choice'], 'maybe')
 
 
 # ---------------------------------------------------------------------------
