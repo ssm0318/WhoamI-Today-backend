@@ -52,6 +52,9 @@
     en: ""
   friend_visible: false
   results_hidden: true
+  # Highest priority — surfaces first in the index, ahead of editable
+  # endpoint surveys (priority 100). One-shot: not editable, not repeatable.
+  priority: 200
 
   questions:
 

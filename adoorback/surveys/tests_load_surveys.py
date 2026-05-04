@@ -63,3 +63,35 @@ class LoadSurveysCommandTests(TestCase):
         call_command('load_surveys', str(path2), '--replace-questions')
         s = Survey.objects.get(slug='unit_test_a')
         self.assertEqual(s.questions.get().prompt_en, 'NEW')
+
+    def test_loader_picks_up_editable_closed_priority(self):
+        """The loader must read editable / closed / priority from YAML —
+        regression for the June 1 audit bug where these silently defaulted
+        to False/False/0 and disabled both the editable-survey UX and the
+        priority sort."""
+        sample = [
+            {
+                'slug': 'flags_test',
+                'type': 'likert_5',
+                'title': {'en': 'F', 'ko': 'F'},
+                'description': {'en': 'd', 'ko': 'd'},
+                'interpretation': {'en': '', 'ko': ''},
+                'editable': True,
+                'closed': False,
+                'priority': 200,
+                'questions': [
+                    {
+                        'order': 1,
+                        'prompt': {'en': 'p', 'ko': 'p'},
+                        'low_label': {'en': 'lo', 'ko': 'lo'},
+                        'high_label': {'en': 'hi', 'ko': 'hi'},
+                    },
+                ],
+            },
+        ]
+        path = self._write_fixture(sample)
+        call_command('load_surveys', str(path))
+        s = Survey.objects.get(slug='flags_test')
+        self.assertTrue(s.editable)
+        self.assertFalse(s.closed)
+        self.assertEqual(s.priority, 200)

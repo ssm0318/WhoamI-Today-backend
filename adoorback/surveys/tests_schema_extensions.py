@@ -1399,6 +1399,37 @@ class TargetUserGroupSchedulingTests(TestCase):
         self.assertIn('feature_eval_w', slugs_w)
         self.assertNotIn('feature_eval_w', slugs_q)
 
+    def test_target_group_overrides_slug_suffix_routing(self):
+        """A `_w`-suffixed slug with target_user_group='group_q_first' must
+        reach q-users — schedule-level routing wins over slug-suffix.
+
+        This is the Day-19 case for feature_eval_w: q-first users get a
+        second scheduled row pointing at the same Survey content so they
+        can evaluate Ver.W after the biweekly crossover.
+        """
+        from unittest.mock import patch
+
+        s = Survey.objects.create(slug='feature_eval_w', title_en='F', title_ko='F')
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        # Same survey, scheduled for the OTHER group via target_user_group.
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='endpoint',
+            window_start=self.today, window_end=None,
+            allow_late=True, sequence_index=803,
+            target_user_group='group_q_first',
+        )
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx_q = get_survey_index(self.user_q)
+            idx_w = get_survey_index(self.user_w)
+        # q-user sees it (target_user_group beats _w suffix).
+        slugs_q = {x.survey.slug for x in idx_q['available_now']}
+        self.assertIn('feature_eval_w', slugs_q)
+        # w-user does NOT — only the q-targeted row exists in this test.
+        slugs_w = {x.survey.slug for x in idx_w['available_now']}
+        self.assertNotIn('feature_eval_w', slugs_w)
+
 
 class PrioritySortTests(TestCase):
     def setUp(self):
@@ -1427,6 +1458,60 @@ class PrioritySortTests(TestCase):
             idx = get_survey_index(self.user)
         slugs = [s.survey.slug for s in idx['available_now']]
         self.assertEqual(slugs, ['high_pri', 'mid_pri', 'low_pri'])
+
+
+class EditableIndexBucketingTests(TestCase):
+    """Editable surveys stay in available_now after submission until
+    `closed=True`, so respondents can re-open and edit their answers.
+    Once closed, the row drops to completed."""
+
+    def setUp(self):
+        from datetime import date as _date
+
+        self.today = _date(2026, 5, 18)
+        self.user = User.objects.create(
+            username='eb', email='eb@x.com', user_group='group_w_first',
+        )
+
+    def _setup_editable(self, slug):
+        s = Survey.objects.create(
+            slug=slug, title_en='E', title_ko='E', editable=True,
+        )
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='endpoint',
+            window_start=self.today, window_end=None,
+            allow_late=True, sequence_index=910,
+        )
+        return s
+
+    def test_answered_editable_open_stays_in_available_not_completed(self):
+        from unittest.mock import patch
+
+        s = self._setup_editable('eb_open')
+        SurveyResponse.objects.create(user=self.user, survey=s)
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx = get_survey_index(self.user)
+        avail_slugs = {x.survey.slug for x in idx['available_now']}
+        comp_slugs = {x.survey.slug for x in idx['completed']}
+        self.assertIn('eb_open', avail_slugs)
+        self.assertNotIn('eb_open', comp_slugs)
+
+    def test_answered_editable_closed_moves_to_completed(self):
+        from unittest.mock import patch
+
+        s = self._setup_editable('eb_closed')
+        SurveyResponse.objects.create(user=self.user, survey=s)
+        s.closed = True
+        s.save(update_fields=['closed'])
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx = get_survey_index(self.user)
+        avail_slugs = {x.survey.slug for x in idx['available_now']}
+        comp_slugs = {x.survey.slug for x in idx['completed']}
+        self.assertNotIn('eb_closed', avail_slugs)
+        self.assertIn('eb_closed', comp_slugs)
 
 
 # ---------------------------------------------------------------------------

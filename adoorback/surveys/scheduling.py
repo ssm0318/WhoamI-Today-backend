@@ -94,20 +94,21 @@ def routes_to_user(survey, user) -> bool:
 def schedule_routes_to_user(scheduled, user) -> bool:
     """True when this scheduled row is visible to `user`.
 
-    Two layers of routing — survey-level (slug-suffix `_w` / `_q`) AND
-    schedule-level (`ScheduledSurvey.target_user_group`). The schedule-level
-    field lets the SAME survey content be scheduled twice with different
-    windows per group (e.g. feature_eval_w opens Day 5 for w_first /
-    Day 19 for q_first), without needing two distinct slugs.
+    Routing priority — schedule-level (`ScheduledSurvey.target_user_group`)
+    OVERRIDES survey-level (slug-suffix `_w` / `_q`) when explicitly set.
+    Without that override, a slug like `feature_eval_w` would never reach
+    a `group_q_first` user even though the q-first row is intentionally
+    scheduled for them in Phase 2 (Day 19) so they can evaluate Ver.W
+    after the biweekly crossover.
+
+    When `target_user_group` is empty, fall back to slug-suffix routing
+    (the original behavior — used by mid_study_w / mid_study_q etc.).
     """
-    if not routes_to_user(scheduled.survey, user):
-        return False
     target = getattr(scheduled, 'target_user_group', '') or ''
     if target:
         user_group = getattr(user, 'user_group', '') or ''
-        if user_group != target:
-            return False
-    return True
+        return user_group == target
+    return routes_to_user(scheduled.survey, user)
 
 
 # Backward-compat alias. Existing callers in this module still use the
@@ -201,10 +202,18 @@ def get_survey_index(user):
         ScheduledSurvey.objects.select_related('survey'), user,
     )
 
+    # Editable surveys whose researcher hasn't closed them stay in
+    # available_now even after the user submits — they can re-open and
+    # overwrite their answers until the survey is closed. They still
+    # carry `user_answered=True` so the frontend can render an "Edit"
+    # affordance instead of "Start". Once `survey.closed` flips to True,
+    # the row drops out of available_now and surfaces in completed.
+    editable_open = Q(survey__editable=True, survey__closed=False)
+
     available = list(
         qs.filter(window_start__lte=today)
           .filter(Q(window_end__isnull=True) | Q(window_end__gte=today))
-          .filter(user_answered=False)
+          .filter(Q(user_answered=False) | editable_open)
     )
     late = list(
         qs.filter(
@@ -213,7 +222,13 @@ def get_survey_index(user):
             user_answered=False,
         )
     )
-    completed = list(qs.filter(user_answered=True))
+    # Completed: answered AND (not editable OR closed). Keeps editable
+    # surveys exclusively in available_now (single source of truth) while
+    # they're still re-openable.
+    completed = list(
+        qs.filter(user_answered=True)
+          .filter(Q(survey__editable=False) | Q(survey__closed=True))
+    )
 
     user_data = _user_embedded_data(user)
 

@@ -143,6 +143,14 @@ class Command(BaseCommand):
             'tokens': entry.get('tokens', {}) or {},
             'repeatable': entry.get('repeatable', False),
             'serving_condition': entry.get('serving_condition', {}) or {},
+            # Persistent / editable surveys (feature_eval_w, goal_comparison_*).
+            # `editable` lets a respondent re-open and overwrite their answers
+            # until the researcher flips `closed=True`. `priority` is the sort
+            # key for the index buckets so high-stakes endpoint surveys
+            # surface ahead of routine reflections.
+            'editable': entry.get('editable', False),
+            'closed': entry.get('closed', False),
+            'priority': entry.get('priority', 0),
         }
         survey, created = Survey.objects.update_or_create(slug=slug, defaults=defaults)
 
