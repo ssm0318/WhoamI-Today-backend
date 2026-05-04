@@ -142,3 +142,43 @@ WIDGET_REJECTED_DM_TEMPLATE = (
     "oh no — admin says: \"{reason}\". "
     "could you redo the screenshot? you can do this. send when ready."
 )
+
+# ---------- Audit / walkthrough ----------
+
+AUDIT_HEADER = "audit time. *summons the spreadsheet of your participation*"
+
+AUDIT_RESULT_TEMPLATE = (
+    "engaged ({engaged_count}):\n{engaged_list}\n\n"
+    "not yet ({missing_count}):\n{missing_list}\n\n"
+    "how do you want to play this?"
+)
+
+AUDIT_NOTHING_MISSING = (
+    "you've tried EVERYTHING. you legend. *single-owl standing ovation*\n"
+    "the boss quiz is coming soon. for now, idle."
+)
+
+WALKTHROUGH_INTRO = (
+    "ok let's walk through what's left. one at a time. "
+    "tap **Take me there** to try, **Mark as done** if you already have, "
+    "or **Skip for now**."
+)
+
+WALKTHROUGH_FEATURE_TEMPLATE = (
+    "{index}/{total}  •  {display_name}\n{description}"
+)
+
+WALKTHROUGH_COMPLETE = (
+    "that's the list done. nice. "
+    "use **Run audit** anytime to re-check yourself."
+)
+
+JUST_LIST_INTRO = (
+    "here's the missing list with deep-links. "
+    "explore on your own time and **Run audit** when you want me to re-check."
+)
+
+EXPLORE_LATER = (
+    "ok — i'll be silent. "
+    "use **Run audit** when you want me to re-check."
+)

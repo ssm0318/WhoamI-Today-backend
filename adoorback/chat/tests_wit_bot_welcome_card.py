@@ -39,9 +39,19 @@ class WelcomeCardTests(TestCase):
         labels = [b['label'] for b in payload['buttons']]
         self.assertIn('Resume onboarding', labels)
 
-    def test_kickoff_complete_shows_no_button_pre_swap(self):
+    def test_kickoff_complete_shows_run_audit_button(self):
+        """After kickoff but no audit run (or audit not 100%), Run audit button shows."""
         state = state_mod.get_or_create_state(self.alice)
         state_mod.set_progress(state, 'version_w', 'kickoff', {'completed': True})
+        payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 5, 5))
+        labels = [b['label'] for b in payload['buttons']]
+        self.assertIn('Run audit', labels)
+
+    def test_audit_complete_shows_no_button_pre_swap(self):
+        """After audit confirms 0 missing, button disappears."""
+        state = state_mod.get_or_create_state(self.alice)
+        state_mod.set_progress(state, 'version_w', 'kickoff', {'completed': True})
+        state_mod.set_progress(state, 'version_w', 'audit', {'last_missing_count': 0})
         payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 5, 5))
         self.assertEqual(payload.get('buttons', []), [])
         self.assertIn('May 18', payload['intro'])

@@ -27,6 +27,10 @@ def idle_handler(state, message, user):
         handler = HANDLERS.get(state.current_intent, idle_handler)
         return handler(state, message, user)
 
+    if payload == 'run_audit':
+        state_mod.set_intent(state, 'audit', step=0)
+        return audit_handler(state, message, user)
+
     return [
         ("not sure what that was. try the welcome card up top, or type `wit?`.", None),
     ]
@@ -255,6 +259,195 @@ def _enter_kickoff_complete(state, user):
     return [(WRAP_KICKOFF, None)]
 
 
+# ---------- Audit ----------
+
+def _predicate_status(predicate, user):
+    """Return 'engaged' | 'self_reported' | 'not_yet'."""
+    from chat.models import OnboardingEvent
+    if predicate.is_engaged(user):
+        return 'engaged'
+    if OnboardingEvent.objects.filter(
+        user=user, event_key=f'self_report:{predicate.feature_key}',
+    ).exists():
+        return 'self_reported'
+    return 'not_yet'
+
+
+def _build_audit_report(user):
+    """Run all predicates for the user's version, return (engaged, missing) lists."""
+    from chat.wit_bot_predicates import predicates_for
+    engaged = []
+    missing = []
+    for pred in predicates_for(user.current_ver):
+        status = _predicate_status(pred, user)
+        if status in ('engaged', 'self_reported'):
+            engaged.append(pred)
+        else:
+            missing.append(pred)
+    return engaged, missing
+
+
+def audit_handler(state, message, user):
+    """Initial entry to audit + branch on user's response."""
+    from chat.wit_bot_copy import (
+        AUDIT_HEADER, AUDIT_RESULT_TEMPLATE, AUDIT_NOTHING_MISSING,
+        EXPLORE_LATER, JUST_LIST_INTRO,
+    )
+    from chat.wit_bot_payloads import card_with_buttons
+
+    payload = (message.bot_payload or {}).get('payload', '')
+
+    # Branch on follow-up choice
+    if payload == 'audit_walkthrough':
+        return _enter_walkthrough(state, user)
+    if payload == 'audit_just_list':
+        _, missing = _build_audit_report(user)
+        if not missing:
+            state_mod.set_intent(state, '', step=0)
+            return [(AUDIT_NOTHING_MISSING, None)]
+        out = [(JUST_LIST_INTRO, None)]
+        for pred in missing:
+            out.append(_walkthrough_feature_card(pred, mode='list'))
+        state_mod.set_intent(state, '', step=0)
+        return out
+    if payload == 'audit_later':
+        state_mod.set_intent(state, '', step=0)
+        return [(EXPLORE_LATER, None)]
+
+    # Default: fresh audit run
+    engaged, missing = _build_audit_report(user)
+
+    if not missing:
+        state_mod.set_intent(state, '', step=0)
+        state_mod.set_progress(state, user.current_ver, 'audit', {
+            'last_engaged_count': len(engaged),
+            'last_missing_count': 0,
+        })
+        return [(AUDIT_HEADER, None), (AUDIT_NOTHING_MISSING, None)]
+
+    engaged_lines = "\n".join(f"  ✓ {p.display_name}" for p in engaged) or "  (nothing yet)"
+    missing_lines = "\n".join(f"  ⏳ {p.display_name}" for p in missing)
+    body = AUDIT_RESULT_TEMPLATE.format(
+        engaged_count=len(engaged),
+        engaged_list=engaged_lines,
+        missing_count=len(missing),
+        missing_list=missing_lines,
+    )
+    state_mod.set_progress(state, user.current_ver, 'audit', {
+        'last_engaged_count': len(engaged),
+        'last_missing_count': len(missing),
+    })
+
+    return [
+        (AUDIT_HEADER, None),
+        (body, card_with_buttons([
+            {'label': 'Walk me through them', 'payload': 'audit_walkthrough'},
+            {'label': 'Just give me the list', 'payload': 'audit_just_list'},
+            {'label': "I'll explore, audit me later", 'payload': 'audit_later'},
+        ])),
+    ]
+
+
+# ---------- Walkthrough ----------
+
+def _walkthrough_feature_card(predicate, mode='walkthrough'):
+    """Build a deep_link_card for one feature.
+
+    mode='walkthrough' → 3 buttons: Take me there / Mark as done / Skip
+    mode='list' → 1 button: Take me there
+    """
+    from chat.wit_bot_payloads import card_with_buttons
+
+    text = f"**{predicate.display_name}**\n{predicate.description}"
+
+    buttons = []
+    if predicate.deep_link:
+        buttons.append({'label': 'Take me there', 'navigate_to': predicate.deep_link})
+
+    if mode == 'walkthrough':
+        buttons.append({
+            'label': 'Mark as done',
+            'payload': f'walkthrough_done:{predicate.feature_key}',
+        })
+        buttons.append({
+            'label': 'Skip for now',
+            'payload': f'walkthrough_skip:{predicate.feature_key}',
+        })
+
+    return (text, card_with_buttons(buttons))
+
+
+def _enter_walkthrough(state, user):
+    from chat.wit_bot_copy import WALKTHROUGH_INTRO, AUDIT_NOTHING_MISSING
+
+    _, missing = _build_audit_report(user)
+    if not missing:
+        state_mod.set_intent(state, '', step=0)
+        return [(AUDIT_NOTHING_MISSING, None)]
+
+    state_mod.set_intent(state, 'walkthrough', step=0)
+    state_mod.set_progress(state, user.current_ver, 'walkthrough', {
+        'missing_keys': [p.feature_key for p in missing],
+        'index': 0,
+    })
+
+    first = missing[0]
+    return [
+        (WALKTHROUGH_INTRO, None),
+        _walkthrough_feature_card(first, mode='walkthrough'),
+    ]
+
+
+def walkthrough_handler(state, message, user):
+    from chat.wit_bot_copy import WALKTHROUGH_COMPLETE
+    from chat.models import OnboardingEvent
+    from chat.wit_bot_predicates import predicate_by_key
+
+    payload = (message.bot_payload or {}).get('payload', '')
+    prog = state_mod.progress_for(state, user.current_ver)
+    walk = prog.get('walkthrough', {})
+    missing_keys = walk.get('missing_keys', [])
+    index = walk.get('index', 0)
+
+    if not missing_keys:
+        state_mod.set_intent(state, '', step=0)
+        return [(WALKTHROUGH_COMPLETE, None)]
+
+    # Process current feature's response
+    advanced = False
+    if payload.startswith('walkthrough_done:'):
+        feature_key = payload.split(':', 1)[1]
+        OnboardingEvent.objects.create(
+            user=user, version=user.current_ver,
+            event_key=f'self_report:{feature_key}',
+        )
+        advanced = True
+    elif payload.startswith('walkthrough_skip:'):
+        advanced = True
+
+    if advanced:
+        index += 1
+        state_mod.set_progress(state, user.current_ver, 'walkthrough', {'index': index})
+
+    # If done, wrap up
+    if index >= len(missing_keys):
+        state_mod.set_intent(state, '', step=0)
+        return [(WALKTHROUGH_COMPLETE, None)]
+
+    # Otherwise, send next feature card
+    next_pred = predicate_by_key(missing_keys[index])
+    if next_pred is None:
+        # Skip stale entries
+        index += 1
+        state_mod.set_progress(state, user.current_ver, 'walkthrough', {'index': index})
+        if index >= len(missing_keys):
+            state_mod.set_intent(state, '', step=0)
+            return [(WALKTHROUGH_COMPLETE, None)]
+        next_pred = predicate_by_key(missing_keys[index])
+
+    return [_walkthrough_feature_card(next_pred, mode='walkthrough')]
+
+
 # ---------- Dispatch table ----------
 
 HANDLERS = {
@@ -266,4 +459,6 @@ HANDLERS = {
     'kickoff_push': kickoff_push_handler,
     'kickoff_friend': kickoff_friend_handler,
     'kickoff_widget': kickoff_widget_handler,
+    'audit': audit_handler,
+    'walkthrough': walkthrough_handler,
 }

@@ -236,6 +236,89 @@ class EngineDispatchTests(TestCase):
         labels = [b['label'] for b in welcome_msgs.first().bot_payload['buttons']]
         self.assertIn('Resume onboarding', labels)
 
+    # ---------- V1.1 — Audit handler ----------
+
+    def _complete_kickoff(self):
+        """Mark kickoff complete in state, return to idle."""
+        state = state_mod.get_or_create_state(self.alice)
+        state_mod.set_intent(state, '', step=0)
+        state_mod.set_progress(state, 'version_w', 'kickoff', {'completed': True})
+
+    def test_run_audit_from_idle_enters_audit(self):
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, 'audit')
+        # Bot replied with header + result body
+        replies = self._bot_replies().exclude(event_type='wit_welcome_card')
+        latest = replies.order_by('-created_at').first()
+        self.assertIn('not yet', latest.content.lower())
+
+    def test_audit_walkthrough_button_enters_walkthrough(self):
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        self._send_choice('audit_walkthrough')
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, 'walkthrough')
+
+    def test_audit_just_list_returns_to_idle(self):
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        self._send_choice('audit_just_list')
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, '')
+
+    def test_audit_later_returns_to_idle(self):
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        self._send_choice('audit_later')
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, '')
+
+    # ---------- V1.1 — Walkthrough handler ----------
+
+    def test_walkthrough_done_logs_self_report_and_advances(self):
+        from chat.models import OnboardingEvent
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        self._send_choice('audit_walkthrough')
+        # State now has missing list, index=0
+        state = state_mod.get_or_create_state(self.alice)
+        prog = state_mod.progress_for(state, 'version_w')
+        first_key = prog['walkthrough']['missing_keys'][0]
+
+        before_count = OnboardingEvent.objects.filter(
+            user=self.alice, event_key=f'self_report:{first_key}',
+        ).count()
+        self._send_choice(f'walkthrough_done:{first_key}')
+
+        after_count = OnboardingEvent.objects.filter(
+            user=self.alice, event_key=f'self_report:{first_key}',
+        ).count()
+        self.assertEqual(after_count, before_count + 1)
+
+        state.refresh_from_db()
+        prog = state_mod.progress_for(state, 'version_w')
+        self.assertEqual(prog['walkthrough']['index'], 1)
+
+    def test_walkthrough_skip_advances_no_event(self):
+        from chat.models import OnboardingEvent
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        self._send_choice('audit_walkthrough')
+        state = state_mod.get_or_create_state(self.alice)
+        prog = state_mod.progress_for(state, 'version_w')
+        first_key = prog['walkthrough']['missing_keys'][0]
+
+        before = OnboardingEvent.objects.filter(user=self.alice).count()
+        self._send_choice(f'walkthrough_skip:{first_key}')
+        after = OnboardingEvent.objects.filter(user=self.alice).count()
+        self.assertEqual(after, before)
+
+        state.refresh_from_db()
+        prog = state_mod.progress_for(state, 'version_w')
+        self.assertEqual(prog['walkthrough']['index'], 1)
+
     # ---------- Task 13 — kickoff_widget ----------
 
     def test_widget_screenshot_creates_record_and_completes(self):

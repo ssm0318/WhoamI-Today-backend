@@ -37,12 +37,31 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             'intro': 'we were in the middle of something.',
         }
 
-    # V1 complete, waiting for swap
-    if completed and now < V2_WINDOW_START and version == 'version_w':
+    # Mid-walkthrough — offer to resume the audit
+    if state.current_intent in ('audit', 'walkthrough'):
         return {
-            'kind': 'card',
-            'intro': "see you May 18 for the swap.",
-            'buttons': [],
+            **card_with_buttons([
+                {'label': 'Resume', 'payload': 'resume_onboarding'},
+                {'label': 'Run audit', 'payload': 'run_audit'},
+            ]),
+            'intro': "audit in progress. resume or rerun?",
+        }
+
+    # Kickoff complete → audit CTA (until V1 fully done)
+    if completed and version == 'version_w' and now < V2_WINDOW_START:
+        audit = progress.get('audit', {})
+        last_missing = audit.get('last_missing_count')
+        if last_missing == 0:
+            return {
+                'kind': 'card',
+                'intro': "you've tried everything. see you May 18 for the swap.",
+                'buttons': [],
+            }
+        return {
+            **card_with_buttons([
+                {'label': 'Run audit', 'payload': 'run_audit'},
+            ]),
+            'intro': "kickoff done. tap **Run audit** when you've explored more.",
         }
 
     # Pre-window
