@@ -12,6 +12,9 @@ urlpatterns = [
     path('entries/<int:pk>/', views.ArchiveEntryDelete.as_view(), name='archive-entry-delete'),
     path('entries/<int:pk>/pin/', views.ArchiveEntryPinToggle.as_view(), name='archive-entry-pin'),
     path('entries/<int:pk>/pin_visibility/', views.ArchiveEntryPinVisibility.as_view(), name='archive-entry-pin-visibility'),
+    path('entries/<int:pk>/acknowledge/', views.PrivateAcknowledgmentToggle.as_view(), name='archive-entry-acknowledge'),
+    path('entries/<int:pk>/acknowledgments/', views.ArchiveEntryAcknowledgments.as_view(), name='archive-entry-acknowledgments'),
+    path('entries/<int:pk>/private-comments/', views.ArchiveEntryPrivateComments.as_view(), name='archive-entry-private-comments'),
 
     path('song/', views.CurrentSong.as_view(), name='current-song'),
     path('song/<int:pk>/', views.SongDetail.as_view(), name='my-song-detail'),

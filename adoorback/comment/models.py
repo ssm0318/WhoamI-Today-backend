@@ -94,14 +94,23 @@ def create_noti(instance, created, **kwargs):
 
     # if is_reply
     if origin.type == 'Comment':
-        redirect_url = f'/{origin.target.type.lower()}s/{origin.target.id}'
-        # send a notification to the author of the origin comment
         post = origin.target
+        if post.type == 'CheckInComponentEntry':
+            redirect_url = f'/users/{post.owner.username}/check-in/pinned?highlight={post.id}'
+        elif post.type == 'CheckInPost':
+            redirect_url = f'/users/{post.author.username}/snippets/pinned?highlight={post.id}'
+        else:
+            redirect_url = f'/{post.type.lower()}s/{post.id}'
+        # send a notification to the author of the origin comment
         if origin_author == actor:
             pass
         elif actor.id in origin_author.user_report_blocked_ids:
             pass
         elif not post.is_audience(origin_author):
+            pass
+        elif (instance.is_private
+              and post.type == 'CheckInComponentEntry'
+              and (not post.is_pinned or not post.owner.is_connected(origin_author))):
             pass
         else:
             noti = Notification.objects.create(user=origin_author,
@@ -166,6 +175,10 @@ def create_noti(instance, created, **kwargs):
             redirect_url = f'/check-in-posts/{origin.id}'
             origin_target_name_ko = '데일리 스니펫'
             origin_target_name_en = 'daily snippet'
+        elif origin.type == 'CheckInComponentEntry':
+            redirect_url = f'/update?tab=pinned&highlight={origin.id}'
+            origin_target_name_ko = '핀된 체크인'
+            origin_target_name_en = 'pinned check-in'
         elif origin.type == 'Note':
             redirect_url = f'/{origin.type.lower()}s/{origin.id}'
             origin_target_name_ko = '게시글'

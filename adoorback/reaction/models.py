@@ -113,8 +113,22 @@ def create_reaction_noti(instance, created, **kwargs):
         else:
             post = origin.target
 
-        if post.type == 'CheckInPost':
-            redirect_url = f'/check-in-posts/{post.id}'
+        # Skip notification for private comments on entries that are no longer pinned
+        # or where the recipient is no longer a friend of the entry owner.
+        # user == post.owner (entry owner replied and got reacted to) is always valid.
+        if (origin.is_private
+                and post.type == 'CheckInComponentEntry'
+                and user != post.owner
+                and (not post.is_pinned or not post.owner.is_connected(user))):
+            return
+
+        if post.type == 'CheckInComponentEntry':
+            if user == post.owner:
+                redirect_url = f'/update?tab=pinned&highlight={post.id}'
+            else:
+                redirect_url = f'/users/{post.owner.username}/check-in/pinned?highlight={post.id}'
+        elif post.type == 'CheckInPost':
+            redirect_url = f'/users/{post.author.username}/snippets/pinned?highlight={post.id}'
         else:
             redirect_url = f'/{post.type.lower()}s/{post.id}'
 

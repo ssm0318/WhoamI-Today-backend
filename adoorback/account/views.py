@@ -1046,8 +1046,8 @@ class UserPinnedCheckInEntries(generics.ListAPIView):
         return ArchiveCursorPagination
 
     def get_serializer_class(self):
-        from check_in.serializers import ArchiveEntrySerializer
-        return ArchiveEntrySerializer
+        from check_in.serializers import FriendPinnedEntrySerializer
+        return FriendPinnedEntrySerializer
 
     def _get_owner(self):
         if not hasattr(self, '_cached_owner'):

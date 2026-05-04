@@ -67,6 +67,11 @@ def get_check_in_post_type():
     return ContentType.objects.get_for_model(CheckInPost)
 
 
+def get_check_in_component_entry_type():
+    from check_in.models import CheckInComponentEntry
+    return ContentType.objects.get_for_model(CheckInComponentEntry)
+
+
 def get_generic_relation_type(model):
     model = model.capitalize()
     if model == 'Comment':
@@ -83,5 +88,7 @@ def get_generic_relation_type(model):
         return get_check_in_type()
     elif model in ('Checkinpost', 'Check_in_post'):
         return get_check_in_post_type()
+    elif model in ('Checkincomponententry', 'Check_in_component_entry'):
+        return get_check_in_component_entry_type()
     else:
         return None

@@ -391,6 +391,24 @@ class CheckInComponentEntry(AdoorTimestampedModel, SafeDeleteModel):
     def type(self):
         return self.__class__.__name__
 
+    @property
+    def author(self):
+        return self.owner
+
+    @property
+    def participants(self):
+        return self.private_comments.values_list('author_id', flat=True).distinct()
+
+    def is_audience(self, user):
+        return True
+
+    private_comments = GenericRelation(Comment)
+    entry_targetted_notis = GenericRelation(
+        'notification.Notification',
+        content_type_field='target_type',
+        object_id_field='target_id',
+    )
+
     @classmethod
     def upsert_live(cls, *, owner, component, data, visibility, at=None):
         """
@@ -448,6 +466,83 @@ class CheckInComponentEntry(AdoorTimestampedModel, SafeDeleteModel):
             current.visibility = visibility
             current.save(update_fields=['visibility', 'updated_at'])
         return current
+
+
+class PrivateAcknowledgment(AdoorTimestampedModel, SafeDeleteModel):
+    """A private, 1-on-1 acknowledgment on a pinned CheckInComponentEntry.
+
+    Distinct from public emoji reactions: single toggle, visible only to
+    the entry owner and the acknowledging user.
+    """
+
+    user = models.ForeignKey(User, related_name='private_acknowledgments', on_delete=models.CASCADE)
+    entry = models.ForeignKey(
+        CheckInComponentEntry,
+        related_name='private_acknowledgments',
+        on_delete=models.CASCADE,
+    )
+
+    ack_targetted_notis = GenericRelation(
+        'notification.Notification',
+        content_type_field='target_type',
+        object_id_field='target_id',
+    )
+
+    _safedelete_policy = SOFT_DELETE_CASCADE
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'entry'],
+                condition=models.Q(deleted__isnull=True),
+                name='unique_private_ack_per_user_entry',
+            )
+        ]
+
+    @property
+    def type(self):
+        return self.__class__.__name__
+
+
+@transaction.atomic
+@receiver(post_save, sender=PrivateAcknowledgment, dispatch_uid='create_private_ack_notification')
+def create_private_ack_notification(created, instance, **kwargs):
+    if not created:
+        return
+
+    from notification.models import Notification, NotificationActor
+
+    actor = instance.user
+    entry_owner = instance.entry.owner
+
+    if actor == entry_owner:
+        return
+    if entry_owner.id in actor.user_report_blocked_ids:
+        return
+
+    COMPONENT_LABELS_KO = {
+        'song': '노래',
+        'mood': '기분',
+        'thought': '한마디',
+        'battery': '소셜 배터리',
+    }
+    COMPONENT_LABELS_EN = {
+        'song': 'song',
+        'mood': 'mood',
+        'thought': 'thought',
+        'battery': 'social battery',
+    }
+    label_ko = COMPONENT_LABELS_KO.get(instance.entry.component, instance.entry.component)
+    label_en = COMPONENT_LABELS_EN.get(instance.entry.component, instance.entry.component)
+
+    noti = Notification.objects.create(
+        user=entry_owner,
+        target=instance,
+        message_ko=f"{actor.username}님이 회원님의 고정된 {label_ko}에 조용히 공감했어요!",
+        message_en=f"{actor.username} sent a quiet high-five to your pinned {label_en}!",
+        redirect_url=f"/update?tab=pinned&highlight={instance.entry.id}",
+    )
+    NotificationActor.objects.create(user=actor, notification=noti)
 
 
 class Poke(AdoorTimestampedModel, SafeDeleteModel):

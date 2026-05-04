@@ -236,6 +236,67 @@ class ArchiveEntrySerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class FriendPinnedEntrySerializer(ArchiveEntrySerializer):
+    """ArchiveEntrySerializer + private reaction/comment counts for friend view."""
+
+    private_acknowledgment_count = serializers.SerializerMethodField()
+    my_acknowledgment = serializers.SerializerMethodField()
+    private_comment_count = serializers.SerializerMethodField()
+    has_my_private_comment = serializers.SerializerMethodField()
+
+    class Meta(ArchiveEntrySerializer.Meta):
+        fields = ArchiveEntrySerializer.Meta.fields + [
+            'private_acknowledgment_count',
+            'my_acknowledgment',
+            'private_comment_count',
+            'has_my_private_comment',
+        ]
+        read_only_fields = fields
+
+    def _viewer(self):
+        return self.context['request'].user
+
+    def get_private_acknowledgment_count(self, obj):
+        from check_in.models import PrivateAcknowledgment
+        return PrivateAcknowledgment.objects.filter(entry=obj).count()
+
+    def get_my_acknowledgment(self, obj):
+        from check_in.models import PrivateAcknowledgment
+        return PrivateAcknowledgment.objects.filter(entry=obj, user=self._viewer()).exists()
+
+    def get_private_comment_count(self, obj):
+        viewer = self._viewer()
+        return obj.private_comments.filter(
+            is_private=True,
+            author_id__in=[viewer.id, obj.owner_id],
+        ).count()
+
+    def get_has_my_private_comment(self, obj):
+        viewer = self._viewer()
+        return obj.private_comments.filter(is_private=True, author=viewer).exists()
+
+
+class OwnerArchiveEntrySerializer(ArchiveEntrySerializer):
+    """ArchiveEntrySerializer + total private reaction/comment counts for owner view."""
+
+    private_acknowledgment_count = serializers.SerializerMethodField()
+    private_comment_count = serializers.SerializerMethodField()
+
+    class Meta(ArchiveEntrySerializer.Meta):
+        fields = ArchiveEntrySerializer.Meta.fields + [
+            'private_acknowledgment_count',
+            'private_comment_count',
+        ]
+        read_only_fields = fields
+
+    def get_private_acknowledgment_count(self, obj):
+        from check_in.models import PrivateAcknowledgment
+        return PrivateAcknowledgment.objects.filter(entry=obj).count()
+
+    def get_private_comment_count(self, obj):
+        return obj.private_comments.filter(is_private=True).count()
+
+
 class PokeSerializer(serializers.ModelSerializer):
     receiver_id = serializers.IntegerField(write_only=True)
 

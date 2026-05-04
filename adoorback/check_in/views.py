@@ -23,6 +23,7 @@ from check_in.models import (
     CheckIn,
     CheckInComponentEntry,
     CheckInPost,
+    PrivateAcknowledgment,
     Song,
     Poke,
 )
@@ -494,6 +495,113 @@ class ArchiveEntryDelete(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class PrivateAcknowledgmentToggle(APIView):
+    """PATCH /api/check_in/entries/<pk>/acknowledge/
+
+    Toggle a private acknowledgment on a friend's pinned CheckInComponentEntry.
+    Creates on first call, soft-deletes on second (toggle). Returns the new
+    state so the frontend can update optimistically.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    @transaction.atomic
+    def patch(self, request, pk):
+        entry = get_object_or_404(CheckInComponentEntry, pk=pk, is_pinned=True)
+        viewer = request.user
+
+        if entry.owner == viewer:
+            raise exceptions.PermissionDenied("Cannot acknowledge your own entry.")
+
+        existing = PrivateAcknowledgment.objects.filter(entry=entry, user=viewer).first()
+        if existing:
+            existing.delete()
+            acknowledged = False
+        else:
+            PrivateAcknowledgment.objects.create(entry=entry, user=viewer)
+            acknowledged = True
+
+        count = PrivateAcknowledgment.objects.filter(entry=entry).count()
+        return Response({'acknowledged': acknowledged, 'count': count})
+
+
+class ArchiveEntryPrivateComments(generics.ListAPIView):
+    """GET /api/check_in/entries/<pk>/private-comments/
+
+    List private comments between the current viewer and the entry owner on a
+    pinned CheckInComponentEntry. Only top-level comments are returned here;
+    replies are fetched via the existing comment reply endpoint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_serializer_class(self):
+        from comment.serializers import CommentFriendSerializer
+        return CommentFriendSerializer
+
+    def get_queryset(self):
+        from comment.models import Comment
+
+        pk = self.kwargs.get('pk')
+        viewer = self.request.user
+
+        # Owner can access any entry (pinned or not); friends only see pinned entries.
+        entry = get_object_or_404(CheckInComponentEntry, pk=pk)
+        owner = entry.owner
+
+        if viewer == owner:
+            # Owner sees every private comment on their own entry.
+            entry_ct = ContentType.objects.get_for_model(CheckInComponentEntry)
+            return Comment.objects.filter(
+                content_type=entry_ct,
+                object_id=entry.pk,
+                is_private=True,
+            ).order_by('created_at')
+
+        if not entry.is_pinned:
+            raise exceptions.PermissionDenied("You cannot view private comments on this entry.")
+        if not owner.is_connected(viewer):
+            raise exceptions.PermissionDenied("You cannot view private comments on this entry.")
+
+        participant_ids = {viewer.id, owner.id}
+        entry_ct = ContentType.objects.get_for_model(CheckInComponentEntry)
+
+        return Comment.objects.filter(
+            content_type=entry_ct,
+            object_id=entry.pk,
+            is_private=True,
+            author_id__in=participant_ids,
+        ).order_by('created_at')
+
+
+class ArchiveEntryAcknowledgments(generics.ListAPIView):
+    """GET /api/check_in/entries/<pk>/acknowledgments/
+
+    Returns the list of users who have privately acknowledged a pinned entry.
+    Only the entry owner may call this endpoint.
+    """
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_exception_handler(self):
+        return adoor_exception_handler
+
+    def get_serializer_class(self):
+        from account.serializers import UserMinimalSerializer
+        return UserMinimalSerializer
+
+    def get_queryset(self):
+        entry = get_object_or_404(CheckInComponentEntry, pk=self.kwargs['pk'], is_pinned=True)
+        viewer = self.request.user
+        if viewer != entry.owner:
+            raise exceptions.PermissionDenied("Only the entry owner can view acknowledgments.")
+        return User.objects.filter(private_acknowledgments__entry=entry)
+
+
 class OwnHistoryEntries(generics.ListAPIView):
     """GET /check_in/entries/?tab=all|pinned&cursor=...
 
@@ -505,7 +613,7 @@ class OwnHistoryEntries(generics.ListAPIView):
     `pinned_count` and `history_count` so the segmented control can
     render without a second request.
     """
-    serializer_class = cs.ArchiveEntrySerializer
+    serializer_class = cs.OwnerArchiveEntrySerializer
     permission_classes = [IsAuthenticated]
     pagination_class = ArchiveCursorPagination
 
