@@ -19,7 +19,11 @@ from typing import Iterable, Optional
 from statistics import median
 
 from surveys.models import (
-    LIKERT_5,
+    DISPLAY_ONLY,
+    INPUT_LESS_TYPES,
+    LIKERT_RANGES,
+    LIKERT_TYPES,
+    NA_SENTINEL,
     RESULT_AGGREGATED_LIKERT,
     RESULT_OPTION_COUNTS,
     RESULT_SLIDER_HISTOGRAM,
@@ -31,9 +35,18 @@ from surveys.models import (
 )
 
 
+# Default likert range — kept for back-compat with callers that don't know the
+# specific likert variant. New code should reach into LIKERT_RANGES[type]
+# instead. likert_5 is the dominant variant and matches the historical default.
 LIKERT_MIN_VALUE = 1
 LIKERT_MAX_VALUE = 5
 MIN_TOKEN_FREQUENCY = 3  # k-anonymity threshold for individual wordcloud tokens
+
+
+def _likert_range(question: SurveyQuestion) -> tuple[int, int]:
+    """Return (min, max) for a likert question, defaulting to (1, 5) if the
+    question's type isn't one of the registered variants."""
+    return LIKERT_RANGES.get(question.type, (LIKERT_MIN_VALUE, LIKERT_MAX_VALUE))
 
 
 class AggregationStrategy(ABC):
@@ -56,14 +69,23 @@ class AggregationStrategy(ABC):
 
 
 def _trait_score_for_response(response: SurveyResponse, question_ids: set[int]) -> int:
-    """Sum reverse-aware values across the panel's questions for one response."""
+    """Sum reverse-aware values across the panel's questions for one response.
+
+    Per-question variant ranges (likert_3..likert_7) feed `_likert_range`, so
+    the inversion math is correct for each item. likert_5_na N/A picks
+    (value=None) are skipped — they contribute 0 to the sum, NOT (max+min)/2,
+    matching the spec's "exclude entirely from scoring" rule.
+    """
     total = 0
     for ans in response.answers.select_related('question').all():
         if ans.question_id not in question_ids:
             continue
+        if ans.value is NA_SENTINEL:
+            continue
         v = int(ans.value)
         if ans.question.reverse_scored:
-            v = LIKERT_MAX_VALUE + LIKERT_MIN_VALUE - v
+            lo, hi = _likert_range(ans.question)
+            v = (hi + lo) - v
         total += v
     return total
 
@@ -74,8 +96,13 @@ class AggregatedLikertStrategy(AggregationStrategy):
     def build(self, survey, questions, responder_ids, viewer_id):
         n_questions = len(questions)
         question_ids = {q.id for q in questions}
-        min_score = LIKERT_MIN_VALUE * n_questions
-        max_score = LIKERT_MAX_VALUE * n_questions
+        # Score range is the SUM of each item's individual range. For a panel of
+        # mixed likert variants (rare but allowed), every variant contributes
+        # its own min/max — likert_3 caps at 3 per item, likert_7 at 7, etc.
+        # likert_5_na items are bounded by their non-N/A range; N/A is skipped
+        # at scoring time (see _trait_score_for_response).
+        min_score = sum(_likert_range(q)[0] for q in questions) if n_questions else 0
+        max_score = sum(_likert_range(q)[1] for q in questions) if n_questions else 0
         responses = SurveyResponse.objects.filter(
             survey=survey, user_id__in=responder_ids
         ).prefetch_related('answers__question')
@@ -282,15 +309,23 @@ STRATEGIES: dict[str, AggregationStrategy] = {
 
 
 def group_panels(survey: Survey) -> list[tuple[str, list[SurveyQuestion]]]:
-    """Group a survey's non-hidden questions into panels by ``effective_group_key``.
+    """Group a survey's non-hidden, scorable questions into panels by
+    ``effective_group_key``.
 
     Returns a list of ``(group_key, [questions])`` preserving the order in which
-    each group's first question appears. Hidden questions are skipped entirely.
+    each group's first question appears.
+
+    Skipped:
+      - questions with ``result_hidden=True``
+      - input-less questions (``display_only``) — they have no value to
+        aggregate and shouldn't appear on the results page
     """
     groups: dict[str, list[SurveyQuestion]] = {}
     order: list[str] = []
     for q in survey.questions.order_by('order'):
         if q.result_hidden:
+            continue
+        if q.type in INPUT_LESS_TYPES:
             continue
         key = q.effective_group_key
         if key not in groups:
