@@ -12,18 +12,52 @@ from adoorback.models import AdoorTimestampedModel
 #   2. Add the input dispatcher case in surveys/serializers.py and the frontend's
 #      SurveyAnswerForm.
 #   3. Add the default result kind mapping below.
+#   4. If it's a new likert variant, extend LIKERT_RANGES below.
+LIKERT_3 = 'likert_3'
+LIKERT_4 = 'likert_4'
 LIKERT_5 = 'likert_5'
+LIKERT_5_NA = 'likert_5_na'
+LIKERT_6 = 'likert_6'
+LIKERT_7 = 'likert_7'
 SINGLE_CHOICE = 'single_choice'
 MULTI_CHOICE = 'multi_choice'
 FREE_TEXT = 'free_text'
 SLIDER = 'slider'
+DISPLAY_ONLY = 'display_only'
 TYPE_CHOICES = (
+    (LIKERT_3, 'Likert 3-point'),
+    (LIKERT_4, 'Likert 4-point'),
     (LIKERT_5, 'Likert 5-point'),
+    (LIKERT_5_NA, 'Likert 5-point with N/A option'),
+    (LIKERT_6, 'Likert 6-point'),
+    (LIKERT_7, 'Likert 7-point'),
     (SINGLE_CHOICE, 'Single choice'),
     (MULTI_CHOICE, 'Multi choice'),
     (FREE_TEXT, 'Free text'),
     (SLIDER, 'Slider'),
+    (DISPLAY_ONLY, 'Display-only content (no input)'),
 )
+
+# Inclusive (min, max) numeric range per likert variant. likert_5_na uses the
+# same numeric range as likert_5; the N/A response is stored as a sentinel
+# (None) and excluded from scoring entirely — see aggregation.py.
+LIKERT_RANGES = {
+    LIKERT_3: (1, 3),
+    LIKERT_4: (1, 4),
+    LIKERT_5: (1, 5),
+    LIKERT_5_NA: (1, 5),
+    LIKERT_6: (1, 6),
+    LIKERT_7: (1, 7),
+}
+LIKERT_TYPES = frozenset(LIKERT_RANGES.keys())
+# Sentinel value persisted in SurveyAnswer.value when the user picks N/A on a
+# likert_5_na question. None is JSON-natural and trivially recognized by the
+# aggregation strategies that need to skip it.
+NA_SENTINEL = None
+
+# Question types that NEVER store a value (no input rendered, no row in
+# SurveyAnswer expected for these questions on submission).
+INPUT_LESS_TYPES = frozenset({DISPLAY_ONLY})
 
 # Result rendering kinds — the registry key shared between the backend aggregation
 # strategy and the frontend renderer. Adding a new kind: see surveys/aggregation.py
@@ -32,21 +66,31 @@ RESULT_AGGREGATED_LIKERT = 'aggregated_likert'
 RESULT_OPTION_COUNTS = 'option_counts'
 RESULT_WORDCLOUD = 'wordcloud'
 RESULT_SLIDER_HISTOGRAM = 'slider_histogram'
+RESULT_SCALE_SCORE_HISTOGRAM = 'scale_score_histogram'
+RESULT_SLIDER_HISTOGRAM_PAIRED = 'slider_histogram_paired'
 RESULT_KIND_CHOICES = (
     (RESULT_AGGREGATED_LIKERT, 'Aggregated likert score'),
     (RESULT_OPTION_COUNTS, 'Per-option counts'),
     (RESULT_WORDCLOUD, 'Wordcloud (free-text tokens)'),
     (RESULT_SLIDER_HISTOGRAM, 'Slider histogram'),
+    (RESULT_SCALE_SCORE_HISTOGRAM, 'Scale-score histogram (survey-level summary)'),
+    (RESULT_SLIDER_HISTOGRAM_PAIRED, 'Paired-slider 2D circumplex'),
 )
 
 # Default result kind per question type. A panel can override with
 # SurveyQuestion.result_kind, but most surveys won't need to.
 DEFAULT_RESULT_KIND_FOR_TYPE = {
+    LIKERT_3: RESULT_AGGREGATED_LIKERT,
+    LIKERT_4: RESULT_AGGREGATED_LIKERT,
     LIKERT_5: RESULT_AGGREGATED_LIKERT,
+    LIKERT_5_NA: RESULT_AGGREGATED_LIKERT,
+    LIKERT_6: RESULT_AGGREGATED_LIKERT,
+    LIKERT_7: RESULT_AGGREGATED_LIKERT,
     SINGLE_CHOICE: RESULT_OPTION_COUNTS,
     MULTI_CHOICE: RESULT_OPTION_COUNTS,
     FREE_TEXT: RESULT_WORDCLOUD,
     SLIDER: RESULT_SLIDER_HISTOGRAM,
+    # display_only never aggregates — group_panels skips these questions entirely.
 }
 
 # Result kinds for which friend / close-friend buckets are suppressed by default
@@ -79,6 +123,65 @@ class Survey(AdoorTimestampedModel):
         blank=True,
         db_index=True,
         help_text='Legacy field — written by the now-deleted rotation cron. Unused.',
+    )
+    # Survey-level result_kind. When set (non-empty), it overrides every
+    # question's `result_kind` on the results page — used for whole-survey
+    # summaries like scale_score_histogram. Blank → fall back to per-question
+    # rendering, which is the default flow.
+    result_kind = models.CharField(
+        max_length=32,
+        choices=RESULT_KIND_CHOICES,
+        blank=True,
+        default='',
+        help_text=(
+            'Optional whole-survey result renderer. When set, overrides the '
+            'per-question result_kind on the results page (e.g. '
+            'scale_score_histogram for a single summary score across all items).'
+        ),
+    )
+    score_formula = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        help_text=(
+            'Name of a registered formula in surveys/scoring/registry.py. When '
+            'blank, scale_score_histogram falls back to the default sum-with-'
+            'reverse formula. See `surveys.scoring.registry.score_formulas`.'
+        ),
+    )
+    score_components = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            'Optional list of question slugs to include in scale_score_histogram '
+            'scoring. Empty list = include every likert_* item in the survey.'
+        ),
+    )
+    tokens = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Static token map substituted into prompts/descriptions/placeholders '
+            'at render time via {{token_name}}. e.g. {"phase_label": "Phase 1"}.'
+        ),
+    )
+    repeatable = models.BooleanField(
+        default=False,
+        help_text=(
+            'When True, the same user may submit this survey multiple times '
+            'within its window. Each submission is a separate SurveyResponse '
+            'row. Used for anytime_reflection-style ongoing feedback surveys.'
+        ),
+    )
+    serving_condition = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Optional rule for skipping this survey for specific users. Form: '
+            '{"skip_if_user_embedded_data": {"<key>": <value>, ...}}. When all '
+            'key/value pairs match the user\'s embedded data, the survey is '
+            'not served to that user.'
+        ),
     )
 
     class Meta:
@@ -126,11 +229,77 @@ class SurveyQuestion(AdoorTimestampedModel):
     # min/max labels — no parallel fields.
     slider_min_value = models.IntegerField(null=True, blank=True)
     slider_max_value = models.IntegerField(null=True, blank=True)
+    # Stable identifier within a survey — used by score_formulas, embedded-data
+    # storage, conditional_display.depends_on, and data exports. Optional on
+    # legacy questions (blank='') so existing rows don't need backfill, but the
+    # uniqueness constraint below applies to non-empty slugs.
+    slug = models.SlugField(
+        max_length=80,
+        blank=True,
+        default='',
+        help_text='Stable per-question identifier. Required for any question referenced by a score formula or conditional_display.',
+    )
+    # Secondary text below `prompt`. Markdown-rendered. Empty if not used.
+    description = models.TextField(blank=True, default='')
+    # free_text-only hint shown inside an empty input.
+    placeholder = models.CharField(max_length=200, blank=True, default='')
+    # Soft length floor for free_text. NULL = no minimum. Combined with
+    # `min_length_warning` to nudge — does not block submission.
+    min_length = models.PositiveIntegerField(null=True, blank=True)
+    min_length_warning = models.TextField(
+        blank=True,
+        default='',
+        help_text='Markdown shown when `min_length` is unmet. Submission still allowed after one acknowledgment.',
+    )
+    required = models.BooleanField(
+        default=True,
+        help_text='If True, submission is blocked until this question is answered (unless conditionally hidden).',
+    )
+    # 6th option label for likert_5_na. Stored as None ("N/A") in the user's
+    # response and excluded from numeric aggregations.
+    na_option = models.CharField(
+        max_length=80,
+        blank=True,
+        default='',
+        help_text='Label for the N/A option on likert_5_na questions. Empty string suppresses the N/A choice.',
+    )
+    # When True, the answer to this question is persisted into the user's
+    # UserSurveyEmbeddedData store (keyed by question.slug) on submission.
+    # Subsequent surveys can reference it via tokens / serving_condition.
+    embedded_data = models.BooleanField(
+        default=False,
+        help_text='If True, the answer is copied into UserSurveyEmbeddedData (keyed by slug) on submission.',
+    )
+    # Display-time gating rule. Empty dict = always shown. Form:
+    #   {"depends_on": "<other_question_slug>", "show_when_value": <v>}
+    #   {"depends_on": "<other_question_slug>", "show_when_value_not": <v>}
+    #   {"depends_on": "<other_question_slug>", "show_when_value_in": [<v1>, ...]}
+    #   {"depends_on": "<other_question_slug>", "show_when_value_includes": <v>}
+    conditional_display = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Rule for showing this question based on a prior answer in the same submission.',
+    )
+    # display_only-only: markdown content rendered as a header/explanation
+    # block. No input is rendered, no value stored.
+    content = models.TextField(
+        blank=True,
+        default='',
+        help_text='Markdown body for display_only questions. Token substitution applies.',
+    )
 
     class Meta:
         ordering = ['survey_id', 'order']
         constraints = [
             models.UniqueConstraint(fields=['survey', 'order'], name='unique_question_order_per_survey'),
+            # Slug must be unique within a survey when set; empty slugs (legacy
+            # questions and display_only blocks that don't need a stable ID)
+            # are skipped by the partial-index condition.
+            models.UniqueConstraint(
+                fields=['survey', 'slug'],
+                condition=~models.Q(slug=''),
+                name='unique_question_slug_per_survey',
+            ),
         ]
 
     def clean(self):
@@ -144,6 +313,13 @@ class SurveyQuestion(AdoorTimestampedModel):
                 raise ValidationError(
                     'slider_min_value must be strictly less than slider_max_value'
                 )
+        if self.type == DISPLAY_ONLY and self.required:
+            # display_only blocks have no input — they cannot be "required".
+            raise ValidationError("display_only questions cannot be required=True")
+        if self.embedded_data and not self.slug:
+            raise ValidationError(
+                "embedded_data=True requires a non-empty slug (used as the storage key)"
+            )
 
     @property
     def effective_result_kind(self) -> str:
@@ -240,10 +416,17 @@ class SurveyResponse(AdoorTimestampedModel):
 class SurveyAnswer(AdoorTimestampedModel):
     response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(SurveyQuestion, on_delete=models.PROTECT, related_name='answers')
+    # Nullable so likert_5_na N/A picks can be stored as the NA_SENTINEL (None).
+    # All other types must persist a non-null value — submission validation
+    # enforces that. The DB null constraint is the storage layer for "N/A",
+    # which is semantically distinct from "did not answer" (the latter would
+    # be a missing SurveyAnswer row, not a present-with-null one).
     value = models.JSONField(
+        null=True,
+        blank=True,
         help_text=(
             'Shape depends on question.type: int for likert/single, list[int] for multi, '
-            'str for free_text.'
+            'str for free_text. NULL (NA_SENTINEL) on likert_5_na means "N/A".'
         ),
     )
 
@@ -251,3 +434,42 @@ class SurveyAnswer(AdoorTimestampedModel):
         constraints = [
             models.UniqueConstraint(fields=['response', 'question'], name='unique_answer_per_response_per_question'),
         ]
+
+
+class UserSurveyEmbeddedData(AdoorTimestampedModel):
+    """Per-user key/value store populated by `embedded_data: true` questions.
+
+    Each key is the question.slug from a prior survey response. Values are
+    the raw JSON answer (matching SurveyAnswer.value semantics). Subsequent
+    surveys can reference these in:
+      - prompt / description / placeholder / content via {{<key>}} tokens
+      - serving_condition.skip_if_user_embedded_data rules
+
+    `source_question` is informational — exports + admin debugging only. The
+    real lookup key is (user, key).
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='survey_embedded_data',
+    )
+    key = models.CharField(max_length=80)
+    value = models.JSONField()
+    source_question = models.ForeignKey(
+        SurveyQuestion,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'key'], name='unique_embedded_data_per_user_key'),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'key']),
+        ]
+
+    def __str__(self):
+        return f'EmbeddedData<{self.user_id}:{self.key}>'
