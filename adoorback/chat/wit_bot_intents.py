@@ -71,14 +71,65 @@ def try_global_command(state, message, user):
 
 def idle_handler(state, message, user):
     """Default when no intent is active. Global commands have already been
-    handled by `try_global_command` before this is called, so this only deals
-    with the unknown-input nudge."""
+    handled by `try_global_command` before this is called.
+
+    For unknown text, return a nudge with the current applicable next-step
+    button INLINE so the user always has an action at the bottom of chat.
+    """
     lang = getattr(user, 'language', 'en') or 'en'
     if lang == 'ko':
-        nudge = "잘 모르겠는 입력이야. 위 카드 사용하거나 `wit?` 쳐봐."
+        nudge = "잘 모르겠는 입력이야. 아래 버튼 눌러서 다음 단계로 가."
     else:
-        nudge = "not sure what that was. try the welcome card up top, or type `wit?`."
-    return [(nudge, None)]
+        nudge = "Not sure what that was. Tap the button below for your next step."
+
+    cta = _idle_cta_button(user)
+    if cta is None:
+        return [(nudge, None)]
+    return [(nudge, card_with_buttons([cta]))]
+
+
+def _idle_cta_button(user):
+    """Return the appropriate next-step button dict for the user's current
+    progress, or None if there's no clear next step (e.g., boss quiz already
+    passed, or pre-V2-swap waiting period)."""
+    from chat.wit_bot_copy import (
+        WC_BTN_RUN_AUDIT, WC_BTN_START_ONBOARDING, WC_BTN_START_VERSION_Q,
+        WC_BTN_START_VERSION_W, WC_BTN_TAKE_BOSS_QUIZ,
+    )
+
+    state = state_mod.get_or_create_state(user)
+    version = user.current_ver
+    progress = state_mod.progress_for(state, version)
+    kickoff = progress.get('kickoff', {})
+    completed = kickoff.get('completed', False)
+    audit = progress.get('audit', {})
+    last_missing = audit.get('last_missing_count')
+    final_quiz = progress.get('final_quiz', {})
+    passed_final = final_quiz.get('passed', False)
+
+    # Post-swap: prior version completed, current version not yet started
+    other_version = 'version_q' if version == 'version_w' else 'version_w'
+    other_progress = state_mod.progress_for(state, other_version)
+    other_kickoff_done = other_progress.get('kickoff', {}).get('completed', False)
+    if other_kickoff_done and not kickoff:
+        if version == 'version_q':
+            return {'label': t(WC_BTN_START_VERSION_Q, user), 'payload': 'start_onboarding'}
+        return {'label': t(WC_BTN_START_VERSION_W, user), 'payload': 'start_onboarding'}
+
+    # Boss quiz passed for this version — no CTA, they're done
+    if passed_final:
+        return None
+
+    # Audit at 0 missing → boss quiz unlocked
+    if completed and last_missing == 0:
+        return {'label': t(WC_BTN_TAKE_BOSS_QUIZ, user), 'payload': 'take_boss_quiz'}
+
+    # Kickoff complete but audit not at 0 → run audit
+    if completed:
+        return {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'}
+
+    # Fresh user — start onboarding
+    return {'label': t(WC_BTN_START_ONBOARDING, user), 'payload': 'start_onboarding'}
 
 
 def _kickoff_welcome_intro(user):
