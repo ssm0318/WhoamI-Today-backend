@@ -1513,6 +1513,58 @@ class EditableIndexBucketingTests(TestCase):
         self.assertNotIn('eb_closed', avail_slugs)
         self.assertIn('eb_closed', comp_slugs)
 
+    def test_answered_repeatable_open_stays_in_available_not_completed(self):
+        """Anytime / drop-in surveys stay in available_now after submit
+        so the user can keep dropping in. Completed stays empty for
+        these — they're a single available_now slot regardless of how
+        many SurveyResponse rows the user has accumulated."""
+        from unittest.mock import patch
+
+        s = Survey.objects.create(
+            slug='rb_open', title_en='R', title_ko='R', repeatable=True,
+        )
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='anytime',
+            window_start=self.today, window_end=None,
+            allow_late=True, sequence_index=920,
+        )
+        # Two submissions — repeatable allows multiple.
+        SurveyResponse.objects.create(user=self.user, survey=s)
+        SurveyResponse.objects.create(user=self.user, survey=s)
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx = get_survey_index(self.user)
+        avail_slugs = {x.survey.slug for x in idx['available_now']}
+        comp_slugs = {x.survey.slug for x in idx['completed']}
+        self.assertIn('rb_open', avail_slugs)
+        self.assertNotIn('rb_open', comp_slugs)
+
+    def test_answered_repeatable_closed_moves_to_completed(self):
+        from unittest.mock import patch
+
+        s = Survey.objects.create(
+            slug='rb_closed', title_en='R', title_ko='R', repeatable=True,
+        )
+        SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='anytime',
+            window_start=self.today, window_end=None,
+            allow_late=True, sequence_index=921,
+        )
+        SurveyResponse.objects.create(user=self.user, survey=s)
+        s.closed = True
+        s.save(update_fields=['closed'])
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx = get_survey_index(self.user)
+        avail_slugs = {x.survey.slug for x in idx['available_now']}
+        comp_slugs = {x.survey.slug for x in idx['completed']}
+        self.assertNotIn('rb_closed', avail_slugs)
+        self.assertIn('rb_closed', comp_slugs)
+
 
 class ResearchInstrumentResultsHiddenTests(TestCase):
     """Research-integrity policy: surveys that gather **opinions on the

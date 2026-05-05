@@ -202,18 +202,23 @@ def get_survey_index(user):
         ScheduledSurvey.objects.select_related('survey'), user,
     )
 
-    # Editable surveys whose researcher hasn't closed them stay in
-    # available_now even after the user submits — they can re-open and
-    # overwrite their answers until the survey is closed. They still
-    # carry `user_answered=True` so the frontend can render an "Edit"
-    # affordance instead of "Start". Once `survey.closed` flips to True,
-    # the row drops out of available_now and surfaces in completed.
-    editable_open = Q(survey__editable=True, survey__closed=False)
+    # Persistent surveys that stay in available_now even after the user
+    # submits, until the researcher closes them:
+    #   - editable: one row per user, re-openable for editing.
+    #   - repeatable: multiple rows allowed (each visit is a fresh entry,
+    #     e.g. anytime_reflection drop-ins).
+    # Both carry `user_answered=True` after first submit, so the frontend
+    # can decide between "Edit" / "Add another" affordances. Once
+    # `survey.closed` flips to True, the row drops from available_now.
+    persistent_open = Q(
+        Q(survey__editable=True) | Q(survey__repeatable=True),
+        survey__closed=False,
+    )
 
     available = list(
         qs.filter(window_start__lte=today)
           .filter(Q(window_end__isnull=True) | Q(window_end__gte=today))
-          .filter(Q(user_answered=False) | editable_open)
+          .filter(Q(user_answered=False) | persistent_open)
     )
     late = list(
         qs.filter(
@@ -222,12 +227,14 @@ def get_survey_index(user):
             user_answered=False,
         )
     )
-    # Completed: answered AND (not editable OR closed). Keeps editable
-    # surveys exclusively in available_now (single source of truth) while
-    # they're still re-openable.
+    # Completed: answered AND (not editable AND not repeatable) OR closed.
+    # Persistent surveys live exclusively in available_now (single source
+    # of truth) while they're still accepting submissions.
     completed = list(
-        qs.filter(user_answered=True)
-          .filter(Q(survey__editable=False) | Q(survey__closed=True))
+        qs.filter(user_answered=True).filter(
+            Q(survey__closed=True) |
+            Q(survey__editable=False, survey__repeatable=False)
+        )
     )
 
     user_data = _user_embedded_data(user)

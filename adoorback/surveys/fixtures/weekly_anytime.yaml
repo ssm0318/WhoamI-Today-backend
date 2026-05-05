@@ -165,7 +165,11 @@ _weekly_questions: &weekly_questions
   interpretation:
     en: "Tomorrow's digest will show how the cohort experienced the first week — favorite features, common moments, and what people are curious to ask each other."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
   tokens:
     week_label: "Week 1"
     week_label_lower: "week 1"
@@ -186,7 +190,11 @@ _weekly_questions: &weekly_questions
   interpretation:
     en: "Tomorrow's digest will show how Week 2 compares to Week 1 across the cohort."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
   tokens:
     week_label: "Week 2"
     week_label_lower: "week 2"
@@ -207,7 +215,11 @@ _weekly_questions: &weekly_questions
   interpretation:
     en: "Tomorrow's digest will show how Week 3 compares to the first two weeks."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
   tokens:
     week_label: "Week 3"
     week_label_lower: "week 3"
@@ -228,7 +240,11 @@ _weekly_questions: &weekly_questions
   interpretation:
     en: "Tomorrow's digest will show how the final week landed across the cohort."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
   tokens:
     week_label: "Week 4"
     week_label_lower: "week 4"
@@ -260,6 +276,9 @@ _weekly_questions: &weekly_questions
   friend_visible: false
   results_hidden: true
   repeatable: true
+  # Always-on drop-in feedback channel; sits below endpoint / daily /
+  # weekly cards in the index but stays accessible throughout the study.
+  priority: 20
 
   questions:
 

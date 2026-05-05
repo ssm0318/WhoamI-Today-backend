@@ -105,6 +105,14 @@ class Command(BaseCommand):
             raise CommandError('--include-demos requires --demo-email')
 
         # 1. Load every long-form study YAML in dependency order.
+        # On a fresh DB this seeds questions correctly via the loader's
+        # "questions are replaced when survey is created" rule. On an
+        # existing DB it ONLY updates survey-level fields — questions
+        # are kept to protect existing SurveyAnswer rows (FK PROTECT).
+        # To re-import revised question content on an existing DB, run
+        # `load_surveys <file> --replace-questions` manually; that fails
+        # with ProtectedError if any participant has already answered,
+        # which is the safe behavior.
         self.stdout.write(self.style.NOTICE('[1] Loading long-form study fixtures ...'))
         for filename in LONG_FORM_FIXTURES:
             path = FIXTURES_DIR / filename
