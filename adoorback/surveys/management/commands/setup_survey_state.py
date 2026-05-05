@@ -145,6 +145,19 @@ class Command(BaseCommand):
         sotd_module = import_module('surveys.migrations.0013_seed_sotd_schedule')
         sotd_module.seed_sotd_schedule(django_apps, None)
 
+        # 4b. Apply the May-5 reschedule for sotd_d01_honeymoon. Step 4
+        #    above runs 0013's pristine schedule (Day 1 = May 4), which
+        #    would un-do the migration 0016 correction. Re-applying 0016
+        #    here keeps every setup_survey_state run convergent on the
+        #    intended state.
+        self.stdout.write(
+            self.style.NOTICE('[4b] Applying day-1 honeymoon reschedule (May 5) ...')
+        )
+        honeymoon_module = import_module(
+            'surveys.migrations.0016_reschedule_d01_honeymoon_to_may_5'
+        )
+        honeymoon_module.reschedule_honeymoon(django_apps, None)
+
         # 5. Re-seed the persistent / editable evaluation surveys (feature_eval_w
         #    and goal_comparison_p1/p2). Endpoint cadence with no window_end —
         #    researchers manually close them at study end via Survey.closed.
