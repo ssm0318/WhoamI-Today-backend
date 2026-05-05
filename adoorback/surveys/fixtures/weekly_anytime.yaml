@@ -1,0 +1,556 @@
+# ============================================================================
+# WEEKLY REFLECTIONS (week1–week4) + ANYTIME REFLECTION
+# ============================================================================
+# Five surveys total:
+#   week1_reflection    — Days 1–7 window  (May 4 – May 10)
+#   week2_reflection    — Days 8–14 window (May 11 – May 17)
+#   week3_reflection    — Days 15–21 window (May 18 – May 24)
+#   week4_reflection    — Days 22–28 window (May 25 – May 31)
+#   anytime_reflection  — Full 28-day window, opt-in, repeatable
+#
+# All five surveys:
+#   - friend_visible: false
+#   - results_hidden: false for weekly reflections (digest-friendly aggregates)
+#   - results_hidden: true  for anytime_reflection (private feedback channel)
+#
+# ============================================================================
+# IMPLEMENTATION NOTES FOR CLAUDE CODE
+# ============================================================================
+#
+# WEEKLY REFLECTIONS — structure
+#   Each week's reflection is the SAME 5-item instrument with a
+#   {{week_label}} token that resolves to "Week 1", "Week 2", etc.
+#   Items: overall feel rating + ritual highlight pick + free-text moment +
+#          tomorrow-question + optional bug/issue flag.
+#   Released at end of week's window; stays open through the following week.
+#   Each user submits ONCE per week (not repeatable).
+#
+#   Single item bank used across all 4 surveys via YAML anchors.
+#
+# ANYTIME REFLECTION — repeatable
+#   New survey-level field: `repeatable: true`
+#     - When set, the survey can be submitted multiple times by the same
+#       user throughout its window.
+#     - Each submission produces a new row in the data export, identified
+#       by user_id + submission_timestamp.
+#     - The UI should present this as a persistent "share feedback" entry
+#       point that doesn't disappear after submission, OR as a survey card
+#       that re-appears available after each submission.
+#
+# Conditional category-based follow-ups in anytime_reflection use the
+# existing `conditional_display` with `show_when_value` (single value match).
+#
+# No other new schema features.
+# ============================================================================
+
+
+# ============================================================================
+# ANCHOR — shared weekly reflection question bank
+# ============================================================================
+
+_weekly_questions: &weekly_questions
+  - order: 1
+    slug: weekly_intro
+    type: display_only
+    content:
+      en: "**{{week_label}} reflection.** A short check-in on how the past week went on WIT. Five items, ~3 minutes."
+
+  - order: 2
+    slug: weekly_overall_feel
+    type: likert_5
+    prompt:
+      en: "Overall, how did your {{week_label_lower}} on WIT feel?"
+    options:
+      - { order: 1, value: 1, label: { en: "Pretty bad" } }
+      - { order: 2, value: 2, label: { en: "Not great" } }
+      - { order: 3, value: 3, label: { en: "Mixed / okay" } }
+      - { order: 4, value: 4, label: { en: "Pretty good" } }
+      - { order: 5, value: 5, label: { en: "Really good" } }
+    reverse_scored: false
+    result_kind: aggregated_likert
+    result_group: "weekly_feel"
+    result_hidden: false
+
+  - order: 3
+    slug: weekly_ritual_highlight
+    type: single_choice
+    prompt:
+      en: "Which part of WIT this week did you actually look forward to or get the most out of?"
+    options:
+      - { order: 1, value: "daily_questions",   label: { en: "Daily questions" } }
+      - { order: 2, value: "mission_of_day",    label: { en: "Mission of the day" } }
+      - { order: 3, value: "survey_of_day",     label: { en: "Survey of the day + digest" } }
+      - { order: 4, value: "check_ins",         label: { en: "Check-ins (mood, status, song, battery)" } }
+      - { order: 5, value: "daily_digest",      label: { en: "Daily digest of friends' posts" } }
+      - { order: 6, value: "private_comments",  label: { en: "Private comments / emoji reactions" } }
+      - { order: 7, value: "messaging_friends", label: { en: "Messaging friends" } }
+      - { order: 8, value: "browsing_quietly",  label: { en: "Browsing without anyone seeing" } }
+      - { order: 9, value: "discover_feed",     label: { en: "Discovering new people" } }
+      - { order: 10, value: "none",             label: { en: "Honestly, nothing this week" } }
+      - { order: 11, value: "other",            label: { en: "Something else (specify below)" } }
+    result_kind: option_counts
+    result_group: "weekly_highlight"
+    result_hidden: false
+
+  - order: 4
+    slug: weekly_ritual_highlight_other
+    type: free_text
+    prompt:
+      en: "What was it?"
+    min_length: 0
+    required: false
+    conditional_display:
+      depends_on: weekly_ritual_highlight
+      show_when_value: "other"
+    result_hidden: true
+
+  - order: 5
+    slug: weekly_moment
+    type: free_text
+    prompt:
+      en: "Tell us about one specific moment from the past week on WIT — a conversation, a post, a feature you tried, a friend interaction, anything that's still on your mind."
+    placeholder:
+      en: "Specific is more useful than general. Even a small moment is fine."
+    min_length: 30
+    required: true
+    result_kind: wordcloud
+    result_hidden: true
+
+  - order: 6
+    slug: weekly_tomorrow_question
+    type: free_text
+    prompt:
+      en: "If you could ask your friends on WIT one question for tomorrow's daily question, what would it be?"
+    placeholder:
+      en: "Anything you're genuinely curious about — silly, deep, weird, or specific."
+    min_length: 10
+    required: false
+    result_kind: wordcloud
+    result_hidden: false
+
+  # Severity-of-friction is ordinal — likert_5 so we can compute a weekly
+  # mean and track frication trend across the cohort. Low end is "no
+  # issues at all"; high end is "major problems". The free-text follow-up
+  # triggers on any non-minimum value (≥2) so even a "barely noticeable"
+  # mark prompts the user to describe it.
+  - order: 7
+    slug: weekly_issue_flag
+    type: likert_5
+    prompt:
+      en: "How much did things on WIT feel broken or confusing this week?"
+    low_label:
+      en: "Nothing notable"
+    high_label:
+      en: "Major problems"
+    reverse_scored: false
+    result_kind: aggregated_likert
+    result_group: weekly_issue
+    result_hidden: true
+
+  - order: 8
+    slug: weekly_issue_text
+    type: free_text
+    prompt:
+      en: "What happened?"
+    min_length: 10
+    required: false
+    conditional_display:
+      depends_on: weekly_issue_flag
+      show_when_value_in: [2, 3, 4, 5]
+    result_hidden: true
+
+
+# ============================================================================
+# SURVEY — week1_reflection (Days 1–7)
+# ============================================================================
+- slug: week1_reflection
+  type: likert_5
+  title:
+    en: "Looking back: Week 1"
+  description:
+    en: "A short reflection on your first week with WIT. Released today; stays open through next week."
+  interpretation:
+    en: "Tomorrow's digest will show how the cohort experienced the first week — favorite features, common moments, and what people are curious to ask each other."
+  friend_visible: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
+  tokens:
+    week_label: "Week 1"
+    week_label_lower: "week 1"
+    week_number: 1
+
+  questions: *weekly_questions
+
+
+# ============================================================================
+# SURVEY — week2_reflection (Days 8–14)
+# ============================================================================
+- slug: week2_reflection
+  type: likert_5
+  title:
+    en: "Looking back: Week 2"
+  description:
+    en: "A short reflection on your second week with WIT."
+  interpretation:
+    en: "Tomorrow's digest will show how Week 2 compares to Week 1 across the cohort."
+  friend_visible: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
+  tokens:
+    week_label: "Week 2"
+    week_label_lower: "week 2"
+    week_number: 2
+
+  questions: *weekly_questions
+
+
+# ============================================================================
+# SURVEY — week3_reflection (Days 15–21)
+# ============================================================================
+- slug: week3_reflection
+  type: likert_5
+  title:
+    en: "Looking back: Week 3"
+  description:
+    en: "A short reflection on your third week with WIT — past the halfway point now."
+  interpretation:
+    en: "Tomorrow's digest will show how Week 3 compares to the first two weeks."
+  friend_visible: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
+  tokens:
+    week_label: "Week 3"
+    week_label_lower: "week 3"
+    week_number: 3
+
+  questions: *weekly_questions
+
+
+# ============================================================================
+# SURVEY — week4_reflection (Days 22–28)
+# ============================================================================
+- slug: week4_reflection
+  type: likert_5
+  title:
+    en: "Looking back: Week 4"
+  description:
+    en: "A short reflection on your final week with WIT. Many of you will also be filling out the post-study survey this week — these complement each other."
+  interpretation:
+    en: "Tomorrow's digest will show how the final week landed across the cohort."
+  friend_visible: false
+  # Research instrument — wellbeing + connection outcomes. Hidden during
+  # the study so week N aggregates don't anchor week N+1 responses;
+  # released after the study ends.
+  results_hidden: true
+  priority: 50
+  tokens:
+    week_label: "Week 4"
+    week_label_lower: "week 4"
+    week_number: 4
+
+  questions: *weekly_questions
+
+
+# ============================================================================
+# SURVEY — anytime_reflection (full 28-day window, repeatable)
+# ============================================================================
+# Opt-in feedback channel. Users can submit as many times as they want
+# throughout the study, each submission tagged by category.
+#
+# Categories: mission suggestion, daily question suggestion, survey-of-the-day
+# suggestion, bug report, feature feedback, feature request, other.
+#
+# Friend visibility: OFF
+# Results: HIDDEN (private feedback, not for digests)
+#
+# Severity / frequency questions use likert scales rather than ordinal
+# multi-choice so the data is analyzable as continuous (means, sums,
+# distributions) rather than just modal-category counts.
+
+- slug: anytime_reflection
+  type: single_choice
+  title:
+    en: "Drop us a note"
+  description:
+    en: "Got something to share that doesn't fit the other surveys? Bug, idea, mission suggestion, question for the cohort, weird thing that happened — submit as many times as you want throughout the study."
+  interpretation:
+    en: ""
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  # Always-on drop-in feedback channel; sits below endpoint / daily /
+  # weekly cards in the index but stays accessible throughout the study.
+  priority: 20
+
+  questions:
+
+    # The category-select is the first question. Previously preceded by
+    # a `display_only` "Quick note" intro — removed because it added a
+    # forced tap that didn't carry information.
+    - order: 1
+      slug: anytime_category
+      type: single_choice
+      prompt:
+        en: "What kind of feedback is this?"
+      options:
+        - { order: 1, value: "mission_suggest",
+            label: { en: "💡 Suggest a mission of the day" } }
+        - { order: 2, value: "daily_question_suggest",
+            label: { en: "❓ Suggest a daily question" } }
+        - { order: 3, value: "survey_of_day_suggest",
+            label: { en: "📊 Suggest a survey of the day" } }
+        - { order: 4, value: "bug_report",
+            label: { en: "🐛 Report a bug or technical issue" } }
+        - { order: 5, value: "feature_feedback",
+            label: { en: "💬 Share feedback on an existing feature" } }
+        - { order: 6, value: "feature_request",
+            label: { en: "🔮 Suggest a feature we don't have" } }
+        - { order: 7, value: "other",
+            label: { en: "✏️ Something else" } }
+      required: true
+      result_kind: option_counts
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 1 — Mission of the day suggestion
+    # ------------------------------------------------------------------------
+    - order: 2
+      slug: mission_suggestion_text
+      type: free_text
+      prompt:
+        en: "What mission would you like us to add? Write it the way you'd want it to appear on the app."
+      placeholder:
+        en: "e.g., 'Send a song that reminded you of someone today,' or 'Take a photo of something blue you noticed.'"
+      min_length: 15
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "mission_suggest"
+      result_hidden: true
+
+    - order: 3
+      slug: mission_suggestion_why
+      type: free_text
+      prompt:
+        en: "Why this mission? (Optional)"
+      min_length: 0
+      required: false
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "mission_suggest"
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 2 — Daily question suggestion
+    # ------------------------------------------------------------------------
+    # Daily question = a self-reflection prompt that the user answers about
+    # themselves, no structured options. Kept separate from survey-of-the-day
+    # because the format and placeholder differ.
+    - order: 4
+      slug: daily_question_suggestion_text
+      type: free_text
+      prompt:
+        en: "What daily question would you like us to add? Write it the way you'd want to see it."
+      placeholder:
+        en: "e.g., 'What's something small that made you feel seen today?' or 'Which part of your routine actually works for you?'"
+      min_length: 10
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "daily_question_suggest"
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 3 — Survey-of-the-day suggestion
+    # ------------------------------------------------------------------------
+    # Survey of the day = a structured-option questionnaire that produces an
+    # aggregate visualization the next day. Different format than a daily
+    # question; sketch-the-options style answers help us scope it.
+    - order: 5
+      slug: survey_of_day_suggestion_text
+      type: free_text
+      prompt:
+        en: "What survey of the day would you like us to add? Sketch the question and what the options might look like."
+      placeholder:
+        en: "e.g., 'How often do you reread your own old posts?' with options Never / Once / A few times / Often."
+      min_length: 10
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "survey_of_day_suggest"
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 4 — Bug report
+    # ------------------------------------------------------------------------
+    - order: 6
+      slug: bug_what_happened
+      type: free_text
+      prompt:
+        en: "What happened? Walk us through it."
+      placeholder:
+        en: "What you tried to do, what happened instead, what part of the app it was in. The more specific the better."
+      min_length: 30
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "bug_report"
+      result_hidden: true
+
+    # Severity is ordinal — represented as likert_5 so we get a continuous
+    # score (mean / distribution) instead of a categorical mode.
+    - order: 7
+      slug: bug_severity
+      type: likert_5
+      prompt:
+        en: "How disruptive was it?"
+      low_label:
+        en: "Barely noticeable"
+      high_label:
+        en: "Completely blocking"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: bug_severity
+      result_hidden: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "bug_report"
+
+    # Reproducibility is ordinal frequency. Likert_5_NA so "not sure" can be
+    # captured as N/A (skipped from scoring) rather than collapsed into a
+    # numeric option that distorts the mean.
+    - order: 8
+      slug: bug_reproducible
+      type: likert_5_na
+      prompt:
+        en: "How often does this happen?"
+      low_label:
+        en: "Once only"
+      high_label:
+        en: "Every time"
+      na_option:
+        en: "Not sure"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: bug_reproducible
+      result_hidden: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "bug_report"
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 5 — Feature feedback
+    # ------------------------------------------------------------------------
+    - order: 9
+      slug: feature_feedback_which
+      type: single_choice
+      prompt:
+        en: "Which feature is this about?"
+      options:
+        - { order: 1, value: "daily_questions",       label: { en: "Daily questions" } }
+        - { order: 2, value: "question_sending",      label: { en: "Question sending" } }
+        - { order: 3, value: "mission_of_day",        label: { en: "Mission of the day" } }
+        - { order: 4, value: "survey_of_day",         label: { en: "Survey of the day / daily digest" } }
+        - { order: 5, value: "check_ins",             label: { en: "Check-ins (mood, status, song, battery)" } }
+        - { order: 6, value: "private_comments",      label: { en: "Private comments" } }
+        - { order: 7, value: "emoji_reactions",       label: { en: "Emoji reactions" } }
+        - { order: 8, value: "browsing_modes",        label: { en: "Browsing modes (quiet/social)" } }
+        - { order: 9, value: "close_friend_filter",   label: { en: "Close-friend filter" } }
+        - { order: 10, value: "profile_decoration",   label: { en: "Profile chips, pinned check-ins, persona" } }
+        - { order: 11, value: "discover_feed",        label: { en: "Discover feed" } }
+        - { order: 12, value: "view_as",              label: { en: "View as / privacy controls" } }
+        - { order: 13, value: "shared_playlist",      label: { en: "Shared playlist" } }
+        - { order: 14, value: "widget",               label: { en: "Widget" } }
+        - { order: 15, value: "other",                label: { en: "Other (specify in next field)" } }
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "feature_feedback"
+      result_hidden: true
+
+    - order: 10
+      slug: feature_feedback_text
+      type: free_text
+      prompt:
+        en: "What's your feedback on this feature? Both 'this works great' and 'this is frustrating' are useful."
+      placeholder:
+        en: "What works, what doesn't, what you wish were different."
+      min_length: 20
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "feature_feedback"
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 6 — Feature request
+    # ------------------------------------------------------------------------
+    - order: 11
+      slug: feature_request_what
+      type: free_text
+      prompt:
+        en: "What feature do you wish WIT had?"
+      placeholder:
+        en: "Describe the feature in your own words. Doesn't have to be polished."
+      min_length: 20
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "feature_request"
+      result_hidden: true
+
+    - order: 12
+      slug: feature_request_why
+      type: free_text
+      prompt:
+        en: "What problem would this solve, or what would it let you do?"
+      placeholder:
+        en: "What you're hoping it would help with."
+      min_length: 0
+      required: false
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "feature_request"
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 7 — Other
+    # ------------------------------------------------------------------------
+    # Friend-experience category was removed: every meaningful friend-related
+    # observation routes naturally through bug_report, feature_feedback, or
+    # this Other bucket. The forced "is this a friend thing?" choice created
+    # mutually-exclusive labeling that researchers can't reliably analyze.
+    - order: 13
+      slug: other_text
+      type: free_text
+      prompt:
+        en: "What's on your mind?"
+      placeholder:
+        en: "Anything that didn't fit the other categories."
+      min_length: 20
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "other"
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # FOLLOW-UP CONTACT (universal across categories)
+    # ------------------------------------------------------------------------
+    - order: 17
+      slug: anytime_followup_ok
+      type: single_choice
+      prompt:
+        en: "Can we follow up with you about this submission if needed?"
+      options:
+        - { order: 1, value: "yes",  label: { en: "Yes, feel free" } }
+        - { order: 2, value: "no",   label: { en: "No, just leave this here" } }
+      result_hidden: true

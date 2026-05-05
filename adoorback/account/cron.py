@@ -145,3 +145,30 @@ class AutoCloseSessionsCronJob(CronJobBase):
 
         print(f"{count} sessions automatically closed.")
         print("Cron job for session cleanup complete.")
+
+
+class CrossoverPhaseFlipCronJob(CronJobBase):
+    """Daily flip of `User.current_ver` per the 4-week study's biweekly
+    crossover. Runs idempotently — only updates rows whose current_ver
+    doesn't match the phase-aware expected value, so it's safe to fire
+    every day before, during, and after the boundary.
+
+    See `account.phase_versioning` for the date logic.
+    """
+    schedule = Schedule(run_every_mins=0)
+    code = 'account.crossover_phase_flip_cron_job'
+
+    def do(self):
+        # Local import — keeps the existing cron module's import surface
+        # unchanged for callers that don't exercise this job.
+        from account.phase_versioning import flip_users_to_expected_version, la_today
+
+        today = la_today()
+        summary = flip_users_to_expected_version(today)
+        total = sum(summary.values())
+        print('=========================')
+        print(f'Crossover phase-flip cron — today (LA, 7am boundary): {today}')
+        for group, n in summary.items():
+            print(f'  {group}: {n} user(s) flipped')
+        print(f'Total users flipped: {total}')
+        print('=========================')

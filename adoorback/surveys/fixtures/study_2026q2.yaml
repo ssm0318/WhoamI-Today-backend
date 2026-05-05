@@ -16,10 +16,15 @@
     en: "Pre-study survey"
     ko: "사전 설문"
   description:
-    en: "Welcome! A few quick questions before we start. We'll share tomorrow what your friends and the WhoamI Today community answered, plus how your responses compare. Friend-level results unlock once you have 5+ close connections."
-    ko: "환영합니다! 시작하기 전에 짧은 질문 몇 가지 드릴게요. 내일은 친구들과 WhoamI Today 커뮤니티의 응답, 그리고 본인의 응답이 어떻게 비교되는지 보여드릴게요. 친구 단위 결과는 가까운 친구가 5명 이상일 때 공개됩니다."
+    en: "Welcome! A few quick questions before we start. Your responses stay private — we don't share aggregate results back during the study so they don't influence later answers."
+    ko: "환영합니다! 시작하기 전에 짧은 질문 몇 가지 드릴게요. 응답은 비공개이며, 이후 답변에 영향을 주지 않도록 연구 기간 중에는 다른 참가자들의 응답 결과를 공유하지 않습니다."
   friend_visible: false
-  results_hidden: false
+  # Research instrument — baseline measurement. Aggregates would anchor
+  # mid_study / post_study responses, so results stay hidden for the
+  # duration of the study.
+  results_hidden: true
+  # Priority 40 (mid/post/pre tier per the convention in models.py).
+  priority: 40
   questions:
     - order: 1
       prompt:
@@ -58,6 +63,9 @@
     ko: "오늘의 빠른 체크인이에요. 내일은 친구들과 WhoamI Today 커뮤니티가 오늘 어떻게 느끼는지, 그리고 본인은 어떤지 보여드릴게요. 친구 단위 결과는 가까운 친구가 5명 이상일 때 공개됩니다."
   friend_visible: true
   results_hidden: false
+  # Priority 80 (daily / SOTD tier per the convention in models.py) —
+  # surfaces above weekly / pre-mid-post / anytime in the index.
+  priority: 80
   questions:
     - order: 1
       prompt:
@@ -79,6 +87,7 @@
     ko: "절반쯤 왔어요. 잠시 시간을 내어 지금까지의 경험을 돌아봐 주세요. 응답은 비공개입니다."
   friend_visible: false
   results_hidden: true
+  priority: 40
   questions:
     - order: 1
       prompt:
@@ -115,6 +124,7 @@
     ko: "4주를 마쳤습니다. 감사합니다. 마무리하며 짧은 회고를 부탁드려요 — 응답은 비공개입니다."
   friend_visible: false
   results_hidden: true
+  priority: 40
   questions:
     - order: 1
       prompt:
@@ -141,166 +151,9 @@
         ko: "지난 4주 동안 가장 기억에 남는 건 무엇인가요?"
       result_kind: wordcloud
 
-- slug: week1_reflection
-  type: likert_5
-  title:
-    en: "Week 1 reflection"
-    ko: "1주차 회고"
-  description:
-    en: "Looking back on the past week. Tomorrow we'll share what the community said."
-    ko: "지난 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
-  friend_visible: false
-  results_hidden: false
-  questions:
-    - order: 1
-      prompt:
-        en: "How was this week for you?"
-        ko: "이번 한 주는 어떠셨나요?"
-      low_label: { en: "Tough", ko: "힘들었어요" }
-      high_label: { en: "Great", ko: "아주 좋았어요" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: week_overall
-    - order: 2
-      prompt:
-        en: "How connected did you feel to your friends this week?"
-        ko: "이번 주 친구들과 얼마나 연결되어 있다고 느끼셨나요?"
-      low_label: { en: "Disconnected", ko: "단절된 느낌" }
-      high_label: { en: "Very connected", ko: "매우 연결됨" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: connection
-    - order: 3
-      type: free_text
-      prompt:
-        en: "One thing you'd like to remember from this week?"
-        ko: "이번 주에 기억하고 싶은 한 가지가 있다면요?"
-      result_kind: wordcloud
-
-- slug: week2_reflection
-  type: likert_5
-  title:
-    en: "Week 2 reflection"
-    ko: "2주차 회고"
-  description:
-    en: "Looking back on the past week. Tomorrow we'll share what the community said."
-    ko: "지난 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
-  friend_visible: false
-  results_hidden: false
-  questions:
-    - order: 1
-      prompt:
-        en: "How was this week for you?"
-        ko: "이번 한 주는 어떠셨나요?"
-      low_label: { en: "Tough", ko: "힘들었어요" }
-      high_label: { en: "Great", ko: "아주 좋았어요" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: week_overall
-    - order: 2
-      prompt:
-        en: "How connected did you feel to your friends this week?"
-        ko: "이번 주 친구들과 얼마나 연결되어 있다고 느끼셨나요?"
-      low_label: { en: "Disconnected", ko: "단절된 느낌" }
-      high_label: { en: "Very connected", ko: "매우 연결됨" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: connection
-    - order: 3
-      type: free_text
-      prompt:
-        en: "One thing you'd like to remember from this week?"
-        ko: "이번 주에 기억하고 싶은 한 가지가 있다면요?"
-      result_kind: wordcloud
-
-- slug: week3_reflection
-  type: likert_5
-  title:
-    en: "Week 3 reflection"
-    ko: "3주차 회고"
-  description:
-    en: "Looking back on the past week. Tomorrow we'll share what the community said."
-    ko: "지난 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
-  friend_visible: false
-  results_hidden: false
-  questions:
-    - order: 1
-      prompt:
-        en: "How was this week for you?"
-        ko: "이번 한 주는 어떠셨나요?"
-      low_label: { en: "Tough", ko: "힘들었어요" }
-      high_label: { en: "Great", ko: "아주 좋았어요" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: week_overall
-    - order: 2
-      prompt:
-        en: "How connected did you feel to your friends this week?"
-        ko: "이번 주 친구들과 얼마나 연결되어 있다고 느끼셨나요?"
-      low_label: { en: "Disconnected", ko: "단절된 느낌" }
-      high_label: { en: "Very connected", ko: "매우 연결됨" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: connection
-    - order: 3
-      type: free_text
-      prompt:
-        en: "One thing you'd like to remember from this week?"
-        ko: "이번 주에 기억하고 싶은 한 가지가 있다면요?"
-      result_kind: wordcloud
-
-- slug: week4_reflection
-  type: likert_5
-  title:
-    en: "Week 4 reflection"
-    ko: "4주차 회고"
-  description:
-    en: "Looking back on the final week. Tomorrow we'll share what the community said."
-    ko: "마지막 한 주를 돌아봐 주세요. 내일 커뮤니티의 응답을 공유해 드릴게요."
-  friend_visible: false
-  results_hidden: false
-  questions:
-    - order: 1
-      prompt:
-        en: "How was this week for you?"
-        ko: "이번 한 주는 어떠셨나요?"
-      low_label: { en: "Tough", ko: "힘들었어요" }
-      high_label: { en: "Great", ko: "아주 좋았어요" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: week_overall
-    - order: 2
-      prompt:
-        en: "How connected did you feel to your friends this week?"
-        ko: "이번 주 친구들과 얼마나 연결되어 있다고 느끼셨나요?"
-      low_label: { en: "Disconnected", ko: "단절된 느낌" }
-      high_label: { en: "Very connected", ko: "매우 연결됨" }
-      reverse_scored: false
-      result_kind: aggregated_likert
-      result_group: connection
-    - order: 3
-      type: free_text
-      prompt:
-        en: "One thing you'd like to remember from this week?"
-        ko: "이번 주에 기억하고 싶은 한 가지가 있다면요?"
-      result_kind: wordcloud
-
-- slug: anytime_reflection
-  type: free_text
-  title:
-    en: "Anytime reflection"
-    ko: "자유 회고"
-  description:
-    en: "Drop in whenever you'd like during the four weeks. A thought, a moment, a question — whatever's on your mind. Your responses stay private."
-    ko: "4주 동안 언제든지 들러주세요. 떠오르는 생각이든 순간이든 질문이든 좋아요. 응답은 비공개입니다."
-  friend_visible: false
-  results_hidden: true
-  questions:
-    - order: 1
-      prompt:
-        en: "What's on your mind right now?"
-        ko: "지금 어떤 생각을 하고 계신가요?"
-      result_kind: wordcloud
+# week1-4_reflection + anytime_reflection are authored in
+# weekly_anytime.yaml. setup_survey_state loads it AFTER this file
+# (with --replace-questions) so it owns those slugs.
 
 - slug: study_endpoint
   type: free_text
