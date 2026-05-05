@@ -3,3 +3,7 @@
 */15 * * * * /app/cron/scripts/run_django_cron.sh --force account.cron.SendDailyWhoAmINotiCronJob
 * * * * * /app/cron/scripts/run_django_cron.sh --force account.cron.AutoCloseSessionsCronJob
 0 15 * * * /app/cron/scripts/run_django_cron.sh --force qna.cron.DailyQuestionCronJob
+# Crossover flip: 14:05 UTC daily = 07:05 PDT, just after the LA-7am
+# boundary the survey scheduling layer uses. Idempotent — runs every
+# day, only writes on the actual phase boundary (2026-05-18).
+5 14 * * * /app/cron/scripts/run_django_cron.sh --force account.cron.CrossoverPhaseFlipCronJob
