@@ -1949,10 +1949,16 @@ class FriendList(generics.ListAPIView):
                 unread_response_count_by_author[author_id] = c
         ctx['unread_response_count_by_author'] = unread_response_count_by_author
 
-        # 10. Pokes (preserved from prior implementation)
-        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        # 10. Pokes — pending only, no calendar window. The previous
+        # `created_at__gte=today_start` (UTC midnight) silently dropped
+        # pings the user had just sent the moment UTC rolled over (5pm PT
+        # / 9am KST), making the friend-card "Pinged ✓" badge reset on
+        # every reload past that boundary even though the ping was still
+        # pending in the DB. Filtering by `responded_at__isnull=True`
+        # mirrors `notify_poke_senders` (the writer that fulfills pings)
+        # and removes timezone math from the read path entirely.
         pokes = Poke.objects.filter(
-            sender=user, receiver_id__in=friend_ids, created_at__gte=today_start,
+            sender=user, receiver_id__in=friend_ids, responded_at__isnull=True,
         ).values('receiver_id', 'component_type', 'id')
         bucket = {}
         for p in pokes:
