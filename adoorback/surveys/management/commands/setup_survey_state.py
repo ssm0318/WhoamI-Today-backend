@@ -158,6 +158,21 @@ class Command(BaseCommand):
         )
         honeymoon_module.reschedule_honeymoon(django_apps, None)
 
+        # 4c. Re-apply migration 0017's weekly schedule shift. Step 2
+        #    above runs 0004's pristine schedule which puts week1
+        #    starting on Day 1 (May 4) — but week1 is "looking back on
+        #    the past week" and shouldn't be visible until Day 7 (May 10)
+        #    when there's actually a past week to reflect on. Without
+        #    this step, every setup_survey_state run silently re-exposes
+        #    week1 from Day 1.
+        self.stdout.write(
+            self.style.NOTICE('[4c] Shifting weekly reflections to end-of-week ...')
+        )
+        weekly_module = import_module(
+            'surveys.migrations.0017_shift_weekly_reflections_to_end_of_week'
+        )
+        weekly_module.shift_weekly_reflections(django_apps, None)
+
         # 5. Re-seed the persistent / editable evaluation surveys (feature_eval_w
         #    and goal_comparison_p1/p2). Endpoint cadence with no window_end —
         #    researchers manually close them at study end via Survey.closed.
