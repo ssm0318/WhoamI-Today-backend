@@ -2250,6 +2250,10 @@
   results_hidden: false
 
   questions:
+    # Q1 single-choice with an "Other" escape hatch — preset emotion words
+    # cover the common cases, but participants whose first impression
+    # doesn't fit any of them can pick "Other" and write the word(s)
+    # themselves in the conditional follow-up below.
     - order: 1
       slug: honeymoon_first_impression
       type: single_choice
@@ -2265,9 +2269,25 @@
         - { order: 7, value: "lonely",       label: { en: "Lonely" } }
         - { order: 8, value: "overwhelmed",  label: { en: "Overwhelmed" } }
         - { order: 9, value: "neutral",      label: { en: "Neutral / haven't formed an impression yet" } }
+        - { order: 10, value: "other",       label: { en: "Other (write your own)" } }
       result_kind: option_counts
 
     - order: 2
+      slug: honeymoon_first_impression_other
+      type: free_text
+      prompt:
+        en: "What word fits best?"
+      placeholder:
+        en: "A single word, or a couple if one isn't enough."
+      min_length: 1
+      required: true
+      conditional_display:
+        depends_on: honeymoon_first_impression
+        show_when_value: "other"
+      result_kind: wordcloud
+      result_hidden: false
+
+    - order: 3
       slug: honeymoon_compared_to
       type: single_choice
       prompt:
@@ -2280,7 +2300,7 @@
         - { order: 5, value: "too_early",        label: { en: "Too early to say" } }
       result_kind: option_counts
 
-    - order: 3
+    - order: 4
       slug: honeymoon_surprised_by
       type: free_text
       prompt:
@@ -2292,7 +2312,7 @@
       result_kind: wordcloud
       result_hidden: false
 
-    - order: 4
+    - order: 5
       slug: honeymoon_first_friend_action
       type: single_choice
       prompt:

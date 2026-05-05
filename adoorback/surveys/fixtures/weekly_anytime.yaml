@@ -128,16 +128,23 @@ _weekly_questions: &weekly_questions
     result_kind: wordcloud
     result_hidden: false
 
+  # Severity-of-friction is ordinal — likert_5 so we can compute a weekly
+  # mean and track frication trend across the cohort. Low end is "no
+  # issues at all"; high end is "major problems". The free-text follow-up
+  # triggers on any non-minimum value (≥2) so even a "barely noticeable"
+  # mark prompts the user to describe it.
   - order: 7
     slug: weekly_issue_flag
-    type: single_choice
+    type: likert_5
     prompt:
-      en: "Did anything not work as you expected this week — a bug, a confusing feature, something that felt broken?"
-    options:
-      - { order: 1, value: "no",        label: { en: "Nope, nothing notable" } }
-      - { order: 2, value: "minor",     label: { en: "Yes, but minor" } }
-      - { order: 3, value: "real",      label: { en: "Yes, something real" } }
-    result_kind: option_counts
+      en: "How much did things on WIT feel broken or confusing this week?"
+    low_label:
+      en: "Nothing notable"
+    high_label:
+      en: "Major problems"
+    reverse_scored: false
+    result_kind: aggregated_likert
+    result_group: weekly_issue
     result_hidden: true
 
   - order: 8
@@ -149,7 +156,7 @@ _weekly_questions: &weekly_questions
     required: false
     conditional_display:
       depends_on: weekly_issue_flag
-      show_when_value_in: ["minor", "real"]
+      show_when_value_in: [2, 3, 4, 5]
     result_hidden: true
 
 
@@ -259,11 +266,15 @@ _weekly_questions: &weekly_questions
 # Opt-in feedback channel. Users can submit as many times as they want
 # throughout the study, each submission tagged by category.
 #
-# Categories: mission suggestion, question/survey suggestion, bug report,
-# feature feedback, feature request, friend-experience note, other.
+# Categories: mission suggestion, daily question suggestion, survey-of-the-day
+# suggestion, bug report, feature feedback, feature request, other.
 #
 # Friend visibility: OFF
 # Results: HIDDEN (private feedback, not for digests)
+#
+# Severity / frequency questions use likert scales rather than ordinal
+# multi-choice so the data is analyzable as continuous (means, sums,
+# distributions) rather than just modal-category counts.
 
 - slug: anytime_reflection
   type: single_choice
@@ -282,13 +293,10 @@ _weekly_questions: &weekly_questions
 
   questions:
 
+    # The category-select is the first question. Previously preceded by
+    # a `display_only` "Quick note" intro — removed because it added a
+    # forced tap that didn't carry information.
     - order: 1
-      slug: anytime_intro
-      type: display_only
-      content:
-        en: "**Quick note: this isn't a long survey.** Pick a category below and answer one or two short questions. You can come back and submit again whenever you have something else to share."
-
-    - order: 2
       slug: anytime_category
       type: single_choice
       prompt:
@@ -296,16 +304,16 @@ _weekly_questions: &weekly_questions
       options:
         - { order: 1, value: "mission_suggest",
             label: { en: "💡 Suggest a mission of the day" } }
-        - { order: 2, value: "question_suggest",
-            label: { en: "❓ Suggest a daily question or survey of the day" } }
-        - { order: 3, value: "bug_report",
+        - { order: 2, value: "daily_question_suggest",
+            label: { en: "❓ Suggest a daily question" } }
+        - { order: 3, value: "survey_of_day_suggest",
+            label: { en: "📊 Suggest a survey of the day" } }
+        - { order: 4, value: "bug_report",
             label: { en: "🐛 Report a bug or technical issue" } }
-        - { order: 4, value: "feature_feedback",
+        - { order: 5, value: "feature_feedback",
             label: { en: "💬 Share feedback on an existing feature" } }
-        - { order: 5, value: "feature_request",
+        - { order: 6, value: "feature_request",
             label: { en: "🔮 Suggest a feature we don't have" } }
-        - { order: 6, value: "friend_experience",
-            label: { en: "🤝 Share something about your experience with friends on WIT" } }
         - { order: 7, value: "other",
             label: { en: "✏️ Something else" } }
       required: true
@@ -315,7 +323,7 @@ _weekly_questions: &weekly_questions
     # ------------------------------------------------------------------------
     # CATEGORY 1 — Mission of the day suggestion
     # ------------------------------------------------------------------------
-    - order: 3
+    - order: 2
       slug: mission_suggestion_text
       type: free_text
       prompt:
@@ -329,7 +337,7 @@ _weekly_questions: &weekly_questions
         show_when_value: "mission_suggest"
       result_hidden: true
 
-    - order: 4
+    - order: 3
       slug: mission_suggestion_why
       type: free_text
       prompt:
@@ -342,43 +350,49 @@ _weekly_questions: &weekly_questions
       result_hidden: true
 
     # ------------------------------------------------------------------------
-    # CATEGORY 2 — Daily question / survey of the day suggestion
+    # CATEGORY 2 — Daily question suggestion
     # ------------------------------------------------------------------------
-    - order: 5
-      slug: question_suggestion_type
-      type: single_choice
-      prompt:
-        en: "Which one are you suggesting?"
-      options:
-        - { order: 1, value: "daily_question",
-            label: { en: "Daily question (something to answer about yourself)" } }
-        - { order: 2, value: "survey_of_day",
-            label: { en: "Survey of the day (something with structured options + digest)" } }
-        - { order: 3, value: "either",
-            label: { en: "Either could work" } }
-      conditional_display:
-        depends_on: anytime_category
-        show_when_value: "question_suggest"
-      result_hidden: true
-
-    - order: 6
-      slug: question_suggestion_text
+    # Daily question = a self-reflection prompt that the user answers about
+    # themselves, no structured options. Kept separate from survey-of-the-day
+    # because the format and placeholder differ.
+    - order: 4
+      slug: daily_question_suggestion_text
       type: free_text
       prompt:
-        en: "What's the question? Write it the way you'd want it to appear."
+        en: "What daily question would you like us to add? Write it the way you'd want to see it."
       placeholder:
-        en: "e.g., 'What's something small that made you feel seen this week?' or 'Which part of your routine actually works for you?'"
+        en: "e.g., 'What's something small that made you feel seen today?' or 'Which part of your routine actually works for you?'"
       min_length: 10
       required: true
       conditional_display:
         depends_on: anytime_category
-        show_when_value: "question_suggest"
+        show_when_value: "daily_question_suggest"
       result_hidden: true
 
     # ------------------------------------------------------------------------
-    # CATEGORY 3 — Bug report
+    # CATEGORY 3 — Survey-of-the-day suggestion
     # ------------------------------------------------------------------------
-    - order: 7
+    # Survey of the day = a structured-option questionnaire that produces an
+    # aggregate visualization the next day. Different format than a daily
+    # question; sketch-the-options style answers help us scope it.
+    - order: 5
+      slug: survey_of_day_suggestion_text
+      type: free_text
+      prompt:
+        en: "What survey of the day would you like us to add? Sketch the question and what the options might look like."
+      placeholder:
+        en: "e.g., 'How often do you reread your own old posts?' with options Never / Once / A few times / Often."
+      min_length: 10
+      required: true
+      conditional_display:
+        depends_on: anytime_category
+        show_when_value: "survey_of_day_suggest"
+      result_hidden: true
+
+    # ------------------------------------------------------------------------
+    # CATEGORY 4 — Bug report
+    # ------------------------------------------------------------------------
+    - order: 6
       slug: bug_what_happened
       type: free_text
       prompt:
@@ -392,40 +406,51 @@ _weekly_questions: &weekly_questions
         show_when_value: "bug_report"
       result_hidden: true
 
-    - order: 8
+    # Severity is ordinal — represented as likert_5 so we get a continuous
+    # score (mean / distribution) instead of a categorical mode.
+    - order: 7
       slug: bug_severity
-      type: single_choice
+      type: likert_5
       prompt:
         en: "How disruptive was it?"
-      options:
-        - { order: 1, value: "minor",     label: { en: "Minor — annoying but I worked around it" } }
-        - { order: 2, value: "moderate",  label: { en: "Moderate — it got in the way" } }
-        - { order: 3, value: "major",     label: { en: "Major — I couldn't do what I was trying to do" } }
-        - { order: 4, value: "blocker",   label: { en: "Total blocker — the app was unusable" } }
+      low_label:
+        en: "Barely noticeable"
+      high_label:
+        en: "Completely blocking"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: bug_severity
+      result_hidden: true
       conditional_display:
         depends_on: anytime_category
         show_when_value: "bug_report"
-      result_hidden: true
 
-    - order: 9
+    # Reproducibility is ordinal frequency. Likert_5_NA so "not sure" can be
+    # captured as N/A (skipped from scoring) rather than collapsed into a
+    # numeric option that distorts the mean.
+    - order: 8
       slug: bug_reproducible
-      type: single_choice
+      type: likert_5_na
       prompt:
-        en: "Can you reproduce it?"
-      options:
-        - { order: 1, value: "every_time",   label: { en: "Every time I try" } }
-        - { order: 2, value: "sometimes",    label: { en: "Sometimes" } }
-        - { order: 3, value: "once",         label: { en: "It only happened once" } }
-        - { order: 4, value: "unsure",       label: { en: "Not sure" } }
+        en: "How often does this happen?"
+      low_label:
+        en: "Once only"
+      high_label:
+        en: "Every time"
+      na_option:
+        en: "Not sure"
+      reverse_scored: false
+      result_kind: aggregated_likert
+      result_group: bug_reproducible
+      result_hidden: true
       conditional_display:
         depends_on: anytime_category
         show_when_value: "bug_report"
-      result_hidden: true
 
     # ------------------------------------------------------------------------
-    # CATEGORY 4 — Feature feedback
+    # CATEGORY 5 — Feature feedback
     # ------------------------------------------------------------------------
-    - order: 10
+    - order: 9
       slug: feature_feedback_which
       type: single_choice
       prompt:
@@ -451,7 +476,7 @@ _weekly_questions: &weekly_questions
         show_when_value: "feature_feedback"
       result_hidden: true
 
-    - order: 11
+    - order: 10
       slug: feature_feedback_text
       type: free_text
       prompt:
@@ -466,9 +491,9 @@ _weekly_questions: &weekly_questions
       result_hidden: true
 
     # ------------------------------------------------------------------------
-    # CATEGORY 5 — Feature request
+    # CATEGORY 6 — Feature request
     # ------------------------------------------------------------------------
-    - order: 12
+    - order: 11
       slug: feature_request_what
       type: free_text
       prompt:
@@ -482,7 +507,7 @@ _weekly_questions: &weekly_questions
         show_when_value: "feature_request"
       result_hidden: true
 
-    - order: 13
+    - order: 12
       slug: feature_request_why
       type: free_text
       prompt:
@@ -497,41 +522,13 @@ _weekly_questions: &weekly_questions
       result_hidden: true
 
     # ------------------------------------------------------------------------
-    # CATEGORY 6 — Friend experience note
-    # ------------------------------------------------------------------------
-    - order: 14
-      slug: friend_experience_text
-      type: free_text
-      prompt:
-        en: "Tell us about something that happened with a friend on WIT — a moment, a feeling, an interaction that stood out."
-      placeholder:
-        en: "Specific is more useful than general. We won't share usernames with anyone."
-      min_length: 30
-      required: true
-      conditional_display:
-        depends_on: anytime_category
-        show_when_value: "friend_experience"
-      result_hidden: true
-
-    - order: 15
-      slug: friend_experience_tone
-      type: single_choice
-      prompt:
-        en: "How did this experience leave you feeling?"
-      options:
-        - { order: 1, value: "good",        label: { en: "Good — happy to share it" } }
-        - { order: 2, value: "complicated", label: { en: "Complicated / mixed" } }
-        - { order: 3, value: "bad",         label: { en: "Bad — wanted to flag it" } }
-        - { order: 4, value: "neutral",     label: { en: "Neutral — just an observation" } }
-      conditional_display:
-        depends_on: anytime_category
-        show_when_value: "friend_experience"
-      result_hidden: true
-
-    # ------------------------------------------------------------------------
     # CATEGORY 7 — Other
     # ------------------------------------------------------------------------
-    - order: 16
+    # Friend-experience category was removed: every meaningful friend-related
+    # observation routes naturally through bug_report, feature_feedback, or
+    # this Other bucket. The forced "is this a friend thing?" choice created
+    # mutually-exclusive labeling that researchers can't reliably analyze.
+    - order: 13
       slug: other_text
       type: free_text
       prompt:
