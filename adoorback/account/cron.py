@@ -33,32 +33,53 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                 continue
 
             user_local_time = timezone.now().astimezone(ZoneInfo(user.timezone))
-            
+
             current_weekday = user_local_time.weekday()  # Monday=0, Sunday=6
             if str(current_weekday) not in user.noti_period_days:
-                continue
-
-            try:
-                daily_question = Question.objects.daily_questions(user)[0]
-                daily_question_en = daily_question.content_en
-                daily_question_ko = daily_question.content_ko
-                daily_question_id = daily_question.id
-            except:
-                print(f'🚨 ERROR: daily question does not exist for user {user.username} ({user.id})!')
-                print("Failed to send daily notification for this user.")
                 continue
 
             user_now = user_local_time
             noti_datetime = user_now.replace(hour=user.noti_time.hour, minute=user.noti_time.minute)
             time_diff = abs(user_now - noti_datetime)
-            if time_diff <= timedelta(minutes=10):
-                noti = Notification.objects.create(user=user,
-                                                target=admin,
-                                                origin=admin,
-                                                message_ko=f"{user.username}님, 오늘 친구들에게 한 마디 남겨보세요! — {daily_question_ko}",
-                                                message_en=f"{user.username}, quick reminder to share something with your friends today! — {daily_question_en}",
-                                                redirect_url=f'/questions/{daily_question_id}/new')
-                NotificationActor.objects.create(user=admin, notification=noti)
+            if time_diff > timedelta(minutes=10):
+                continue
+
+            # Ver.W: question-of-the-day is one of several Share-tab surfaces
+            # (alongside Mission, Photo of the Day, Daily Snapshots, etc.), so
+            # the daily reminder shouldn't be question-shaped or deep-link the
+            # response composer. Drop the user on /share and let them pick.
+            if user.current_ver == 'version_w':
+                message_ko = f"{user.username}님, 오늘 친구들에게 한 마디 남겨보세요!"
+                message_en = (
+                    f"{user.username}, quick reminder to share something with your friends today!"
+                )
+                redirect_url = '/share'
+            else:
+                # Ver.Q: keep the question-anchored copy and the response-composer
+                # deep-link — Q's home tab IS the question feed, so this is the
+                # right primary CTA there.
+                try:
+                    daily_question = Question.objects.daily_questions(user)[0]
+                except Exception:
+                    print(f'🚨 ERROR: daily question does not exist for user {user.username} ({user.id})!')
+                    print("Failed to send daily notification for this user.")
+                    continue
+                message_ko = (
+                    f"{user.username}님, 오늘 친구들에게 한 마디 남겨보세요! — {daily_question.content_ko}"
+                )
+                message_en = (
+                    f"{user.username}, quick reminder to share something with your friends today! "
+                    f"— {daily_question.content_en}"
+                )
+                redirect_url = f'/questions/{daily_question.id}/new'
+
+            noti = Notification.objects.create(user=user,
+                                            target=admin,
+                                            origin=admin,
+                                            message_ko=message_ko,
+                                            message_en=message_en,
+                                            redirect_url=redirect_url)
+            NotificationActor.objects.create(user=admin, notification=noti)
 
         num_notis_after = Notification.objects.admin_only().count()
         print(f'{num_notis_after - num_notis_before} notifications sent!')
