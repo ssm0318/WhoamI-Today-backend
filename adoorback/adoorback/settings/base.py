@@ -83,7 +83,6 @@ INSTALLED_APPS = [
     'translate.apps.TranslateConfig',
     'surveys.apps.SurveysConfig',
     'custom_fcm',
-    'study_admin.apps.StudyAdminConfig',
     'modeltranslation',
     'django.contrib.admin',
     'django.contrib.auth',
