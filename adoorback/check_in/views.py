@@ -784,18 +784,22 @@ class PokeCreate(generics.CreateAPIView):
         if sender.current_ver != receiver.current_ver:
             raise exceptions.PermissionDenied("Cannot poke a user on a different version.")
 
-        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-        # Check duplicate: same sender->receiver->component_type today
+        # One pending ping per (sender, receiver, component_type). The previous
+        # `created_at__gte=today_start` check used UTC midnight, so pings made
+        # earlier in the user's local day got dropped from PokeSent the moment
+        # UTC rolled over (5pm PT / 9am KST). Switching to `responded_at` aligns
+        # with `notify_poke_senders`: a ping is "open" until the receiver shares
+        # the matching component. After the receiver responds (or the sender
+        # un-pings), the slot is free again.
         component_type = serializer.validated_data.get('component_type')
-        already_poked = Poke.objects.filter(
+        already_pending = Poke.objects.filter(
             sender=sender,
             receiver=receiver,
             component_type=component_type,
-            created_at__gte=today_start,
+            responded_at__isnull=True,
         ).exists()
-        if already_poked:
-            raise exceptions.ValidationError("You already poked this component today.")
+        if already_pending:
+            raise exceptions.ValidationError("You already pinged this component.")
 
         serializer.save(sender=sender, receiver=receiver)
 
@@ -808,7 +812,10 @@ class PokeCreate(generics.CreateAPIView):
 
 class PokeSent(generics.ListAPIView):
     """
-    Get pokes sent by the current user to a specific receiver today.
+    Get *pending* pings the current user has sent to a specific receiver — i.e.
+    pings the receiver hasn't fulfilled yet (no matching component shared since
+    the ping landed). Used by the friend-card PokeButton to render the
+    "Pinged: <component> ✓" state.
     GET /poke/sent/?receiver_id=X
     """
     serializer_class = cs.PokeSerializer
@@ -822,11 +829,18 @@ class PokeSent(generics.ListAPIView):
         receiver_id = self.request.query_params.get('receiver_id')
         if not receiver_id:
             raise exceptions.ValidationError("receiver_id query parameter is required.")
-        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        # Filter by `responded_at__isnull=True` instead of a "created today"
+        # window. The previous `today_start = timezone.now().replace(hour=0, ...)`
+        # was UTC midnight (server settings have USE_TZ=True), which silently
+        # dropped pings the user had just sent the moment UTC rolled over —
+        # 5pm PT / 9am KST every day — even though the ping was still pending
+        # in the DB. `notify_poke_senders` already uses the same
+        # `responded_at__isnull=True` predicate to find pokes to fulfill, so
+        # this lines up the read path with the write path.
         return Poke.objects.filter(
             sender=sender,
             receiver_id=receiver_id,
-            created_at__gte=today_start,
+            responded_at__isnull=True,
         )
 
 
