@@ -173,6 +173,18 @@ class Command(BaseCommand):
         )
         weekly_module.shift_weekly_reflections(django_apps, None)
 
+        # 4d. Apply the May-7 reschedule for sotd_d02_rsds. May 5 was
+        #    already double-booked with d01_honeymoon; pushing RSDS to
+        #    May 7 (alongside sotd_d04_iscs_bridge) spreads load and
+        #    leverages the auto-chain UX.
+        self.stdout.write(
+            self.style.NOTICE('[4d] Applying day-2 RSDS reschedule (May 7) ...')
+        )
+        rsds_module = import_module(
+            'surveys.migrations.0018_reschedule_d02_rsds_to_may_7'
+        )
+        rsds_module.reschedule_rsds(django_apps, None)
+
         # 5. Re-seed the persistent / editable evaluation surveys (feature_eval_w
         #    and goal_comparison_p1/p2). Endpoint cadence with no window_end —
         #    researchers manually close them at study end via Survey.closed.
