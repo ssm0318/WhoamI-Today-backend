@@ -57,6 +57,7 @@ class MissionToday(APIView):
             'id': mission.id,
             'prompt': mission.prompt,
             'type': mission.type,
+            'cta_url': mission.cta_url,
             'attempts_used': attempts_used,
             'attempts_remaining': attempts_remaining,
             'max_attempts': MAX_MISSION_ATTEMPTS_PER_DAY,

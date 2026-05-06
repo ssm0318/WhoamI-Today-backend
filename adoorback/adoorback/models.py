@@ -30,6 +30,14 @@ class Mission(AdoorTimestampedModel):
 
     prompt = models.TextField()
     type = models.CharField(max_length=20, choices=MISSION_TYPE_CHOICES)
+    # When False, the discover digest hides the yesterday_mission card the
+    # next day (e.g. for chat-based missions where there are no posts to share).
+    share_results = models.BooleanField(default=True)
+    # Optional override link surfaced on the Discover digest mission-card.
+    # Empty string = default "View mission posts" → /missions/<id>?discover=true.
+    # Non-empty = "Take me to wit_bot" (or similar) → cta_url verbatim.
+    # Does NOT affect the Share tab "Do it" button.
+    cta_url = models.CharField(max_length=200, blank=True, default='')
 
     class Meta:
         ordering = ['id']
