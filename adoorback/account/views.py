@@ -3155,6 +3155,10 @@ class DiscoverFeedView(APIView):
         yesterday_day_of_year = yesterday_boundary.timetuple().tm_yday
         missions = list(Mission.objects.all().order_by('id'))
         yesterday_mission_obj = missions[yesterday_day_of_year % len(missions)] if missions else None
+        # Suppress the digest mission card when the mission is opted out of
+        # showing results (e.g. chat-based missions with no posts to share).
+        if yesterday_mission_obj is not None and not yesterday_mission_obj.share_results:
+            yesterday_mission_obj = None
         yesterday_question_obj = Question.objects.filter(
             selected_dates__contains=[yesterday_boundary.date()]
         ).first()
@@ -3332,6 +3336,11 @@ class DiscoverFeedView(APIView):
         yesterday_day_of_year = yesterday_7am_la.timetuple().tm_yday
         missions = list(Mission.objects.all().order_by('id'))
         yesterday_mission_obj = missions[yesterday_day_of_year % len(missions)] if missions else None
+        # Suppress yesterday_mission DiscoverFeed rows when the mission opts
+        # out of showing results — keeps generate_new_feed in sync with the
+        # digest gating in _yesterday_digest_objects.
+        if yesterday_mission_obj is not None and not yesterday_mission_obj.share_results:
+            yesterday_mission_obj = None
         yesterday_question_obj = Question.objects.filter(selected_dates__contains=[yesterday_7am_la.date()]).first()
 
         # All responses & notes by non-friends with public visibility
