@@ -67,11 +67,14 @@
 # Higher score = greater general willingness to self-disclose.
 
 - slug: sotd_d02_rsds
-  # Wheeless RSDS-10 published scale uses 7-point Likert (Strongly
-  # disagree → Strongly agree). Earlier YAML drafts had likert_5 here
-  # — that compresses the original 7 response categories into 5,
-  # making cross-study comparison invalid.
-  type: likert_7
+  # NOTE: Wheeless RSDS-10 published scale is 7-point. This deployment
+  # used 5-point because the YAML's earlier likert_5 typo went live for
+  # the May 7 administration before the scale-type bug was caught. May 7
+  # responses are locked at 5-point; reverted to likert_5 so the schema
+  # matches the data already collected. For analysis: rescale by 7/5 if
+  # comparing to other RSDS studies, or treat as a study-specific 5-point
+  # variant.
+  type: likert_5
   title:
     en: "How openly do you tend to share?"
   description:
@@ -85,7 +88,7 @@
   questions:
     - order: 1
       slug: rsds_1
-      type: likert_7
+      type: likert_5
       prompt:
         en: "When I share with others, I usually share for a long time at once."
       low_label:  { en: "Strongly disagree" }
@@ -94,7 +97,7 @@
 
     - order: 2
       slug: rsds_2
-      type: likert_7
+      type: likert_5
       prompt:
         en: "My statements about myself are usually quite long."
       low_label:  { en: "Strongly disagree" }
@@ -103,7 +106,7 @@
 
     - order: 3
       slug: rsds_3
-      type: likert_7
+      type: likert_5
       prompt:
         en: "Once I get started, my self-disclosures last a long time."
       low_label:  { en: "Strongly disagree" }
@@ -112,7 +115,7 @@
 
     - order: 4
       slug: rsds_4
-      type: likert_7
+      type: likert_5
       prompt:
         en: "I do not often share information about myself."
       low_label:  { en: "Strongly disagree" }
@@ -121,7 +124,7 @@
 
     - order: 5
       slug: rsds_5
-      type: likert_7
+      type: likert_5
       prompt:
         en: "I usually share what I really feel and think."
       low_label:  { en: "Strongly disagree" }
@@ -130,7 +133,7 @@
 
     - order: 6
       slug: rsds_6
-      type: likert_7
+      type: likert_5
       prompt:
         en: "When I share things, I usually share things that are personal."
       low_label:  { en: "Strongly disagree" }
@@ -139,7 +142,7 @@
 
     - order: 7
       slug: rsds_7
-      type: likert_7
+      type: likert_5
       prompt:
         en: "I usually share intimate, personal things about myself."
       low_label:  { en: "Strongly disagree" }
@@ -148,7 +151,7 @@
 
     - order: 8
       slug: rsds_8
-      type: likert_7
+      type: likert_5
       prompt:
         en: "I usually keep my personal feelings to myself."
       low_label:  { en: "Strongly disagree" }
@@ -157,7 +160,7 @@
 
     - order: 9
       slug: rsds_9
-      type: likert_7
+      type: likert_5
       prompt:
         en: "When I share something, I let others know exactly how I feel about it."
       low_label:  { en: "Strongly disagree" }
@@ -166,7 +169,7 @@
 
     - order: 10
       slug: rsds_10
-      type: likert_7
+      type: likert_5
       prompt:
         en: "When I share, I am consciously willing to reveal personal information about myself."
       low_label:  { en: "Strongly disagree" }
