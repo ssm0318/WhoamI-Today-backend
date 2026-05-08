@@ -67,7 +67,11 @@
 # Higher score = greater general willingness to self-disclose.
 
 - slug: sotd_d02_rsds
-  type: likert_5
+  # Wheeless RSDS-10 published scale uses 7-point Likert (Strongly
+  # disagree → Strongly agree). Earlier YAML drafts had likert_5 here
+  # — that compresses the original 7 response categories into 5,
+  # making cross-study comparison invalid.
+  type: likert_7
   title:
     en: "How openly do you tend to share?"
   description:
@@ -81,7 +85,7 @@
   questions:
     - order: 1
       slug: rsds_1
-      type: likert_5
+      type: likert_7
       prompt:
         en: "When I share with others, I usually share for a long time at once."
       low_label:  { en: "Strongly disagree" }
@@ -90,7 +94,7 @@
 
     - order: 2
       slug: rsds_2
-      type: likert_5
+      type: likert_7
       prompt:
         en: "My statements about myself are usually quite long."
       low_label:  { en: "Strongly disagree" }
@@ -99,7 +103,7 @@
 
     - order: 3
       slug: rsds_3
-      type: likert_5
+      type: likert_7
       prompt:
         en: "Once I get started, my self-disclosures last a long time."
       low_label:  { en: "Strongly disagree" }
@@ -108,7 +112,7 @@
 
     - order: 4
       slug: rsds_4
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I do not often share information about myself."
       low_label:  { en: "Strongly disagree" }
@@ -117,7 +121,7 @@
 
     - order: 5
       slug: rsds_5
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I usually share what I really feel and think."
       low_label:  { en: "Strongly disagree" }
@@ -126,7 +130,7 @@
 
     - order: 6
       slug: rsds_6
-      type: likert_5
+      type: likert_7
       prompt:
         en: "When I share things, I usually share things that are personal."
       low_label:  { en: "Strongly disagree" }
@@ -135,7 +139,7 @@
 
     - order: 7
       slug: rsds_7
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I usually share intimate, personal things about myself."
       low_label:  { en: "Strongly disagree" }
@@ -144,7 +148,7 @@
 
     - order: 8
       slug: rsds_8
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I usually keep my personal feelings to myself."
       low_label:  { en: "Strongly disagree" }
@@ -153,7 +157,7 @@
 
     - order: 9
       slug: rsds_9
-      type: likert_5
+      type: likert_7
       prompt:
         en: "When I share something, I let others know exactly how I feel about it."
       low_label:  { en: "Strongly disagree" }
@@ -162,7 +166,7 @@
 
     - order: 10
       slug: rsds_10
-      type: likert_5
+      type: likert_7
       prompt:
         en: "When I share, I am consciously willing to reveal personal information about myself."
       low_label:  { en: "Strongly disagree" }
@@ -995,7 +999,7 @@
       reverse_scored: true
 
     - order: 4
-      slug: was_self_alien_2
+      slug: was_external_2
       type: likert_7
       prompt:
         en: "I always feel I need to do what others expect me to do."
@@ -1004,7 +1008,7 @@
       reverse_scored: true
 
     - order: 5
-      slug: was_authentic_living_2
+      slug: was_external_3
       type: likert_7
       prompt:
         en: "Other people influence me greatly."
@@ -1013,7 +1017,7 @@
       reverse_scored: true
 
     - order: 6
-      slug: was_external_2
+      slug: was_self_alien_2
       type: likert_7
       prompt:
         en: "I feel as if I don't know myself very well."
@@ -1022,7 +1026,7 @@
       reverse_scored: true
 
     - order: 7
-      slug: was_self_alien_3
+      slug: was_authentic_living_2
       type: likert_7
       prompt:
         en: "I always stand by what I believe in."
@@ -1040,7 +1044,7 @@
       reverse_scored: false
 
     - order: 9
-      slug: was_external_3
+      slug: was_self_alien_3
       type: likert_7
       prompt:
         en: "I feel out of touch with the 'real me'."
@@ -1049,7 +1053,7 @@
       reverse_scored: true
 
     - order: 10
-      slug: was_self_alien_4
+      slug: was_authentic_living_4
       type: likert_7
       prompt:
         en: "I live in accordance with my values and beliefs."
@@ -1058,7 +1062,7 @@
       reverse_scored: false
 
     - order: 11
-      slug: was_authentic_living_4
+      slug: was_self_alien_4
       type: likert_7
       prompt:
         en: "I feel alienated from myself."
@@ -2334,7 +2338,7 @@
 # Higher score = greater general curiosity / exploration tendency.
 
 - slug: sotd_d24_ceii
-  type: likert_5
+  type: likert_7
   title:
     en: "How drawn are you to the new and uncertain?"
   description:
@@ -2348,7 +2352,7 @@
   questions:
     - order: 1
       slug: ceii_1
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I actively seek as much information as I can in new situations."
       low_label:  { en: "Very slightly or not at all" }
@@ -2357,7 +2361,7 @@
 
     - order: 2
       slug: ceii_2
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I am the type of person who really enjoys the uncertainty of everyday life."
       low_label:  { en: "Very slightly or not at all" }
@@ -2366,7 +2370,7 @@
 
     - order: 3
       slug: ceii_3
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I am at my best when doing something that is complex or challenging."
       low_label:  { en: "Very slightly or not at all" }
@@ -2375,7 +2379,7 @@
 
     - order: 4
       slug: ceii_4
-      type: likert_5
+      type: likert_7
       prompt:
         en: "Everywhere I go, I am out looking for new things or experiences."
       low_label:  { en: "Very slightly or not at all" }
@@ -2384,7 +2388,7 @@
 
     - order: 5
       slug: ceii_5
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I view challenging situations as an opportunity to grow and learn."
       low_label:  { en: "Very slightly or not at all" }
@@ -2393,7 +2397,7 @@
 
     - order: 6
       slug: ceii_6
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I like to do things that are a little frightening."
       low_label:  { en: "Very slightly or not at all" }
@@ -2402,7 +2406,7 @@
 
     - order: 7
       slug: ceii_7
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I am always looking for experiences that challenge how I think about myself and the world."
       low_label:  { en: "Very slightly or not at all" }
@@ -2411,7 +2415,7 @@
 
     - order: 8
       slug: ceii_8
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I prefer jobs that are excitingly unpredictable."
       low_label:  { en: "Very slightly or not at all" }
@@ -2420,7 +2424,7 @@
 
     - order: 9
       slug: ceii_9
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I frequently seek out opportunities to challenge myself and grow as a person."
       low_label:  { en: "Very slightly or not at all" }
@@ -2429,7 +2433,7 @@
 
     - order: 10
       slug: ceii_10
-      type: likert_5
+      type: likert_7
       prompt:
         en: "I am the kind of person who embraces unfamiliar people, events, and places."
       low_label:  { en: "Very slightly or not at all" }
