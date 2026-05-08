@@ -122,8 +122,6 @@ def serialize_check_in_base_for_viewer(check_in, request, context=None):
 
 class RecentPostsMixin:
     def get_recent_posts(self, obj):
-        from itertools import chain
-        from note.serializers import NoteSerializer
         from qna.serializers import ResponseSerializer
         from qna.models import Response as QnaResponse
         cutoff = timezone.now() - RECENT_POST_WINDOW
@@ -158,20 +156,24 @@ class RecentPostsMixin:
             if is_recent or is_unread:
                 resps_by_id[r.id] = r
 
-        combined = sorted(
-            chain(notes_by_id.values(), resps_by_id.values()),
-            key=lambda p: p.created_at, reverse=True,
-        )
-        out = []
-        for p in combined:
-            if isinstance(p, Note):
-                data = NoteSerializer(p, context=self.context).data
-                data['type'] = 'Note'
-            else:
-                data = ResponseSerializer(p, context=self.context).data
-                data['type'] = 'Response'
-            out.append(data)
-        return out
+        # Group mission notes; non-mission notes keep type='Note'
+        from note.feed_grouping import serialize_note_entries, group_note_entries
+        sorted_notes = sorted(notes_by_id.values(), key=lambda n: n.created_at)
+        note_entries = serialize_note_entries(sorted_notes, context=self.context)
+        grouped_notes = group_note_entries(note_entries)
+        for item in grouped_notes:
+            if 'type' not in item:
+                item['type'] = 'Note'
+
+        resp_items = []
+        for r in resps_by_id.values():
+            data = dict(ResponseSerializer(r, context=self.context).data)
+            data['type'] = 'Response'
+            resp_items.append(data)
+
+        all_items = grouped_notes + resp_items
+        all_items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        return all_items
 
 
 class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.HyperlinkedModelSerializer):

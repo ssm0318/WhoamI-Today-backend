@@ -15,9 +15,13 @@ from note.serializers import NoteSerializer
 
 
 def count_mission_attempts_today(user, now=None):
-    """Count the user's mission Notes since the most recent 7AM LA boundary."""
+    """Count the user's mission Notes since the most recent 7AM LA boundary.
+
+    Includes soft-deleted notes so that (a) attempt numbers never collide after
+    a delete and (b) the daily cap cannot be gamed by deleting then re-posting.
+    """
     boundary = get_today_la_boundary(now=now)
-    return Note.objects.filter(
+    return Note.objects.all_with_deleted().filter(
         author=user,
         share_type=ShareType.MISSION,
         created_at__gte=boundary,
@@ -66,12 +70,6 @@ class MissionToday(APIView):
 
 
 def _mission_note_filter(mission):
-    note_field_names = {field.name for field in Note._meta.get_fields()}
-    if 'mission_id' in note_field_names:
-        return {'mission_id': mission}
-    if 'mission' in note_field_names:
-        return {'mission': mission}
-    # Temporary compatibility until the mission FK change lands.
     return {'mission_prompt': mission.prompt}
 
 
@@ -97,14 +95,22 @@ class MissionAttempts(generics.ListAPIView):
             friend_ids = set(user.friend_ids + user.close_friend_ids)
             notes = notes.exclude(author_id__in=friend_ids | {user.id})
 
+        author_param = self.request.query_params.get('author')
+        if author_param is not None:
+            try:
+                notes = notes.filter(author_id=int(author_param))
+            except ValueError:
+                pass
+
+        ordering = ('mission_attempt_number', 'created_at') if author_param else ('-created_at',)
         notes = notes.select_related('author').prefetch_related(
             'images',
             'videos',
             'readers',
-        ).order_by('-created_at')
+        ).order_by(*ordering)
 
         visible_note_ids = [note.id for note in notes if note.is_audience(user)]
-        return Note.objects.filter(id__in=visible_note_ids).order_by('-created_at')
+        return Note.objects.filter(id__in=visible_note_ids).order_by(*ordering)
 
     def list(self, request, *args, **kwargs):
         mission = self.get_mission()

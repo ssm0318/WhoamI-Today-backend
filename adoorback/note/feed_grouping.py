@@ -61,31 +61,27 @@ def serialize_mission_grouped_notes(notes, context, wrap_notes=False, data_by_no
 
 
 def group_note_entries(entries, wrap_notes=False):
-    results = []
-    pending_group = []
-    pending_key = None
+    from collections import OrderedDict
 
-    def flush_group():
-        nonlocal pending_group, pending_key
-        if pending_group:
-            results.append(build_mission_group(pending_group))
-            pending_group = []
-            pending_key = None
+    mission_groups = OrderedDict()  # key -> list of entries
+    result_order = []  # sequence of {'kind': 'mission'/'note', 'key'/'entry': ...}
 
     for entry in entries:
         key = get_mission_group_key(entry['note'])
         if key is None:
-            flush_group()
-            results.append(wrap_note_entry(entry, wrap_notes=wrap_notes))
-            continue
+            result_order.append({'kind': 'note', 'entry': entry})
+        else:
+            if key not in mission_groups:
+                mission_groups[key] = []
+                result_order.append({'kind': 'mission', 'key': key})
+            mission_groups[key].append(entry)
 
-        if pending_key is not None and key != pending_key:
-            flush_group()
-
-        pending_key = key
-        pending_group.append(entry)
-
-    flush_group()
+    results = []
+    for item in result_order:
+        if item['kind'] == 'note':
+            results.append(wrap_note_entry(item['entry'], wrap_notes=wrap_notes))
+        else:
+            results.append(build_mission_group(mission_groups[item['key']]))
     return results
 
 

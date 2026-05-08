@@ -75,6 +75,7 @@ class Note(AdoorModel, SafeDeleteModel):
     # Snapshot of the mission prompt at post time. We snapshot rather than FK
     # to Mission so historical posts survive Mission row edits/deletes — what
     # the user "responded to" should not change retroactively.
+    mission_id = models.IntegerField(null=True, blank=True)
     mission_prompt = models.TextField(blank=True, null=True)
     mission_attempt_number = models.PositiveSmallIntegerField(null=True, blank=True)
 

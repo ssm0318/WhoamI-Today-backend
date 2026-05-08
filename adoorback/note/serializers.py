@@ -93,7 +93,7 @@ class NoteSerializer(BaseNoteSerializer):
     visibility = VisibilityField(choices=['only_me', 'close_friends', 'friends', 'public'], required=True)
     share_type = serializers.CharField(required=False, default='regular')
     content = serializers.CharField(required=False, allow_blank=True, default='')
-    mission_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    mission_id = serializers.IntegerField(required=False, allow_null=True)
     mission_prompt = serializers.CharField(read_only=True)
     mission_attempt_number = serializers.IntegerField(read_only=True)
 
@@ -138,7 +138,7 @@ class NoteSerializer(BaseNoteSerializer):
         return attrs
 
     def create(self, validated_data):
-        mission_id = validated_data.pop('mission_id', None)
+        mission_id = validated_data.get('mission_id')
         if validated_data.get('share_type') == ShareType.MISSION and mission_id is not None:
             mission = Mission.objects.get(id=mission_id)
             validated_data['mission_prompt'] = mission.prompt

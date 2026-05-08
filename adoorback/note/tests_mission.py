@@ -409,7 +409,7 @@ def _create_mission_note_for_test(mission, **kwargs):
     }
     note_field_names = {field.name for field in Note._meta.get_fields()}
     if 'mission_id' in note_field_names:
-        data['mission_id'] = mission
+        data['mission_id'] = mission.id
     elif 'mission' in note_field_names:
         data['mission'] = mission
     return Note.objects.create(**data)
@@ -562,3 +562,64 @@ class MissionAttemptsEndpointTests(TestCase):
         anon = APIClient()
         response = anon.get(f'/api/missions/{self.mission.id}/attempts/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class MissionDeleteRenumberTests(TestCase):
+    """Soft-deleting a mission attempt must not lower the daily attempt counter
+    or cause mission_attempt_number collisions on the next post."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='del_user', email='del@example.com', password='password',
+        )
+        self.mission = Mission.objects.create(prompt='Delete renumber test', type='text')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def _post_attempt(self, content='attempt'):
+        return self.client.post('/api/notes/', data={
+            'content': content,
+            'visibility': '["friends"]',
+            'share_type': 'mission',
+            'mission_id': self.mission.id,
+        })
+
+    def test_attempt_number_increments_past_deleted_attempts(self):
+        """Create #1, delete it, create new — new should be #2, not #1."""
+        resp1 = self._post_attempt('first')
+        self.assertEqual(resp1.status_code, status.HTTP_201_CREATED, resp1.data)
+        note1_id = resp1.data['id']
+        self.assertEqual(resp1.data['mission_attempt_number'], 1)
+
+        Note.objects.get(id=note1_id).delete()
+
+        resp2 = self._post_attempt('second')
+        self.assertEqual(resp2.status_code, status.HTTP_201_CREATED, resp2.data)
+        self.assertEqual(resp2.data['mission_attempt_number'], 2)
+
+    def test_daily_cap_is_preserved_across_deletions(self):
+        """Use 3 attempts, delete all 3 — 4th create should still be rejected."""
+        for i in range(3):
+            r = self._post_attempt(f'attempt {i + 1}')
+            self.assertEqual(r.status_code, status.HTTP_201_CREATED, r.data)
+
+        Note.objects.all_with_deleted().filter(
+            author=self.user, share_type='mission',
+        ).delete()
+
+        resp = self._post_attempt('should fail')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST, resp.data)
+
+    def test_deleted_attempt_not_shown_in_slider_endpoint(self):
+        """Soft-deleted attempt must not appear in MissionAttempts endpoint."""
+        resp = self._post_attempt('to be deleted')
+        note_id = resp.data['id']
+
+        Note.objects.get(id=note_id).delete()
+
+        r = self.client.get(
+            f'/api/missions/{self.mission.id}/attempts/?author={self.user.id}',
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        result_ids = [n['id'] for n in r.data['results']]
+        self.assertNotIn(note_id, result_ids)

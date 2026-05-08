@@ -23,7 +23,7 @@ def find_like_noti(user, origin, noti_type):
             origin_id__in=reply_ids)
     elif noti_type == "like_response_noti":
         existing_notifications = existing_notifications.filter(origin_type=get_response_type())
-    elif noti_type == "like_note_noti":
+    elif noti_type in ("like_note_noti", "like_mission_note_noti"):
         existing_notifications = existing_notifications.filter(origin_type=get_note_type())
     elif noti_type == "like_check_in_post_noti":
         existing_notifications = existing_notifications.filter(origin_type=get_check_in_post_type())
@@ -79,6 +79,16 @@ def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, 
         else:
             return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 게시글을 좋아합니다: {content_ko}', \
                 f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your post: {content_en}'
+    elif noti_type == "like_mission_note_noti":
+        if N == 1:
+            return f'{user_a_ko}이 회원님의 미션 응답을 좋아합니다', \
+                f'{user_a_en} liked your mission response'
+        elif N == 2:
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 미션 응답을 좋아합니다', \
+                f'{user_a_en} and {user_b_en} liked your mission response'
+        else:
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 미션 응답을 좋아합니다', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) liked your mission response'
     elif noti_type == "like_check_in_post_noti":
         if N == 1:
             return f'{user_a_ko}이 회원님의 데일리 스니펫을 좋아합니다', \
@@ -109,6 +119,16 @@ def construct_message(noti_type, user_a_ko, user_b_ko, user_a_en, user_b_en, N, 
         else:
             return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 답변에 {emoji} 반응을 남겼습니다: {content_ko}', \
                 f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) reacted with {emoji} to your response: {content_en}'
+    elif noti_type == "reaction_mission_note_noti":
+        if N == 1:
+            return f'{user_a_ko}이 회원님의 미션 응답에 {emoji} 반응을 남겼습니다', \
+                f'{user_a_en} reacted with {emoji} to your mission response'
+        elif N == 2:
+            return f'{user_a_ko}과 {user_b_ko}이 회원님의 미션 응답에 반응을 남겼습니다', \
+                f'{user_a_en} and {user_b_en} reacted to your mission response'
+        else:
+            return f'{user_a_ko}, {user_b_ko}, 외 {N - 2}명의 친구가 회원님의 미션 응답에 {emoji} 반응을 남겼습니다', \
+                f'{user_a_en}, {user_b_en}, and {N - 2} other friend(s) reacted with {emoji} to your mission response'
     elif noti_type == "reaction_checkin_noti":
         comp_ko = COMPONENT_LABELS_KO.get(component, '체크인')
         comp_en = COMPONENT_LABELS_EN.get(component, 'check-in')

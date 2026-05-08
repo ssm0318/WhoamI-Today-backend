@@ -125,6 +125,7 @@ def create_noti(instance, created, **kwargs):
 
         # send a notification to the author of the qna where the origin comment commented
         post_author = origin.target.author
+        is_mission_post = post.type == 'Note' and post.share_type == 'mission'
         if post_author == origin_author:
             pass
         elif post_author == actor:
@@ -132,13 +133,19 @@ def create_noti(instance, created, **kwargs):
         elif actor.id in post_author.user_report_blocked_ids:
             pass
         else:
+            if is_mission_post:
+                reply_post_msg_ko = '회원님의 미션 응답에 달린 댓글에 새로운 답글이 달렸습니다'
+                reply_post_msg_en = 'Someone replied to a comment on your mission response'
+            else:
+                reply_post_msg_ko = f'회원님의 답변에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"'
+                reply_post_msg_en = f'Someone replied to a comment on your response: "{content_preview}"'
             noti = Notification.objects.create(user=post_author,
                                                origin_id=origin.id,
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'회원님의 답변에 달린 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
-                                               message_en=f'Someone replied to a comment on your response: "{content_preview}"',
+                                               message_ko=reply_post_msg_ko,
+                                               message_en=reply_post_msg_en,
                                                redirect_url=redirect_url)
             NotificationActor.objects.create(user=actor, notification=noti)
 
@@ -159,13 +166,19 @@ def create_noti(instance, created, **kwargs):
                 content_type = ContentType.objects.get_for_model(origin).model
                 if (content_type, origin.id) in participant.content_report_blocked_model_ids:
                     return
+                if is_mission_post:
+                    participant_reply_msg_ko = '회원님이 답글을 단 댓글에 새로운 답글이 달렸습니다'
+                    participant_reply_msg_en = 'Someone replied to a comment you responded to'
+                else:
+                    participant_reply_msg_ko = f'회원님이 답글을 단 댓글에 새로운 답글이 달렸습니다: "{content_preview}"'
+                    participant_reply_msg_en = f'Someone replied to a comment you responded to: "{content_preview}"'
                 noti = Notification.objects.create(user=participant,
                                                 origin_id=origin.id,
                                                 origin_type=get_generic_relation_type(origin.type),
                                                 target_id=target.id,
                                                 target_type=get_comment_type(),
-                                                message_ko=f'회원님이 답글을 단 댓글에 새로운 답글이 달렸습니다: "{content_preview}"',
-                                                message_en=f'Someone replied to a comment you responded to: "{content_preview}"',
+                                                message_ko=participant_reply_msg_ko,
+                                                message_en=participant_reply_msg_en,
                                                 redirect_url=redirect_url)
                 NotificationActor.objects.create(user=actor, notification=noti)
 
@@ -181,12 +194,28 @@ def create_noti(instance, created, **kwargs):
             origin_target_name_en = 'pinned check-in'
         elif origin.type == 'Note':
             redirect_url = f'/{origin.type.lower()}s/{origin.id}'
-            origin_target_name_ko = '게시글'
-            origin_target_name_en = 'post'
+            if origin.share_type == 'mission':
+                origin_target_name_ko = '미션 응답'
+                origin_target_name_en = 'mission response'
+            else:
+                origin_target_name_ko = '게시글'
+                origin_target_name_en = 'post'
         else:
             redirect_url = f'/{origin.type.lower()}s/{origin.id}'
             origin_target_name_ko = '답변'
             origin_target_name_en = 'response'
+        is_mission_note = origin.type == 'Note' and origin.share_type == 'mission'
+        if is_mission_note:
+            comment_msg_ko = f'{actor.username}님이 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다'
+            comment_msg_en = f'{actor.username} has commented on your {origin_target_name_en}'
+            participant_msg_ko = f'회원님이 댓글을 단 {origin_target_name_ko}에 새로운 댓글이 달렸습니다'
+            participant_msg_en = f'A new comment was added to the {origin_target_name_en} you commented on'
+        else:
+            comment_msg_ko = f'{actor.username}님이 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다: "{content_preview}"'
+            comment_msg_en = f'{actor.username} has commented on your {origin_target_name_en}: "{content_preview}"'
+            participant_msg_ko = f'회원님이 댓글을 단 {origin_target_name_ko}에 새로운 댓글이 달렸습니다: "{content_preview}"'
+            participant_msg_en = f'A new comment was added to the {origin_target_name_en} you commented on: "{content_preview}"'
+
         if origin_author == actor:
             pass
         elif actor.id in origin_author.user_report_blocked_ids:
@@ -197,8 +226,8 @@ def create_noti(instance, created, **kwargs):
                                                origin_type=get_generic_relation_type(origin.type),
                                                target_id=target.id,
                                                target_type=get_comment_type(),
-                                               message_ko=f'{actor.username}님이 회원님의 {origin_target_name_ko}에 댓글을 남겼습니다: "{content_preview}"',
-                                               message_en=f'{actor.username} has commented on your {origin_target_name_en}: "{content_preview}"',
+                                               message_ko=comment_msg_ko,
+                                               message_en=comment_msg_en,
                                                redirect_url=redirect_url)
             NotificationActor.objects.create(user=actor, notification=noti)
 
@@ -222,8 +251,8 @@ def create_noti(instance, created, **kwargs):
                                                 origin_type=get_generic_relation_type(origin.type),
                                                 target_id=target.id,
                                                 target_type=get_comment_type(),
-                                                message_ko=f'회원님이 댓글을 단 {origin_target_name_ko}에 새로운 댓글이 달렸습니다: "{content_preview}"',
-                                                message_en=f'A new comment was added to the {origin_target_name_en} you commented on: "{content_preview}"',
+                                                message_ko=participant_msg_ko,
+                                                message_en=participant_msg_en,
                                                 redirect_url=redirect_url)
                 NotificationActor.objects.create(user=actor, notification=noti)
 

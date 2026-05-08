@@ -113,8 +113,9 @@ def create_like_noti(instance, created, **kwargs):
                                                            content_en=content, content_ko=content)
     elif origin.type == 'Note':
         redirect_url = _post_url(origin)
+        noti_type = "like_mission_note_noti" if origin.share_type == 'mission' else "like_note_noti"
         Notification.objects.create_or_update_notification(user=user, actor=actor,
-                                                           origin=origin, target=target, noti_type="like_note_noti",
+                                                           origin=origin, target=target, noti_type=noti_type,
                                                            redirect_url=redirect_url,
                                                            content_en=content, content_ko=content)
     elif origin.type == 'CheckInPost':
@@ -172,7 +173,7 @@ def update_like_noti_after_delete(instance, **kwargs):
     elif origin.type == 'Response':
         noti_type = "like_response_noti"
     elif origin.type == 'Note':
-        noti_type = "like_note_noti"
+        noti_type = "like_mission_note_noti" if origin.share_type == 'mission' else "like_note_noti"
     elif origin.type == 'CheckInPost':
         noti_type = "like_check_in_post_noti"
 

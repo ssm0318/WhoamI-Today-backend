@@ -138,11 +138,17 @@ def create_reaction_noti(instance, created, **kwargs):
             content_en=content, content_ko=content,
         )
     else:
-        content = wrap_content(origin.content)
+        is_mission_note = origin.type == 'Note' and getattr(origin, 'share_type', None) == 'mission'
+        if is_mission_note:
+            noti_type = "reaction_mission_note_noti"
+            content_en = content_ko = ''
+        else:
+            noti_type = "reaction_response_noti"
+            content_en = content_ko = wrap_content(origin.content)
         redirect_url = f'/{origin.type.lower()}s/{origin.id}'
         Notification.objects.create_or_update_notification(
             user=user, actor=actor, origin=origin, target=target,
-            noti_type="reaction_response_noti", redirect_url=redirect_url,
-            content_en=content, content_ko=content,
+            noti_type=noti_type, redirect_url=redirect_url,
+            content_en=content_en, content_ko=content_ko,
             emoji=target.emoji,
         )
