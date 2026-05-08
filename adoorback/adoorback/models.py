@@ -26,6 +26,10 @@ class Mission(AdoorTimestampedModel):
         ('question', 'Question'),
         ('text', 'Text'),
         ('compliment', 'Compliment'),
+        # 'none' = action-only mission with no post-creation flow. The Share
+        # tab "Do it" button navigates directly to cta_url; mission attempts
+        # are not tracked (no Note rows are created).
+        ('none', 'None'),
     ]
 
     prompt = models.TextField()
@@ -33,11 +37,14 @@ class Mission(AdoorTimestampedModel):
     # When False, the discover digest hides the yesterday_mission card the
     # next day (e.g. for chat-based missions where there are no posts to share).
     share_results = models.BooleanField(default=True)
-    # Optional override link surfaced on the Discover digest mission-card.
-    # Empty string = default "View mission posts" → /missions/<id>?discover=true.
-    # Non-empty = "Take me to wit_bot" (or similar) → cta_url verbatim.
-    # Does NOT affect the Share tab "Do it" button.
+    # Optional override link surfaced on the Discover digest mission-card AND
+    # the Share tab "Do it" button (when type='none' only). Empty string =
+    # default routing.
     cta_url = models.CharField(max_length=200, blank=True, default='')
+    # Optional label for the Discover digest button. When non-empty, replaces
+    # the default "View mission posts" text. Stored as plain text (not an
+    # i18n key) — short copy authored per mission in the migration.
+    cta_label = models.CharField(max_length=100, blank=True, default='')
 
     class Meta:
         ordering = ['id']

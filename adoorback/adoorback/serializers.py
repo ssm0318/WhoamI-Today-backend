@@ -84,4 +84,4 @@ class AdoorBaseSerializer(serializers.ModelSerializer):
 class MissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Mission
-        fields = ['id', 'prompt', 'type', 'cta_url']
+        fields = ['id', 'prompt', 'type', 'cta_url', 'cta_label']
