@@ -1330,6 +1330,76 @@ class EditableSurveyTests(TestCase):
         )
         self.assertEqual(r.status_code, 410)
 
+    def test_multi_window_daily_submit_succeeds_within_current_window(self):
+        """Regression: `daily_base` has 28 ScheduledSurvey rows (one per
+        study day, allow_late=False). The submit-view's expiration check
+        used to fire 410 if ANY past row had window_end < today, which
+        meant daily_base was 410-blocked from May 5 onward — until users
+        hit a weekend (e.g. May 9) when daily_base became the featured
+        SOTD card and started visibly failing.
+
+        Verifies: even when MOST of a survey's scheduled rows are past
+        and non-late-accepting, a CURRENT row makes the submit succeed.
+        """
+        from datetime import date as _date, timedelta
+        from unittest.mock import patch
+
+        s = Survey.objects.create(slug='mw_daily', title_en='D', title_ko='D')
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        today = _date(2026, 5, 9)
+        # Five past rows + one current — all allow_late=False, mirroring
+        # the daily_base / SOTD prod schedule.
+        for offset in range(5, 0, -1):
+            day = today - timedelta(days=offset)
+            ScheduledSurvey.objects.create(
+                survey=s, cadence='daily',
+                window_start=day, window_end=day,
+                allow_late=False, sequence_index=800 + offset,
+            )
+        ScheduledSurvey.objects.create(
+            survey=s, cadence='daily',
+            window_start=today, window_end=today,
+            allow_late=False, sequence_index=810,
+        )
+        with patch('surveys.scheduling._today_la_7am', return_value=today), \
+             patch('surveys.views._today_la_7am', return_value=today):
+            r = self.client.post(
+                f'/api/surveys/{s.slug}/responses/',
+                data={'answers': [{'question_id': q.id, 'value': 3}]},
+                format='json',
+            )
+        self.assertEqual(r.status_code, 201)
+
+    def test_multi_window_daily_submit_410_when_no_current_window(self):
+        """Same multi-window survey, but today is AFTER the last scheduled
+        row's window_end and allow_late=False everywhere → 410, as
+        intended for genuinely-expired daily prompts."""
+        from datetime import date as _date, timedelta
+        from unittest.mock import patch
+
+        s = Survey.objects.create(slug='mw_expired', title_en='D', title_ko='D')
+        q = SurveyQuestion.objects.create(
+            survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
+        )
+        today = _date(2026, 6, 5)  # After all scheduled days below
+        for offset in range(5, 0, -1):
+            day = _date(2026, 5, 9) - timedelta(days=offset)
+            ScheduledSurvey.objects.create(
+                survey=s, cadence='daily',
+                window_start=day, window_end=day,
+                allow_late=False, sequence_index=820 + offset,
+            )
+        with patch('surveys.scheduling._today_la_7am', return_value=today), \
+             patch('surveys.views._today_la_7am', return_value=today):
+            r = self.client.post(
+                f'/api/surveys/{s.slug}/responses/',
+                data={'answers': [{'question_id': q.id, 'value': 3}]},
+                format='json',
+            )
+        self.assertEqual(r.status_code, 410)
+
     def test_my_response_returns_404_when_no_response(self):
         s = Survey.objects.create(slug='mr_s', title_en='M', title_ko='M')
         SurveyQuestion.objects.create(
