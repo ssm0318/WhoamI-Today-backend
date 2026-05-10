@@ -26,6 +26,7 @@ from check_in.models import (
     PrivateAcknowledgment,
     Song,
     Poke,
+    mark_check_in_read,
 )
 from reaction.models import Reaction
 from reaction.serializers import ReactionSerializer
@@ -379,11 +380,16 @@ class CheckInRead(generics.UpdateAPIView):
     
     def patch(self, request, *args, **kwargs):
         '''
-        Used when user views a friend's check-in.
+        Used when user views a friend's check-in. Marks the check-in as read
+        in BOTH the legacy `CheckIn.readers` M2M (preserved for the all-content
+        `current_user_read` flag and the unread-counts logic) and the new
+        per-(user, check_in) `CheckInRead` table whose `read_at` timestamp
+        drives the per-component [UP] badge.
         '''
         current_user = self.request.user
         instance = self.get_object()
         instance.readers.add(current_user)
+        mark_check_in_read(current_user, instance)
         data = serialize_check_in_base_for_viewer(instance, request)
         return Response(data, status=status.HTTP_200_OK)
 

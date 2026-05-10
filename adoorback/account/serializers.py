@@ -752,6 +752,16 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
     connection_status = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     current_user_read_check_in = serializers.SerializerMethodField(read_only=True)
+    # Per-component read flags drive the per-component [UP] badge on each
+    # check-in chip (battery / mood / song / thought). Computed by comparing
+    # the viewer's `CheckInRead.read_at` against each component's `*_updated_at`.
+    # If the viewer hasn't seen this CheckIn at all → all four are False.
+    # If the owner edits ONLY mood, only `current_user_read_mood` flips to False
+    # for viewers; the other three remain True (no spurious [UP] on battery).
+    current_user_read_battery = serializers.SerializerMethodField(read_only=True)
+    current_user_read_mood = serializers.SerializerMethodField(read_only=True)
+    current_user_read_song = serializers.SerializerMethodField(read_only=True)
+    current_user_read_thought = serializers.SerializerMethodField(read_only=True)
     unread_cnt = serializers.SerializerMethodField(read_only=True)
     unread_post_cnt = serializers.SerializerMethodField(read_only=True)
     recent_posts = serializers.SerializerMethodField(read_only=True)
@@ -899,6 +909,49 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
             return True
         viewer_id = self.context['request'].user.id
         return viewer_id in {u.id for u in ci.readers.all()}
+
+    def _read_at_for_check_in(self, ci):
+        """Viewer's read_at on this CheckIn (None if never read)."""
+        if ci is None:
+            return None
+        return self.context.get('check_in_read_at_by_check_in_id', {}).get(ci.pk)
+
+    def _component_read(self, obj, updated_at_attr):
+        """Per-component [UP] flag: viewer's read_at >= component's *_updated_at.
+
+        Returns True (read / no [UP]) when:
+          - viewer is the owner (always counts as read)
+          - the component has no `*_updated_at` (nothing to be unread about)
+          - viewer's read_at is at or after the component's last update
+        Returns False (unread / [UP] shows) only when there is concrete
+        evidence the component was updated AFTER the viewer last marked
+        the check-in as read (or the viewer never read it).
+        """
+        ci = self.check_in(obj)
+        if ci is None:
+            return True
+        viewer = self.context.get('request').user if self.context.get('request') else None
+        if viewer is None or viewer == obj:
+            return True
+        component_updated_at = getattr(ci, updated_at_attr, None)
+        if component_updated_at is None:
+            return True  # nothing to be unread about
+        read_at = self._read_at_for_check_in(ci)
+        if read_at is None:
+            return False  # never read at all → unread
+        return read_at >= component_updated_at
+
+    def get_current_user_read_battery(self, obj):
+        return self._component_read(obj, 'battery_updated_at')
+
+    def get_current_user_read_mood(self, obj):
+        return self._component_read(obj, 'mood_updated_at')
+
+    def get_current_user_read_song(self, obj):
+        return self._component_read(obj, 'song_updated_at')
+
+    def get_current_user_read_thought(self, obj):
+        return self._component_read(obj, 'thought_updated_at')
 
     def get_unread_post_cnt(self, obj):
         return (self.context.get('unread_note_count_by_author', {}).get(obj.id, 0)
@@ -1049,6 +1102,8 @@ class FriendListSerializer(UserMinimalSerializer, RecentPostsMixin):
         model = User
         fields = UserMinimalSerializer.Meta.fields + ['is_favorite', 'is_hidden', 'connection_status', 'current_user_read',
                                                       'current_user_read_check_in',
+                                                      'current_user_read_battery', 'current_user_read_mood',
+                                                      'current_user_read_song', 'current_user_read_thought',
                                                       'unread_cnt', 'unread_post_cnt', 'recent_posts',
                                                       'bio', 'check_in_id', 'track_id', 'thought',
                                                       'unread_chat_count', 'social_battery', 'mood',

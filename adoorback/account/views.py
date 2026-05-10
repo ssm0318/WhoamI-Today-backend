@@ -1885,6 +1885,20 @@ class FriendList(generics.ListAPIView):
             visible_check_in_by_user_id[ci.user_id] = ci
         ctx['visible_check_in_by_user_id'] = visible_check_in_by_user_id
 
+        # Per-(viewer, check_in) read_at — drives the per-component [UP] badge
+        # (battery / mood / song / thought). The serializer compares this
+        # `read_at` against each component's `*_updated_at` and exposes
+        # 4 booleans. One query for the whole page, keyed by check_in_id.
+        from check_in.models import CheckInRead
+        check_in_ids = [ci.pk for ci in visible_check_in_by_user_id.values()]
+        read_at_by_check_in_id = {}
+        if check_in_ids:
+            for cir in CheckInRead.objects.filter(
+                user=user, check_in_id__in=check_in_ids
+            ).only('check_in_id', 'read_at'):
+                read_at_by_check_in_id[cir.check_in_id] = cir.read_at
+        ctx['check_in_read_at_by_check_in_id'] = read_at_by_check_in_id
+
         live_check_in_entries_by_user_id = defaultdict(dict)
         live_entries = (
             CheckInComponentEntry.objects

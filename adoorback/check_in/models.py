@@ -309,6 +309,57 @@ class CheckIn(AdoorTimestampedModel, SafeDeleteModel):
         ]
 
 
+class CheckInRead(models.Model):
+    """Per-(user, check_in) read tracking with timestamp.
+
+    Sits parallel to the existing `CheckIn.readers` M2M. The M2M is binary
+    (member or not); to drive a per-component [UP] badge — "battery is
+    unread because the owner just edited it, but mood was already there
+    when I last looked" — we need to know WHEN the viewer last read the
+    check-in so we can compare against per-component `*_updated_at`.
+
+    `read_at` uses `auto_now=True`, so any save (or `update_or_create`)
+    bumps it to now. Marking a check-in as read = upsert into this table
+    via `mark_check_in_read(user, check_in)`.
+
+    Per-component "is read" = `read_at >= <component>_updated_at`.
+    """
+
+    check_in = models.ForeignKey(
+        CheckIn, on_delete=models.CASCADE, related_name='read_records'
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='check_in_read_records'
+    )
+    read_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['check_in', 'user'],
+                name='unique_check_in_read',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'check_in']),
+        ]
+
+
+def mark_check_in_read(user, check_in):
+    """Upsert a CheckInRead row, bumping read_at to now via auto_now.
+
+    Single canonical entry point so view code doesn't have to remember to
+    keep this in sync with the legacy `CheckIn.readers` M2M (which we
+    still maintain for backward compatibility with the all-content
+    `current_user_read` flag and the unread-counts logic).
+    """
+    obj, created = CheckInRead.objects.get_or_create(check_in=check_in, user=user)
+    if not created:
+        # auto_now only fires on save(), not on get_or_create() of an existing row.
+        obj.save()
+    return obj
+
+
 class Song(AdoorTimestampedModel, SafeDeleteModel):
     user = models.ForeignKey(User, related_name='song_set', on_delete=models.CASCADE)
     is_active = models.BooleanField(default=False)
