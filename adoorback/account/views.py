@@ -21,6 +21,7 @@ from django.http import HttpResponse, HttpResponseNotAllowed, Http404, JsonRespo
 from django.middleware import csrf
 from django.shortcuts import get_object_or_404
 from django.utils import translation, timezone
+from django.utils.cache import patch_cache_control
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.utils.decorators import method_decorator
@@ -79,6 +80,27 @@ from tracking.utils import clean_session_key
 import random
 
 User = get_user_model()
+
+
+def mark_auth_response_uncacheable(response):
+    """Prevent shared/proxy caches from storing auth-bearing responses."""
+    patch_cache_control(
+        response,
+        no_store=True,
+        no_cache=True,
+        must_revalidate=True,
+        max_age=0,
+        private=True,
+    )
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
+
+
+class NoStoreResponseMixin:
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        return mark_auth_response_uncacheable(response)
 
 
 class MissionGroupedNoteListMixin:
@@ -222,7 +244,7 @@ def update_user_interests_logic(user, interest_labels):
 @ensure_csrf_cookie
 def token_anonymous(request):
     if request.method == 'GET':
-        return HttpResponse(status=204)
+        return mark_auth_response_uncacheable(HttpResponse(status=204))
     else:
         return HttpResponseNotAllowed(['GET'])
 
@@ -232,7 +254,7 @@ def get_access_token_for_user(user):
     return str(refresh.access_token)
 
 
-class UserLogin(APIView):
+class UserLogin(NoStoreResponseMixin, APIView):
     authentication_classes = []
 
     def get_exception_handler(self):
@@ -274,7 +296,7 @@ class UserLogin(APIView):
             raise WrongPassword()
 
 
-class UserLogout(APIView):
+class UserLogout(NoStoreResponseMixin, APIView):
 
     def get_exception_handler(self):
         return adoor_exception_handler
@@ -465,7 +487,7 @@ class UserInviterUsernameCheck(generics.CreateAPIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
-class UserSignup(generics.CreateAPIView):
+class UserSignup(NoStoreResponseMixin, generics.CreateAPIView):
     serializer_class = CurrentUserSignupSerializer
     parser_classes = (MultiPartParser, FormParser)
     authentication_classes = []
@@ -1132,7 +1154,7 @@ class CurrentUserNoteStatus(APIView):
 
 
 @method_decorator(ensure_csrf_cookie, name='dispatch')
-class CurrentUserDetail(generics.RetrieveUpdateAPIView):
+class CurrentUserDetail(NoStoreResponseMixin, generics.RetrieveUpdateAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
@@ -1427,7 +1449,7 @@ class CustomChipListCreate(generics.ListCreateAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class CurrentUserDelete(generics.DestroyAPIView):
+class CurrentUserDelete(NoStoreResponseMixin, generics.DestroyAPIView):
     serializer_class = CurrentUserSerializer
     permission_classes = [IsAuthenticated]
 
@@ -1456,7 +1478,7 @@ class CurrentUserDelete(generics.DestroyAPIView):
         return response
 
 
-class CurrentUserProfile(generics.RetrieveAPIView):
+class CurrentUserProfile(NoStoreResponseMixin, generics.RetrieveAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
 
