@@ -74,7 +74,16 @@ def viewer_sees_check_in_component(check_in, profile_user, viewer, visibility_fi
             return True
         if upgrade_time is None:
             return True
-        if check_in.created_at > upgrade_time:
+        # Compare against the per-component `*_updated_at` rather than
+        # `check_in.created_at`. CheckIn is a long-lived row whose components
+        # mutate over time — a row created six months ago might have a brand
+        # new mood added today. Using `created_at` would hide that fresh
+        # close-friends content from a friend who was just promoted to
+        # close-friends with `update_past_posts=False`, even though the mood
+        # itself is brand new. Falls back to `created_at` if the component
+        # has no `*_updated_at` set (older rows / never edited).
+        component_updated_at = getattr(check_in, updated_at_field, None) or check_in.created_at
+        if component_updated_at > upgrade_time:
             return True
         return False
     return False
