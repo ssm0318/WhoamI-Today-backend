@@ -1859,15 +1859,30 @@ class FriendList(generics.ListAPIView):
                 return _passes_close_friends(author_id, created_at)
             return False
 
-        # 5. Active check-ins (with readers prefetch) + visibility filter
+        # 5. Active check-ins (with readers prefetch).
+        # Per-component visibility (battery_visibility / mood_visibility /
+        # song_visibility / thought_visibility) is authoritative for the
+        # friend-feed; downstream getters call `viewer_sees_check_in_component`
+        # to gate each component independently. The legacy master
+        # `CheckIn.visibility` ArrayField is deprecated for this surface —
+        # gating on it here would fall through ALL four per-component values
+        # if a row ever ends up with `['only_me']` as its master, hiding
+        # components even when the user has `*_visibility='public'`. Keep
+        # only the block / content-report short-circuits (which `_is_audience`
+        # also enforces, but those checks belong here regardless of the
+        # ArrayField gate). Notes and Responses keep using `_is_audience`
+        # against their own `visibility` ArrayFields — those are still active.
         check_ins = list(
             CheckIn.objects.filter(user_id__in=friend_ids, is_active=True)
             .prefetch_related('readers')
         )
         visible_check_in_by_user_id = {}
         for ci in check_ins:
-            if _is_audience(ci.user_id, ci.visibility, ci.pk, ct_ci.id, ci.created_at):
-                visible_check_in_by_user_id[ci.user_id] = ci
+            if (ct_ci.id, ci.pk) in content_report_keys:
+                continue
+            if ci.user_id in user_report_blocked_ids:
+                continue
+            visible_check_in_by_user_id[ci.user_id] = ci
         ctx['visible_check_in_by_user_id'] = visible_check_in_by_user_id
 
         live_check_in_entries_by_user_id = defaultdict(dict)
