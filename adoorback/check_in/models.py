@@ -537,7 +537,7 @@ def create_private_ack_notification(created, instance, **kwargs):
     COMPONENT_LABELS_EN = {
         'song': 'song',
         'mood': 'mood',
-        'thought': 'thought',
+        'thought': 'Be Random',
         'battery': 'social battery',
     }
     label_ko = COMPONENT_LABELS_KO.get(instance.entry.component, instance.entry.component)
@@ -612,7 +612,7 @@ def create_poke_notification(created, instance, **kwargs):
     COMPONENT_LABELS_EN = {
         'song': 'song',
         'mood': 'mood',
-        'thought': 'thought snippet',
+        'thought': 'Be Random',
         'battery': 'social battery',
     }
 

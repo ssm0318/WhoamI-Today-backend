@@ -43,7 +43,7 @@ COMPONENT_LABELS_KO = {
 COMPONENT_LABELS_EN = {
     'battery': 'social battery',
     'mood': 'mood',
-    'thought': 'thought snippet',
+    'thought': 'Be Random',
     'song': 'song',
 }
 

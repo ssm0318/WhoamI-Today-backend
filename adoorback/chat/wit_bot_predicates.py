@@ -289,7 +289,7 @@ PREDICATES: list[FeaturePredicate] = [
     FeaturePredicate(
         feature_key='checkin_thought',
         versions={'version_w'},
-        display_name='Set a thought check-in',
+        display_name='Set a Be Random check-in',
         description='Up to 88 characters of what is on your mind.',
         deep_link='/update',
         kind='db',
