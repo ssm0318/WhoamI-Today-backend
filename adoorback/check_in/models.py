@@ -531,7 +531,7 @@ def create_private_ack_notification(created, instance, **kwargs):
     COMPONENT_LABELS_KO = {
         'song': '노래',
         'mood': '기분',
-        'thought': '한마디',
+        'thought': '랜덤 TMI 한 마디',
         'battery': '소셜 배터리',
     }
     COMPONENT_LABELS_EN = {
@@ -606,7 +606,7 @@ def create_poke_notification(created, instance, **kwargs):
     COMPONENT_LABELS_KO = {
         'song': '노래',
         'mood': '기분',
-        'thought': '한마디',
+        'thought': '랜덤 TMI 한 마디',
         'battery': '소셜 배터리',
     }
     COMPONENT_LABELS_EN = {

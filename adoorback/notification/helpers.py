@@ -37,7 +37,7 @@ def find_like_noti(user, origin, noti_type):
 COMPONENT_LABELS_KO = {
     'battery': '소셜 배터리',
     'mood': '기분',
-    'thought': '한마디',
+    'thought': '랜덤 TMI 한 마디',
     'song': '노래',
 }
 COMPONENT_LABELS_EN = {
