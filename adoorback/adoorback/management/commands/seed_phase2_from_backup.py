@@ -137,7 +137,7 @@ class Command(BaseCommand):
                 if u['email'].lower() not in participant_emails
             ]
             if not non_participant_ids:
-                return {}, [], [], [], []
+                return {}, [], [], [], [], set()
 
             cur.execute(
                 'SELECT id, author_id, question_id, content, visibility, '
@@ -159,8 +159,6 @@ class Command(BaseCommand):
             )
             notes = [dict(r) for r in cur.fetchall()]
 
-            note_ids_with_images = {img['note_id'] for img in note_images}
-
             author_ids_with_content = (
                 {r['author_id'] for r in responses} | {n['author_id'] for n in notes}
             )
@@ -170,7 +168,7 @@ class Command(BaseCommand):
                 if uid in all_users
             }
             if not authors_by_id:
-                return {}, [], [], [], []
+                return {}, [], [], [], [], set()
 
             note_ids = [n['id'] for n in notes]
             note_images, note_videos = [], []
@@ -193,6 +191,8 @@ class Command(BaseCommand):
                         [note_ids],
                     )
                     note_videos = [dict(r) for r in cur.fetchall()]
+
+            note_ids_with_images = {img['note_id'] for img in note_images}
 
         return authors_by_id, responses, notes, note_images, note_videos, note_ids_with_images
 
