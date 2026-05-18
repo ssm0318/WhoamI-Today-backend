@@ -106,6 +106,22 @@ class SurveyMinimalSerializer(serializers.ModelSerializer):
         model = Survey
         fields = ['slug', 'title_en', 'title_ko', 'priority', 'editable', 'closed']
 
+    def to_representation(self, instance):
+        # Even the minimal index payload needs token substitution on the
+        # title — otherwise `{{habit_platform_label}}`-style references in
+        # survey titles leak through to the /surveys index card. Build a
+        # fresh token map per survey row; the overhead is one UserSurvey-
+        # EmbeddedData query per row, which is acceptable for the index.
+        from surveys.tokens import apply_to_survey_dict, build_token_map
+
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        viewer = getattr(request, 'user', None) if request else None
+        tokens = build_token_map(instance, viewer=viewer)
+        if tokens:
+            apply_to_survey_dict(data, tokens)
+        return data
+
 
 class SurveyDetailSerializer(serializers.ModelSerializer):
     questions = SurveyQuestionSerializer(many=True, read_only=True)
@@ -133,15 +149,24 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         # Build the tokens map once per Survey and pass it down via context
-        # so each question doesn't re-query UserSurveyEmbeddedData.
-        from surveys.tokens import build_token_map
+        # so each question doesn't re-query UserSurveyEmbeddedData. Also
+        # apply substitution to the survey-level text fields (title,
+        # description, interpretation) — previously only question-level
+        # fields ran through token substitution, so a title with
+        # `{{habit_platform_label}}` would render as the literal token on
+        # the survey-of-the-day card and daily archive.
+        from surveys.tokens import apply_to_survey_dict, build_token_map
 
         request = self.context.get('request')
         viewer = getattr(request, 'user', None) if request else None
+        tokens = build_token_map(instance, viewer=viewer)
         # Cloning the context preserves request/view for the nested serializer
         # while letting us add `survey_tokens` without mutating the parent.
-        self.context['survey_tokens'] = build_token_map(instance, viewer=viewer)
-        return super().to_representation(instance)
+        self.context['survey_tokens'] = tokens
+        data = super().to_representation(instance)
+        if tokens:
+            apply_to_survey_dict(data, tokens)
+        return data
 
     def get_user_has_responded(self, obj):
         request = self.context.get('request')

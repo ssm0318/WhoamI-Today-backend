@@ -41,6 +41,17 @@ _SUBSTITUTABLE_QUESTION_TEXT_FIELDS = (
     'content',
 )
 
+# Survey-level fields that may contain `{{token}}` references in their
+# bilingual variants. The serializer applies substitution to these once per
+# survey (cheap — at most six string scans) so the frontend never sees a
+# literal `{{habit_platform_label}}` on the survey-of-the-day card,
+# /surveys index, or daily archive.
+_SUBSTITUTABLE_SURVEY_TEXT_FIELDS = (
+    'title',
+    'description',
+    'interpretation',
+)
+
 
 def substitute(text: str, tokens: dict) -> str:
     """Replace `{{name}}` occurrences in `text` with `tokens[name]`.
@@ -98,3 +109,20 @@ def apply_to_question_dict(question_data: dict, tokens: dict) -> dict:
             if key in question_data:
                 question_data[key] = substitute(question_data[key], tokens)
     return question_data
+
+
+def apply_to_survey_dict(survey_data: dict, tokens: dict) -> dict:
+    """Mutate-and-return a serialized survey dict with substitution applied
+    to title / description / interpretation (en + ko each).
+
+    The bug this closes: prior to this helper, only question-level fields
+    ran through substitution, so a survey whose TITLE contained
+    `{{habit_platform_label}}` would surface the literal token on the
+    survey-of-the-day card, the /surveys index, and the daily archive.
+    """
+    for base in _SUBSTITUTABLE_SURVEY_TEXT_FIELDS:
+        for lang in ('en', 'ko'):
+            key = f'{base}_{lang}'
+            if key in survey_data:
+                survey_data[key] = substitute(survey_data[key], tokens)
+    return survey_data
