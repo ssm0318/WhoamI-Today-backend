@@ -394,6 +394,24 @@ def _build_schedule_rows() -> list[dict[str, Any]]:
             target_user_group=target_group,
         )
 
+    deadline_windows = importlib.import_module(
+        'surveys.migrations.0032_survey_deadline_windows'
+    )
+    _update_schedule_date(
+        rows,
+        'endpoint',
+        2,
+        deadline_windows.FEATURE_W_FIRST_START,
+        deadline_windows.PHASE1_DUE,
+    )
+    _update_schedule_date(
+        rows,
+        'endpoint',
+        3,
+        deadline_windows.FEATURE_Q_FIRST_START,
+        deadline_windows.PHASE2_DUE,
+    )
+
     phase1_reflection = importlib.import_module(
         'surveys.migrations.0031_phase1_reflection_parts_due_may18'
     )
@@ -443,13 +461,14 @@ def _build_schedule_rows() -> list[dict[str, Any]]:
             row['late_behavior'] = 'Late accepted'
 
     catchup = importlib.import_module('surveys.migrations.0024_seed_pre_study_catchup_schedule')
+    rows.pop(('biweekly', deadline_windows.OLD_HABIT_PLATFORM_BIWEEKLY_SEQ), None)
     _upsert_schedule(
         rows,
-        'biweekly',
-        8,
+        'daily',
+        deadline_windows.HABIT_PLATFORM_DAILY_SEQ,
         catchup.HABIT_PLATFORM_SLUG,
-        catchup.SHIP_DATE,
-        catchup.STUDY_END,
+        deadline_windows.PHASE1_DUE,
+        deadline_windows.PHASE1_DUE,
         True,
     )
 

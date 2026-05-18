@@ -263,6 +263,15 @@ class Command(BaseCommand):
         )
         phase_reflection_module.apply_phase_reflection_parts(django_apps, None)
 
+        # 5d. Give the W-feature and May 18 prerequisite surveys real
+        #    close dates, and place habit_platform in the daily/SOTD
+        #    schedule alongside SHI instead of the long catchup window.
+        self.stdout.write(self.style.NOTICE('[5d] Applying survey deadline windows ...'))
+        deadline_windows_module = import_module(
+            'surveys.migrations.0032_survey_deadline_windows'
+        )
+        deadline_windows_module.apply_deadline_windows(django_apps, None)
+
         # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:
             mock_yaml = FIXTURES_DIR / '_archive' / 'mock_test_today.yaml'

@@ -51,8 +51,18 @@ class SurveyAuditTests(SimpleTestCase):
         feature_rows = sorted(by_slug['feature_eval_w'], key=lambda row: row['window_start'])
         self.assertEqual(feature_rows[0]['audience'], 'group_w_first')
         self.assertEqual(feature_rows[0]['window_start'], date(2026, 5, 8).isoformat())
+        self.assertEqual(feature_rows[0]['window_end'], date(2026, 5, 18).isoformat())
+        self.assertTrue(feature_rows[0]['allow_late'])
         self.assertEqual(feature_rows[1]['audience'], 'group_q_first')
         self.assertEqual(feature_rows[1]['window_start'], date(2026, 5, 22).isoformat())
+        self.assertEqual(feature_rows[1]['window_end'], date(2026, 5, 31).isoformat())
+        self.assertTrue(feature_rows[1]['allow_late'])
+
+        habit = by_slug['habit_platform'][0]
+        self.assertEqual(habit['cadence'], 'daily')
+        self.assertEqual(habit['window_start'], date(2026, 5, 18).isoformat())
+        self.assertEqual(habit['window_end'], date(2026, 5, 18).isoformat())
+        self.assertTrue(habit['allow_late'])
 
     def test_phase_reflection_part_titles_cover_mid_and_post_surveys(self):
         audit = build_survey_audit()
@@ -89,6 +99,14 @@ class SurveyAuditTests(SimpleTestCase):
         )
         self.assertEqual(
             sotd_rows[('sotd_d04_iscs_bridge', date(2026, 5, 7).isoformat())]['featured_surface'],
+            'Survey index',
+        )
+        self.assertEqual(
+            sotd_rows[('sotd_d15_shi', date(2026, 5, 18).isoformat())]['featured_surface'],
+            'Survey of the Day card',
+        )
+        self.assertEqual(
+            sotd_rows[('habit_platform', date(2026, 5, 18).isoformat())]['featured_surface'],
             'Survey index',
         )
         self.assertTrue(sotd_rows[('sotd_d02_rsds', date(2026, 5, 7).isoformat())]['allow_late'])
