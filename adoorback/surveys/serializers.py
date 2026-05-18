@@ -2,7 +2,8 @@ from rest_framework import serializers
 
 from surveys.models import (
     DISPLAY_ONLY, INPUT_LESS_TYPES, LIKERT_5_NA, LIKERT_RANGES, NA_SENTINEL,
-    SLIDER, ScheduledSurvey, Survey, SurveyOption, SurveyQuestion, SurveyResponse,
+    PER_FRIEND_TYPES, SLIDER, ScheduledSurvey, Survey, SurveyOption,
+    SurveyQuestion, SurveyResponse,
 )
 from surveys.scheduling import _today_la_7am
 
@@ -88,6 +89,12 @@ class SurveyQuestionSerializer(serializers.ModelSerializer):
         # context (`survey_tokens` key) — see `to_representation` there for
         # how the map is built once per Survey, not per question.
         data = super().to_representation(instance)
+        # Per-friend question types are fanned out into one virtual question
+        # per friend by SurveyDetailSerializer post-processing; skip token
+        # substitution here so {{friend_name}} etc. survive the survey-level
+        # pass intact and get resolved later with the per-friend token map.
+        if instance.type in PER_FRIEND_TYPES:
+            return data
         tokens = self.context.get('survey_tokens')
         if tokens:
             from surveys.tokens import apply_to_question_dict
@@ -121,6 +128,70 @@ class SurveyMinimalSerializer(serializers.ModelSerializer):
         if tokens:
             apply_to_survey_dict(data, tokens)
         return data
+
+
+def _expand_per_friend_questions(questions_data, questions_qs, *, viewer, survey_tokens):
+    """Fan out per_friend_* question rows into one virtual row per friend.
+
+    Per-friend question types render once per friend the viewer currently
+    has. Each virtual row carries:
+      - target_user_id  / target_user_username  → identifies the friend
+      - baseline_closeness  / baseline_relationship_type  → from the
+        viewer's earliest non-skipped FriendEvaluation for that friend
+        (NULL when no baseline exists)
+      - prompt / description / placeholder / content fields with
+        {{friend_name}} and {{baseline_*}} tokens substituted
+    Non-per-friend questions pass through unchanged. With 0 friends, all
+    per-friend questions are dropped from the output (their inputs would
+    have no targets) — non-per-friend questions still render so the survey
+    isn't a blank page.
+    Friends are sorted by username for predictable display.
+    """
+    has_per_friend = any(q.type in PER_FRIEND_TYPES for q in questions_qs)
+    if not has_per_friend:
+        return questions_data
+
+    friends = list(viewer.connected_users.order_by('username'))
+    if not friends:
+        return [
+            q for q, qm in zip(questions_data, questions_qs)
+            if qm.type not in PER_FRIEND_TYPES
+        ]
+
+    # Baseline lookup: {friend_id → most recent non-skipped FriendEvaluation}.
+    # `order_by('-created_at')` + `setdefault` picks the most recent row per
+    # friend. Single query for all friends.
+    from account.models import FriendEvaluation
+    baselines: dict[int, FriendEvaluation] = {}
+    for ev in (
+        FriendEvaluation.objects
+        .filter(evaluator=viewer, evaluated_user__in=friends, skipped=False)
+        .order_by('-created_at')
+    ):
+        baselines.setdefault(ev.evaluated_user_id, ev)
+
+    from surveys.tokens import apply_to_question_dict, build_per_friend_tokens
+
+    expanded = []
+    survey_tokens = survey_tokens or {}
+    for q_dict, q_model in zip(questions_data, questions_qs):
+        if q_model.type not in PER_FRIEND_TYPES:
+            expanded.append(q_dict)
+            continue
+        for friend in friends:
+            baseline = baselines.get(friend.id)
+            per_friend_tokens = build_per_friend_tokens(friend, baseline)
+            merged_tokens = {**survey_tokens, **per_friend_tokens}
+            virtual = dict(q_dict)
+            apply_to_question_dict(virtual, merged_tokens)
+            virtual['target_user_id'] = friend.id
+            virtual['target_user_username'] = friend.username
+            virtual['baseline_closeness'] = baseline.closeness if baseline else None
+            virtual['baseline_relationship_type'] = (
+                baseline.relationship_type if baseline else None
+            )
+            expanded.append(virtual)
+    return expanded
 
 
 class SurveyDetailSerializer(serializers.ModelSerializer):
@@ -166,6 +237,19 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         if tokens:
             apply_to_survey_dict(data, tokens)
+        # Fan out per-friend question types: each per_friend_* source row in
+        # `data['questions']` is replaced with N virtual rows, one per friend
+        # the viewer currently has. Each virtual row carries a `target_user_id`
+        # and pre-substituted text. Skipped when there's no authenticated
+        # viewer (e.g. anonymous preview) — the source row passes through
+        # untouched and the frontend will show an empty state.
+        if viewer is not None and getattr(viewer, 'is_authenticated', False):
+            data['questions'] = _expand_per_friend_questions(
+                data.get('questions', []),
+                instance.questions.all(),
+                viewer=viewer,
+                survey_tokens=tokens,
+            )
         return data
 
     def get_user_has_responded(self, obj):
@@ -194,6 +278,10 @@ class SurveyAnswerInputSerializer(serializers.Serializer):
     # `allow_null=True` so likert_5_na N/A picks (NA_SENTINEL) submit
     # cleanly. JSONField rejects None by default.
     value = serializers.JSONField(allow_null=True)
+    # For per-friend question types: which friend this answer is about.
+    # Required on per_friend_* types; ignored on every other type. Submit
+    # view validates friend-list membership before write.
+    target_user_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class SurveyResponseInputSerializer(serializers.Serializer):

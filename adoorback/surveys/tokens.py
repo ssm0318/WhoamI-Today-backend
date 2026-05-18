@@ -111,6 +111,56 @@ def apply_to_question_dict(question_data: dict, tokens: dict) -> dict:
     return question_data
 
 
+# Per-question dynamic tokens — populated at expand time when a per-friend
+# question is fanned out into one virtual question per friend. Not part of
+# the survey-level / embedded-data resolution; built freshly per (question,
+# friend) pair so each virtual question carries the right friend's name and
+# baseline metadata into the rendered text fields.
+def build_per_friend_tokens(friend, baseline_evaluation=None) -> dict:
+    """Return a token map for one (per_friend question × friend) expansion.
+
+    `friend` is a User. `baseline_evaluation` is the most recent non-skipped
+    FriendEvaluation row written by the requesting user about this friend,
+    or None if no evaluation exists.
+
+    Tokens emitted:
+      - friend_name             — display name (matches friend-list UI)
+      - friend_username         — raw Adoor handle (used for profile links)
+      - baseline_closeness      — int 1–5, or omitted if no baseline
+      - baseline_relationship_type — code string (e.g. "school_friend"), or omitted
+    """
+    # Always populate the baseline tokens (with an em-dash fallback when
+    # missing) so the substitute() pass doesn't emit "token not found"
+    # warnings for friends without a FriendEvaluation row. The frontend
+    # reads the dedicated `baseline_closeness` field on the virtual question
+    # (set to None when missing) for any conditional UI like hiding the
+    # corrected-baseline row when there's nothing to correct.
+    tokens = {
+        'friend_name': _display_name(friend),
+        'friend_username': friend.username,
+        'baseline_closeness': '—',
+        'baseline_relationship_type': '—',
+    }
+    if baseline_evaluation is not None:
+        if baseline_evaluation.closeness is not None:
+            tokens['baseline_closeness'] = baseline_evaluation.closeness
+        if baseline_evaluation.relationship_type:
+            tokens['baseline_relationship_type'] = baseline_evaluation.relationship_type
+    return tokens
+
+
+def _display_name(user) -> str:
+    """Display name used wherever {{friend_name}} appears in a per-friend
+    survey question.
+
+    Today this returns the Adoor handle (username), which is what the friend
+    list UI shows. If the frontend ever switches to nickname-primary display
+    on friend cards, update both places at once so the survey matches what
+    participants see elsewhere in the app.
+    """
+    return user.username
+
+
 def apply_to_survey_dict(survey_data: dict, tokens: dict) -> dict:
     """Mutate-and-return a serialized survey dict with substitution applied
     to title / description / interpretation (en + ko each).

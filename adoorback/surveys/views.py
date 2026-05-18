@@ -13,14 +13,15 @@ from surveys.aggregation import (
     group_panels_for_survey_level_kind,
 )
 from surveys.models import (
-    CADENCE_DAILY, INPUT_LESS_TYPES, ScheduledSurvey, Survey, SurveyAnswer,
-    SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
+    CADENCE_DAILY, INPUT_LESS_TYPES, PER_FRIEND_TYPES, ScheduledSurvey, Survey,
+    SurveyAnswer, SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.scheduling import (
     _today_la_7am, get_survey_index, get_today_daily,
     get_today_daily_with_prereq, routes_to_user,
 )
+from surveys.retired import is_retired_survey_slug
 from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
     SurveyResponseInputSerializer, validate_answer_value,
@@ -133,6 +134,8 @@ class SurveyDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, slug):
+        if is_retired_survey_slug(slug):
+            return Response(status=status.HTTP_404_NOT_FOUND)
         try:
             survey = Survey.objects.get(slug=slug)
         except Survey.DoesNotExist:
@@ -150,6 +153,8 @@ class SurveyResponseSubmitView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, slug):
+        if is_retired_survey_slug(slug):
+            return Response(status=status.HTTP_404_NOT_FOUND)
         try:
             survey = Survey.objects.get(slug=slug)
         except Survey.DoesNotExist:
@@ -231,6 +236,9 @@ class SurveyResponseSubmitView(APIView):
                     response.answers.all().delete()
                 else:
                     response = SurveyResponse.objects.create(user=request.user, survey=survey)
+                # Cache the viewer's friend ID set once for per-friend
+                # tampering checks across all answers in this submission.
+                friend_ids: set[int] | None = None
                 for a in ser.validated_data['answers']:
                     question = SurveyQuestion.objects.get(id=a['question_id'], survey=survey)
                     # display_only blocks accept no value — defensively skip
@@ -238,7 +246,36 @@ class SurveyResponseSubmitView(APIView):
                     if question.type in INPUT_LESS_TYPES:
                         continue
                     validate_answer_value(question, a['value'])
-                    SurveyAnswer.objects.create(response=response, question=question, value=a['value'])
+                    target_user = None
+                    if question.type in PER_FRIEND_TYPES:
+                        target_user_id = a.get('target_user_id')
+                        if target_user_id is None:
+                            from rest_framework.exceptions import ValidationError
+                            raise ValidationError({
+                                'answers': [
+                                    f'target_user_id is required for {question.type} '
+                                    f'(question_id={question.id})'
+                                ]
+                            })
+                        if friend_ids is None:
+                            friend_ids = set(
+                                request.user.connected_users.values_list('id', flat=True)
+                            )
+                        if target_user_id not in friend_ids:
+                            from rest_framework.exceptions import ValidationError
+                            raise ValidationError({
+                                'answers': [
+                                    f'target_user_id {target_user_id} is not on the '
+                                    f'submitter\'s friend list'
+                                ]
+                            })
+                        target_user = target_user_id  # FK by ID assignment
+                    SurveyAnswer.objects.create(
+                        response=response,
+                        question=question,
+                        value=a['value'],
+                        target_user_id=target_user,
+                    )
                 # Persist `embedded_data: true` answers into the per-user
                 # store keyed by question.slug. Subsequent surveys read these
                 # via `{{slug}}` tokens or `serving_condition`.
@@ -276,7 +313,11 @@ class MyResponseView(APIView):
             'id': response.id,
             'submitted_at': response.submitted_at.isoformat(),
             'answers': [
-                {'question_id': a.question_id, 'value': a.value}
+                {
+                    'question_id': a.question_id,
+                    'value': a.value,
+                    'target_user_id': a.target_user_id,
+                }
                 for a in response.answers.all()
             ],
         })
