@@ -74,6 +74,10 @@ class Command(BaseCommand):
             '--reset-fakes', action='store_true',
             help='Hard-delete existing fake_*@whoami.test users and their cascaded content first.',
         )
+        parser.add_argument(
+            '--skip-notes-with-images', action='store_true',
+            help='Skip Note rows that have NoteImage attachments (use when note_images/ media dir was wiped).',
+        )
 
     # ------------------------------------------------------------------ #
     # Helpers                                                              #
@@ -155,6 +159,8 @@ class Command(BaseCommand):
             )
             notes = [dict(r) for r in cur.fetchall()]
 
+            note_ids_with_images = {img['note_id'] for img in note_images}
+
             author_ids_with_content = (
                 {r['author_id'] for r in responses} | {n['author_id'] for n in notes}
             )
@@ -188,7 +194,7 @@ class Command(BaseCommand):
                     )
                     note_videos = [dict(r) for r in cur.fetchall()]
 
-        return authors_by_id, responses, notes, note_images, note_videos
+        return authors_by_id, responses, notes, note_images, note_videos, note_ids_with_images
 
     def _fetch_profiles(self, conn, author_ids):
         """Return {orig_user_id: profile_dict} with bio/pronouns/persona/visibility/etc."""
@@ -405,6 +411,7 @@ class Command(BaseCommand):
         no_input = options['no_input']
         skip_regen = options['skip_regen']
         reset_fakes = options['reset_fakes']
+        skip_notes_with_images = options['skip_notes_with_images']
 
         csv_path = self._locate_csv(options['participants_csv'])
         participant_emails = self._read_participants(csv_path)
@@ -456,6 +463,7 @@ class Command(BaseCommand):
             self._run(
                 content_conn, profiles_conn, participant_emails,
                 cutoff_str, shift_days, dry_run, no_input, skip_regen,
+                skip_notes_with_images,
             )
         finally:
             content_conn.close()
@@ -463,12 +471,25 @@ class Command(BaseCommand):
                 profiles_conn.close()
 
     def _run(self, content_conn, profiles_conn, participant_emails,
-             cutoff_str, shift_days, dry_run, no_input, skip_regen):
+             cutoff_str, shift_days, dry_run, no_input, skip_regen, skip_notes_with_images):
 
         self.stdout.write('\n--- Fetching data from temp DBs ---')
-        authors_by_id, responses, notes, note_images, note_videos = self._fetch_content(
-            content_conn, participant_emails, cutoff_str,
-        )
+        authors_by_id, responses, notes, note_images, note_videos, note_ids_with_images = \
+            self._fetch_content(content_conn, participant_emails, cutoff_str)
+
+        if skip_notes_with_images and note_ids_with_images:
+            # Skip only notes that have images AND no meaningful text content
+            skipped_ids = {
+                n['id'] for n in notes
+                if n['id'] in note_ids_with_images and not (n['content'] or '').strip()
+            }
+            notes = [n for n in notes if n['id'] not in skipped_ids]
+            note_images = [img for img in note_images if img['note_id'] not in skipped_ids]
+            self.stdout.write(
+                f'  Skipping {len(skipped_ids)} image-only notes (no text) '
+                f'(--skip-notes-with-images)'
+            )
+
         self.stdout.write(f'  Non-participant authors with posts: {len(authors_by_id)}')
         self.stdout.write(f'  Responses (pre-cutoff):            {len(responses)}')
         self.stdout.write(f'  Notes (pre-cutoff):                {len(notes)}')
