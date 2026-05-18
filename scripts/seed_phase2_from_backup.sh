@@ -2,51 +2,67 @@
 # Seed Phase 2 from pg_dump backups.
 #
 # Usage:
-#   ./scripts/seed_phase2_from_backup.sh <content_dump> <profiles_dump> [--dry-run] [--reset-fakes]
+#   ./scripts/seed_phase2_from_backup.sh <content_dump> [profiles_dump] [--dry-run] [--reset-fakes]
+#
+# profiles_dump defaults to content_dump (same file used for both queries).
 #
 # Dump paths are resolved in this order:
-#   1. Host filesystem (absolute or relative path)
-#   2. Inside the web container  (e.g. /app/adoorback/backups/whoamitoday_pre_reset_*.dump)
+#   1. Host filesystem (absolute or relative)
+#   2. Inside the web container
+#   3. Inside the cron container  (/app/db_backup/data/)
+# Files ending in .gz are decompressed automatically.
 #
 # Examples:
-#   # Dry-run (counts only, no DB writes):
+#   # Use the last hourly backup before the 5/18 reset (same file for both):
 #   ./scripts/seed_phase2_from_backup.sh \
-#     /app/adoorback/backups/whoamitoday_pre_reset_20260518_000011.dump \
-#     /app/adoorback/backups/whoamitoday_pre_reset_20260518_000402.dump \
+#     /app/db_backup/data/whoamitoday_2026-05-17_23.backup.gz \
 #     --dry-run
 #
 #   # Full run:
 #   ./scripts/seed_phase2_from_backup.sh \
-#     /app/adoorback/backups/whoamitoday_pre_reset_20260518_000011.dump \
-#     /app/adoorback/backups/whoamitoday_pre_reset_20260518_000402.dump
+#     /app/db_backup/data/whoamitoday_2026-05-17_23.backup.gz
 #
-#   # Re-run cleanly (delete previous fake users first):
-#   ./scripts/seed_phase2_from_backup.sh dump1 dump2 --reset-fakes
+#   # Re-run (delete previous fake users first):
+#   ./scripts/seed_phase2_from_backup.sh \
+#     /app/db_backup/data/whoamitoday_2026-05-17_23.backup.gz \
+#     --reset-fakes
 #
 # Environment overrides:
 #   COMPOSE_FILE   (default: docker-compose.production.yml)
 #   DB_SERVICE     (default: db)
 #   WEB_SERVICE    (default: web)
+#   CRON_SERVICE   (default: cron)
 #   DB_USER        (default: postgres)
 
 set -euo pipefail
 
-CONTENT_DUMP="${1:?Usage: $0 <content_dump> <profiles_dump> [--dry-run] [--reset-fakes]}"
-PROFILES_DUMP="${2:?Usage: $0 <content_dump> <profiles_dump> [--dry-run] [--reset-fakes]}"
-shift 2
-EXTRA_ARGS=("$@")   # everything after the two positional args
+CONTENT_DUMP="${1:?Usage: $0 <content_dump> [profiles_dump] [--dry-run] [--reset-fakes]}"
+shift
+
+# Second arg: if it looks like a flag, treat it as an extra arg (profiles = content)
+PROFILES_DUMP="$CONTENT_DUMP"
+if [[ "${1:-}" != --* && -n "${1:-}" ]]; then
+    PROFILES_DUMP="$1"
+    shift
+fi
+
+EXTRA_ARGS=("$@")
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.production.yml}"
 DB_SERVICE="${DB_SERVICE:-db}"
 WEB_SERVICE="${WEB_SERVICE:-web}"
+CRON_SERVICE="${CRON_SERVICE:-cron}"
 DB_USER="${DB_USER:-postgres}"
 
 CONTENT_DB="whoamitoday_seed_src"
 PROFILES_DB="whoamitoday_seed_profiles"
+SAME_DUMP=false
+[[ "$CONTENT_DUMP" == "$PROFILES_DUMP" ]] && SAME_DUMP=true
 
 echo "=== Phase 2 seed ==="
 echo "  Content dump:  $CONTENT_DUMP"
 echo "  Profiles dump: $PROFILES_DUMP"
+echo "  Same file:     $SAME_DUMP"
 echo "  Extra args:    ${EXTRA_ARGS[*]:-<none>}"
 echo "  Compose file:  $COMPOSE_FILE"
 echo ""
@@ -57,43 +73,73 @@ cleanup() {
     echo "--- Cleanup ---"
     docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
         dropdb -U "$DB_USER" --if-exists "$CONTENT_DB" 2>/dev/null || true
-    docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
-        dropdb -U "$DB_USER" --if-exists "$PROFILES_DB" 2>/dev/null || true
+    if ! $SAME_DUMP; then
+        docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
+            dropdb -U "$DB_USER" --if-exists "$PROFILES_DB" 2>/dev/null || true
+    fi
     docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
         bash -c "rm -f /tmp/seed_content.dump /tmp/seed_profiles.dump" 2>/dev/null || true
-    rm -f /tmp/seed_content_host.dump /tmp/seed_profiles_host.dump 2>/dev/null || true
+    rm -f /tmp/_seed_content_raw.dump /tmp/_seed_profiles_raw.dump \
+          /tmp/_seed_content_host.dump /tmp/_seed_profiles_host.dump 2>/dev/null || true
     echo "  Done."
 }
 trap cleanup EXIT
 
-# ── Helper: resolve a dump path to a local host file ────────────────────── #
-# If the path exists on the host, use it directly.
-# Otherwise, try to copy it from the web container.
-resolve_dump() {
+# ── Helper: fetch a dump file to a local host path ──────────────────────── #
+# Handles: host paths, web-container paths, cron-container paths, .gz files.
+fetch_dump() {
     local src="$1"
-    local dest="$2"   # host temp path to copy to if needed
+    local dest="$2"   # host path to write the raw (non-gz) dump
 
+    local raw_dest="${dest%.dump}_raw.dump"
+
+    # 1. Try host filesystem
     if [[ -f "$src" ]]; then
-        echo "$src"
-        return
+        echo "  Found on host: $src" >&2
+        raw_dest="$src"
+    else
+        # 2. Try web container
+        echo "  Not on host — trying $WEB_SERVICE container..." >&2
+        if docker compose -f "$COMPOSE_FILE" cp "$WEB_SERVICE:$src" "$raw_dest" 2>/dev/null; then
+            echo "  Copied from $WEB_SERVICE container." >&2
+        else
+            # 3. Try cron container
+            echo "  Not in $WEB_SERVICE — trying $CRON_SERVICE container..." >&2
+            if docker compose -f "$COMPOSE_FILE" cp "$CRON_SERVICE:$src" "$raw_dest" 2>/dev/null; then
+                echo "  Copied from $CRON_SERVICE container." >&2
+            else
+                echo "ERROR: '$src' not found on host, in $WEB_SERVICE, or in $CRON_SERVICE." >&2
+                exit 1
+            fi
+        fi
     fi
 
-    echo "  '$src' not found on host — trying web container..." >&2
-    docker compose -f "$COMPOSE_FILE" cp "$WEB_SERVICE:$src" "$dest"
-    echo "$dest"
+    # 4. Decompress .gz if needed
+    if [[ "$raw_dest" == *.gz ]]; then
+        echo "  Decompressing $raw_dest → $dest ..." >&2
+        gunzip -c "$raw_dest" > "$dest"
+    else
+        cp "$raw_dest" "$dest"
+    fi
 }
 
-# ── Step 1: Resolve dump files ───────────────────────────────────────────── #
-echo "--- Step 1: Resolving dump files ---"
-CONTENT_HOST=$(resolve_dump "$CONTENT_DUMP"  /tmp/seed_content_host.dump)
-PROFILES_HOST=$(resolve_dump "$PROFILES_DUMP" /tmp/seed_profiles_host.dump)
-echo "  Content:  $CONTENT_HOST"
-echo "  Profiles: $PROFILES_HOST"
+# ── Step 1: Fetch dump files to host ────────────────────────────────────── #
+echo "--- Step 1: Fetching dump files ---"
+fetch_dump "$CONTENT_DUMP"  /tmp/_seed_content_host.dump
+echo "  Content dump ready."
+
+if $SAME_DUMP; then
+    cp /tmp/_seed_content_host.dump /tmp/_seed_profiles_host.dump
+    echo "  Profiles dump = content dump (same file)."
+else
+    fetch_dump "$PROFILES_DUMP" /tmp/_seed_profiles_host.dump
+    echo "  Profiles dump ready."
+fi
 
 # ── Step 2: Copy dumps into the db container ────────────────────────────── #
 echo "--- Step 2: Copying dumps to db container ---"
-docker compose -f "$COMPOSE_FILE" cp "$CONTENT_HOST"  "$DB_SERVICE:/tmp/seed_content.dump"
-docker compose -f "$COMPOSE_FILE" cp "$PROFILES_HOST" "$DB_SERVICE:/tmp/seed_profiles.dump"
+docker compose -f "$COMPOSE_FILE" cp /tmp/_seed_content_host.dump  "$DB_SERVICE:/tmp/seed_content.dump"
+docker compose -f "$COMPOSE_FILE" cp /tmp/_seed_profiles_host.dump "$DB_SERVICE:/tmp/seed_profiles.dump"
 echo "  Copied."
 
 # ── Step 3: Create temp DBs and restore ─────────────────────────────────── #
@@ -106,12 +152,17 @@ docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
     --no-comments -j 2 /tmp/seed_content.dump
 echo "  Content DB ($CONTENT_DB) restored."
 
-docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
-    createdb -U "$DB_USER" "$PROFILES_DB"
-docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
-    pg_restore -U "$DB_USER" -d "$PROFILES_DB" --no-owner --no-privileges \
-    --no-comments -j 2 /tmp/seed_profiles.dump
-echo "  Profiles DB ($PROFILES_DB) restored."
+if $SAME_DUMP; then
+    PROFILES_DB="$CONTENT_DB"
+    echo "  Profiles DB = Content DB (skipping second restore)."
+else
+    docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
+        createdb -U "$DB_USER" "$PROFILES_DB"
+    docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" \
+        pg_restore -U "$DB_USER" -d "$PROFILES_DB" --no-owner --no-privileges \
+        --no-comments -j 2 /tmp/seed_profiles.dump
+    echo "  Profiles DB ($PROFILES_DB) restored."
+fi
 
 # ── Step 4: Run management command ──────────────────────────────────────── #
 echo "--- Step 4: Running management command ---"

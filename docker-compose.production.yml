@@ -27,6 +27,7 @@ services:
       - ./adoorback/adoorback/assets/user_list.csv:/app/adoorback/adoorback/assets/user_list.csv
       - ./adoorback/adoorback/assets/created_users.csv:/app/adoorback/adoorback/assets/created_users.csv
       - ./adoorback/adoorback/serviceAccountKey.json:/app/adoorback/adoorback/serviceAccountKey.json
+      - ./db_backup:/app/adoorback/backups
     healthcheck:
       test:
         [
