@@ -11,8 +11,8 @@ from django.db.models import Exists, OuterRef, Q, Subquery
 from django.utils import timezone
 
 from surveys.models import (
-    CADENCE_DAILY, ScheduledSurvey, Survey, SurveyQuestion, SurveyResponse,
-    UserSurveyEmbeddedData,
+    CADENCE_DAILY, PER_FRIEND_TYPES, ScheduledSurvey, Survey, SurveyQuestion,
+    SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.retired import is_retired_survey_slug
 
@@ -52,10 +52,15 @@ def _required_tokens_for_survey(survey: 'Survey') -> set:
         if text:
             needed.update(_TOKEN_RE.findall(text))
     for q in survey.questions.all():
+        question_tokens: set = set()
         for f in _QUESTION_TEXT_FIELDS:
             text = getattr(q, f, '') or ''
             if text:
-                needed.update(_TOKEN_RE.findall(text))
+                question_tokens.update(_TOKEN_RE.findall(text))
+        if q.type in PER_FRIEND_TYPES:
+            from surveys.tokens import PER_FRIEND_DYNAMIC_TOKENS
+            question_tokens -= PER_FRIEND_DYNAMIC_TOKENS
+        needed.update(question_tokens)
     survey_provided = set((survey.tokens or {}).keys())
     return needed - survey_provided
 

@@ -32,6 +32,16 @@ logger = logging.getLogger(__name__)
 # inside the braces is allowed and stripped.
 _TOKEN_RE = re.compile(r'\{\{\s*(\w+)\s*\}\}')
 
+# Tokens resolved per virtual row when a per_friend_* question is expanded.
+# These are not survey prerequisites and should not be required in
+# UserSurveyEmbeddedData before the survey appears in the index.
+PER_FRIEND_DYNAMIC_TOKENS = frozenset({
+    'friend_name',
+    'friend_username',
+    'baseline_closeness',
+    'baseline_relationship_type',
+})
+
 # Question fields whose values are strings and should have token substitution
 # applied. Both _en and _ko variants are processed.
 _SUBSTITUTABLE_QUESTION_TEXT_FIELDS = (

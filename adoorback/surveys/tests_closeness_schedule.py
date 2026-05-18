@@ -6,18 +6,33 @@ from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from surveys.models import CADENCE_BIWEEKLY, ScheduledSurvey, Survey
-from surveys.scheduling import get_survey_index
+from surveys.models import CADENCE_BIWEEKLY, ScheduledSurvey, Survey, SurveyQuestion
+from surveys.scheduling import _required_tokens_for_survey, get_survey_index
 
 
 class ClosenessScheduleTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.user = User.objects.create(username='alice', email='alice@example.com')
-        Survey.objects.create(
+        phase1 = Survey.objects.create(
             slug='phase1_friend_closeness',
             title_en='Phase 1 friend closeness',
             title_ko='',
+        )
+        SurveyQuestion.objects.create(
+            survey=phase1,
+            order=1,
+            type='per_friend_likert_5',
+            prompt_en='How close do you feel to {{friend_name}}?',
+            prompt_ko='{{friend_name}}',
+        )
+        SurveyQuestion.objects.create(
+            survey=phase1,
+            order=2,
+            type='per_friend_likert_5',
+            prompt_en='Earlier baseline was {{baseline_closeness}}/5.',
+            prompt_ko='{{baseline_closeness}}',
+            required=False,
         )
         Survey.objects.create(
             slug='phase2_friend_closeness',
@@ -37,6 +52,7 @@ class ClosenessScheduleTests(TestCase):
         self.assertEqual(phase1.window_start, date(2026, 5, 18))
         self.assertEqual(phase1.window_end, date(2026, 5, 18))
         self.assertTrue(phase1.allow_late)
+        self.assertEqual(_required_tokens_for_survey(phase1.survey), set())
 
         with patch('surveys.scheduling._today_la_7am', return_value=date(2026, 5, 18)):
             due_today = get_survey_index(self.user)
