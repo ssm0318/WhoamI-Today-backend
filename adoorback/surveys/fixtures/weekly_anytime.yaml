@@ -73,9 +73,9 @@ _weekly_questions: &weekly_questions
 
   - order: 3
     slug: weekly_ritual_highlight
-    type: single_choice
+    type: multi_choice
     prompt:
-      en: "Which part of WIT this week did you actually look forward to or get the most out of?"
+      en: "Which parts of WIT this week did you actually look forward to or get the most out of? Pick all that apply."
     options:
       - { order: 1, value: "daily_questions",   label: { en: "Daily questions" } }
       - { order: 2, value: "mission_of_day",    label: { en: "Mission of the day" } }
@@ -101,7 +101,11 @@ _weekly_questions: &weekly_questions
     required: false
     conditional_display:
       depends_on: weekly_ritual_highlight
-      show_when_value: "other"
+      # Multi-choice controller — value is an array, not a scalar.
+      # `show_when_value_includes` checks array membership, which matches
+      # how the conditional needs to fire: "show this follow-up when the
+      # user has selected the 'other' option among their picks."
+      show_when_value_includes: "other"
     result_hidden: true
 
   - order: 5
@@ -452,9 +456,9 @@ _weekly_questions: &weekly_questions
     # ------------------------------------------------------------------------
     - order: 9
       slug: feature_feedback_which
-      type: single_choice
+      type: multi_choice
       prompt:
-        en: "Which feature is this about?"
+        en: "Which feature(s) is this about? Pick all that apply."
       options:
         - { order: 1, value: "daily_questions",       label: { en: "Daily questions" } }
         - { order: 2, value: "question_sending",      label: { en: "Question sending" } }
