@@ -20,8 +20,8 @@ Brings a freshly-migrated DB to a working state for the long-form study:
   4. Retires the removed `pre_study` survey so it is not re-created by
      the legacy seed schedule.
   5. Applies schedule overrides: habit platform prereq, SOTD reschedules,
-     SOTD late-answer rules,
-     weekend-only weekly reflections, and closeness re-eval dates.
+     SOTD late-answer rules, weekend-only weekly reflections, phase
+     reflection part labels/windows, and closeness re-eval dates.
   6. (Optional, `--mock-dailies`) Loads `mock_test_today.yaml` and creates
      the May 1-3 mock daily ScheduledSurvey rows.
   7. Applies the committed sidebar order map, if any, from
@@ -250,6 +250,18 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('[5b] Re-seeding closeness re-eval surveys ...'))
         closeness_module = import_module('surveys.migrations.0021_seed_closeness_schedule')
         closeness_module.seed_closeness(django_apps, None)
+
+        # 5c. Make the phase reflection cards read as Part 1 / Part 2,
+        #    and close the Phase 1 cards today with late submissions
+        #    accepted. This runs after both the W/Q and persistent seeders
+        #    because those historical seeders own the same rows.
+        self.stdout.write(
+            self.style.NOTICE('[5c] Applying phase reflection part labels/windows ...')
+        )
+        phase_reflection_module = import_module(
+            'surveys.migrations.0031_phase1_reflection_parts_due_may18'
+        )
+        phase_reflection_module.apply_phase_reflection_parts(django_apps, None)
 
         # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:

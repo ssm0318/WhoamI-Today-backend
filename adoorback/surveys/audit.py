@@ -394,6 +394,29 @@ def _build_schedule_rows() -> list[dict[str, Any]]:
             target_user_group=target_group,
         )
 
+    phase1_reflection = importlib.import_module(
+        'surveys.migrations.0031_phase1_reflection_parts_due_may18'
+    )
+    for seq in (2, 3):
+        _update_schedule_date(
+            rows,
+            'biweekly',
+            seq,
+            phase1_reflection.PHASE1_DUE,
+            phase1_reflection.PHASE1_DUE,
+        )
+        rows[('biweekly', seq)]['allow_late'] = True
+        rows[('biweekly', seq)]['late_behavior'] = 'Late accepted'
+    _update_schedule_date(
+        rows,
+        'endpoint',
+        4,
+        phase1_reflection.PHASE1_DUE,
+        phase1_reflection.PHASE1_DUE,
+    )
+    rows[('endpoint', 4)]['allow_late'] = True
+    rows[('endpoint', 4)]['late_behavior'] = 'Late accepted'
+
     honeymoon = importlib.import_module('surveys.migrations.0016_reschedule_d01_honeymoon_to_may_5')
     _update_schedule_date(rows, 'daily', honeymoon.HONEYMOON_SEQ, honeymoon.NEW_WINDOW, honeymoon.NEW_WINDOW)
 
@@ -647,6 +670,7 @@ def _sidebar_entry(row: dict[str, Any], survey: dict[str, Any], bucket: str) -> 
         'sidebar_order': row.get('sidebar_order'),
         'window_start': row['window_start'],
         'window_end': row['window_end'],
+        'allow_late': row['allow_late'],
         'priority': survey['priority'],
         'redirect_url': f"/surveys/{row['survey_slug']}/answer",
         'runtime_source_file': survey['source_file'],

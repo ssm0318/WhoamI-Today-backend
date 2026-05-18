@@ -1582,11 +1582,13 @@ _wrapup_block: &wrapup_block
 - slug: mid_study_w
   type: likert_5
   title:
-    en: "Looking back: Phase 1"
+    en: "Phase 1 reflection: Part 1"
+    ko: "Phase 1 reflection: Part 1"
   description:
     en: "Now that you've finished the first half, we'd like to hear what your experience was like. About 30 minutes. Take your time."
   friend_visible: false
   results_hidden: true
+  priority: 100
   tokens:
     phase_label: "Phase 1"
     phase_window: "the past two weeks"
@@ -1632,11 +1634,13 @@ _wrapup_block: &wrapup_block
 - slug: mid_study_q
   type: likert_5
   title:
-    en: "Looking back: Phase 1"
+    en: "Phase 1 reflection: Part 1"
+    ko: "Phase 1 reflection: Part 1"
   description:
     en: "Now that you've finished the first half, we'd like to hear what your experience was like. About 17 minutes. Take your time."
   friend_visible: false
   results_hidden: true
+  priority: 100
   tokens:
     phase_label: "Phase 1"
     phase_window: "the past two weeks"
@@ -1683,11 +1687,13 @@ _wrapup_block: &wrapup_block
 - slug: post_study_w
   type: likert_5
   title:
-    en: "Looking back: Phase 2"
+    en: "Phase 2 reflection: Part 1"
+    ko: "Phase 2 reflection: Part 1"
   description:
     en: "You've now finished both halves. This survey asks about the second half only. About 30 minutes."
   friend_visible: false
   results_hidden: true
+  priority: 100
   tokens:
     phase_label: "Phase 2"
     phase_window: "the second half"
@@ -1729,11 +1735,13 @@ _wrapup_block: &wrapup_block
 - slug: post_study_q
   type: likert_5
   title:
-    en: "Looking back: Phase 2"
+    en: "Phase 2 reflection: Part 1"
+    ko: "Phase 2 reflection: Part 1"
   description:
     en: "You've now finished both halves. This survey asks about the second half only. About 17 minutes."
   friend_visible: false
   results_hidden: true
+  priority: 100
   tokens:
     phase_label: "Phase 2"
     phase_window: "the second half"
@@ -1823,7 +1831,8 @@ _wrapup_block: &wrapup_block
 - slug: goal_comparison_p1
   type: likert_5
   title:
-    en: "How did Phase 1 go?"
+    en: "Phase 1 reflection: Part 2"
+    ko: "Phase 1 reflection: Part 2"
   description:
     en: "Answer a few questions about different parts of your WIT experience during Phase 1. You can come back and edit while this survey remains open."
   friend_visible: false
@@ -1853,7 +1862,8 @@ _wrapup_block: &wrapup_block
 - slug: goal_comparison_p2
   type: likert_5
   title:
-    en: "How did Phase 2 go?"
+    en: "Phase 2 reflection: Part 2"
+    ko: "Phase 2 reflection: Part 2"
   description:
     en: "Answer a few questions about different parts of your WIT experience during Phase 2. You can come back and edit while this survey remains open."
   friend_visible: false

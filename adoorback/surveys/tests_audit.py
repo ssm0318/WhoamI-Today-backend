@@ -54,6 +54,22 @@ class SurveyAuditTests(SimpleTestCase):
         self.assertEqual(feature_rows[1]['audience'], 'group_q_first')
         self.assertEqual(feature_rows[1]['window_start'], date(2026, 5, 22).isoformat())
 
+    def test_phase_reflection_part_titles_cover_mid_and_post_surveys(self):
+        audit = build_survey_audit()
+
+        expected_titles = {
+            'mid_study_w': 'Phase 1 reflection: Part 1',
+            'mid_study_q': 'Phase 1 reflection: Part 1',
+            'goal_comparison_p1': 'Phase 1 reflection: Part 2',
+            'post_study_w': 'Phase 2 reflection: Part 1',
+            'post_study_q': 'Phase 2 reflection: Part 1',
+            'goal_comparison_p2': 'Phase 2 reflection: Part 2',
+        }
+
+        for slug, title in expected_titles.items():
+            with self.subTest(slug=slug):
+                self.assertEqual(audit['surveys'][slug]['title'], title)
+
     def test_audit_marks_featured_sotd_card_after_reschedules(self):
         audit = build_survey_audit()
 
@@ -100,6 +116,7 @@ class SurveyAuditTests(SimpleTestCase):
             [
                 'habit_platform',
                 'feature_eval_w',
+                'mid_study_w',
                 'goal_comparison_p1',
                 'daily_base',
                 'anytime_reflection',
@@ -109,11 +126,36 @@ class SurveyAuditTests(SimpleTestCase):
             [entry['survey_slug'] for entry in q_first['buckets']['available_now']],
             [
                 'habit_platform',
+                'mid_study_q',
                 'goal_comparison_p1',
                 'daily_base',
                 'anytime_reflection',
             ],
         )
+        w_mid = next(
+            entry for entry in w_first['buckets']['available_now']
+            if entry['survey_slug'] == 'mid_study_w'
+        )
+        q_mid = next(
+            entry for entry in q_first['buckets']['available_now']
+            if entry['survey_slug'] == 'mid_study_q'
+        )
+        phase1_goal = next(
+            entry for entry in w_first['buckets']['available_now']
+            if entry['survey_slug'] == 'goal_comparison_p1'
+        )
+        self.assertEqual(w_mid['survey_title'], 'Phase 1 reflection: Part 1')
+        self.assertEqual(q_mid['survey_title'], 'Phase 1 reflection: Part 1')
+        self.assertEqual(phase1_goal['survey_title'], 'Phase 1 reflection: Part 2')
+        self.assertEqual(w_mid['window_start'], date(2026, 5, 18).isoformat())
+        self.assertEqual(w_mid['window_end'], date(2026, 5, 18).isoformat())
+        self.assertTrue(w_mid['allow_late'])
+        self.assertEqual(q_mid['window_start'], date(2026, 5, 18).isoformat())
+        self.assertEqual(q_mid['window_end'], date(2026, 5, 18).isoformat())
+        self.assertTrue(q_mid['allow_late'])
+        self.assertEqual(phase1_goal['window_start'], date(2026, 5, 18).isoformat())
+        self.assertEqual(phase1_goal['window_end'], date(2026, 5, 18).isoformat())
+        self.assertTrue(phase1_goal['allow_late'])
         self.assertEqual(w_first['hidden_available_now'], [])
         self.assertEqual(q_first['hidden_available_now'], [])
 
@@ -122,11 +164,11 @@ class SurveyAuditTests(SimpleTestCase):
         self.assertNotIn('week1_reflection', w_late_slugs)
         self.assertNotIn('week2_reflection', w_late_slugs)
         self.assertNotIn('pre_study', w_late_slugs)
-        self.assertIn('mid_study_w', w_late_slugs)
+        self.assertNotIn('mid_study_w', w_late_slugs)
         self.assertNotIn('mid_study_q', w_late_slugs)
         self.assertNotIn('sotd_d15_shi', w_late_slugs)
         self.assertNotIn('pre_study', q_late_slugs)
-        self.assertIn('mid_study_q', q_late_slugs)
+        self.assertNotIn('mid_study_q', q_late_slugs)
         self.assertNotIn('mid_study_w', q_late_slugs)
         self.assertEqual(w_first['buckets']['completed'], [])
 
