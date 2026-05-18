@@ -161,7 +161,7 @@ def _make_event_predicate(event_key: str):
     def check(user):
         from chat.models import OnboardingEvent
         return OnboardingEvent.objects.filter(
-            user=user, event_key=event_key,
+            user=user, version=user.current_ver, event_key=event_key,
         ).exists()
     return check
 

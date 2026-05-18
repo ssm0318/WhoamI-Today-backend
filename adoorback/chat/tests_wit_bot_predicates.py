@@ -48,6 +48,16 @@ class PredicateRegistryTests(TestCase):
         )
         self.assertTrue(pred.is_engaged(self.alice))
 
+    def test_event_predicate_uses_current_version_only(self):
+        pred = p.predicate_by_key('discover_visit')
+        OnboardingEvent.objects.create(
+            user=self.alice, version='version_w',
+            event_key='discover_opened',
+        )
+        self.alice.current_ver = 'version_q'
+        self.alice.save(update_fields=['current_ver'])
+        self.assertFalse(pred.is_engaged(self.alice))
+
     def test_db_predicate_non_public_account(self):
         pred = p.predicate_by_key('non_public_account')
         self.assertFalse(pred.is_engaged(self.alice))

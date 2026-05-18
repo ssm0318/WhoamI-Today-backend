@@ -265,11 +265,11 @@ class EngineDispatchTests(TestCase):
 
     # ---------- V1.1 — Audit handler ----------
 
-    def _complete_kickoff(self):
+    def _complete_kickoff(self, version='version_w'):
         """Mark kickoff complete in state, return to idle."""
         state = state_mod.get_or_create_state(self.alice)
         state_mod.set_intent(state, '', step=0)
-        state_mod.set_progress(state, 'version_w', 'kickoff', {'completed': True})
+        state_mod.set_progress(state, version, 'kickoff', {'completed': True})
 
     def test_run_audit_from_idle_enters_audit(self):
         self._complete_kickoff()
@@ -280,6 +280,32 @@ class EngineDispatchTests(TestCase):
         replies = self._bot_replies().exclude(event_type='wit_welcome_card')
         latest = replies.order_by('-created_at').first()
         self.assertIn('not yet', latest.content.lower())
+
+    def test_run_audit_uses_current_q_version_feature_set(self):
+        self.alice.current_ver = 'version_q'
+        self.alice.save(update_fields=['current_ver'])
+        self._complete_kickoff(version='version_q')
+        self._send_choice('run_audit')
+        replies = self._bot_replies().exclude(event_type='wit_welcome_card')
+        latest = replies.order_by('-created_at').first()
+        self.assertIn('Post an image+text check-in', latest.content)
+        self.assertIn('Open the Friends feed', latest.content)
+        self.assertNotIn('Set a mood check-in', latest.content)
+        self.assertNotIn('Pick a browsing mode', latest.content)
+
+    def test_prior_version_self_report_does_not_satisfy_current_audit(self):
+        from chat.models import OnboardingEvent
+        OnboardingEvent.objects.create(
+            user=self.alice, version='version_w',
+            event_key='self_report:discover_visit',
+        )
+        self.alice.current_ver = 'version_q'
+        self.alice.save(update_fields=['current_ver'])
+        self._complete_kickoff(version='version_q')
+        self._send_choice('run_audit')
+        replies = self._bot_replies().exclude(event_type='wit_welcome_card')
+        latest = replies.order_by('-created_at').first()
+        self.assertIn('⏳ Open Discover / Daily Digest', latest.content)
 
     def test_audit_walkthrough_button_enters_walkthrough(self):
         self._complete_kickoff()

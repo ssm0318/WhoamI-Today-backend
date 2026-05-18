@@ -427,7 +427,9 @@ def _predicate_status(predicate, user):
     if predicate.is_engaged(user):
         return 'engaged'
     if OnboardingEvent.objects.filter(
-        user=user, event_key=f'self_report:{predicate.feature_key}',
+        user=user,
+        version=user.current_ver,
+        event_key=f'self_report:{predicate.feature_key}',
     ).exists():
         return 'self_reported'
     return 'not_yet'
