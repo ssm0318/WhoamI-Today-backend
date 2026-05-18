@@ -21,7 +21,7 @@ Brings a freshly-migrated DB to a working state for the long-form study:
      the legacy seed schedule.
   5. Applies schedule overrides: habit platform prereq, SOTD reschedules,
      SOTD late-answer rules,
-     and weekend-only weekly reflections.
+     weekend-only weekly reflections, and closeness re-eval dates.
   6. (Optional, `--mock-dailies`) Loads `mock_test_today.yaml` and creates
      the May 1-3 mock daily ScheduledSurvey rows.
   7. Applies the committed sidebar order map, if any, from
@@ -243,6 +243,13 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('[5] Re-seeding persistent evaluation surveys ...'))
         persistent_module = import_module('surveys.migrations.0015_seed_persistent_eval_surveys')
         persistent_module.seed_persistent(django_apps, None)
+
+        # 5b. Re-seed the end-of-phase per-friend closeness surveys. The
+        #    original migration can short-circuit on fresh DBs before YAML is
+        #    loaded, so setup_survey_state reapplies it after fixtures.
+        self.stdout.write(self.style.NOTICE('[5b] Re-seeding closeness re-eval surveys ...'))
+        closeness_module = import_module('surveys.migrations.0021_seed_closeness_schedule')
+        closeness_module.seed_closeness(django_apps, None)
 
         # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:

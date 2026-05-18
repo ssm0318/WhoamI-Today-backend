@@ -2,7 +2,7 @@
 
 Joins three sources at analysis time:
   - FriendEvaluation (per-friend baseline collected at friend-request time)
-  - phase1_friend_closeness SurveyAnswer rows (Day 14)
+  - phase1_friend_closeness SurveyAnswer rows (Day 15)
   - phase2_friend_closeness SurveyAnswer rows (Day 28)
 
 Each output row is one (evaluator, evaluated_user) pair with the baseline

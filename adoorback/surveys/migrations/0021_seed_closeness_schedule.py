@@ -1,11 +1,9 @@
 # Schedule the end-of-phase per-friend closeness re-rating surveys.
 #
-# phase1_friend_closeness opens on Day 14 (May 17), phase2_friend_closeness
+# phase1_friend_closeness opens on Day 15 (May 18), phase2_friend_closeness
 # opens on Day 28 (May 31). Both have `allow_late=True` so the slot stays
 # completable through end-of-study — important because the surveys were
-# specced after Day 14 had already passed in this rollout, and we want
-# Phase 1 to still collect data retroactively for participants who open it
-# late.
+# specced on Day 15 and should remain answerable after the due date.
 #
 # Sequence indices 4 and 5 are taken by post_study_w / post_study_q from
 # 0011 (the spec was authored before that migration's expansion). We pick
@@ -20,12 +18,12 @@ from datetime import date
 from django.db import migrations
 
 
-DAY_14 = date(2026, 5, 17)
+PHASE1_DUE = date(2026, 5, 18)
 DAY_28 = date(2026, 5, 31)
 
 
 CLOSENESS_SCHEDULE = [
-    (6, 'phase1_friend_closeness', DAY_14),
+    (6, 'phase1_friend_closeness', PHASE1_DUE),
     (7, 'phase2_friend_closeness', DAY_28),
 ]
 

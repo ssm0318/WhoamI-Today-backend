@@ -2,7 +2,7 @@
 # END-OF-PHASE PER-FRIEND CLOSENESS RE-EVALUATION (2 surveys, 1 file)
 # ============================================================================
 # Surveys produced by this file:
-#   1. phase1_friend_closeness  — Day 14 (May 17), end of Phase 1
+#   1. phase1_friend_closeness  — Day 15 (May 18), end of Phase 1
 #   2. phase2_friend_closeness  — Day 28 (May 31), end of Phase 2
 #
 # Each survey re-asks the closeness rating originally collected via
@@ -10,7 +10,7 @@
 # end of a study phase. Joining SurveyAnswer × FriendEvaluation at analysis
 # time gives a longitudinal per-friend delta:
 #   baseline (FriendEvaluation.closeness, written at friend-request time)
-#   → phase1_friend_closeness (Day 14)
+#   → phase1_friend_closeness (Day 15)
 #   → phase2_friend_closeness (Day 28)
 #
 # Each survey has the SAME structure, differing only in slug, title copy,
