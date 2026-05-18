@@ -25,27 +25,35 @@
 #   global_outcomes_block      — 12 items
 #   goal_outcome_ratings_block — 8 items (one outcome rating per goal,
 #                                shown on BOTH versions)
+#   global_appreciate_block    — 3 items (who would appreciate / not the
+#                                current version)
 #   reflection_block           — 3 items (closer / not-closer free text)
 #   wrapup_block               — 9 items (continue, recommend, like/change,
 #                                difficult, interview, anything else)
+#   preferred_version_block    — 3 items (post-study only, both-version
+#                                comparison)
 #
 # Version-specific blocks:
-#   ver_w_feature_blocks       — per-feature satisfaction for goals 1–8
-#                                (each goal's features evaluated together)
-#   ver_q_feature_blocks       — per-feature satisfaction for goal 1
-#                                (daily questions, question sending) and
-#                                goal 7 (scrollable Discover feed)
+#   ver_w_feature_blocks       — per-feature like-rating + enjoy + dislike
+#                                for goals 1–8 (each goal's features
+#                                evaluated as a 3-item sub-sequence)
+#   ver_q_feature_blocks       — per-feature like-rating + enjoy + dislike
+#                                for goal 1 (daily questions, question
+#                                sending) and goal 7 (scrollable Discover
+#                                feed)
 #
 # Composition pattern (per survey):
-#   §0 intro
+#   §0 version_orientation         [W or Q variant, mid/post only]
 #   §1 tie_outcomes_block          [shared]
 #   §2 global_outcomes_block       [shared]
-#   §3 per-goal blocks:
+#   §3 global_appreciate_block     [shared, mid/post only]
+#   §4 per-goal blocks:
 #       goal_outcome_ratings_block [shared, one rating per goal]
 #       INTERLEAVED with version-specific feature satisfaction blocks
 #       (only on goals where the version has features)
-#   §4 reflection_block            [shared]
-#   §5 wrapup_block                [shared]
+#   §5 reflection_block            [shared]
+#   §6 wrapup_block                [shared]
+#   §7 preferred_version_block     [post-study only]
 #
 # IMPORTANT: Because per-goal blocks interleave a shared outcome rating with
 # version-specific features, the §3 section cannot be a single anchor — it's
@@ -56,7 +64,8 @@
 # ============================================================================
 #
 # The four surveys at the bottom of this file each have:
-#   - slug, title, description, tokens (phase_label, phase_window, phase_number)
+#   - slug, title, description, tokens (phase_label, phase_window, phase_number,
+#     version_short_letter)
 #   - questions: a list composed by reference to anchored blocks plus
 #     interleaved per-goal subsequences
 #
@@ -70,14 +79,33 @@
 # question (since version routing is now handled at the survey-assignment
 # layer).
 #
-# Token substitution {{phase_label}}, {{phase_window}}, {{phase_number}}
-# resolves against each survey's tokens block at render time.
+# Token substitution {{phase_label}}, {{phase_window}}, {{phase_number}},
+# {{version_short_letter}} resolves against each survey's tokens block at
+# render time.
 # ============================================================================
 
 
 # ============================================================================
 # ANCHOR DEFINITIONS — shared building blocks
 # ============================================================================
+
+# Version orientation — first item in each mid/post survey. Names which
+# version (W or Q) the participant just spent two weeks on and describes
+# it in plain terms, so teens don't need to remember internal labels.
+_version_orientation_w: &version_orientation_w
+  order: 1
+  slug: version_orientation
+  type: display_only
+  content:
+    en: "**Heads up — this survey is about Ver.W.** That's the version of WIT you've been using during {{phase_label}}: the one with check-ins, missions, daily digest, profile decoration, and browsing modes. Please answer based on your experience with that version."
+
+_version_orientation_q: &version_orientation_q
+  order: 1
+  slug: version_orientation
+  type: display_only
+  content:
+    en: "**Heads up — this survey is about Ver.Q.** That's the version of WIT you've been using during {{phase_label}}: the one focused on daily questions, sending questions to specific friends, likes, and the scrollable Discover feed. Please answer based on your experience with that version."
+
 
 # Block 1 — Tie-level outcomes (7 items)
 _tie_outcomes_block: &tie_outcomes_block
@@ -500,8 +528,11 @@ _goal8_freetext: &goal8_freetext
 
 
 # ============================================================================
-# VER.W FEATURE BLOCKS — per-goal, satisfaction ratings only
-# Each block contains the per-feature satisfaction items for one goal.
+# VER.W FEATURE BLOCKS — per-goal, like-rating + enjoy + dislike
+# Each feature contributes a 3-item sub-sequence: a likert_5_na "I liked
+# this feature" item followed by two free_text items (enjoy / dislike).
+# The like rating measures personal preference for the feature; goal
+# achievement is captured separately in goal_comparison_p1 / p2.
 # ============================================================================
 
 _goal1_features_w: &goal1_features_w
@@ -509,7 +540,7 @@ _goal1_features_w: &goal1_features_w
     slug: goal1_feat_dailyq
     type: likert_5_na
     prompt:
-      en: "**Daily questions** — I was satisfied with this feature."
+      en: "**Daily questions** — I liked this feature."
     description:
       en: "The daily question prompt that asks you something specific to answer and share."
     low_label:  { en: "Strongly disagree" }
@@ -520,10 +551,28 @@ _goal1_features_w: &goal1_features_w
     result_hidden: true
 
   - order: 2
+    slug: goal1_feat_dailyq_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the daily questions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal1_feat_dailyq_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the daily questions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal1_feat_qsend
     type: likert_5_na
     prompt:
-      en: "**Question sending** — I was satisfied with this feature."
+      en: "**Question sending** — I liked this feature."
     description:
       en: "Sending a question to a specific friend, prompting them to share something with you."
     low_label:  { en: "Strongly disagree" }
@@ -533,13 +582,31 @@ _goal1_features_w: &goal1_features_w
     reverse_scored: false
     result_hidden: true
 
+  - order: 5
+    slug: goal1_feat_qsend_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the question sending feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal1_feat_qsend_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the question sending feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
 
 _goal2_features_w: &goal2_features_w
   - order: 1
     slug: goal2_feat_browse
     type: likert_5_na
     prompt:
-      en: "**Browsing modes** (quiet vs. social mode) — I was satisfied with this feature."
+      en: "**Browsing modes** (quiet vs. social mode) — I liked this feature."
     description:
       en: "Being able to browse without others knowing you're active, or signal that you're open to interaction."
     low_label:  { en: "Strongly disagree" }
@@ -550,17 +617,53 @@ _goal2_features_w: &goal2_features_w
     result_hidden: true
 
   - order: 2
-    slug: goal2_feat_chatstatus
+    slug: goal2_feat_browse_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the browsing modes (quiet vs. social mode) feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal2_feat_browse_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the browsing modes (quiet vs. social mode) feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
+    slug: goal2_feat_social_battery_level
     type: likert_5_na
     prompt:
-      en: "**Chat status options** — I was satisfied with this feature."
+      en: "**Social battery level** — I liked this feature."
     description:
-      en: "Setting expectations about how quickly you'll respond to messages."
+      en: "Setting and showing your current social battery level so friends know how available you are for interaction."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
-      en: "N/A — didn't use or wasn't available"
+      en: "N/A — didn't use"
     reverse_scored: false
+    result_hidden: true
+
+  - order: 5
+    slug: goal2_feat_social_battery_level_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the social battery level feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal2_feat_social_battery_level_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the social battery level feature?"
+    min_length: 0
+    required: false
     result_hidden: true
 
 
@@ -569,7 +672,7 @@ _goal3_features_w: &goal3_features_w
     slug: goal3_feat_checkin_reactions
     type: likert_5_na
     prompt:
-      en: "**Check-in reactions** (notification-only reactions to others' check-ins) — I was satisfied with this feature."
+      en: "**Check-in reactions** (notification-only reactions to others' check-ins) — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
@@ -578,10 +681,28 @@ _goal3_features_w: &goal3_features_w
     result_hidden: true
 
   - order: 2
+    slug: goal3_feat_checkin_reactions_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the check-in reactions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal3_feat_checkin_reactions_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the check-in reactions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal3_feat_emoji
     type: likert_5_na
     prompt:
-      en: "**Emoji reactions** — I was satisfied with this feature."
+      en: "**Emoji reactions** — I liked this feature."
     description:
       en: "Reacting to a post with a specific emoji rather than a comment."
     low_label:  { en: "Strongly disagree" }
@@ -591,11 +712,29 @@ _goal3_features_w: &goal3_features_w
     reverse_scored: false
     result_hidden: true
 
-  - order: 3
+  - order: 5
+    slug: goal3_feat_emoji_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the emoji reactions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal3_feat_emoji_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the emoji reactions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 7
     slug: goal3_feat_private
     type: likert_5_na
     prompt:
-      en: "**Private comments** — I was satisfied with this feature."
+      en: "**Private comments** — I liked this feature."
     description:
       en: "Comments visible only to the post author and you, instead of going to the chat."
     low_label:  { en: "Strongly disagree" }
@@ -605,11 +744,29 @@ _goal3_features_w: &goal3_features_w
     reverse_scored: false
     result_hidden: true
 
-  - order: 4
+  - order: 8
+    slug: goal3_feat_private_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the private comments feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 9
+    slug: goal3_feat_private_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the private comments feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 10
     slug: goal3_feat_profile_list
     type: likert_5_na
     prompt:
-      en: "**Profile-list feed** (people-as-feed view alongside the regular feed) — I was satisfied with this feature."
+      en: "**Profile-list feed** (people-as-feed view alongside the regular feed) — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
@@ -617,11 +774,29 @@ _goal3_features_w: &goal3_features_w
     reverse_scored: false
     result_hidden: true
 
-  - order: 5
+  - order: 11
+    slug: goal3_feat_profile_list_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the profile-list feed feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 12
+    slug: goal3_feat_profile_list_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the profile-list feed feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 13
     slug: goal3_feat_ping
     type: likert_5_na
     prompt:
-      en: "**Ping for check-in** — I was satisfied with this feature."
+      en: "**Ping for check-in** — I liked this feature."
     description:
       en: "Sending a small nudge to a friend asking them to check in."
     low_label:  { en: "Strongly disagree" }
@@ -631,13 +806,31 @@ _goal3_features_w: &goal3_features_w
     reverse_scored: false
     result_hidden: true
 
+  - order: 14
+    slug: goal3_feat_ping_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the ping for check-in feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 15
+    slug: goal3_feat_ping_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the ping for check-in feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
 
 _goal4_features_w: &goal4_features_w
   - order: 1
     slug: goal4_feat_close_filter
     type: likert_5_na
     prompt:
-      en: "**Close-friend filter** (in feed and chats) — I was satisfied with this feature."
+      en: "**Close-friend filter** (in feed and chats) — I liked this feature."
     description:
       en: "Filtering your feed or chats to show only your close friends."
     low_label:  { en: "Strongly disagree" }
@@ -648,24 +841,28 @@ _goal4_features_w: &goal4_features_w
     result_hidden: true
 
   - order: 2
-    slug: goal4_feat_social_battery
-    type: likert_5_na
+    slug: goal4_feat_close_filter_enjoy
+    type: free_text
     prompt:
-      en: "**Social battery update after long chats** — I was satisfied with this feature."
-    description:
-      en: "Being prompted to update your social battery after spending time chatting."
-    low_label:  { en: "Strongly disagree" }
-    high_label: { en: "Strongly agree" }
-    na_option:
-      en: "N/A — didn't use"
-    reverse_scored: false
+      en: "What, if anything, did you enjoy most about the close-friend filter feature?"
+    min_length: 0
+    required: false
     result_hidden: true
 
   - order: 3
+    slug: goal4_feat_close_filter_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the close-friend filter feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal4_feat_granular_sub
     type: likert_5_na
     prompt:
-      en: "**Granular subscription to friends** — I was satisfied with this feature."
+      en: "**Granular subscription to friends** — I liked this feature."
     description:
       en: "Choosing exactly what kinds of activity from a friend you want to be notified about."
     low_label:  { en: "Strongly disagree" }
@@ -675,13 +872,31 @@ _goal4_features_w: &goal4_features_w
     reverse_scored: false
     result_hidden: true
 
+  - order: 5
+    slug: goal4_feat_granular_sub_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the granular subscription to friends feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal4_feat_granular_sub_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the granular subscription to friends feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
 
 _goal5_features_w: &goal5_features_w
   - order: 1
     slug: goal5_feat_posts
     type: likert_5_na
     prompt:
-      en: "**Structured posts** (mission of the day, photo of the day, question of the day) — I was satisfied with this feature."
+      en: "**Structured posts** (mission of the day, photo of the day, question of the day) — I liked this feature."
     description:
       en: "Daily-cadence post types that give you a specific thing to share."
     low_label:  { en: "Strongly disagree" }
@@ -692,10 +907,28 @@ _goal5_features_w: &goal5_features_w
     result_hidden: true
 
   - order: 2
+    slug: goal5_feat_posts_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the structured posts (mission of the day, photo of the day, question of the day) feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal5_feat_posts_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the structured posts (mission of the day, photo of the day, question of the day) feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal5_feat_checkins
     type: likert_5_na
     prompt:
-      en: "**Check-ins** (mood, status, song, social battery — 12-hour expiry) — I was satisfied with this feature."
+      en: "**Check-ins** (mood, status, song, social battery — 12-hour expiry) — I liked this feature."
     description:
       en: "Lighter, shorter-lived sharing that disappears after 12 hours."
     low_label:  { en: "Strongly disagree" }
@@ -705,13 +938,31 @@ _goal5_features_w: &goal5_features_w
     reverse_scored: false
     result_hidden: true
 
+  - order: 5
+    slug: goal5_feat_checkins_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the check-ins feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal5_feat_checkins_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the check-ins feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
 
 _goal6_features_w: &goal6_features_w
   - order: 1
     slug: goal6_feat_playlist
     type: likert_5_na
     prompt:
-      en: "**Shared playlist** — I was satisfied with this feature."
+      en: "**Shared playlist** — I liked this feature."
     description:
       en: "A playlist contributed to by everyone."
     low_label:  { en: "Strongly disagree" }
@@ -722,10 +973,28 @@ _goal6_features_w: &goal6_features_w
     result_hidden: true
 
   - order: 2
+    slug: goal6_feat_playlist_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the shared playlist feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal6_feat_playlist_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the shared playlist feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal6_feat_widget
     type: likert_5_na
     prompt:
-      en: "**Widget** — I was satisfied with this feature."
+      en: "**Widget** — I liked this feature."
     description:
       en: "The home-screen widget showing WIT activity."
     low_label:  { en: "Strongly disagree" }
@@ -735,11 +1004,29 @@ _goal6_features_w: &goal6_features_w
     reverse_scored: false
     result_hidden: true
 
-  - order: 3
+  - order: 5
+    slug: goal6_feat_widget_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the widget feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal6_feat_widget_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the widget feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 7
     slug: goal6_feat_survey_digest
     type: likert_5_na
     prompt:
-      en: "**Survey of the day + daily digest** — I was satisfied with this feature."
+      en: "**Survey of the day + daily digest** — I liked this feature."
     description:
       en: "The daily survey question and the next-day digest showing how everyone answered."
     low_label:  { en: "Strongly disagree" }
@@ -749,11 +1036,29 @@ _goal6_features_w: &goal6_features_w
     reverse_scored: false
     result_hidden: true
 
-  - order: 4
+  - order: 8
+    slug: goal6_feat_survey_digest_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the survey of the day + daily digest feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 9
+    slug: goal6_feat_survey_digest_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the survey of the day + daily digest feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 10
     slug: goal6_feat_mission
     type: likert_5_na
     prompt:
-      en: "**Mission of the day** — I was satisfied with this feature."
+      en: "**Mission of the day** — I liked this feature."
     description:
       en: "A daily prompt or task shared across users."
     low_label:  { en: "Strongly disagree" }
@@ -763,13 +1068,31 @@ _goal6_features_w: &goal6_features_w
     reverse_scored: false
     result_hidden: true
 
+  - order: 11
+    slug: goal6_feat_mission_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the mission of the day feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 12
+    slug: goal6_feat_mission_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the mission of the day feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
 
 _goal7_features_w: &goal7_features_w
   - order: 1
     slug: goal7_feat_discover
     type: likert_5_na
     prompt:
-      en: "**Discover feed** (limited new content with mutual-friend / trait filters) — I was satisfied with this feature."
+      en: "**Discover feed** (limited new content with mutual-friend / trait filters) — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
@@ -778,10 +1101,28 @@ _goal7_features_w: &goal7_features_w
     result_hidden: true
 
   - order: 2
+    slug: goal7_feat_discover_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the Discover feed feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal7_feat_discover_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the Discover feed feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal7_feat_nth_degree
     type: likert_5_na
     prompt:
-      en: "**Nth-degree connections + mutual interests on profiles** — I was satisfied with this feature."
+      en: "**Nth-degree connections + mutual interests on profiles** — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
@@ -789,16 +1130,52 @@ _goal7_features_w: &goal7_features_w
     reverse_scored: false
     result_hidden: true
 
-  - order: 3
+  - order: 5
+    slug: goal7_feat_nth_degree_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the Nth-degree connections + mutual interests on profiles feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal7_feat_nth_degree_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the Nth-degree connections + mutual interests on profiles feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 7
     slug: goal7_feat_profile_decoration
     type: likert_5_na
     prompt:
-      en: "**Profile decoration** (profile chips, pinned check-ins) — I was satisfied with this feature."
+      en: "**Profile decoration** (profile chips, pinned check-ins) — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
       en: "N/A — didn't use"
     reverse_scored: false
+    result_hidden: true
+
+  - order: 8
+    slug: goal7_feat_profile_decoration_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the profile decoration feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 9
+    slug: goal7_feat_profile_decoration_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the profile decoration feature?"
+    min_length: 0
+    required: false
     result_hidden: true
 
 
@@ -807,7 +1184,7 @@ _goal8_features_w: &goal8_features_w
     slug: goal8_feat_nonpublic
     type: likert_5_na
     prompt:
-      en: "**Non-public account with selective public sharing** — I was satisfied with this feature."
+      en: "**Non-public account with selective public sharing** — I liked this feature."
     description:
       en: "Your account being non-public by default but letting you share specific things publicly."
     low_label:  { en: "Strongly disagree" }
@@ -818,10 +1195,28 @@ _goal8_features_w: &goal8_features_w
     result_hidden: true
 
   - order: 2
+    slug: goal8_feat_nonpublic_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the non-public account with selective public sharing feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal8_feat_nonpublic_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the non-public account with selective public sharing feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal8_feat_view_as
     type: likert_5_na
     prompt:
-      en: "**View as** (preview your profile as a specific other user would see it) — I was satisfied with this feature."
+      en: "**View as** (preview your profile as a specific other user would see it) — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
@@ -829,11 +1224,29 @@ _goal8_features_w: &goal8_features_w
     reverse_scored: false
     result_hidden: true
 
-  - order: 3
+  - order: 5
+    slug: goal8_feat_view_as_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the View As feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal8_feat_view_as_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the View As feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 7
     slug: goal8_feat_retroactive
     type: likert_5_na
     prompt:
-      en: "**Apply privacy changes to past posts** — I was satisfied with this feature."
+      en: "**Apply privacy changes to past posts** — I liked this feature."
     description:
       en: "When you change your privacy settings, having those changes apply to things you already posted."
     low_label:  { en: "Strongly disagree" }
@@ -843,11 +1256,31 @@ _goal8_features_w: &goal8_features_w
     reverse_scored: false
     result_hidden: true
 
+  - order: 8
+    slug: goal8_feat_retroactive_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the applying privacy changes to past posts feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 9
+    slug: goal8_feat_retroactive_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the applying privacy changes to past posts feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
 
 # ============================================================================
 # VER.Q FEATURE BLOCKS — only goal 1 and goal 7 (the only goals where Ver.Q
 # has features at all). Goal 1 features are shared between versions; goal 7
 # has the scrollable Discover feed which is Ver.Q-specific.
+# YAML anchors don't share state across the W/Q split, so each anchor
+# carries its own copies of the per-feature 3-item sub-sequence.
 # ============================================================================
 
 _goal1_features_q: &goal1_features_q
@@ -855,7 +1288,7 @@ _goal1_features_q: &goal1_features_q
     slug: goal1_feat_dailyq
     type: likert_5_na
     prompt:
-      en: "**Daily questions** — I was satisfied with this feature."
+      en: "**Daily questions** — I liked this feature."
     description:
       en: "The daily question prompt that asks you something specific to answer and share."
     low_label:  { en: "Strongly disagree" }
@@ -866,10 +1299,28 @@ _goal1_features_q: &goal1_features_q
     result_hidden: true
 
   - order: 2
+    slug: goal1_feat_dailyq_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the daily questions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal1_feat_dailyq_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the daily questions feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 4
     slug: goal1_feat_qsend
     type: likert_5_na
     prompt:
-      en: "**Question sending** — I was satisfied with this feature."
+      en: "**Question sending** — I liked this feature."
     description:
       en: "Sending a question to a specific friend, prompting them to share something with you."
     low_label:  { en: "Strongly disagree" }
@@ -879,13 +1330,31 @@ _goal1_features_q: &goal1_features_q
     reverse_scored: false
     result_hidden: true
 
+  - order: 5
+    slug: goal1_feat_qsend_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the question sending feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 6
+    slug: goal1_feat_qsend_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the question sending feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
 
 _goal7_features_q: &goal7_features_q
   - order: 1
     slug: goal7_feat_scrollable_discover
     type: likert_5_na
     prompt:
-      en: "**Scrollable Discover feed** — I was satisfied with this feature."
+      en: "**Scrollable Discover feed** — I liked this feature."
     description:
       en: "The scrollable feed of content from people you don't already follow."
     low_label:  { en: "Strongly disagree" }
@@ -893,6 +1362,99 @@ _goal7_features_q: &goal7_features_q
     na_option:
       en: "N/A — didn't use"
     reverse_scored: false
+    result_hidden: true
+
+  - order: 2
+    slug: goal7_feat_scrollable_discover_enjoy
+    type: free_text
+    prompt:
+      en: "What, if anything, did you enjoy most about the scrollable Discover feed feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+  - order: 3
+    slug: goal7_feat_scrollable_discover_dislike
+    type: free_text
+    prompt:
+      en: "What, if anything, did you dislike most about the scrollable Discover feed feature?"
+    min_length: 0
+    required: false
+    result_hidden: true
+
+
+# ============================================================================
+# GLOBAL APPRECIATE / NOT-APPRECIATE BLOCK (shared, mid + post)
+# Two quick free-text items framing who the current version is and isn't for.
+# Uses {{version_short_letter}} so the same anchor serves both W and Q surveys.
+# ============================================================================
+
+_global_appreciate_block: &global_appreciate_block
+  - order: 1
+    slug: would_appreciate_intro
+    type: display_only
+    content:
+      en: "**Two quick questions about who Ver.{{version_short_letter}} is for.**"
+
+  - order: 2
+    slug: would_appreciate
+    type: free_text
+    prompt:
+      en: "What kinds of people do you think would appreciate Ver.{{version_short_letter}} the most? Be specific."
+    placeholder:
+      en: "Specific descriptors are more useful than 'people who like X.'"
+    min_length: 20
+    required: true
+    result_hidden: true
+
+  - order: 3
+    slug: would_not_appreciate
+    type: free_text
+    prompt:
+      en: "What kinds of people do you think would dislike Ver.{{version_short_letter}} the most? Be specific."
+    placeholder:
+      en: "Specific descriptors are more useful than 'people who don't like X.'"
+    min_length: 20
+    required: true
+    result_hidden: true
+
+
+# ============================================================================
+# PREFERRED VERSION BLOCK (shared, post-study only)
+# After both phases are done, participants have used both Ver.W and Ver.Q
+# and can compare directly.
+# ============================================================================
+
+_preferred_version_block: &preferred_version_block
+  - order: 1
+    slug: preferred_version_intro
+    type: display_only
+    content:
+      en: "**Looking back at both halves.** You've now used both Ver.W and Ver.Q."
+
+  - order: 2
+    slug: preferred_version
+    type: single_choice
+    prompt:
+      en: "Which version would you actually prefer to use going forward?"
+    options:
+      - { order: 1, value: "ver_w",       label: { en: "Ver.W (with check-ins, missions, daily digest)" } }
+      - { order: 2, value: "ver_q",       label: { en: "Ver.Q (with prominent daily questions and scrollable Discover)" } }
+      - { order: 3, value: "cant_decide", label: { en: "I really can't decide" } }
+      - { order: 4, value: "neither",     label: { en: "Honestly, neither — I'd want something different" } }
+      - { order: 5, value: "other",       label: { en: "Other (specify below)" } }
+    required: true
+    result_hidden: true
+
+  - order: 3
+    slug: preferred_version_reason
+    type: free_text
+    prompt:
+      en: "Could you briefly explain your choice?"
+    placeholder:
+      en: "Even a few sentences helps."
+    min_length: 20
+    required: true
     result_hidden: true
 
 
@@ -1022,15 +1584,22 @@ _wrapup_block: &wrapup_block
     phase_label: "Phase 1"
     phase_window: "the past two weeks"
     phase_number: 1
+    version_short_letter: "W"
 
   questions:
+    # §0 Version orientation
+    - *version_orientation_w
+
     # §1 Tie outcomes
     - <<: *tie_outcomes_block
 
     # §2 Global outcomes
     - <<: *global_outcomes_block
 
-    # §3 Goal blocks — qualitative reflection only.
+    # §3 Global appreciate / not-appreciate framing
+    - <<: *global_appreciate_block
+
+    # §4 Goal blocks — qualitative reflection only.
     # Outcome ratings are now in `goal_comparison_p1` (priority 100,
     # editable, opens Day 15). W feature ratings are now in
     # `feature_eval_w` (priority 100, editable, opens Day 5 for w_first).
@@ -1043,10 +1612,10 @@ _wrapup_block: &wrapup_block
     - *goal7_freetext
     - *goal8_freetext
 
-    # §4 Reflection
+    # §5 Reflection
     - <<: *reflection_block
 
-    # §5 Wrapup
+    # §6 Wrapup
     - <<: *wrapup_block
 
 
@@ -1065,15 +1634,22 @@ _wrapup_block: &wrapup_block
     phase_label: "Phase 1"
     phase_window: "the past two weeks"
     phase_number: 1
+    version_short_letter: "Q"
 
   questions:
+    # §0 Version orientation
+    - *version_orientation_q
+
     # §1 Tie outcomes
     - <<: *tie_outcomes_block
 
     # §2 Global outcomes
     - <<: *global_outcomes_block
 
-    # §3 Goal blocks — qualitative reflection + Q feature ratings on the
+    # §3 Global appreciate / not-appreciate framing
+    - <<: *global_appreciate_block
+
+    # §4 Goal blocks — qualitative reflection + Q feature ratings on the
     # 2 goals where Ver.Q has features (goals 1, 7). Outcome ratings live
     # in `goal_comparison_p1` (editable, Day 15).
     - <<: *goal1_features_q
@@ -1087,10 +1663,10 @@ _wrapup_block: &wrapup_block
     - *goal7_freetext
     - *goal8_freetext
 
-    # §4 Reflection
+    # §5 Reflection
     - <<: *reflection_block
 
-    # §5 Wrapup
+    # §6 Wrapup
     - <<: *wrapup_block
 
 
@@ -1109,12 +1685,19 @@ _wrapup_block: &wrapup_block
     phase_label: "Phase 2"
     phase_window: "the second half of the study"
     phase_number: 2
+    version_short_letter: "W"
 
   questions:
+    # §0 Version orientation
+    - *version_orientation_w
+
     - <<: *tie_outcomes_block
     - <<: *global_outcomes_block
 
-    # §3 Goal blocks — qualitative reflection only.
+    # §3 Global appreciate / not-appreciate framing
+    - <<: *global_appreciate_block
+
+    # §4 Goal blocks — qualitative reflection only.
     # Outcome ratings → goal_comparison_p2 (editable, opens Day 29).
     # W feature ratings → feature_eval_w (editable, persistent across phases).
     - *goal1_freetext
@@ -1128,6 +1711,9 @@ _wrapup_block: &wrapup_block
 
     - <<: *reflection_block
     - <<: *wrapup_block
+
+    # §7 Preferred version (post-study only — participants have used both)
+    - <<: *preferred_version_block
 
 
 # ============================================================================
@@ -1145,12 +1731,19 @@ _wrapup_block: &wrapup_block
     phase_label: "Phase 2"
     phase_window: "the second half of the study"
     phase_number: 2
+    version_short_letter: "Q"
 
   questions:
+    # §0 Version orientation
+    - *version_orientation_q
+
     - <<: *tie_outcomes_block
     - <<: *global_outcomes_block
 
-    # §3 Goal blocks — qualitative reflection + Q feature ratings on the
+    # §3 Global appreciate / not-appreciate framing
+    - <<: *global_appreciate_block
+
+    # §4 Goal blocks — qualitative reflection + Q feature ratings on the
     # 2 goals where Ver.Q has features (goals 1, 7). Outcome ratings live
     # in `goal_comparison_p2` (editable, Day 29).
     - <<: *goal1_features_q
@@ -1166,6 +1759,9 @@ _wrapup_block: &wrapup_block
 
     - <<: *reflection_block
     - <<: *wrapup_block
+
+    # §7 Preferred version (post-study only — participants have used both)
+    - <<: *preferred_version_block
 
 
 # ============================================================================
@@ -1184,7 +1780,7 @@ _wrapup_block: &wrapup_block
   title:
     en: "Ver. W feature evaluation"
   description:
-    en: "Rate how satisfied you were with each Ver. W feature you used. You can come back and edit your answers until the researchers close this survey."
+    en: "Rate how much you liked each Ver. W feature you used, and tell us briefly what you enjoyed and disliked about each. You can come back and edit your answers until the researchers close this survey."
   friend_visible: false
   results_hidden: true
   editable: true
@@ -1199,7 +1795,7 @@ _wrapup_block: &wrapup_block
       slug: feature_eval_intro
       type: display_only
       content:
-        en: "**Ver. W features.** This evaluation covers all 8 design goals. You don't have to fill it in all at once — your answers save as you go and you can come back to edit them until the researchers close the survey."
+        en: "**Ver. W features.** This evaluation covers all 8 design goals. For each feature, rate how much you liked it and briefly say what you enjoyed and disliked. You don't have to fill it in all at once — your answers save as you go and you can come back to edit them until the researchers close the survey."
 
     - <<: *goal1_features_w
     - <<: *goal2_features_w
