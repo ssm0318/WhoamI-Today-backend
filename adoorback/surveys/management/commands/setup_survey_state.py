@@ -18,9 +18,11 @@ Brings a freshly-migrated DB to a working state for the long-form study:
   3. Re-applies the W/Q biweekly schedule (`0011_schedule_wq_biweekly.
      seed_wq_biweekly`) — replaces the legacy `mid_study` / `post_study`
      biweekly rows with the version-suffixed pair.
-  4. (Optional, `--mock-dailies`) Loads `mock_test_today.yaml` and creates
+  4. Retires the removed `pre_study` survey so it is not re-created by
+     the legacy seed schedule.
+  5. (Optional, `--mock-dailies`) Loads `mock_test_today.yaml` and creates
      the May 1-3 mock daily ScheduledSurvey rows.
-  5. (Optional, `--include-demos --demo-email <email>`) Loads demo
+  6. (Optional, `--include-demos --demo-email <email>`) Loads demo
      question-type surveys + populates them with mock responses + seeds a
      viewer response so each `/surveys/<slug>/results` page renders
      unlocked. Dev-only — never pass on production.
@@ -64,6 +66,7 @@ LONG_FORM_FIXTURES = [
     'endpoint.yaml',
     'weekly_anytime.yaml',
     'sotd.yaml',
+    'closeness_reeval.yaml',
 ]
 
 # May 1-3 mock daily slots — see mock_test_today.yaml for the matching Survey
@@ -137,6 +140,13 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('[3] Re-applying W/Q biweekly schedule ...'))
         wq_module = import_module('surveys.migrations.0011_schedule_wq_biweekly')
         wq_module.seed_wq_biweekly(django_apps, None)
+
+        # 3b. Remove the retired pre-study survey after the legacy schedule
+        #    seeders have had a chance to re-create it. Existing responses are
+        #    preserved by closing the survey; fresh/dev DBs delete it entirely.
+        self.stdout.write(self.style.NOTICE('[3b] Retiring pre-study survey ...'))
+        retire_pre_study_module = import_module('surveys.migrations.0022_retire_pre_study')
+        retire_pre_study_module.retire_pre_study(django_apps, None)
 
         # 4. Re-seed the 20-row SOTD calendar. Slugs follow `sotd_dNN_*`
         #    convention; sequence_index = 100 + day_number. Skipped silently

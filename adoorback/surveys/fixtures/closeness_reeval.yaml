@@ -1,0 +1,155 @@
+# ============================================================================
+# END-OF-PHASE PER-FRIEND CLOSENESS RE-EVALUATION (2 surveys, 1 file)
+# ============================================================================
+# Surveys produced by this file:
+#   1. phase1_friend_closeness  — Day 14 (May 17), end of Phase 1
+#   2. phase2_friend_closeness  — Day 28 (May 31), end of Phase 2
+#
+# Each survey re-asks the closeness rating originally collected via
+# FriendEvaluation (when the user added each friend) but now scoped to the
+# end of a study phase. Joining SurveyAnswer × FriendEvaluation at analysis
+# time gives a longitudinal per-friend delta:
+#   baseline (FriendEvaluation.closeness, written at friend-request time)
+#   → phase1_friend_closeness (Day 14)
+#   → phase2_friend_closeness (Day 28)
+#
+# Each survey has the SAME structure, differing only in slug, title copy,
+# and per-question slugs. Both surveys:
+#   - friend_visible: false       (private research data)
+#   - results_hidden: true        (no aggregate result panel)
+#   - allow_late: true (set on the ScheduledSurvey row)
+#   - priority: 50                (above weekly anytime / daily diary,
+#                                  below endpoint surveys at 100)
+#
+# Per-friend types: see surveys/models.py PER_FRIEND_TYPES. At render time
+# the API expands each per_friend_* question into one virtual question per
+# friend the viewer currently has. Each virtual question carries:
+#   target_user_id, target_user_username, baseline_closeness,
+#   baseline_relationship_type
+# alongside the normal question fields, plus {{friend_name}},
+# {{baseline_closeness}}, {{baseline_relationship_type}} resolved in any
+# text field at expansion time.
+# ============================================================================
+
+- slug: phase1_friend_closeness
+  type: per_friend_likert_5
+  title:
+    en: "Rate your closeness with each friend (Phase 1)"
+    ko: "친구별 친밀감 평가 (Phase 1)"
+  description:
+    en: "When you added each friend on WIT, you rated how close you felt to them on a 1–5 scale. Now that Phase 1 is wrapping up, we'd like to hear those ratings again, plus a quick note on how often you see them in person. The whole thing should take a couple of minutes — there's one short card per friend."
+    ko: "WIT에서 친구를 추가할 때 1~5점으로 친밀감을 평가하셨어요. Phase 1이 마무리되는 지금, 같은 친구들에 대해 다시 한 번 평가해 주세요. 오프라인에서 얼마나 자주 만나는지도 함께 알려주세요. 친구당 한 장씩, 몇 분이면 끝납니다."
+  friend_visible: false
+  results_hidden: true
+  priority: 50
+  tokens:
+    phase_label: "Phase 1"
+
+  questions:
+    - order: 1
+      slug: phase1_friend_closeness_intro
+      type: display_only
+      content:
+        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you see them offline. Tap their name to open their profile if you need a refresher on who they are."
+        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
+
+    - order: 2
+      slug: phase1_friend_closeness_current
+      type: per_friend_likert_5
+      prompt:
+        en: "How close do you feel to {{friend_name}} right now?"
+        ko: "지금 {{friend_name}} 님과 얼마나 가깝다고 느끼나요?"
+      low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
+      high_label: { en: "Extremely close",  ko: "매우 가까움" }
+      reverse_scored: false
+      required: true
+      result_hidden: true
+
+    - order: 3
+      slug: phase1_friend_closeness_corrected_baseline
+      type: per_friend_likert_5
+      prompt:
+        en: "When you added them, you rated this {{baseline_closeness}}/5. Most people don't need to change this — but if your earlier answer didn't reflect how close you actually felt at the time (e.g., you weren't paying attention), pick the rating that should have been there."
+        ko: "친구를 추가할 때 {{baseline_closeness}}/5점을 주셨어요. 보통은 그대로 두시면 됩니다. 다만 그때 솔직하게 답하지 못했다면 (예: 그냥 아무거나 누르셨다면), 그 시점에 실제로 느꼈던 정도로 다시 골라 주세요."
+      low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
+      high_label: { en: "Extremely close",  ko: "매우 가까움" }
+      reverse_scored: false
+      required: false
+      result_hidden: true
+
+    - order: 4
+      slug: phase1_friend_closeness_offline
+      type: per_friend_single_choice
+      prompt:
+        en: "How often do you usually see {{friend_name}} in person, outside of school/work?"
+        ko: "{{friend_name}} 님과 학교/직장 외에 오프라인에서 얼마나 자주 만나나요?"
+      options:
+        - { order: 1, value: "never",     label: { en: "Never",                              ko: "전혀 만나지 않음" } }
+        - { order: 2, value: "rarely",    label: { en: "Rarely (a few times a year)",        ko: "드물게 (일 년에 몇 번)" } }
+        - { order: 3, value: "monthly",   label: { en: "About monthly",                      ko: "한 달에 한 번 정도" } }
+        - { order: 4, value: "weekly",    label: { en: "About weekly",                       ko: "일주일에 한 번 정도" } }
+        - { order: 5, value: "daily_ish", label: { en: "Daily or almost daily",              ko: "거의 매일" } }
+      required: true
+      result_hidden: true
+
+
+- slug: phase2_friend_closeness
+  type: per_friend_likert_5
+  title:
+    en: "Rate your closeness with each friend (Phase 2)"
+    ko: "친구별 친밀감 평가 (Phase 2)"
+  description:
+    en: "Same idea as last time — for each friend on your list, please re-rate how close you feel right now and how often you see them in person. We'll line up your answers from Phase 1 and Phase 2 at the end of the study to see how things shifted."
+    ko: "지난번과 같은 방식이에요. 친구 한 명 한 명에 대해 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 다시 평가해 주세요. 연구 마지막에 Phase 1과 Phase 2 답변을 비교해서 변화를 살펴볼 거예요."
+  friend_visible: false
+  results_hidden: true
+  priority: 50
+  tokens:
+    phase_label: "Phase 2"
+
+  questions:
+    - order: 1
+      slug: phase2_friend_closeness_intro
+      type: display_only
+      content:
+        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you see them offline. Tap their name to open their profile if you need a refresher on who they are."
+        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
+
+    - order: 2
+      slug: phase2_friend_closeness_current
+      type: per_friend_likert_5
+      prompt:
+        en: "How close do you feel to {{friend_name}} right now?"
+        ko: "지금 {{friend_name}} 님과 얼마나 가깝다고 느끼나요?"
+      low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
+      high_label: { en: "Extremely close",  ko: "매우 가까움" }
+      reverse_scored: false
+      required: true
+      result_hidden: true
+
+    - order: 3
+      slug: phase2_friend_closeness_corrected_baseline
+      type: per_friend_likert_5
+      prompt:
+        en: "When you added them, you rated this {{baseline_closeness}}/5. Most people don't need to change this — but if your earlier answer didn't reflect how close you actually felt at the time (e.g., you weren't paying attention), pick the rating that should have been there."
+        ko: "친구를 추가할 때 {{baseline_closeness}}/5점을 주셨어요. 보통은 그대로 두시면 됩니다. 다만 그때 솔직하게 답하지 못했다면 (예: 그냥 아무거나 누르셨다면), 그 시점에 실제로 느꼈던 정도로 다시 골라 주세요."
+      low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
+      high_label: { en: "Extremely close",  ko: "매우 가까움" }
+      reverse_scored: false
+      required: false
+      result_hidden: true
+
+    - order: 4
+      slug: phase2_friend_closeness_offline
+      type: per_friend_single_choice
+      prompt:
+        en: "How often do you usually see {{friend_name}} in person, outside of school/work?"
+        ko: "{{friend_name}} 님과 학교/직장 외에 오프라인에서 얼마나 자주 만나나요?"
+      options:
+        - { order: 1, value: "never",     label: { en: "Never",                              ko: "전혀 만나지 않음" } }
+        - { order: 2, value: "rarely",    label: { en: "Rarely (a few times a year)",        ko: "드물게 (일 년에 몇 번)" } }
+        - { order: 3, value: "monthly",   label: { en: "About monthly",                      ko: "한 달에 한 번 정도" } }
+        - { order: 4, value: "weekly",    label: { en: "About weekly",                       ko: "일주일에 한 번 정도" } }
+        - { order: 5, value: "daily_ish", label: { en: "Daily or almost daily",              ko: "거의 매일" } }
+      required: true
+      result_hidden: true
