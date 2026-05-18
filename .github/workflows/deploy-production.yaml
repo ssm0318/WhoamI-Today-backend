@@ -24,13 +24,40 @@ jobs:
 
             echo "🚀 선택한 브랜치(${{ github.ref_name }})로 강제 checkout"
             cd ~/WhoamI-Today-backend
+            COMPOSE="docker compose -f docker-compose.production.yml"
+            DB_NAME="whoamitoday"
+            DB_USER="postgres"
+            PREVIOUS_COMMIT="$(git rev-parse HEAD)"
+
+            restore_db_backup() {
+              if [ ! -s "$BACKUP_FILE" ]; then
+                echo "⚠️ DB 백업 파일이 없거나 비어 있어 DB 롤백을 건너뜁니다"
+                return 0
+              fi
+
+              echo "🔄 DB 롤백: web/cron 중지 후 DB를 재생성하고 백업을 복원"
+              $COMPOSE stop web cron >/dev/null 2>&1 || true
+              $COMPOSE exec -T db psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $DB_NAME WITH (FORCE);" || return 1
+              $COMPOSE exec -T db psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE $DB_NAME;" || return 1
+              $COMPOSE exec -T db psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < "$BACKUP_FILE" || return 1
+            }
+
+            rollback_deploy() {
+              echo "🔄 롤백 시도..."
+              restore_db_backup || return 1
+              git reset --hard "$PREVIOUS_COMMIT" || return 1
+              $COMPOSE build web || return 1
+              $COMPOSE up -d --no-deps --force-recreate web cron || return 1
+              echo "🔄 롤백 완료 (이전 버전으로 복구)"
+            }
+
             git fetch --all --prune
             git checkout ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
 
             echo "🔍 Migration 상태 사전 확인"
             # 현재 적용된 migration 상태 확인
-            docker compose -f docker-compose.production.yml exec -T web python manage.py showmigrations --plan 2>/dev/null || echo "컨테이너가 아직 실행 중이지 않음"
+            $COMPOSE exec -T web python manage.py showmigrations --plan 2>/dev/null || echo "컨테이너가 아직 실행 중이지 않음"
             
             # 새로운 migration 파일이 있는지 확인
             echo "📋 새로운 migration 파일 확인:"
@@ -39,12 +66,12 @@ jobs:
             echo "🔒 DB 백업 생성"
             # 타임스탬프가 포함된 백업 파일명
             BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
-            docker compose -f docker-compose.production.yml exec -T db pg_dump -U postgres whoamitoday > "$BACKUP_FILE" 2>/dev/null || {
-              echo "⚠️ DB 백업 실패 - 컨테이너 상태 확인 필요"
-              docker ps | grep -E "(db|postgres)" || echo "DB 컨테이너 없음"
-            }
-            if [ -f "$BACKUP_FILE" ]; then
+            if $COMPOSE exec -T db pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_FILE"; then
               echo "백업 완료: $BACKUP_FILE ($(du -h $BACKUP_FILE 2>/dev/null | cut -f1 || echo 'unknown size'))"
+            else
+              echo "⚠️ DB 백업 실패 - 컨테이너 상태 확인 필요"
+              rm -f "$BACKUP_FILE"
+              docker ps | grep -E "(db|postgres)" || echo "DB 컨테이너 없음"
             fi
 
             echo "🧹 사전 디스크 정리 (volume은 절대 건드리지 않음 — DB 데이터 보존)"
@@ -57,13 +84,13 @@ jobs:
             df -h / | tail -1
 
             echo "🏗  새 이미지 빌드 (낮은 우선순위로 기존 서비스 영향 최소화)"
-            nice -n 19 ionice -c 3 docker compose -f docker-compose.production.yml build web
+            nice -n 19 ionice -c 3 $COMPOSE build web
 
             echo "🔄 web/cron만 재시작 (DB/Redis는 유지 — 다운타임 최소화)"
             echo "   (백엔드 다운 시 nginx가 자동으로 503 응답 → 프론트엔드에서 점검 안내)"
             DOWNTIME_START=$(date +%s)
             echo "   ⏱ 다운타임 시작: $(date '+%H:%M:%S')"
-            docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
+            $COMPOSE up -d --no-deps --force-recreate web cron
 
             echo "⏳ 컨테이너 시작 대기 (최대 60초)"
             timeout 60 bash -c 'until docker compose -f docker-compose.production.yml exec -T web python manage.py check --database default 2>/dev/null; do sleep 2; done' || {
@@ -73,41 +100,28 @@ jobs:
               echo "📋 백엔드 로그 (최근 20줄):"
               docker logs whoami-backend --tail 20 2>/dev/null || echo "로그 확인 불가"
               
-              if [ -f "$BACKUP_FILE" ]; then
-                echo "🔄 롤백 시도..."
-                docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < "$BACKUP_FILE" || echo "DB 롤백 실패"
-                git reset --hard HEAD~1
-                docker compose -f docker-compose.production.yml build web
-                docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
-                echo "🔄 롤백 완료 (이전 버전으로 복구)"
-              fi
-                            exit 1
+              rollback_deploy || echo "❌ 롤백 실패"
+              exit 1
             }
 
             echo "🔄 Nginx DNS 캐시 갱신 (백엔드 컨테이너 IP 변경 반영)"
             docker exec nginx-reverse-proxy nginx -s reload 2>/dev/null || echo "⚠️ nginx reload 실패 (프론트엔드 컨테이너 확인 필요)"
 
             echo "🧪 Migration Dry Run 테스트"
-            docker compose -f docker-compose.production.yml exec -T web python manage.py migrate --dry-run --verbosity=2 || {
+            $COMPOSE exec -T web python manage.py migrate --dry-run --verbosity=2 || {
               echo "⚠️ Migration dry-run에서 문제 감지됨"
             }
 
             echo "🚀 Migration 실행"
-            docker compose -f docker-compose.production.yml exec -T web python manage.py migrate --verbosity=2 || {
+            $COMPOSE exec -T web python manage.py migrate --verbosity=2 || {
               echo "❌ Migration 실패 — 롤백 시작"
-              if [ -f "$BACKUP_FILE" ]; then
-                docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < "$BACKUP_FILE" || echo "DB 롤백 실패"
-                git reset --hard HEAD~1
-                docker compose -f docker-compose.production.yml build web
-                docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
-                echo "🔄 롤백 완료 (이전 버전으로 복구)"
-              fi
-                            exit 1
+              rollback_deploy || echo "❌ 롤백 실패"
+              exit 1
             }
 
             echo "✅ 배포 후 검증"
             # Django 시스템 체크
-            docker compose -f docker-compose.production.yml exec -T web python manage.py check --database default || {
+            $COMPOSE exec -T web python manage.py check --database default || {
               echo "⚠️ Django 시스템 체크에서 문제 발견"
             }
 
@@ -117,14 +131,8 @@ jobs:
               echo "❌ API 헬스체크 실패 — 롤백 시작"
               echo "📋 백엔드 로그 확인:"
               docker logs whoami-backend --tail 30 2>/dev/null || echo "로그 확인 불가"
-              if [ -f "$BACKUP_FILE" ]; then
-                docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < "$BACKUP_FILE" || echo "DB 롤백 실패"
-                git reset --hard HEAD~1
-                docker compose -f docker-compose.production.yml build web
-                docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate web cron
-                echo "🔄 롤백 완료 (이전 버전으로 복구)"
-              fi
-                            exit 1
+              rollback_deploy || echo "❌ 롤백 실패"
+              exit 1
             }
 
             DOWNTIME_END=$(date +%s)
@@ -135,7 +143,7 @@ jobs:
             docker logs whoami-backend --tail 20 2>/dev/null | grep -i "error\|exception\|traceback" || echo "에러 로그 없음"
 
             echo "📊 최종 Migration 상태:"
-            docker compose -f docker-compose.production.yml exec -T web python manage.py showmigrations 2>/dev/null || echo "Migration 상태 확인 불가"
+            $COMPOSE exec -T web python manage.py showmigrations 2>/dev/null || echo "Migration 상태 확인 불가"
 
             echo "✅ 배포 완료! 최종 디스크 상태:"
             df -h / | tail -1
@@ -143,5 +151,8 @@ jobs:
             if [ -f "$BACKUP_FILE" ]; then
               echo "🗂️ 백업 파일 위치: ~/$BACKUP_FILE"
               echo "💡 문제 발생 시 롤백 명령어:"
-              echo "   docker compose -f docker-compose.production.yml exec -T db psql -U postgres whoamitoday < $BACKUP_FILE"
+              echo "   docker compose -f docker-compose.production.yml stop web cron"
+              echo "   docker compose -f docker-compose.production.yml exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \"DROP DATABASE IF EXISTS whoamitoday WITH (FORCE);\""
+              echo "   docker compose -f docker-compose.production.yml exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -c \"CREATE DATABASE whoamitoday;\""
+              echo "   docker compose -f docker-compose.production.yml exec -T db psql -U postgres -d whoamitoday -v ON_ERROR_STOP=1 < $BACKUP_FILE"
             fi
