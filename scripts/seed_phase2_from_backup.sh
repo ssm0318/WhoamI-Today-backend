@@ -114,9 +114,9 @@ fetch_dump() {
         fi
     fi
 
-    # 4. Decompress .gz if needed
-    if [[ "$raw_dest" == *.gz ]]; then
-        echo "  Decompressing $raw_dest → $dest ..." >&2
+    # 4. Decompress .gz if needed (check source path, not the copied dest name)
+    if [[ "$src" == *.gz ]]; then
+        echo "  Decompressing → $dest ..." >&2
         gunzip -c "$raw_dest" > "$dest"
     else
         cp "$raw_dest" "$dest"
