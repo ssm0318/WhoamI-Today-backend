@@ -18,7 +18,8 @@ from surveys.models import (
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.scheduling import (
-    _today_la_7am, get_survey_index, get_today_daily, routes_to_user,
+    _today_la_7am, get_survey_index, get_today_daily,
+    get_today_daily_with_prereq, routes_to_user,
 )
 from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
@@ -106,11 +107,26 @@ class SurveyOfTheDayView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        scheduled = get_today_daily(request.user)
-        if scheduled is None:
+        # Use the prereq-aware resolver: if today's scheduled survey
+        # references `{{token}}` keys the user hasn't populated, this
+        # returns the upstream survey that would populate them (so the
+        # user does the prereq first instead of seeing literal tokens).
+        # Returns None when nothing is scheduled OR when missing tokens
+        # have no findable source.
+        today = get_today_daily_with_prereq(request.user)
+        if today is None:
             return Response({'survey': None})
-        ser = SurveyDetailSerializer(scheduled.survey, context={'request': request})
-        return Response({'date': scheduled.window_start.isoformat(), 'survey': ser.data})
+        ser = SurveyDetailSerializer(today.survey, context={'request': request})
+        payload = {'survey': ser.data}
+        if today.date is not None:
+            payload['date'] = today.date.isoformat()
+        if today.is_prereq_redirect:
+            # Frontend can use this flag to badge the card ("Before today's
+            # survey: …") or just ignore it. Today the SOTD card doesn't
+            # surface it, but exposing it now means we don't need a second
+            # round-trip if/when the UX wants to differentiate.
+            payload['is_prereq_redirect'] = True
+        return Response(payload)
 
 
 class SurveyDetailView(APIView):

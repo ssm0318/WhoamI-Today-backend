@@ -3,6 +3,7 @@
 Pure query helpers — no view code. Consumed by `SurveyOfTheDayView` (today's
 daily) and `SurveyIndexView` (the bucketed index).
 """
+import re
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
@@ -10,8 +11,104 @@ from django.db.models import Exists, OuterRef, Q, Subquery
 from django.utils import timezone
 
 from surveys.models import (
-    CADENCE_DAILY, ScheduledSurvey, SurveyResponse, UserSurveyEmbeddedData,
+    CADENCE_DAILY, ScheduledSurvey, Survey, SurveyQuestion, SurveyResponse,
+    UserSurveyEmbeddedData,
 )
+
+
+# Same pattern as `surveys.tokens._TOKEN_RE` — duplicated locally so this
+# module stays decoupled from the substitution layer. If the syntax ever
+# changes, update both.
+_TOKEN_RE = re.compile(r'\{\{\s*(\w+)\s*\}\}')
+
+# Survey-level text fields that may contain `{{token}}` references. Used by
+# `_required_tokens_for_survey` to enumerate which keys a survey depends on.
+_SURVEY_TEXT_FIELDS = (
+    'title_en', 'title_ko',
+    'description_en', 'description_ko',
+    'interpretation_en', 'interpretation_ko',
+)
+
+# Question-level text fields with the same role. Kept aligned with the
+# substitution helper in `surveys.tokens.apply_to_question_dict`.
+_QUESTION_TEXT_FIELDS = (
+    'prompt_en', 'prompt_ko',
+    'description_en', 'description_ko',
+    'placeholder_en', 'placeholder_ko',
+    'content_en', 'content_ko',
+)
+
+
+def _required_tokens_for_survey(survey: 'Survey') -> set:
+    """Set of token keys this survey will need at render time.
+
+    Tokens listed in the survey's own `tokens` block are subtracted — those
+    resolve from the survey row itself and never depend on the user.
+    """
+    needed: set = set()
+    for f in _SURVEY_TEXT_FIELDS:
+        text = getattr(survey, f, '') or ''
+        if text:
+            needed.update(_TOKEN_RE.findall(text))
+    for q in survey.questions.all():
+        for f in _QUESTION_TEXT_FIELDS:
+            text = getattr(q, f, '') or ''
+            if text:
+                needed.update(_TOKEN_RE.findall(text))
+    survey_provided = set((survey.tokens or {}).keys())
+    return needed - survey_provided
+
+
+def _find_source_survey_for_token(token: str) -> 'Survey | None':
+    """Survey whose `embedded_data=True` question populates this token.
+
+    Convention:
+      - A question with slug `X` and `embedded_data=True` populates token `X`.
+      - For specific keys (currently only `habit_platform`), an additional
+        resolver writes `X_label` as a side-effect — so `X_label` is also
+        sourced from the same question.
+
+    Returns None when no source exists in the DB. Callers then have to
+    decide between hiding the downstream survey or surfacing the literal
+    token. `get_today_daily` chooses to hide.
+    """
+    candidates = [token]
+    if token.endswith('_label'):
+        candidates.append(token[: -len('_label')])
+    for slug in candidates:
+        q = (
+            SurveyQuestion.objects
+            .filter(slug=slug, embedded_data=True)
+            .select_related('survey')
+            .first()
+        )
+        if q:
+            return q.survey
+    return None
+
+
+def _resolve_missing_token_to_source(scheduled_survey: 'Survey', user) -> 'Survey | None':
+    """If `scheduled_survey` has any required tokens this user hasn't
+    populated, return the upstream Survey that would populate the first such
+    token. Returns `None` either when nothing is missing (run as scheduled)
+    OR when none of the missing tokens have a resolvable source (caller
+    should skip the survey entirely).
+    """
+    user_data = _user_embedded_data(user)
+    missing = sorted(_required_tokens_for_survey(scheduled_survey) - set(user_data.keys()))
+    if not missing:
+        return None
+    for tok in missing:
+        source = _find_source_survey_for_token(tok)
+        if source is None:
+            continue
+        # Don't loop: if the user already responded to the source survey
+        # (so the answer just hasn't propagated to embedded data — shouldn't
+        # happen, but defensive), prefer skipping over redirecting.
+        if SurveyResponse.objects.filter(survey=source, user=user).exists():
+            continue
+        return source
+    return None
 
 
 # Saturdays = weekday 5, Sundays = weekday 6. Weekend skipping: standard
@@ -182,6 +279,64 @@ def get_today_daily(user):
     return visible[0]
 
 
+# Sentinel return shape from `get_today_daily_with_prereq`. The view turns
+# this into the API response without having to know about ScheduledSurvey
+# vs Survey directly. `date` is None when the survey is a token-prereq
+# redirect (not on the user's actual schedule for today).
+class _SurveyForToday:
+    __slots__ = ('survey', 'date', 'is_prereq_redirect')
+
+    def __init__(self, survey, date=None, is_prereq_redirect=False):
+        self.survey = survey
+        self.date = date
+        self.is_prereq_redirect = is_prereq_redirect
+
+
+def get_today_daily_with_prereq(user):
+    """Wrap `get_today_daily` with token-prerequisite resolution.
+
+    Three outcomes:
+
+    1. No daily scheduled today (or all filtered out) → returns `None`.
+
+    2. Today's scheduled survey has all its `{{token}}` references either
+       provided by the survey's own `tokens` map or already populated in
+       the user's `UserSurveyEmbeddedData` → returns `_SurveyForToday`
+       wrapping that ScheduledSurvey row (with `date = window_start`).
+
+    3. Today's scheduled survey has at least one token the user hasn't
+       populated, AND there exists an upstream Survey whose
+       `embedded_data=True` question would populate it → returns
+       `_SurveyForToday` wrapping the upstream Survey (with `date = None`
+       since the redirected survey isn't tied to today's window) and
+       `is_prereq_redirect = True`. The SOTD card on Share / digest will
+       render this in place of today's scheduled survey, so the user
+       answers the prerequisite first and the literal `{{token}}` never
+       leaks to the UI.
+
+    4. Today's scheduled survey has missing tokens and NO source is
+       findable for them → returns `None` (caller treats as "no SOTD
+       today"). Prevents serving a survey whose text would contain raw
+       `{{token}}` literals — the user-visible behavior of the bug that
+       this whole machinery exists to close.
+    """
+    scheduled = get_today_daily(user)
+    if scheduled is None:
+        return None
+    source = _resolve_missing_token_to_source(scheduled.survey, user)
+    if source is None:
+        # Either nothing missing, or nothing findable. If something is
+        # missing AND nothing is findable, return None — we never want to
+        # surface literal tokens.
+        missing = _required_tokens_for_survey(scheduled.survey) - set(
+            _user_embedded_data(user).keys()
+        )
+        if missing:
+            return None
+        return _SurveyForToday(survey=scheduled.survey, date=scheduled.window_start)
+    return _SurveyForToday(survey=source, date=None, is_prereq_redirect=True)
+
+
 def get_survey_index(user):
     """Bucket every ScheduledSurvey row into available / late / completed for `user`.
 
@@ -238,6 +393,21 @@ def get_survey_index(user):
     )
 
     user_data = _user_embedded_data(user)
+    user_data_keys = set(user_data.keys())
+
+    def _has_unresolved_tokens(survey) -> bool:
+        """True when a survey would render with literal `{{token}}` text
+        for this user (no value in their embedded data and no upstream
+        source survey exists in the DB to populate it). Drops the row from
+        the bucket so the user never taps into a half-broken answer flow.
+        Surveys whose missing tokens DO have a findable source could stay
+        in the index (the user can answer the source survey first, then
+        the row resolves), but for now we keep things simple and drop them
+        as well — the SOTD card is the primary surface and already handles
+        the prereq redirect.
+        """
+        missing = _required_tokens_for_survey(survey) - user_data_keys
+        return bool(missing)
 
     def _filter(rows):
         out = []
@@ -247,6 +417,13 @@ def get_survey_index(user):
             if _is_weekend_skipped(sched, today):
                 continue
             if _skip_for_serving_condition(sched.survey, user_data):
+                continue
+            if _has_unresolved_tokens(sched.survey):
+                # Hide the row from `available_now` / `late_but_accepted`
+                # — opening it would reveal literal `{{token}}` text. The
+                # row reappears in the next index fetch once the source
+                # survey is answered (token populates -> missing set
+                # shrinks -> filter passes).
                 continue
             out.append(sched)
         return out
