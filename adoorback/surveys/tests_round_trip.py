@@ -127,3 +127,21 @@ class SurveyIndexRoundTripTests(TestCase):
         body = r.json()
         for entry in body['available_now'] + body['late_but_accepted']:
             self.assertEqual(entry['redirect_url'], f"/surveys/{entry['survey']['slug']}/answer")
+
+    def test_index_entries_include_allow_late(self):
+        r = self.client.get('/api/surveys/index/')
+        body = r.json()
+
+        daily = next(
+            e for e in body['available_now'] if e['survey']['slug'] == 'daily_base'
+        )
+        anytime = next(
+            e for e in body['available_now'] if e['survey']['slug'] == 'anytime_reflection'
+        )
+        late_weekly = next(
+            e for e in body['late_but_accepted'] if e['survey']['slug'] == 'week1_reflection'
+        )
+
+        self.assertIs(daily['allow_late'], False)
+        self.assertIs(anytime['allow_late'], True)
+        self.assertIs(late_weekly['allow_late'], True)
