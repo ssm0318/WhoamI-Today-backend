@@ -69,8 +69,8 @@
       slug: phase1_friend_closeness_corrected_baseline
       type: per_friend_likert_5
       prompt:
-        en: "When you added them, you rated this {{baseline_closeness}}/5. Most people don't need to change this — but if your earlier answer didn't reflect how close you actually felt at the time (e.g., you weren't paying attention), pick the rating that should have been there."
-        ko: "친구를 추가할 때 {{baseline_closeness}}/5점을 주셨어요. 보통은 그대로 두시면 됩니다. 다만 그때 솔직하게 답하지 못했다면 (예: 그냥 아무거나 누르셨다면), 그 시점에 실제로 느꼈던 정도로 다시 골라 주세요."
+        en: "What should the earlier rating have been?"
+        ko: "그때의 평가는 몇 점이었어야 하나요?"
       low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
       high_label: { en: "Extremely close",  ko: "매우 가까움" }
       reverse_scored: false
@@ -131,8 +131,8 @@
       slug: phase2_friend_closeness_corrected_baseline
       type: per_friend_likert_5
       prompt:
-        en: "When you added them, you rated this {{baseline_closeness}}/5. Most people don't need to change this — but if your earlier answer didn't reflect how close you actually felt at the time (e.g., you weren't paying attention), pick the rating that should have been there."
-        ko: "친구를 추가할 때 {{baseline_closeness}}/5점을 주셨어요. 보통은 그대로 두시면 됩니다. 다만 그때 솔직하게 답하지 못했다면 (예: 그냥 아무거나 누르셨다면), 그 시점에 실제로 느꼈던 정도로 다시 골라 주세요."
+        en: "What should the earlier rating have been?"
+        ko: "그때의 평가는 몇 점이었어야 하나요?"
       low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
       high_label: { en: "Extremely close",  ko: "매우 가까움" }
       reverse_scored: false
