@@ -37,8 +37,8 @@
     en: "Rate your closeness with each friend (Phase 1)"
     ko: "친구별 친밀감 평가 (Phase 1)"
   description:
-    en: "When you added each friend on WIT, you rated how close you felt to them on a 1–5 scale. Now that Phase 1 is wrapping up, we'd like to hear those ratings again, plus a quick note on how often you see them in person. The whole thing should take a couple of minutes — there's one short card per friend."
-    ko: "WIT에서 친구를 추가할 때 1~5점으로 친밀감을 평가하셨어요. Phase 1이 마무리되는 지금, 같은 친구들에 대해 다시 한 번 평가해 주세요. 오프라인에서 얼마나 자주 만나는지도 함께 알려주세요. 친구당 한 장씩, 몇 분이면 끝납니다."
+    en: "When you added each friend on WIT, you rated how close you felt to them on a 1–5 scale. Now that Phase 1 is wrapping up, we'd like to hear those ratings again, plus a quick note on how often you interact in person. The whole thing should take a couple of minutes — there's one short card per friend."
+    ko: "WIT에서 친구를 추가할 때 1~5점으로 친밀감을 평가하셨어요. Phase 1이 마무리되는 지금, 같은 친구들에 대해 다시 한 번 평가해 주세요. 직접 만나 얼마나 자주 교류하는지도 함께 알려주세요. 친구당 한 장씩, 몇 분이면 끝납니다."
   friend_visible: false
   results_hidden: true
   priority: 50
@@ -50,8 +50,8 @@
       slug: phase1_friend_closeness_intro
       type: display_only
       content:
-        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you see them offline. Tap their name to open their profile if you need a refresher on who they are."
-        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
+        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you interact in person. Tap their name to open their profile if you need a refresher on who they are."
+        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 직접 만나 얼마나 자주 교류하는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
 
     - order: 2
       slug: phase1_friend_closeness_current
@@ -81,8 +81,8 @@
       slug: phase1_friend_closeness_offline
       type: per_friend_single_choice
       prompt:
-        en: "How often do you usually see {{friend_name}} in person, outside of school/work?"
-        ko: "{{friend_name}} 님과 학교/직장 외에 오프라인에서 얼마나 자주 만나나요?"
+        en: "How often do you usually interact with {{friend_name}} in person?"
+        ko: "{{friend_name}} 님과 직접 만나 얼마나 자주 교류하나요?"
       options:
         - { order: 1, value: "never",     label: { en: "Never",                              ko: "전혀 만나지 않음" } }
         - { order: 2, value: "rarely",    label: { en: "Rarely (a few times a year)",        ko: "드물게 (일 년에 몇 번)" } }
@@ -99,8 +99,8 @@
     en: "Rate your closeness with each friend (Phase 2)"
     ko: "친구별 친밀감 평가 (Phase 2)"
   description:
-    en: "Same idea as last time — for each friend on your list, please re-rate how close you feel right now and how often you see them in person."
-    ko: "지난번과 같은 방식이에요. 친구 한 명 한 명에 대해 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 다시 평가해 주세요."
+    en: "Same idea as last time — for each friend on your list, please re-rate how close you feel right now and how often you interact in person."
+    ko: "지난번과 같은 방식이에요. 친구 한 명 한 명에 대해 지금 얼마나 가까운지와 직접 만나 얼마나 자주 교류하는지를 다시 평가해 주세요."
   friend_visible: false
   results_hidden: true
   priority: 50
@@ -112,8 +112,8 @@
       slug: phase2_friend_closeness_intro
       type: display_only
       content:
-        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you see them offline. Tap their name to open their profile if you need a refresher on who they are."
-        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
+        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you interact in person. Tap their name to open their profile if you need a refresher on who they are."
+        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 직접 만나 얼마나 자주 교류하는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
 
     - order: 2
       slug: phase2_friend_closeness_current
@@ -143,8 +143,8 @@
       slug: phase2_friend_closeness_offline
       type: per_friend_single_choice
       prompt:
-        en: "How often do you usually see {{friend_name}} in person, outside of school/work?"
-        ko: "{{friend_name}} 님과 학교/직장 외에 오프라인에서 얼마나 자주 만나나요?"
+        en: "How often do you usually interact with {{friend_name}} in person?"
+        ko: "{{friend_name}} 님과 직접 만나 얼마나 자주 교류하나요?"
       options:
         - { order: 1, value: "never",     label: { en: "Never",                              ko: "전혀 만나지 않음" } }
         - { order: 2, value: "rarely",    label: { en: "Rarely (a few times a year)",        ko: "드물게 (일 년에 몇 번)" } }
