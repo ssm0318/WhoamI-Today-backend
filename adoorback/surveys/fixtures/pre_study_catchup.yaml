@@ -1,0 +1,87 @@
+# ============================================================================
+# PRE-STUDY CATCH-UP (1 survey, 1 file)
+# ============================================================================
+# Survey produced by this file:
+#   pre_study_catchup — collects the `habit_platform` data point that was
+#   originally planned for pre_study but never made it into a served
+#   fixture before the study kicked off. Authored mid-study as a catch-up.
+#
+# Why this needs to ship before today's SOTD slot:
+#   sotd_d15_shi (Self-Report Habit Index) is scheduled for today's SOTD
+#   slot. Its prompts use {{habit_platform_label}}, populated by this
+#   survey via the embedded_data persistence path. Without an answered
+#   habit_platform row, the prereq-redirect logic
+#   (surveys/scheduling.py:_resolve_missing_token_to_source) hides
+#   sotd_d15_shi from the SOTD card entirely and points participants here.
+#
+# Friend visibility: OFF
+# Results page: HIDDEN (no aggregate panel; data is purely instrument input)
+# Priority: 110 — above the default 0 used by SOTD entries so this card
+#           surfaces ahead of the SHI redirect target.
+# Editable: TRUE — participants can come back and amend if they pick the
+#           wrong platform initially.
+
+- slug: pre_study_catchup
+  type: single_choice
+  title:
+    en: "One quick question we missed at the start"
+    ko: "시작할 때 빠뜨린 짧은 질문 하나"
+  description:
+    en: "We meant to ask this before the study began but missed it. It takes about thirty seconds and unlocks today's survey of the day."
+    ko: "연구 시작 전에 여쭤봤어야 했는데 빠뜨린 질문이에요. 30초면 끝나고, 오늘의 설문이 열립니다."
+  friend_visible: false
+  results_hidden: true
+  editable: true
+  priority: 110
+
+  questions:
+    - order: 1
+      slug: pre_study_catchup_intro
+      type: display_only
+      content:
+        en: "Pick the platform that feels the most automatic for you to open — the one you tap without really deciding to. We'll use this to personalize today's survey."
+        ko: "별 생각 없이 자동으로 열게 되는 플랫폼을 골라 주세요. 이 답을 기준으로 오늘의 설문을 맞춤 진행합니다."
+
+    - order: 2
+      slug: habit_platform
+      type: single_choice
+      prompt:
+        en: "Which platform feels the most habitual to open?"
+        ko: "어떤 플랫폼이 가장 습관적으로 열게 되나요?"
+      required: true
+      # Persists into UserSurveyEmbeddedData keyed on this slug. The
+      # `_persist_embedded_data` view helper also writes the human-readable
+      # label as `habit_platform_label` (looks up the picked option's
+      # label_en) — that's what sotd_d15_shi reads.
+      embedded_data: true
+      result_hidden: true
+      options:
+        - { order: 1,  value: "instagram", label: { en: "Instagram",     ko: "인스타그램" } }
+        - { order: 2,  value: "tiktok",    label: { en: "TikTok",        ko: "틱톡" } }
+        - { order: 3,  value: "snapchat",  label: { en: "Snapchat",      ko: "스냅챗" } }
+        - { order: 4,  value: "youtube",   label: { en: "YouTube",       ko: "유튜브" } }
+        - { order: 5,  value: "twitter",   label: { en: "Twitter / X",   ko: "트위터 / X" } }
+        - { order: 6,  value: "threads",   label: { en: "Threads",       ko: "스레드" } }
+        - { order: 7,  value: "bereal",    label: { en: "BeReal",        ko: "비리얼" } }
+        - { order: 8,  value: "discord",   label: { en: "Discord",       ko: "디스코드" } }
+        - { order: 9,  value: "reddit",    label: { en: "Reddit",        ko: "레딧" } }
+        - { order: 10, value: "facebook",  label: { en: "Facebook",      ko: "페이스북" } }
+        - { order: 11, value: "imessage",  label: { en: "iMessage / SMS", ko: "iMessage / 문자" } }
+        - { order: 12, value: "other",     label: { en: "Other (specify below)", ko: "기타 (아래에 적기)" } }
+        - { order: 13, value: "none",      label: { en: "None really — I don't have one like that", ko: "딱히 없음" } }
+
+    - order: 3
+      slug: habit_platform_other
+      type: free_text
+      prompt:
+        en: "Which platform?"
+        ko: "어떤 플랫폼인가요?"
+      required: true
+      min_length: 1
+      result_hidden: true
+      # Show only when the user picked "Other" above. The label resolver
+      # in views._resolve_habit_platform_label falls back to this free-text
+      # answer when habit_platform == "other".
+      conditional_display:
+        depends_on: habit_platform
+        show_when_value: "other"

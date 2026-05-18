@@ -20,9 +20,12 @@ Brings a freshly-migrated DB to a working state for the long-form study:
      biweekly rows with the version-suffixed pair.
   4. Retires the removed `pre_study` survey so it is not re-created by
      the legacy seed schedule.
-  5. (Optional, `--mock-dailies`) Loads `mock_test_today.yaml` and creates
+  5. Applies schedule overrides: pre-study catch-up, SOTD reschedules,
+     SOTD late-answer rules,
+     and weekend-only weekly reflections.
+  6. (Optional, `--mock-dailies`) Loads `mock_test_today.yaml` and creates
      the May 1-3 mock daily ScheduledSurvey rows.
-  6. (Optional, `--include-demos --demo-email <email>`) Loads demo
+  7. (Optional, `--include-demos --demo-email <email>`) Loads demo
      question-type surveys + populates them with mock responses + seeds a
      viewer response so each `/surveys/<slug>/results` page renders
      unlocked. Dev-only — never pass on production.
@@ -67,6 +70,7 @@ LONG_FORM_FIXTURES = [
     'weekly_anytime.yaml',
     'sotd.yaml',
     'closeness_reeval.yaml',
+    'pre_study_catchup.yaml',
 ]
 
 # May 1-3 mock daily slots — see mock_test_today.yaml for the matching Survey
@@ -148,6 +152,17 @@ class Command(BaseCommand):
         retire_pre_study_module = import_module('surveys.migrations.0022_retire_pre_study')
         retire_pre_study_module.retire_pre_study(django_apps, None)
 
+        # 3c. Re-seed the catch-up prerequisite for the SHI SOTD. The
+        #    migration can short-circuit on fresh DBs before YAML has been
+        #    loaded, so setup_survey_state reapplies it after fixtures.
+        self.stdout.write(
+            self.style.NOTICE('[3c] Re-seeding pre-study catch-up prerequisite ...')
+        )
+        catchup_module = import_module(
+            'surveys.migrations.0024_seed_pre_study_catchup_schedule'
+        )
+        catchup_module.seed_catchup(django_apps, None)
+
         # 4. Re-seed the 20-row SOTD calendar. Slugs follow `sotd_dNN_*`
         #    convention; sequence_index = 100 + day_number. Skipped silently
         #    if no SOTD surveys exist yet (sotd.yaml empty / not loaded).
@@ -183,6 +198,19 @@ class Command(BaseCommand):
         )
         weekly_module.shift_weekly_reflections(django_apps, None)
 
+        # 4c2. Narrow weekly reflections to the weekend-only windows and
+        #    prune the instrument to the three retained weekly questions.
+        #    This runs after 0017 because setup_survey_state deliberately
+        #    replays historical seeders in order, then converges via the
+        #    latest overlays.
+        self.stdout.write(
+            self.style.NOTICE('[4c2] Applying weekend-only weekly reflections ...')
+        )
+        weekend_weekly_module = import_module(
+            'surveys.migrations.0023_weekly_reflections_weekend_only'
+        )
+        weekend_weekly_module.apply_weekend_weekly_reflections(django_apps, None)
+
         # 4d. Apply the May-7 reschedule for sotd_d02_rsds. May 5 was
         #    already double-booked with d01_honeymoon; pushing RSDS to
         #    May 7 (alongside sotd_d04_iscs_bridge) spreads load and
@@ -194,6 +222,16 @@ class Command(BaseCommand):
             'surveys.migrations.0018_reschedule_d02_rsds_to_may_7'
         )
         rsds_module.reschedule_rsds(django_apps, None)
+
+        # 4e. Re-apply the late-answer rule for trait-level SOTDs. Step 4
+        #    replays 0013's original SOTD schedule with allow_late=False;
+        #    0019 corrected that for SOTD instruments while keeping
+        #    daily_base state diaries expiring at end-of-day.
+        self.stdout.write(
+            self.style.NOTICE('[4e] Applying SOTD late-answer rules ...')
+        )
+        sotd_late_module = import_module('surveys.migrations.0019_sotd_allow_late_true')
+        sotd_late_module.forward(django_apps, None)
 
         # 5. Re-seed the persistent / editable evaluation surveys (feature_eval_w
         #    and goal_comparison_p1/p2). Endpoint cadence with no window_end —
