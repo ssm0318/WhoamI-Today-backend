@@ -332,7 +332,7 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = ScheduledSurvey
         fields = [
-            'id', 'cadence', 'sequence_index',
+            'id', 'cadence', 'sequence_index', 'sidebar_order',
             'window_start', 'window_end',
             'survey', 'bucket',
             'user_answered', 'submitted_at',

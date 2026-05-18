@@ -443,6 +443,16 @@ class ScheduledSurvey(AdoorTimestampedModel):
     window_end = models.DateField(null=True, blank=True)
     allow_late = models.BooleanField(default=True)
     sequence_index = models.PositiveSmallIntegerField()
+    sidebar_order = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            'Optional explicit order within each survey index bucket. Lower '
+            'numbers appear earlier. Blank falls back to survey priority, '
+            'window_start, then sequence_index.'
+        ),
+    )
     target_user_group = models.CharField(
         max_length=32,
         blank=True,

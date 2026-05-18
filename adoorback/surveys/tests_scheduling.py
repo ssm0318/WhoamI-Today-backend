@@ -18,8 +18,8 @@ class SchedulingTests(TestCase):
         self.yesterday = self.today - datetime.timedelta(days=1)
         self.tomorrow = self.today + datetime.timedelta(days=1)
 
-    def _survey(self, slug):
-        return Survey.objects.create(slug=slug, title_en='T', title_ko='T')
+    def _survey(self, slug, *, priority=0):
+        return Survey.objects.create(slug=slug, title_en='T', title_ko='T', priority=priority)
 
     # get_today_daily ------------------------------------------------------
 
@@ -73,7 +73,7 @@ class SchedulingTests(TestCase):
         self.assertEqual(result['completed'], [])
 
     def test_index_buckets_late_correctly(self):
-        s = self._survey('pre_study')
+        s = self._survey('mid_study')
         ScheduledSurvey.objects.create(
             survey=s, cadence=CADENCE_BIWEEKLY,
             window_start=self.yesterday, window_end=self.yesterday,
@@ -161,3 +161,30 @@ class SchedulingTests(TestCase):
         result = get_survey_index(self.user)
         self.assertEqual(len(result['completed']), 1)
         self.assertEqual(result['completed'][0].user_submitted_at, response.submitted_at)
+
+    def test_sidebar_order_overrides_priority_with_priority_fallback(self):
+        high = self._survey('high_priority_unordered', priority=200)
+        second = self._survey('explicit_second', priority=10)
+        first = self._survey('explicit_first', priority=50)
+
+        ScheduledSurvey.objects.create(
+            survey=high, cadence=CADENCE_WEEKLY,
+            window_start=self.today, window_end=self.today,
+            allow_late=True, sequence_index=201,
+        )
+        ScheduledSurvey.objects.create(
+            survey=second, cadence=CADENCE_WEEKLY,
+            window_start=self.today, window_end=self.today,
+            allow_late=True, sequence_index=202, sidebar_order=2,
+        )
+        ScheduledSurvey.objects.create(
+            survey=first, cadence=CADENCE_WEEKLY,
+            window_start=self.today, window_end=self.today,
+            allow_late=True, sequence_index=203, sidebar_order=1,
+        )
+
+        result = get_survey_index(self.user)
+        self.assertEqual(
+            [row.survey.slug for row in result['available_now']],
+            ['explicit_first', 'explicit_second', 'high_priority_unordered'],
+        )

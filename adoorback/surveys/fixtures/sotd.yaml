@@ -1228,7 +1228,7 @@
 # ============================================================================
 #
 # NEW feature for SHI: token substitution from user-level embedded data.
-#   - The pre-study `habit_platform` answer is stored as user embedded data.
+#   - The `habit_platform` answer is stored as user embedded data.
 #   - In day15_shi, item prompts use {{habit_platform_label}} which the
 #     scheduler resolves at render time per user (e.g., "Instagram",
 #     "TikTok", "Discord").
@@ -1249,7 +1249,7 @@
 #                            note below)
 #
 # Graceful fallback for SHI:
-#   If user picked "none" in pre-study habit_platform, day15_shi should
+#   If user picked "none" for habit_platform, day15_shi should
 #   either:
 #   (a) Skip serving day15_shi to that user entirely
 #   (b) Substitute "social media" as the label and ask in general terms
@@ -1378,7 +1378,7 @@
 # 12 items, all positively keyed (no reverse-scoring).
 # Higher score = stronger habitual use of the nominated platform.
 #
-# Personalized: {{habit_platform_label}} substituted from pre-study.
+# Personalized: {{habit_platform_label}} substituted from embedded data.
 # If user picked "none" in pre-study, this survey is NOT served.
 
 - slug: sotd_d15_shi
@@ -2286,7 +2286,7 @@
         en: "What word fits best?"
       placeholder:
         en: "A single word, or a couple if one isn't enough."
-      min_length: 1
+      min_length: 0
       required: true
       conditional_display:
         depends_on: honeymoon_first_impression
@@ -2314,7 +2314,7 @@
         en: "What surprised you about WIT on your first day, if anything?"
       placeholder:
         en: "Could be a feature, a small detail, the look, how it felt — anything."
-      min_length: 15
+      min_length: 0
       required: false
       result_kind: wordcloud
       result_hidden: false
@@ -2576,7 +2576,7 @@
   title:
     en: "Looking back at the month"
   description:
-    en: "You've been on WIT for almost a month now. A few quick reflections — your fuller post-study survey was also just published, and it'll go deeper. This one is just gut reactions."
+    en: "You've been on WIT for almost a month now. A few quick reflections — this one is just gut reactions."
   interpretation:
     en: "Tomorrow's digest will show how the cohort summarized the month — favorite features, biggest changes, what people thought about social media in general after this experience."
   friend_visible: false
@@ -2611,7 +2611,7 @@
       slug: transition_keep_using
       type: single_choice
       prompt:
-        en: "If WIT stayed available after this study, would you keep using it?"
+        en: "If WIT stayed available in the future, would you keep using it?"
       options:
         - { order: 1, value: "definitely_yes", label: { en: "Definitely yes" } }
         - { order: 2, value: "probably_yes",   label: { en: "Probably yes" } }
@@ -2639,7 +2639,7 @@
         en: "If yes — what changed in how you think about social media?"
       placeholder:
         en: "A specific shift, even a small one, is more useful than a general statement."
-      min_length: 20
+      min_length: 0
       required: false
       result_kind: wordcloud
       conditional_display:
@@ -2653,7 +2653,7 @@
         en: "If you could keep one thing about WIT and bring it to other apps you use, what would it be?"
       placeholder:
         en: "A feature, a behavior, a vibe — anything."
-      min_length: 15
+      min_length: 0
       required: false
       result_kind: wordcloud
 
@@ -2661,4 +2661,4 @@
       slug: transition_outro
       type: display_only
       content:
-        en: "**Thanks for these gut reactions.** Your full post-study survey is also published today — it'll go deeper into specific features and the goal-by-goal breakdown. Take your time with it; it can stay open through Sunday."
+        en: "**Thanks for these gut reactions.** There may be a longer survey available too. Take your time with it; it can stay open through Sunday."

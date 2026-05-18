@@ -47,7 +47,7 @@
   title:
     en: "What happens next with WIT"
   description:
-    en: "Now that the research portion of the study is done, we'd like to ask a few questions about how you'd want WIT to fit into your life going forward — or whether it should at all. About 12 minutes."
+    en: "A few questions about how you'd want WIT to fit into your life going forward — or whether it should at all. About 12 minutes."
   interpretation:
     en: ""
   friend_visible: false
@@ -66,7 +66,7 @@
       slug: cadence_block_intro
       type: display_only
       content:
-        en: "**Part 1: Rhythms.** Several things on WIT happen on a daily rhythm — daily questions, the mission of the day, survey of the day, the daily digest. Outside of a research study (with no surveys to fill out), how would you actually want these to show up?"
+        en: "**Part 1: Rhythms.** Several things on WIT happen on a daily rhythm — daily questions, the mission of the day, survey of the day, the daily digest. How would you actually want these to show up?"
 
     # ------------------------------------------------------------------------
     # §1.1 — Daily questions cadence
@@ -233,7 +233,7 @@
       slug: cadence_general_freq
       type: single_choice
       prompt:
-        en: "**Overall** — how often would feel natural to actually open WIT and check in (assuming no study constraints)?"
+        en: "**Overall** — how often would feel natural to actually open WIT and check in?"
       options:
         - { order: 1, value: "never",            label: { en: "Never — I'd stop using it" } }
         - { order: 2, value: "less_than_weekly", label: { en: "Less than once a week" } }
@@ -273,7 +273,7 @@
       slug: data_block_intro
       type: display_only
       content:
-        en: "**Part 2: Your data going forward.** Now that the formal study is done, we want to ask how you'd like us to handle your data."
+        en: "**Part 2: Your data going forward.** How would you like us to handle your data?"
 
     - order: 18
       slug: data_use
@@ -311,7 +311,7 @@
       slug: keep_block_intro
       type: display_only
       content:
-        en: "**Part 3: Your account.** Going forward, we'll be keeping the **Ver.W** version of WIT (the one with check-ins, mission of the day, daily digest). Ver.Q won't continue.\n\nUnfortunately, we can't offer payment for continued use — so please decide based on whether you'd actually want this in your life, not on study compensation."
+        en: "**Part 3: Your account.** Going forward, we'll be keeping the **Ver.W** version of WIT (the one with check-ins, mission of the day, daily digest). Ver.Q won't continue.\n\nPlease decide based on whether you'd actually want this in your life."
 
     - order: 21
       slug: keep_account
@@ -336,7 +336,7 @@
         en: "Could you briefly explain your reason — and if you chose to keep your account, what changes (if any) would make Ver.W feel more satisfying to keep using?"
       placeholder:
         en: "A few sentences is plenty."
-      min_length: 20
+      min_length: 0
       required: true
       result_hidden: true
 
@@ -348,7 +348,7 @@
       slug: friend_graph_block_intro
       type: display_only
       content:
-        en: "**Part 4: Your connections.** During the study you connected with friends on WIT. Going forward, we'd like to know how you'd like those connections to carry over."
+        en: "**Part 4: Your connections.** How would you like your WIT connections to carry over?"
 
     - order: 24
       slug: friend_graph_decision
@@ -389,7 +389,7 @@
       slug: profile_block_intro
       type: display_only
       content:
-        en: "**Part 5: Your profile.** During the study you may have customized your profile — picked profile chips/persona traits, pinned check-ins, set up your decoration. We'd like to know how you'd like that to carry over."
+        en: "**Part 5: Your profile.** How would you like your profile setup to carry over?"
       conditional_display:
         depends_on: keep_account
         show_when_value_not: "delete"
@@ -435,7 +435,7 @@
       slug: goodbye_block_intro
       type: display_only
       content:
-        en: "**Last part.** Anything you want us to know — about WIT, about the study, about social media in general after this experience — as you wrap up?"
+        en: "**Last part.** Anything you want us to know — about WIT, social media in general, or this experience — as you wrap up?"
 
     - order: 30
       slug: final_thoughts
@@ -452,12 +452,12 @@
       slug: future_contact
       type: single_choice
       prompt:
-        en: "Could we contact you in the future about new features, follow-up studies, or related research?"
+        en: "Could we contact you in the future about WIT updates or follow-up opportunities?"
       options:
         - { order: 1, value: "yes_anything",
-            label: { en: "Yes, anything related to WIT or this kind of research" } }
+            label: { en: "Yes, anything related to WIT" } }
         - { order: 2, value: "yes_specific",
-            label: { en: "Yes, but only for follow-up studies" } }
+            label: { en: "Yes, but only for follow-up questions" } }
         - { order: 3, value: "yes_product",
             label: { en: "Yes, but only for product updates if I keep my account" } }
         - { order: 4, value: "no",

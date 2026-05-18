@@ -2,10 +2,10 @@
 # WEEKLY REFLECTIONS (week1–week4) + ANYTIME REFLECTION
 # ============================================================================
 # Five surveys total:
-#   week1_reflection    — Days 1–7 window  (May 4 – May 10)
-#   week2_reflection    — Days 8–14 window (May 11 – May 17)
-#   week3_reflection    — Days 15–21 window (May 18 – May 24)
-#   week4_reflection    — Days 22–28 window (May 25 – May 31)
+#   week1_reflection    — weekend window  (May 9 – May 10)
+#   week2_reflection    — weekend window  (May 16 – May 17)
+#   week3_reflection    — weekend window  (May 23 – May 24)
+#   week4_reflection    — weekend window  (May 30 – May 31)
 #   anytime_reflection  — Full 28-day window, opt-in, repeatable
 #
 # All five surveys:
@@ -18,11 +18,10 @@
 # ============================================================================
 #
 # WEEKLY REFLECTIONS — structure
-#   Each week's reflection is the SAME 5-item instrument with a
+#   Each week's reflection is the SAME 3-item instrument with a
 #   {{week_label}} token that resolves to "Week 1", "Week 2", etc.
-#   Items: overall feel rating + ritual highlight pick + free-text moment +
-#          tomorrow-question + optional bug/issue flag.
-#   Released at end of week's window; stays open through the following week.
+#   Items: ritual highlight pick + optional bug/issue flag.
+#   Released on the weekend only; expires after Sunday.
 #   Each user submits ONCE per week (not repeatable).
 #
 #   Single item bank used across all 4 surveys via YAML anchors.
@@ -50,28 +49,6 @@
 
 _weekly_questions: &weekly_questions
   - order: 1
-    slug: weekly_intro
-    type: display_only
-    content:
-      en: "**{{week_label}} reflection.** A short check-in on how the past week went on WIT. Five items, ~3 minutes."
-
-  - order: 2
-    slug: weekly_overall_feel
-    type: likert_5
-    prompt:
-      en: "Overall, how did your {{week_label_lower}} on WIT feel?"
-    options:
-      - { order: 1, value: 1, label: { en: "Pretty bad" } }
-      - { order: 2, value: 2, label: { en: "Not great" } }
-      - { order: 3, value: 3, label: { en: "Mixed / okay" } }
-      - { order: 4, value: 4, label: { en: "Pretty good" } }
-      - { order: 5, value: 5, label: { en: "Really good" } }
-    reverse_scored: false
-    result_kind: aggregated_likert
-    result_group: "weekly_feel"
-    result_hidden: false
-
-  - order: 3
     slug: weekly_ritual_highlight
     type: multi_choice
     prompt:
@@ -87,49 +64,9 @@ _weekly_questions: &weekly_questions
       - { order: 8, value: "browsing_quietly",  label: { en: "Browsing without anyone seeing" } }
       - { order: 9, value: "discover_feed",     label: { en: "Discovering new people" } }
       - { order: 10, value: "none",             label: { en: "Honestly, nothing this week" } }
-      - { order: 11, value: "other",            label: { en: "Something else (specify below)" } }
+      - { order: 11, value: "other",            label: { en: "Something else" } }
     result_kind: option_counts
     result_group: "weekly_highlight"
-    result_hidden: false
-
-  - order: 4
-    slug: weekly_ritual_highlight_other
-    type: free_text
-    prompt:
-      en: "What was it?"
-    min_length: 0
-    required: false
-    conditional_display:
-      depends_on: weekly_ritual_highlight
-      # Multi-choice controller — value is an array, not a scalar.
-      # `show_when_value_includes` checks array membership, which matches
-      # how the conditional needs to fire: "show this follow-up when the
-      # user has selected the 'other' option among their picks."
-      show_when_value_includes: "other"
-    result_hidden: true
-
-  - order: 5
-    slug: weekly_moment
-    type: free_text
-    prompt:
-      en: "Tell us about one specific moment from the past week on WIT — a conversation, a post, a feature you tried, a friend interaction, anything that's still on your mind."
-    placeholder:
-      en: "Specific is more useful than general. Even a small moment is fine."
-    min_length: 30
-    required: true
-    result_kind: wordcloud
-    result_hidden: true
-
-  - order: 6
-    slug: weekly_tomorrow_question
-    type: free_text
-    prompt:
-      en: "If you could ask your friends on WIT one question for tomorrow's daily question, what would it be?"
-    placeholder:
-      en: "Anything you're genuinely curious about — silly, deep, weird, or specific."
-    min_length: 10
-    required: false
-    result_kind: wordcloud
     result_hidden: false
 
   # Severity-of-friction is ordinal — likert_5 so we can compute a weekly
@@ -137,7 +74,7 @@ _weekly_questions: &weekly_questions
   # issues at all"; high end is "major problems". The free-text follow-up
   # triggers on any non-minimum value (≥2) so even a "barely noticeable"
   # mark prompts the user to describe it.
-  - order: 7
+  - order: 2
     slug: weekly_issue_flag
     type: likert_5
     prompt:
@@ -151,12 +88,12 @@ _weekly_questions: &weekly_questions
     result_group: weekly_issue
     result_hidden: true
 
-  - order: 8
+  - order: 3
     slug: weekly_issue_text
     type: free_text
     prompt:
       en: "What happened?"
-    min_length: 10
+    min_length: 0
     required: false
     conditional_display:
       depends_on: weekly_issue_flag
@@ -172,7 +109,7 @@ _weekly_questions: &weekly_questions
   title:
     en: "Looking back: Week 1"
   description:
-    en: "A short reflection on your first week with WIT. Released today; stays open through next week."
+    en: "A short weekend check-in on your first week with WIT."
   interpretation:
     en: "Tomorrow's digest will show how the cohort experienced the first week — favorite features, common moments, and what people are curious to ask each other."
   friend_visible: false
@@ -197,7 +134,7 @@ _weekly_questions: &weekly_questions
   title:
     en: "Looking back: Week 2"
   description:
-    en: "A short reflection on your second week with WIT."
+    en: "A short weekend check-in on your second week with WIT."
   interpretation:
     en: "Tomorrow's digest will show how Week 2 compares to Week 1 across the cohort."
   friend_visible: false
@@ -222,7 +159,7 @@ _weekly_questions: &weekly_questions
   title:
     en: "Looking back: Week 3"
   description:
-    en: "A short reflection on your third week with WIT — past the halfway point now."
+    en: "A short weekend check-in on your third week with WIT."
   interpretation:
     en: "Tomorrow's digest will show how Week 3 compares to the first two weeks."
   friend_visible: false
@@ -247,7 +184,7 @@ _weekly_questions: &weekly_questions
   title:
     en: "Looking back: Week 4"
   description:
-    en: "A short reflection on your final week with WIT. Many of you will also be filling out the post-study survey this week — these complement each other."
+    en: "A short weekend check-in on your final week with WIT."
   interpretation:
     en: "Tomorrow's digest will show how the final week landed across the cohort."
   friend_visible: false
@@ -285,7 +222,7 @@ _weekly_questions: &weekly_questions
   title:
     en: "Drop us a note"
   description:
-    en: "Got something to share that doesn't fit the other surveys? Bug, idea, mission suggestion, question for the cohort, weird thing that happened — submit as many times as you want throughout the study."
+    en: "Got something to share that doesn't fit the other surveys? Bug, idea, mission suggestion, question for the cohort, weird thing that happened — submit as many times as you want."
   interpretation:
     en: ""
   friend_visible: false
@@ -334,7 +271,7 @@ _weekly_questions: &weekly_questions
         en: "What mission would you like us to add? Write it the way you'd want it to appear on the app."
       placeholder:
         en: "e.g., 'Send a song that reminded you of someone today,' or 'Take a photo of something blue you noticed.'"
-      min_length: 15
+      min_length: 0
       required: true
       conditional_display:
         depends_on: anytime_category
@@ -366,7 +303,7 @@ _weekly_questions: &weekly_questions
         en: "What daily question would you like us to add? Write it the way you'd want to see it."
       placeholder:
         en: "e.g., 'What's something small that made you feel seen today?' or 'Which part of your routine actually works for you?'"
-      min_length: 10
+      min_length: 0
       required: true
       conditional_display:
         depends_on: anytime_category
@@ -386,7 +323,7 @@ _weekly_questions: &weekly_questions
         en: "What survey of the day would you like us to add? Sketch the question and what the options might look like."
       placeholder:
         en: "e.g., 'How often do you reread your own old posts?' with options Never / Once / A few times / Often."
-      min_length: 10
+      min_length: 0
       required: true
       conditional_display:
         depends_on: anytime_category
@@ -403,7 +340,7 @@ _weekly_questions: &weekly_questions
         en: "What happened? Walk us through it."
       placeholder:
         en: "What you tried to do, what happened instead, what part of the app it was in. The more specific the better."
-      min_length: 30
+      min_length: 0
       required: true
       conditional_display:
         depends_on: anytime_category
@@ -487,7 +424,7 @@ _weekly_questions: &weekly_questions
         en: "What's your feedback on this feature? Both 'this works great' and 'this is frustrating' are useful."
       placeholder:
         en: "What works, what doesn't, what you wish were different."
-      min_length: 20
+      min_length: 0
       required: true
       conditional_display:
         depends_on: anytime_category
@@ -504,7 +441,7 @@ _weekly_questions: &weekly_questions
         en: "What feature do you wish WIT had?"
       placeholder:
         en: "Describe the feature in your own words. Doesn't have to be polished."
-      min_length: 20
+      min_length: 0
       required: true
       conditional_display:
         depends_on: anytime_category
@@ -539,7 +476,7 @@ _weekly_questions: &weekly_questions
         en: "What's on your mind?"
       placeholder:
         en: "Anything that didn't fit the other categories."
-      min_length: 20
+      min_length: 0
       required: true
       conditional_display:
         depends_on: anytime_category

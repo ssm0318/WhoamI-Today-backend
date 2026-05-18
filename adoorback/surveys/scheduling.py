@@ -14,6 +14,7 @@ from surveys.models import (
     CADENCE_DAILY, ScheduledSurvey, Survey, SurveyQuestion, SurveyResponse,
     UserSurveyEmbeddedData,
 )
+from surveys.retired import is_retired_survey_slug
 
 
 # Same pattern as `surveys.tokens._TOKEN_RE` — duplicated locally so this
@@ -412,6 +413,8 @@ def get_survey_index(user):
     def _filter(rows):
         out = []
         for sched in rows:
+            if is_retired_survey_slug(sched.survey.slug):
+                continue
             if not schedule_routes_to_user(sched, user):
                 continue
             if _is_weekend_skipped(sched, today):
@@ -428,24 +431,29 @@ def get_survey_index(user):
             out.append(sched)
         return out
 
-    # Within each bucket, surface the highest-priority surveys first so
-    # users who don't have time for everything see the research-critical
-    # surveys at the top of their list. Tie-break by window_start (earlier
-    # first) then sequence_index for stable ordering.
-    def _by_priority(rows):
+    # Within each bucket, an explicit ScheduledSurvey.sidebar_order wins.
+    # Rows without one keep the legacy fallback: highest-priority survey,
+    # earlier window_start, then sequence_index for stable ordering.
+    def _by_sidebar_order(rows):
         return sorted(
             rows,
-            key=lambda s: (-s.survey.priority, s.window_start, s.sequence_index),
+            key=lambda s: (
+                s.sidebar_order is None,
+                s.sidebar_order if s.sidebar_order is not None else 0,
+                -s.survey.priority,
+                s.window_start,
+                s.sequence_index,
+            ),
         )
 
     return {
-        'available_now': _by_priority(_filter(available)),
-        'late_but_accepted': _by_priority(_filter(late)),
+        'available_now': _by_sidebar_order(_filter(available)),
+        'late_but_accepted': _by_sidebar_order(_filter(late)),
         # Completed rows aren't filtered by serving_condition / weekend —
         # the user already answered, so they should still see the entry in
         # their archive. Version routing IS applied (a Q user shouldn't
         # see a W-only completion in their list, even if they somehow have one).
-        'completed': _by_priority(
+        'completed': _by_sidebar_order(
             [s for s in completed if schedule_routes_to_user(s, user)]
         ),
     }

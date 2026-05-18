@@ -33,10 +33,13 @@ class SurveyQuestionAdmin(admin.ModelAdmin):
 
 @admin.register(ScheduledSurvey)
 class ScheduledSurveyAdmin(admin.ModelAdmin):
-    list_display = ('cadence', 'sequence_index', 'survey', 'window_start', 'window_end', 'allow_late')
+    list_display = (
+        'cadence', 'sequence_index', 'sidebar_order', 'survey',
+        'window_start', 'window_end', 'allow_late',
+    )
     list_filter = ('cadence', 'allow_late')
     search_fields = ('survey__slug',)
-    ordering = ('window_start', 'sequence_index')
+    ordering = ('window_start', 'sidebar_order', 'sequence_index')
 
 
 @admin.register(SurveyResponse)

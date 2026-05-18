@@ -99,8 +99,8 @@
     en: "Rate your closeness with each friend (Phase 2)"
     ko: "친구별 친밀감 평가 (Phase 2)"
   description:
-    en: "Same idea as last time — for each friend on your list, please re-rate how close you feel right now and how often you see them in person. We'll line up your answers from Phase 1 and Phase 2 at the end of the study to see how things shifted."
-    ko: "지난번과 같은 방식이에요. 친구 한 명 한 명에 대해 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 다시 평가해 주세요. 연구 마지막에 Phase 1과 Phase 2 답변을 비교해서 변화를 살펴볼 거예요."
+    en: "Same idea as last time — for each friend on your list, please re-rate how close you feel right now and how often you see them in person."
+    ko: "지난번과 같은 방식이에요. 친구 한 명 한 명에 대해 지금 얼마나 가까운지와 오프라인에서 얼마나 자주 만나는지를 다시 평가해 주세요."
   friend_visible: false
   results_hidden: true
   priority: 50

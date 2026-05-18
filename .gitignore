@@ -48,6 +48,11 @@
 **/log.django
 logs/
 
+# local generated reports
+/adoorback/survey_audit.html
+/adoorback/survey_user_audit.html
+/adoorback/survey_priority_audit.html
+
 # python
 .python-version
 adoorback/.python-version

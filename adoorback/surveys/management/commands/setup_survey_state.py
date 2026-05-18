@@ -10,7 +10,7 @@ Brings a freshly-migrated DB to a working state for the long-form study:
        - weekly_anytime.yaml — week1..week4_reflection + anytime_reflection
        - sotd.yaml           — daily SOTD instruments
        - closeness_reeval.yaml — phase1/phase2 per-friend closeness re-rating
-       - pre_study_catchup.yaml — habit_platform catch-up (mid-study add)
+       - habit_platform.yaml — habitual platform prereq
        - _archive/mock_test_today.yaml — May 1-3 mock dailies (only with --mock-dailies)
   2. Seeds the 4-week study schedule (37 ScheduledSurvey rows from
      `0004_seed_study_schedule.seed_schedule`).
@@ -19,12 +19,14 @@ Brings a freshly-migrated DB to a working state for the long-form study:
      biweekly rows with the version-suffixed pair.
   4. Retires the removed `pre_study` survey so it is not re-created by
      the legacy seed schedule.
-  5. Applies schedule overrides: pre-study catch-up, SOTD reschedules,
+  5. Applies schedule overrides: habit platform prereq, SOTD reschedules,
      SOTD late-answer rules,
      and weekend-only weekly reflections.
   6. (Optional, `--mock-dailies`) Loads `mock_test_today.yaml` and creates
      the May 1-3 mock daily ScheduledSurvey rows.
-  7. (Optional, `--include-demos --demo-email <email>`) Loads demo
+  7. Applies the committed sidebar order map, if any, from
+     `surveys/sidebar_order.py`.
+  8. (Optional, `--include-demos --demo-email <email>`) Loads demo
      question-type surveys + populates them with mock responses + seeds a
      viewer response so each `/surveys/<slug>/results` page renders
      unlocked. Dev-only — never pass on production.
@@ -53,6 +55,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 
 from surveys.models import CADENCE_DAILY, ScheduledSurvey, Survey
+from surveys.sidebar_order import SIDEBAR_ORDER, apply_sidebar_order_to_model
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[2] / 'fixtures'
@@ -71,7 +74,7 @@ LONG_FORM_FIXTURES = [
     'weekly_anytime.yaml',
     'sotd.yaml',
     'closeness_reeval.yaml',
-    'pre_study_catchup.yaml',
+    'habit_platform.yaml',
 ]
 
 # May 1-3 mock daily slots — see mock_test_today.yaml for the matching Survey
@@ -153,11 +156,11 @@ class Command(BaseCommand):
         retire_pre_study_module = import_module('surveys.migrations.0022_retire_pre_study')
         retire_pre_study_module.retire_pre_study(django_apps, None)
 
-        # 3c. Re-seed the catch-up prerequisite for the SHI SOTD. The
+        # 3c. Re-seed the habit platform prerequisite for the SHI SOTD. The
         #    migration can short-circuit on fresh DBs before YAML has been
         #    loaded, so setup_survey_state reapplies it after fixtures.
         self.stdout.write(
-            self.style.NOTICE('[3c] Re-seeding pre-study catch-up prerequisite ...')
+                self.style.NOTICE('[3c] Re-seeding habit platform prerequisite ...')
         )
         catchup_module = import_module(
             'surveys.migrations.0024_seed_pre_study_catchup_schedule'
@@ -271,12 +274,31 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.NOTICE('[6] Skipping mock dailies (no --mock-dailies)'))
 
-        # 7. Demo surveys + mock responses (optional, dev-only).
+        # 7. Re-apply the committed sidebar order map after all runtime
+        #    ScheduledSurvey rows have been created.
+        self.stdout.write(self.style.NOTICE('[7] Applying committed sidebar order ...'))
+        order_result = apply_sidebar_order_to_model(
+            ScheduledSurvey,
+            SIDEBAR_ORDER,
+            clear_missing=True,
+        )
+        if SIDEBAR_ORDER:
+            self.stdout.write(
+                f'    updated={len(order_result["updated"])} '
+                f'cleared={len(order_result["cleared"])} '
+                f'missing={len(order_result["missing"])}'
+            )
+            if order_result['missing']:
+                self.stdout.write('    missing: ' + ', '.join(order_result['missing']))
+        else:
+            self.stdout.write('    no committed order map')
+
+        # 8. Demo surveys + mock responses (optional, dev-only).
         if opts['include_demos']:
-            self.stdout.write(self.style.NOTICE('[7] Seeding demo question-type surveys ...'))
+            self.stdout.write(self.style.NOTICE('[8] Seeding demo question-type surveys ...'))
             call_command('seed_question_type_demos', email=opts['demo_email'])
         else:
-            self.stdout.write(self.style.NOTICE('[7] Skipping demos (no --include-demos)'))
+            self.stdout.write(self.style.NOTICE('[8] Skipping demos (no --include-demos)'))
 
         self.stdout.write(self.style.SUCCESS(
             f'Done. Surveys={Survey.objects.count()} '

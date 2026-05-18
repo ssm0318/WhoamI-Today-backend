@@ -347,7 +347,7 @@ _goal1_freetext: &goal1_freetext
     en: "Tell us about a specific moment during {{phase_label}} when WIT felt like it was helping you go deeper with someone — or, if it didn't, what got in the way?"
   placeholder:
     en: "A specific moment, conversation, or post is more useful than general impressions."
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -372,7 +372,7 @@ _goal2_freetext: &goal2_freetext
   type: free_text
   prompt:
     en: "Tell us about a specific moment during {{phase_label}} when WIT made keeping up with friends feel easier — or, if it didn't, when did it feel like work?"
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -397,7 +397,7 @@ _goal3_freetext: &goal3_freetext
   type: free_text
   prompt:
     en: "Tell us about a specific moment during {{phase_label}} when starting a small exchange with someone felt easy on WIT — or, if it didn't, what felt awkward?"
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -422,7 +422,7 @@ _goal4_freetext: &goal4_freetext
   type: free_text
   prompt:
     en: "Tell us about a specific moment during {{phase_label}} when WIT helped protect a close friendship from being diluted — or, if it didn't, when did you feel that closeness was harder to hold onto?"
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -447,7 +447,7 @@ _goal5_freetext: &goal5_freetext
   type: free_text
   prompt:
     en: "Tell us about a specific moment during {{phase_label}} when WIT made it clear what to share — or, if it didn't, when did you feel uncertain about whether something was appropriate?"
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -472,7 +472,7 @@ _goal6_freetext: &goal6_freetext
   type: free_text
   prompt:
     en: "Tell us about a specific moment during {{phase_label}} when WIT felt like a shared experience with other people — or, if it didn't, why did it feel like a solo app?"
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -497,7 +497,7 @@ _goal7_freetext: &goal7_freetext
   type: free_text
   prompt:
     en: "Tell us about a specific moment during {{phase_label}} when you started forming a connection with someone new on WIT — or, if you didn't, what got in the way?"
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -522,7 +522,7 @@ _goal8_freetext: &goal8_freetext
   type: free_text
   prompt:
     en: "Tell us about a specific moment during {{phase_label}} when WIT made it feel safe to share something with people you didn't fully know — or, if it didn't, when did sharing feel risky?"
-  min_length: 30
+  min_length: 0
   required: false
   result_hidden: true
 
@@ -1403,7 +1403,7 @@ _global_appreciate_block: &global_appreciate_block
       en: "What kinds of people do you think would appreciate Ver.{{version_short_letter}} the most? Be specific."
     placeholder:
       en: "Specific descriptors are more useful than 'people who like X.'"
-    min_length: 20
+    min_length: 0
     required: true
     result_hidden: true
 
@@ -1414,7 +1414,7 @@ _global_appreciate_block: &global_appreciate_block
       en: "What kinds of people do you think would dislike Ver.{{version_short_letter}} the most? Be specific."
     placeholder:
       en: "Specific descriptors are more useful than 'people who don't like X.'"
-    min_length: 20
+    min_length: 0
     required: true
     result_hidden: true
 
@@ -1453,7 +1453,7 @@ _preferred_version_block: &preferred_version_block
       en: "Could you briefly explain your choice?"
     placeholder:
       en: "Even a few sentences helps."
-    min_length: 20
+    min_length: 0
     required: true
     result_hidden: true
 
@@ -1476,6 +1476,7 @@ _reflection_block: &reflection_block
       en: "Was there a specific friend you felt closer to during {{phase_label}}? If so, what's their current username, and what experiences on WIT do you think helped that happen?"
     placeholder:
       en: "Username + a sentence or two on what experiences on WIT contributed."
+    min_length: 0
     required: false
     result_hidden: true
 
@@ -1486,6 +1487,7 @@ _reflection_block: &reflection_block
       en: "Was there a friend you weren't able to feel closer to during {{phase_label}}? If so, what's their current username, and why do you think that didn't happen?"
     placeholder:
       en: "Username + a sentence or two on why it didn't happen."
+    min_length: 0
     required: false
     result_hidden: true
 
@@ -1501,7 +1503,7 @@ _wrapup_block: &wrapup_block
     slug: continue_using
     type: likert_5
     prompt:
-      en: "I would like to continue using this version of WIT after the research study is over."
+      en: "I would like to continue using this version of WIT in the future."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -1512,6 +1514,7 @@ _wrapup_block: &wrapup_block
     type: free_text
     prompt:
       en: "Could you briefly explain the reason for your choice above?"
+    min_length: 0
     required: false
     result_hidden: true
 
@@ -1530,6 +1533,7 @@ _wrapup_block: &wrapup_block
     type: free_text
     prompt:
       en: "What is one thing you liked most about WIT during {{phase_label}}?"
+    min_length: 0
     required: false
     result_hidden: true
 
@@ -1538,6 +1542,7 @@ _wrapup_block: &wrapup_block
     type: free_text
     prompt:
       en: "What is one thing you would most like to change about WIT during {{phase_label}}?"
+    min_length: 0
     required: false
     result_hidden: true
 
@@ -1546,6 +1551,7 @@ _wrapup_block: &wrapup_block
     type: free_text
     prompt:
       en: "If there were moments during {{phase_label}} that were difficult to share, when did you feel that the most? (Write N/A if not applicable.)"
+    min_length: 0
     required: false
     result_hidden: true
 
@@ -1565,6 +1571,7 @@ _wrapup_block: &wrapup_block
     type: free_text
     prompt:
       en: "Last question — anything else you'd like to share with us about {{phase_label}}?"
+    min_length: 0
     required: false
     result_hidden: true
 
@@ -1577,7 +1584,7 @@ _wrapup_block: &wrapup_block
   title:
     en: "Looking back: Phase 1"
   description:
-    en: "Now that you've finished the first half of the study, we'd like to hear what your experience was like. About 30 minutes. Take your time — your answers here are the most important data we collect."
+    en: "Now that you've finished the first half, we'd like to hear what your experience was like. About 30 minutes. Take your time."
   friend_visible: false
   results_hidden: true
   tokens:
@@ -1627,7 +1634,7 @@ _wrapup_block: &wrapup_block
   title:
     en: "Looking back: Phase 1"
   description:
-    en: "Now that you've finished the first half of the study, we'd like to hear what your experience was like. About 17 minutes. Take your time — your answers here are the most important data we collect."
+    en: "Now that you've finished the first half, we'd like to hear what your experience was like. About 17 minutes. Take your time."
   friend_visible: false
   results_hidden: true
   tokens:
@@ -1678,12 +1685,12 @@ _wrapup_block: &wrapup_block
   title:
     en: "Looking back: Phase 2"
   description:
-    en: "You've now finished both halves of the study. This survey asks about the second half (Phase 2) only — we already heard about Phase 1 at the midpoint. About 30 minutes."
+    en: "You've now finished both halves. This survey asks about the second half only. About 30 minutes."
   friend_visible: false
   results_hidden: true
   tokens:
     phase_label: "Phase 2"
-    phase_window: "the second half of the study"
+    phase_window: "the second half"
     phase_number: 2
     version_short_letter: "W"
 
@@ -1724,12 +1731,12 @@ _wrapup_block: &wrapup_block
   title:
     en: "Looking back: Phase 2"
   description:
-    en: "You've now finished both halves of the study. This survey asks about the second half (Phase 2) only — we already heard about Phase 1 at the midpoint. About 17 minutes."
+    en: "You've now finished both halves. This survey asks about the second half only. About 17 minutes."
   friend_visible: false
   results_hidden: true
   tokens:
     phase_label: "Phase 2"
-    phase_window: "the second half of the study"
+    phase_window: "the second half"
     phase_number: 2
     version_short_letter: "Q"
 
@@ -1778,9 +1785,9 @@ _wrapup_block: &wrapup_block
 - slug: feature_eval_w
   type: likert_5
   title:
-    en: "Ver. W feature evaluation"
+    en: "Ver. W features"
   description:
-    en: "Rate how much you liked each Ver. W feature you used, and tell us briefly what you enjoyed and disliked about each. You can come back and edit your answers until the researchers close this survey."
+    en: "Rate how much you liked each Ver. W feature you used, and tell us briefly what you enjoyed and disliked about each. You can come back and edit your answers while this survey remains open."
   friend_visible: false
   results_hidden: true
   editable: true
@@ -1795,7 +1802,7 @@ _wrapup_block: &wrapup_block
       slug: feature_eval_intro
       type: display_only
       content:
-        en: "**Ver. W features.** This evaluation covers all 8 design goals. For each feature, rate how much you liked it and briefly say what you enjoyed and disliked. You don't have to fill it in all at once — your answers save as you go and you can come back to edit them until the researchers close the survey."
+        en: "**Ver. W features.** For each feature, rate how much you liked it and briefly say what you enjoyed and disliked. You don't have to fill it in all at once — your answers save as you go and you can come back to edit them while this survey remains open."
 
     - <<: *goal1_features_w
     - <<: *goal2_features_w
@@ -1812,13 +1819,13 @@ _wrapup_block: &wrapup_block
 # ============================================================================
 # All 8 goal-outcome ratings, scoped to the user's Phase 1 experience
 # (W for group_w_first, Q for group_q_first). Opens Day 15 (May 18).
-# Editable until researchers close.
+# Editable while the survey remains open.
 - slug: goal_comparison_p1
   type: likert_5
   title:
-    en: "How did Phase 1 go? (Goal-by-goal)"
+    en: "How did Phase 1 go?"
   description:
-    en: "Rate how well WIT helped you with each of the 8 design goals during Phase 1. You can come back and edit until researchers close this survey."
+    en: "Answer a few questions about different parts of your WIT experience during Phase 1. You can come back and edit while this survey remains open."
   friend_visible: false
   results_hidden: true
   editable: true
@@ -1846,9 +1853,9 @@ _wrapup_block: &wrapup_block
 - slug: goal_comparison_p2
   type: likert_5
   title:
-    en: "How did Phase 2 go? (Goal-by-goal)"
+    en: "How did Phase 2 go?"
   description:
-    en: "Rate how well WIT helped you with each of the 8 design goals during Phase 2. You can come back and edit until researchers close this survey."
+    en: "Answer a few questions about different parts of your WIT experience during Phase 2. You can come back and edit while this survey remains open."
   friend_visible: false
   results_hidden: true
   editable: true

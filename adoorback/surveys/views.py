@@ -167,7 +167,7 @@ class SurveyResponseSubmitView(APIView):
         # Existing responses are preserved; this just rejects further submits.
         if survey.closed:
             return Response(
-                {'detail': 'This survey has been closed by researchers.'},
+                {'detail': 'This survey is closed.'},
                 status=status.HTTP_410_GONE,
             )
         # Submit semantics depend on Survey.repeatable + Survey.editable:

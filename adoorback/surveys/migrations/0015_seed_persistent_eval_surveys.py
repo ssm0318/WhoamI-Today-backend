@@ -7,7 +7,7 @@
 #                                                 all groups
 #
 # All 3 use cadence='endpoint' since "open from day X, no upper bound,
-# editable until researchers close manually" matches that cadence's
+# editable until manually closed" matches that cadence's
 # semantics. allow_late=True is true-but-redundant when window_end is null.
 #
 # feature_eval_w gets TWO ScheduledSurvey rows for the same Survey row,
@@ -39,8 +39,7 @@ def seed_persistent(apps, schema_editor):
 
     Endpoint cadence + window_end=NULL = "opens day X, never closes
     automatically". Combined with Survey.editable=True (set in the YAML)
-    and Survey.closed (researchers flip manually), users can submit and
-    edit until the researchers close the survey at study end.
+    and Survey.closed, users can submit and edit while the survey remains open.
 
     Idempotent — `update_or_create` keyed on (cadence, sequence_index).
     """

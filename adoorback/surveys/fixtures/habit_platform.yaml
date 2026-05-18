@@ -1,10 +1,8 @@
 # ============================================================================
-# PRE-STUDY CATCH-UP (1 survey, 1 file)
+# HABIT PLATFORM (1 survey, 1 file)
 # ============================================================================
 # Survey produced by this file:
-#   pre_study_catchup — collects the `habit_platform` data point that was
-#   originally planned for pre_study but never made it into a served
-#   fixture before the study kicked off. Authored mid-study as a catch-up.
+#   habit_platform — collects the platform participants most habitually open.
 #
 # Why this needs to ship before today's SOTD slot:
 #   sotd_d15_shi (Self-Report Habit Index) is scheduled for today's SOTD
@@ -21,14 +19,14 @@
 # Editable: TRUE — participants can come back and amend if they pick the
 #           wrong platform initially.
 
-- slug: pre_study_catchup
+- slug: habit_platform
   type: single_choice
   title:
-    en: "One quick question we missed at the start"
-    ko: "시작할 때 빠뜨린 짧은 질문 하나"
+    en: "Habitual platform"
+    ko: "습관적으로 여는 플랫폼"
   description:
-    en: "We meant to ask this before the study began but missed it. It takes about thirty seconds and unlocks today's survey of the day."
-    ko: "연구 시작 전에 여쭤봤어야 했는데 빠뜨린 질문이에요. 30초면 끝나고, 오늘의 설문이 열립니다."
+    en: ""
+    ko: ""
   friend_visible: false
   results_hidden: true
   editable: true
@@ -36,11 +34,11 @@
 
   questions:
     - order: 1
-      slug: pre_study_catchup_intro
+      slug: habit_platform_intro
       type: display_only
       content:
-        en: "Pick the platform that feels the most automatic for you to open — the one you tap without really deciding to. We'll use this to personalize today's survey."
-        ko: "별 생각 없이 자동으로 열게 되는 플랫폼을 골라 주세요. 이 답을 기준으로 오늘의 설문을 맞춤 진행합니다."
+        en: "Pick the platform that feels the most automatic for you to open — the one you tap without really deciding to."
+        ko: "별 생각 없이 자동으로 열게 되는 플랫폼을 골라 주세요."
 
     - order: 2
       slug: habit_platform
@@ -77,7 +75,7 @@
         en: "Which platform?"
         ko: "어떤 플랫폼인가요?"
       required: true
-      min_length: 1
+      min_length: 0
       result_hidden: true
       # Show only when the user picked "Other" above. The label resolver
       # in views._resolve_habit_platform_label falls back to this free-text

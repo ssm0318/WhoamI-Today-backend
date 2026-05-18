@@ -1,4 +1,4 @@
-# Schedule the pre_study_catchup survey so it surfaces in the surveys
+# Schedule the habit_platform survey so it surfaces in the surveys
 # index as available_now. The window opens today (the day this ships)
 # and stays open through end-of-study via allow_late=True; the priority
 # field (set in the YAML at 110) bumps it ahead of the SOTD card so the
@@ -17,6 +17,7 @@ from django.db import migrations
 SHIP_DATE = date(2026, 5, 18)
 # Window stays open through the end of the study window.
 STUDY_END = date(2026, 5, 31)
+HABIT_PLATFORM_SLUG = 'habit_platform'
 
 
 def seed_catchup(apps, schema_editor):
@@ -25,7 +26,7 @@ def seed_catchup(apps, schema_editor):
     if not Survey.objects.exists():
         return
     try:
-        survey = Survey.objects.get(slug='pre_study_catchup')
+        survey = Survey.objects.get(slug=HABIT_PLATFORM_SLUG)
     except Survey.DoesNotExist:
         # YAML not loaded yet; setup_survey_state retries this on next run.
         return
