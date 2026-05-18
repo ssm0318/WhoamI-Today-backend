@@ -4,15 +4,14 @@ Brings a freshly-migrated DB to a working state for the long-form study:
 
   1. Loads every survey fixture in `surveys/fixtures/`. Order matters
      because some fixtures depend on others' anchors:
-       - study_2026q2.yaml — legacy/baseline study YAML (kept for
-         backward compat with existing prod data).
        - daily.yaml          — daily_base diary
        - pre.yaml            — mid_study_w/q + post_study_w/q
        - endpoint.yaml       — study_endpoint
        - weekly_anytime.yaml — week1..week4_reflection + anytime_reflection
-       - sotd.yaml           — daily SOTD instruments (empty placeholder
-                               while content is authored)
-       - mock_test_today.yaml — May 1-3 mock dailies (only with --mock-dailies)
+       - sotd.yaml           — daily SOTD instruments
+       - closeness_reeval.yaml — phase1/phase2 per-friend closeness re-rating
+       - pre_study_catchup.yaml — habit_platform catch-up (mid-study add)
+       - _archive/mock_test_today.yaml — May 1-3 mock dailies (only with --mock-dailies)
   2. Seeds the 4-week study schedule (37 ScheduledSurvey rows from
      `0004_seed_study_schedule.seed_schedule`).
   3. Re-applies the W/Q biweekly schedule (`0011_schedule_wq_biweekly.
@@ -58,12 +57,14 @@ from surveys.models import CADENCE_DAILY, ScheduledSurvey, Survey
 
 FIXTURES_DIR = Path(__file__).resolve().parents[2] / 'fixtures'
 
-# Fixture files loaded in order. study_2026q2.yaml stays first for backward
-# compat (its slugs are referenced by 0004's seed_schedule). The new
-# long-form fixtures replace placeholder content for the same slugs and
-# add new ones (mid_study_w/q, post_study_w/q, etc.).
+# Fixture files loaded in order. Earlier study_2026q2.yaml lived at the
+# top of this list as a baseline placeholder; it has since been archived
+# (surveys/fixtures/_archive/) and its surviving slugs (daily_base,
+# study_endpoint) are authored in their dedicated fixtures below. The
+# legacy slugs pre_study / mid_study / post_study are referenced by
+# 0004's SCHEDULE but seed_schedule now skips them when missing — see
+# LEGACY_REPLACED_SLUGS in 0004_seed_study_schedule.py.
 LONG_FORM_FIXTURES = [
-    'study_2026q2.yaml',
     'daily.yaml',
     'pre.yaml',
     'endpoint.yaml',
@@ -242,7 +243,7 @@ class Command(BaseCommand):
 
         # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:
-            mock_yaml = FIXTURES_DIR / 'mock_test_today.yaml'
+            mock_yaml = FIXTURES_DIR / '_archive' / 'mock_test_today.yaml'
             if not mock_yaml.exists():
                 raise CommandError(f'Required fixture missing: {mock_yaml}')
             self.stdout.write(self.style.NOTICE(f'[6a] Loading {mock_yaml.name} ...'))

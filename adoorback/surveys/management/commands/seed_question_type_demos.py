@@ -102,7 +102,7 @@ class Command(BaseCommand):
             raise CommandError(f'No user with email {viewer_email!r}')
 
         # 1. Load fixture (idempotent; re-runs upsert by slug).
-        fixture_path = Path(__file__).resolve().parents[2] / 'fixtures' / 'demo_question_types.yaml'
+        fixture_path = Path(__file__).resolve().parents[2] / 'fixtures' / '_archive' / 'demo_question_types.yaml'
         if not fixture_path.exists():
             raise CommandError(f'Demo fixture not found at {fixture_path}')
         self.stdout.write(f'Loading {fixture_path} ...')

@@ -82,15 +82,25 @@ SCHEDULE = (
 )
 
 
+# Legacy biweekly slugs that downstream migrations have since retired or
+# replaced — pre_study by 0022, mid_study + post_study by 0011's
+# W/Q-variant rewrite. setup_survey_state.py re-invokes seed_schedule as
+# a runtime helper, and after the original study_2026q2.yaml fixture was
+# archived these slugs no longer exist in the DB. Skip them quietly when
+# missing instead of crashing — the post-replacement rows are recreated
+# by the seed_wq_biweekly / retire_pre_study steps that follow.
+LEGACY_REPLACED_SLUGS = frozenset({'pre_study', 'mid_study', 'post_study'})
+
+
 def seed_schedule(apps, schema_editor):
     Survey = apps.get_model('surveys', 'Survey')
     ScheduledSurvey = apps.get_model('surveys', 'ScheduledSurvey')
 
     # Fresh dev / test DB with no surveys yet: skip cleanly. Production deploys
-    # must run `python manage.py load_surveys surveys/fixtures/study_2026q2.yaml`
-    # before applying this migration. The migration still aborts if some
-    # surveys exist but the required slugs do not (so an incomplete YAML load
-    # surfaces immediately).
+    # must run `python manage.py load_surveys` for the active fixtures before
+    # applying this migration. The migration still aborts if some surveys
+    # exist but a required non-legacy slug does not — so an incomplete YAML
+    # load surfaces immediately.
     if not Survey.objects.exists():
         return
 
@@ -98,9 +108,11 @@ def seed_schedule(apps, schema_editor):
         try:
             survey = Survey.objects.get(slug=slug)
         except Survey.DoesNotExist:
+            if slug in LEGACY_REPLACED_SLUGS:
+                continue
             raise RuntimeError(
-                f'Survey with slug={slug!r} not found. Author it in '
-                'surveys/fixtures/study_2026q2.yaml and run '
+                f'Survey with slug={slug!r} not found. Author it in the '
+                'appropriate fixture under surveys/fixtures/ and run '
                 '`python manage.py load_surveys <path>` before applying this migration.'
             )
         ScheduledSurvey.objects.update_or_create(

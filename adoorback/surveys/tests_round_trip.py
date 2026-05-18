@@ -19,7 +19,7 @@ from surveys.models import (
 )
 
 
-FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'study_2026q2.example.yaml'
+FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / '_archive' / 'study_2026q2.example.yaml'
 
 
 class SurveyIndexRoundTripTests(TestCase):
@@ -51,8 +51,8 @@ class SurveyIndexRoundTripTests(TestCase):
                  today - datetime.timedelta(days=1),
                  allow_late=True)
 
-        # Pre-study biweekly that's late
-        schedule('pre_study', CADENCE_BIWEEKLY, 1,
+        # Mid-study biweekly that's late
+        schedule('mid_study', CADENCE_BIWEEKLY, 1,
                  today - datetime.timedelta(days=2),
                  today - datetime.timedelta(days=2),
                  allow_late=True)
@@ -112,7 +112,7 @@ class SurveyIndexRoundTripTests(TestCase):
 
         # Past weekly + biweekly with allow_late=True land in late_but_accepted.
         self.assertIn('week1_reflection', late_slugs)
-        self.assertIn('pre_study', late_slugs)
+        self.assertIn('mid_study', late_slugs)
 
         # No responses yet → completed empty.
         self.assertEqual(completed_slugs, set())
