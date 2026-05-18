@@ -58,6 +58,63 @@ class PredicateRegistryTests(TestCase):
         self.alice.save(update_fields=['current_ver'])
         self.assertFalse(pred.is_engaged(self.alice))
 
+    def test_browse_mode_customize_open_counts_as_engagement(self):
+        pred = p.predicate_by_key('browse_mode')
+        self.assertFalse(pred.is_engaged(self.alice))
+        OnboardingEvent.objects.create(
+            user=self.alice, version='version_w',
+            event_key='browse_mode_customize_opened',
+            payload={'source': 'new'},
+        )
+        self.assertTrue(pred.is_engaged(self.alice))
+
+    def test_browse_mode_customize_open_uses_current_version_only(self):
+        pred = p.predicate_by_key('browse_mode')
+        OnboardingEvent.objects.create(
+            user=self.alice, version='version_w',
+            event_key='browse_mode_customize_opened',
+            payload={'source': 'new'},
+        )
+        self.alice.current_ver = 'version_q'
+        self.alice.save(update_fields=['current_ver'])
+        self.assertFalse(pred.is_engaged(self.alice))
+
+    def test_walkthrough_predicates_have_take_me_there_links(self):
+        missing_links = [
+            pred.feature_key
+            for pred in p.PREDICATES
+            if pred.deep_link is None
+        ]
+        self.assertEqual(missing_links, [])
+
+    def test_walkthrough_deep_links_route_to_feature_entry_points(self):
+        expected = {
+            'browse_mode': '/discover?browse_mode=customize',
+            'private_comment': '/discover',
+            'reaction': '/discover',
+            'subscribe_bell': '/friends',
+            'photo_of_day': '/share/photo',
+            'checkin_battery': '/update?editor=battery',
+            'checkin_mood': '/update?editor=mood',
+            'checkin_thought': '/update?editor=thought',
+            'checkin_song': '/update?editor=song',
+            'profile_chips': '/settings/edit-profile',
+            'pinned_checkin': '/update?tab=history',
+            'checkin_post': '/check-in-posts/new',
+        }
+        for feature_key, deep_link in expected.items():
+            self.assertEqual(p.predicate_by_key(feature_key).deep_link, deep_link)
+
+    def test_subscribe_bell_walkthrough_link_matches_current_version(self):
+        pred = p.predicate_by_key('subscribe_bell')
+        self.assertEqual(pred.deep_link_for('version_w'), '/friends')
+        self.assertEqual(pred.deep_link_for('version_q'), '/my/friends/list')
+
+    def test_subscribe_bell_walkthrough_copy_matches_current_version(self):
+        pred = p.predicate_by_key('subscribe_bell')
+        self.assertIn('Open Friends', pred.description_for('version_w'))
+        self.assertIn('My tab friend list', pred.description_for('version_q'))
+
     def test_db_predicate_non_public_account(self):
         pred = p.predicate_by_key('non_public_account')
         self.assertFalse(pred.is_engaged(self.alice))

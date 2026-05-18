@@ -29,9 +29,21 @@ class FeaturePredicate:
     deep_link: str | None
     kind: PredicateKind
     is_engaged: Callable[[object], bool]  # User -> bool
+    deep_links_by_version: dict[str, str] | None = None
+    descriptions_by_version: dict[str, str] | None = None
 
     def in_version(self, version: str) -> bool:
         return version in self.versions
+
+    def deep_link_for(self, version: str) -> str | None:
+        if self.deep_links_by_version and version in self.deep_links_by_version:
+            return self.deep_links_by_version[version]
+        return self.deep_link
+
+    def description_for(self, version: str) -> str:
+        if self.descriptions_by_version and version in self.descriptions_by_version:
+            return self.descriptions_by_version[version]
+        return self.description
 
 
 # ---------- DB-backed predicates ----------
@@ -157,13 +169,24 @@ def _has_checkin_post(user):
 
 # ---------- Event-backed predicate factory ----------
 
+def _has_onboarding_event(user, event_key: str) -> bool:
+    from chat.models import OnboardingEvent
+    return OnboardingEvent.objects.filter(
+        user=user, version=user.current_ver, event_key=event_key,
+    ).exists()
+
+
 def _make_event_predicate(event_key: str):
     def check(user):
-        from chat.models import OnboardingEvent
-        return OnboardingEvent.objects.filter(
-            user=user, version=user.current_ver, event_key=event_key,
-        ).exists()
+        return _has_onboarding_event(user, event_key)
     return check
+
+
+def _has_browse_mode_engagement(user):
+    return (
+        _has_browse_mode_pick(user)
+        or _has_onboarding_event(user, 'browse_mode_customize_opened')
+    )
 
 
 # ---------- Registry ----------
@@ -193,11 +216,11 @@ PREDICATES: list[FeaturePredicate] = [
     FeaturePredicate(
         feature_key='browse_mode',
         versions={'version_w'},
-        display_name='Pick a browsing mode',
-        description='Quiet vs social — set the vibe for your session. Look for the prompt on the Discover tab (or tap the eye icon in the header).',
-        deep_link='/discover',
-        kind='db',
-        is_engaged=_has_browse_mode_pick,
+        display_name='Try creating a browsing mode',
+        description='Open Discover / Daily Digest, tap the eye icon, then tap Add a new browsing mode and play with the settings. Saving it is optional.',
+        deep_link='/discover?browse_mode=customize',
+        kind='event',
+        is_engaged=_has_browse_mode_engagement,
     ),
 
     # ---- Goal 3: Scaffold casual relational initiation ----
@@ -205,8 +228,8 @@ PREDICATES: list[FeaturePredicate] = [
         feature_key='private_comment',
         versions={'version_w'},
         display_name='Post a private comment',
-        description="Comment that only the post's author can see.",
-        deep_link=None,
+        description="Open a post or response from Discover / Daily Digest, tap comments, turn on the private-comment option, and send it.",
+        deep_link='/discover',
         kind='db',
         is_engaged=_has_private_comment,
     ),
@@ -214,8 +237,8 @@ PREDICATES: list[FeaturePredicate] = [
         feature_key='reaction',
         versions={'version_w'},
         display_name='React with an emoji',
-        description='Tap-and-hold on a post or check-in to react.',
-        deep_link=None,
+        description='Open a post or response from Discover / Daily Digest, tap the emoji button, and choose a reaction.',
+        deep_link='/discover',
         kind='db',
         is_engaged=_has_reaction,
     ),
@@ -243,10 +266,18 @@ PREDICATES: list[FeaturePredicate] = [
         feature_key='subscribe_bell',
         versions={'version_w', 'version_q'},
         display_name='Tap the subscribe bell on a friend',
-        description='Open the bell on a profile or chat to manage subscriptions.',
-        deep_link=None,
+        description='Open Friends, tap a friend subscription bell, choose what to hear about, and save.',
+        deep_link='/friends',
         kind='db',
         is_engaged=_has_subscription,
+        deep_links_by_version={
+            'version_w': '/friends',
+            'version_q': '/my/friends/list',
+        },
+        descriptions_by_version={
+            'version_w': 'Open Friends, tap a friend subscription bell, choose what to hear about, and save.',
+            'version_q': "Open the My tab friend list, open a friend's profile, tap the subscription bell, choose what to hear about, and save.",
+        },
     ),
 
     # ---- Goal 5: Clarity of sharing norms ----
@@ -264,7 +295,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Post a Photo of the Day',
         description='Pick a photo, crop it, write a caption, share.',
-        deep_link='/share',
+        deep_link='/share/photo',
         kind='db',
         is_engaged=_has_photo_post,
     ),
@@ -273,7 +304,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Set a social battery check-in',
         description='How social are you feeling? 0–100 with an emoji.',
-        deep_link='/update',
+        deep_link='/update?editor=battery',
         kind='db',
         is_engaged=_has_checkin_component('battery'),
     ),
@@ -282,7 +313,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Set a mood check-in',
         description='Up to 5 emojis representing how you feel.',
-        deep_link='/update',
+        deep_link='/update?editor=mood',
         kind='db',
         is_engaged=_has_checkin_component('mood'),
     ),
@@ -291,7 +322,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Set a Be Random check-in',
         description='Up to 88 characters of what is on your mind.',
-        deep_link='/update',
+        deep_link='/update?editor=thought',
         kind='db',
         is_engaged=_has_checkin_component('thought'),
     ),
@@ -300,7 +331,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Set a song check-in',
         description='Pick a song that captures the moment.',
-        deep_link='/update',
+        deep_link='/update?editor=song',
         kind='db',
         is_engaged=_has_checkin_component('song'),
     ),
@@ -332,7 +363,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Set profile chips (Persona)',
         description="Pick interests, identities, vibes — they show on your profile.",
-        deep_link='/settings',
+        deep_link='/settings/edit-profile',
         kind='db',
         is_engaged=_has_profile_chips,
     ),
@@ -341,7 +372,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Pin a check-in to your profile',
         description="Decorate your profile with a check-in you want to keep visible.",
-        deep_link='/update',
+        deep_link='/update?tab=history',
         kind='db',
         is_engaged=_has_pinned_checkin,
     ),
@@ -381,7 +412,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_q'},
         display_name='Post an image+text check-in',
         description='Q-style check-in — image with a caption, lives in the stories rail.',
-        deep_link='/share',
+        deep_link='/check-in-posts/new',
         kind='db',
         is_engaged=_has_checkin_post,
     ),

@@ -539,13 +539,14 @@ def _walkthrough_feature_card(predicate, user, mode='walkthrough'):
         WALKTHROUGH_TAKE_ME_THERE,
     )
 
-    text = f"**{predicate.display_name}**\n{predicate.description}"
+    text = f"**{predicate.display_name}**\n{predicate.description_for(user.current_ver)}"
 
     buttons = []
-    if predicate.deep_link:
+    deep_link = predicate.deep_link_for(user.current_ver)
+    if deep_link:
         buttons.append({
             'label': t(WALKTHROUGH_TAKE_ME_THERE, user),
-            'navigate_to': predicate.deep_link,
+            'navigate_to': deep_link,
         })
 
     if mode == 'walkthrough':
