@@ -182,13 +182,6 @@ def _make_event_predicate(event_key: str):
     return check
 
 
-def _has_browse_mode_engagement(user):
-    return (
-        _has_browse_mode_pick(user)
-        or _has_onboarding_event(user, 'browse_mode_customize_opened')
-    )
-
-
 # ---------- Registry ----------
 
 # Goal numbers reference the user's 8-goal scheme from the spec.
@@ -216,11 +209,11 @@ PREDICATES: list[FeaturePredicate] = [
     FeaturePredicate(
         feature_key='browse_mode',
         versions={'version_w'},
-        display_name='Try creating a browsing mode',
-        description='Open Discover / Daily Digest, tap the eye icon, then tap Add a new browsing mode and play with the settings. Saving it is optional.',
-        deep_link='/discover?browse_mode=customize',
-        kind='event',
-        is_engaged=_has_browse_mode_engagement,
+        display_name='Apply a browsing mode',
+        description='Open Discover / Daily Digest, choose an existing browsing mode, and tap Select. You do not need to create a custom mode.',
+        deep_link='/discover?browse_mode=picker',
+        kind='db',
+        is_engaged=_has_browse_mode_pick,
     ),
 
     # ---- Goal 3: Scaffold casual relational initiation ----
@@ -363,7 +356,7 @@ PREDICATES: list[FeaturePredicate] = [
         versions={'version_w'},
         display_name='Set profile chips (Persona)',
         description="Pick interests, identities, vibes — they show on your profile.",
-        deep_link='/settings/edit-profile',
+        deep_link='/settings/edit-profile?tab=interests',
         kind='db',
         is_engaged=_has_profile_chips,
     ),

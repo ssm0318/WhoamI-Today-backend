@@ -685,6 +685,7 @@ WC_BTN_TAKE_BOSS_QUIZ = {'en': 'Take the boss quiz', 'ko': '보스 퀴즈 도전
 WC_BTN_START_ONBOARDING = {'en': 'Start onboarding', 'ko': '온보딩 시작'}
 WC_BTN_START_VERSION_W = {'en': 'Start version W onboarding', 'ko': '버전 W 온보딩 시작'}
 WC_BTN_START_VERSION_Q = {'en': 'Start version Q onboarding', 'ko': '버전 Q 온보딩 시작'}
+WC_BTN_CALL_ADMIN = {'en': 'Call admin', 'ko': '어드민 호출'}
 
 
 HELP_REPLY = {

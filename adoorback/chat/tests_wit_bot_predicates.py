@@ -58,25 +58,24 @@ class PredicateRegistryTests(TestCase):
         self.alice.save(update_fields=['current_ver'])
         self.assertFalse(pred.is_engaged(self.alice))
 
-    def test_browse_mode_customize_open_counts_as_engagement(self):
+    def test_browse_mode_pick_counts_as_engagement(self):
         pred = p.predicate_by_key('browse_mode')
         self.assertFalse(pred.is_engaged(self.alice))
-        OnboardingEvent.objects.create(
-            user=self.alice, version='version_w',
-            event_key='browse_mode_customize_opened',
-            payload={'source': 'new'},
+        from browse_mode.models import BrowseModePickEvent
+        BrowseModePickEvent.objects.create(
+            user=self.alice,
+            kind='built_in',
+            built_in_id='quiet',
         )
         self.assertTrue(pred.is_engaged(self.alice))
 
-    def test_browse_mode_customize_open_uses_current_version_only(self):
+    def test_browse_mode_customize_open_does_not_count_as_engagement(self):
         pred = p.predicate_by_key('browse_mode')
         OnboardingEvent.objects.create(
             user=self.alice, version='version_w',
             event_key='browse_mode_customize_opened',
             payload={'source': 'new'},
         )
-        self.alice.current_ver = 'version_q'
-        self.alice.save(update_fields=['current_ver'])
         self.assertFalse(pred.is_engaged(self.alice))
 
     def test_walkthrough_predicates_have_take_me_there_links(self):
@@ -89,7 +88,7 @@ class PredicateRegistryTests(TestCase):
 
     def test_walkthrough_deep_links_route_to_feature_entry_points(self):
         expected = {
-            'browse_mode': '/discover?browse_mode=customize',
+            'browse_mode': '/discover?browse_mode=picker',
             'private_comment': '/discover',
             'reaction': '/discover',
             'subscribe_bell': '/friends',
@@ -98,7 +97,7 @@ class PredicateRegistryTests(TestCase):
             'checkin_mood': '/update?editor=mood',
             'checkin_thought': '/update?editor=thought',
             'checkin_song': '/update?editor=song',
-            'profile_chips': '/settings/edit-profile',
+            'profile_chips': '/settings/edit-profile?tab=interests',
             'pinned_checkin': '/update?tab=history',
             'checkin_post': '/check-in-posts/new',
         }

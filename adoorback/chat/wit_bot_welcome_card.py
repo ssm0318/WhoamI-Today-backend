@@ -9,7 +9,7 @@ from django.utils import timezone
 from chat import wit_bot_state as state_mod
 from chat.wit_bot_copy import (
     WC_AUDIT_DONE_PRE_BOSS, WC_AUDIT_IN_PROGRESS, WC_BOSS_PASSED_PRE_SWAP,
-    WC_BTN_RESUME, WC_BTN_RESUME_ONBOARDING, WC_BTN_RUN_AUDIT,
+    WC_BTN_CALL_ADMIN, WC_BTN_RESUME, WC_BTN_RESUME_ONBOARDING, WC_BTN_RUN_AUDIT,
     WC_BTN_START_ONBOARDING, WC_BTN_START_VERSION_Q, WC_BTN_START_VERSION_W,
     WC_BTN_TAKE_BOSS_QUIZ, WC_DEFAULT_SILENT, WC_KICKOFF_DONE_PRE_AUDIT,
     WC_MID_FLOW, WC_POST_SWAP_Q, WC_POST_SWAP_W,
@@ -22,6 +22,13 @@ from chat.wit_bot_payloads import card_with_buttons
 # once a V1 participant has finished everything. The bot has NO date-based
 # gating for starting onboarding — participants can begin any time.
 V2_WINDOW_START = timezone.make_aware(datetime(2026, 5, 18, 0, 0))
+
+
+def _with_admin(buttons: list[dict[str, Any]], user) -> list[dict[str, Any]]:
+    return [
+        *buttons,
+        {'label': t(WC_BTN_CALL_ADMIN, user), 'payload': 'admin'},
+    ]
 
 
 def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
@@ -43,35 +50,34 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
     # a way back if the inline card scrolls off.
     if state.current_intent == 'kickoff_welcome':
         return {
-            'kind': 'card',
+            **card_with_buttons(_with_admin([], user)),
             'intro': t(WC_MID_FLOW, user),
-            'buttons': [],
         }
     if state.current_intent.startswith('kickoff_') and state.current_intent != 'kickoff_complete':
         return {
-            **card_with_buttons([
+            **card_with_buttons(_with_admin([
                 {'label': t(WC_BTN_RESUME_ONBOARDING, user), 'payload': 'resume_onboarding'},
-            ]),
+            ], user)),
             'intro': t(WC_MID_FLOW, user),
         }
 
     # Audit — Resume + fresh Run audit
     if state.current_intent == 'audit':
         return {
-            **card_with_buttons([
+            **card_with_buttons(_with_admin([
                 {'label': t(WC_BTN_RESUME, user), 'payload': 'resume_onboarding'},
                 {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
-            ]),
+            ], user)),
             'intro': t(WC_AUDIT_IN_PROGRESS, user),
         }
 
     # Walkthrough — distinct intro so users don't think we're auditing
     if state.current_intent == 'walkthrough':
         return {
-            **card_with_buttons([
+            **card_with_buttons(_with_admin([
                 {'label': t(WC_BTN_RESUME, user), 'payload': 'resume_onboarding'},
                 {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
-            ]),
+            ], user)),
             'intro': t(WC_WALKTHROUGH_IN_PROGRESS, user),
         }
 
@@ -86,22 +92,21 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
 
         if passed_final and now < V2_WINDOW_START:
             return {
-                'kind': 'card',
+                **card_with_buttons(_with_admin([], user)),
                 'intro': t(WC_BOSS_PASSED_PRE_SWAP, user),
-                'buttons': [],
             }
         if not passed_final and last_missing == 0:
             return {
-                **card_with_buttons([
+                **card_with_buttons(_with_admin([
                     {'label': t(WC_BTN_TAKE_BOSS_QUIZ, user), 'payload': 'take_boss_quiz'},
-                ]),
+                ], user)),
                 'intro': t(WC_AUDIT_DONE_PRE_BOSS, user),
             }
         if not passed_final:
             return {
-                **card_with_buttons([
+                **card_with_buttons(_with_admin([
                     {'label': t(WC_BTN_RUN_AUDIT, user), 'payload': 'run_audit'},
-                ]),
+                ], user)),
                 'intro': t(WC_KICKOFF_DONE_PRE_AUDIT, user),
             }
 
@@ -118,9 +123,9 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
             cta_label = t(WC_BTN_START_VERSION_W, user)
             intro = t(WC_POST_SWAP_W, user)
         return {
-            **card_with_buttons([
+            **card_with_buttons(_with_admin([
                 {'label': cta_label, 'payload': 'start_onboarding'},
-            ]),
+            ], user)),
             'intro': intro,
         }
 
@@ -128,15 +133,14 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
     if not kickoff:
         intro_value = WC_TIME_TO_ONBOARD_Q if version == 'version_q' else WC_TIME_TO_ONBOARD_W
         return {
-            **card_with_buttons([
+            **card_with_buttons(_with_admin([
                 {'label': t(WC_BTN_START_ONBOARDING, user), 'payload': 'start_onboarding'},
-            ]),
+            ], user)),
             'intro': t(intro_value, user),
         }
 
     # Default: silent
     return {
-        'kind': 'card',
+        **card_with_buttons(_with_admin([], user)),
         'intro': t(WC_DEFAULT_SILENT, user),
-        'buttons': [],
     }

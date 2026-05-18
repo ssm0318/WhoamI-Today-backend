@@ -96,6 +96,19 @@ class EngineDispatchTests(TestCase):
         self.room.refresh_from_db()
         self.assertTrue(self.room.is_group)
 
+    def test_admin_text_escalates_even_mid_flow(self):
+        self._send_choice('start_onboarding')
+        state = state_mod.get_or_create_state(self.alice)
+        self.assertEqual(state.current_intent, 'kickoff_welcome')
+        self._send_text('call admin')
+        self.room.refresh_from_db()
+        self.assertTrue(self.room.is_group)
+
+    def test_korean_admin_text_escalates(self):
+        self._send_text('어드민 호출')
+        self.room.refresh_from_db()
+        self.assertTrue(self.room.is_group)
+
     def test_start_onboarding_enters_kickoff_welcome(self):
         self._send_choice('start_onboarding')
         state = state_mod.get_or_create_state(self.alice)
@@ -256,12 +269,13 @@ class EngineDispatchTests(TestCase):
 
     def test_welcome_card_silent_during_kickoff_welcome(self):
         """At kickoff_welcome the inline 'let's go' button is enough; the
-        welcome card stays silent (no buttons) to avoid duplicate CTAs."""
+        welcome card only keeps the human-help escape hatch."""
         self._send_choice('start_onboarding')
         welcome_msg = Message.objects.filter(
             chat_room=self.room, event_type='wit_welcome_card',
         ).first()
-        self.assertEqual(welcome_msg.bot_payload.get('buttons', []), [])
+        labels = [b['label'] for b in welcome_msg.bot_payload.get('buttons', [])]
+        self.assertEqual(labels, ['Call admin'])
 
     # ---------- V1.1 — Audit handler ----------
 
@@ -462,6 +476,8 @@ class EngineDispatchTests(TestCase):
         self._send_text('help')
         latest = self._bot_replies().exclude(event_type='wit_welcome_card').order_by('-created_at').first()
         self.assertIn('run audit', latest.content.lower())
+        labels = [b['label'] for b in latest.bot_payload.get('buttons', [])]
+        self.assertIn('Call admin', labels)
 
     def test_cat_emoji_returns_cat_reply(self):
         self._send_text('🐈')

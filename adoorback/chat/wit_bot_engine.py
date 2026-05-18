@@ -102,12 +102,18 @@ def handle_user_message(message):
     is_admin_choice = (
         payload.get('kind') == 'choice' and payload.get('payload') == 'admin'
     )
+    text = (message.content or '').strip().lower()
+    is_admin_text = not payload and text in {
+        'admin', 'call admin', 'call_admin', 'call in admin',
+        'help admin', 'human', 'operator',
+        '어드민', '어드민 호출', '관리자', '사람', '운영자',
+    }
 
     state = state_mod.get_or_create_state(user)
 
     with transaction.atomic():
         # Safety hatch — admin escalation always wins, regardless of intent.
-        if is_admin_choice:
+        if is_admin_choice or is_admin_text:
             escalate_to_human(user)
             _post_replies(room, bot, user, [
                 ("Admin has been called in 👀", None),

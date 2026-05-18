@@ -58,8 +58,10 @@ def try_global_command(state, message, user):
             from chat.wit_bot_copy import WHO_AM_I_REPLY
             return [(t(WHO_AM_I_REPLY, user), None)]
         if text == 'help':
-            from chat.wit_bot_copy import HELP_REPLY
-            return [(t(HELP_REPLY, user), None)]
+            from chat.wit_bot_copy import HELP_REPLY, WC_BTN_CALL_ADMIN
+            return [(t(HELP_REPLY, user), card_with_buttons([
+                {'label': t(WC_BTN_CALL_ADMIN, user), 'payload': 'admin'},
+            ]))]
         if '🐈' in text or '🐱' in text:
             from chat.wit_bot_copy import CAT_REPLY
             return [(t(CAT_REPLY, user), None)]
