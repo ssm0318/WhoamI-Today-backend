@@ -70,6 +70,11 @@
     ko: "매일의 체크인은 28일 동안 공유 편안함, 인정받는 느낌, 그리고 기분이 어떻게 변하는지를 보여줘요."
   friend_visible: false
   results_hidden: false
+  # Priority matches the documented convention (see Survey.priority help_text):
+  # 80 = daily / SOTD. Without this, daily_base defaulted to 0 and sorted
+  # *below* anytime_reflection (priority=20) in the index, which is backwards —
+  # the daily diary is the higher-engagement asset and should surface first.
+  priority: 80
 
   questions:
 
@@ -242,7 +247,7 @@
       placeholder:
         en: "A specific moment, message, post, or feeling — anything that stuck with you."
         ko: "특정 순간, 메시지, 게시물, 감정 — 마음에 남아 있는 것이라면 무엇이든 괜찮아요."
-      min_length: 1. 0
+      min_length: 0
       min_length_warning:
         en: "A sentence or two helps us a lot — but if there's really nothing today, just write 'nothing today.'"
         ko: "한두 문장만 적어 주셔도 큰 도움이 돼요. 정말 떠오르는 게 없다면 '오늘은 없어요'라고만 적어 주셔도 괜찮아요."
@@ -287,6 +292,7 @@
       placeholder:
         en: "Doesn't have to be detailed — even one line about what stopped you helps."
         ko: "자세히 적지 않으셔도 괜찮아요. 무엇이 막았는지 한 줄만 적어 주셔도 도움이 돼요."
+      min_length: 0
       conditional_display:
         depends_on: inhibition_yn
         show_when_value: "yes"
