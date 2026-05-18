@@ -24,6 +24,13 @@ MULTI_CHOICE = 'multi_choice'
 FREE_TEXT = 'free_text'
 SLIDER = 'slider'
 DISPLAY_ONLY = 'display_only'
+# Per-friend question types: at render time the API expands one virtual
+# question per friend the requesting user currently has. At submit time the
+# frontend sends one answer per friend, each tagged with `target_user_id`,
+# and the backend writes one SurveyAnswer row per (response, question,
+# target_user). Used by the end-of-phase closeness re-evaluation surveys.
+PER_FRIEND_LIKERT_5 = 'per_friend_likert_5'
+PER_FRIEND_SINGLE_CHOICE = 'per_friend_single_choice'
 TYPE_CHOICES = (
     (LIKERT_3, 'Likert 3-point'),
     (LIKERT_4, 'Likert 4-point'),
@@ -36,7 +43,13 @@ TYPE_CHOICES = (
     (FREE_TEXT, 'Free text'),
     (SLIDER, 'Slider'),
     (DISPLAY_ONLY, 'Display-only content (no input)'),
+    (PER_FRIEND_LIKERT_5, 'Likert 5-point asked once per friend'),
+    (PER_FRIEND_SINGLE_CHOICE, 'Single choice asked once per friend'),
 )
+# Question types that expand into one virtual question per friend at render
+# time. Aggregation / analysis treats the resulting SurveyAnswer rows as
+# (target_user, value) tuples — see dump_friend_closeness_panel.
+PER_FRIEND_TYPES = frozenset({PER_FRIEND_LIKERT_5, PER_FRIEND_SINGLE_CHOICE})
 
 # Inclusive (min, max) numeric range per likert variant. likert_5_na uses the
 # same numeric range as likert_5; the N/A response is stored as a sentinel
@@ -48,6 +61,7 @@ LIKERT_RANGES = {
     LIKERT_5_NA: (1, 5),
     LIKERT_6: (1, 6),
     LIKERT_7: (1, 7),
+    PER_FRIEND_LIKERT_5: (1, 5),
 }
 LIKERT_TYPES = frozenset(LIKERT_RANGES.keys())
 # Sentinel value persisted in SurveyAnswer.value when the user picks N/A on a
@@ -90,6 +104,13 @@ DEFAULT_RESULT_KIND_FOR_TYPE = {
     MULTI_CHOICE: RESULT_OPTION_COUNTS,
     FREE_TEXT: RESULT_WORDCLOUD,
     SLIDER: RESULT_SLIDER_HISTOGRAM,
+    # Per-friend likerts aggregate the same way as regular likerts (mean / SD)
+    # over all (response, question, target_user) tuples. Per-friend single
+    # choice aggregates to per-option counts. Neither type currently surfaces
+    # results to participants (results_hidden=True on the closeness re-eval
+    # surveys), so this is for analysis-side completeness.
+    PER_FRIEND_LIKERT_5: RESULT_AGGREGATED_LIKERT,
+    PER_FRIEND_SINGLE_CHOICE: RESULT_OPTION_COUNTS,
     # display_only never aggregates — group_panels skips these questions entirely.
 }
 
@@ -221,7 +242,7 @@ class SurveyQuestion(AdoorTimestampedModel):
     survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='questions')
     order = models.PositiveSmallIntegerField()
     type = models.CharField(
-        max_length=20,
+        max_length=32,
         choices=TYPE_CHOICES,
         default=LIKERT_5,
         help_text='Input type. Determines which input UI is rendered and how value is validated.',
@@ -482,10 +503,48 @@ class SurveyAnswer(AdoorTimestampedModel):
             'str for free_text. NULL (NA_SENTINEL) on likert_5_na means "N/A".'
         ),
     )
+    # For per-friend question types (PER_FRIEND_TYPES): the friend this row's
+    # answer is *about*. NULL for every other question type. Set ON DELETE
+    # SET_NULL so unfriending / account deletion doesn't erase research data;
+    # the row keeps its value with a dangling target so analysis can detect
+    # post-hoc unfriends.
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='survey_answers_targeting',
+        help_text=(
+            'Only populated for per-friend question types. NULL for all '
+            'other types. Indicates the friend that the answer\'s value '
+            'is about.'
+        ),
+    )
 
     class Meta:
+        # Two partial constraints because PostgreSQL treats NULL as distinct
+        # from NULL in unique indexes, which would otherwise let the same
+        # non-per-friend question be answered twice in one response:
+        #   - non per-friend (target_user IS NULL): one answer per question
+        #   - per-friend (target_user IS NOT NULL): one answer per (question,
+        #     target_user) pair
         constraints = [
-            models.UniqueConstraint(fields=['response', 'question'], name='unique_answer_per_response_per_question'),
+            models.UniqueConstraint(
+                fields=['response', 'question'],
+                condition=models.Q(target_user__isnull=True),
+                name='unique_answer_per_response_per_question',
+            ),
+            models.UniqueConstraint(
+                fields=['response', 'question', 'target_user'],
+                condition=models.Q(target_user__isnull=False),
+                name='unique_answer_per_response_per_question_per_target',
+            ),
+        ]
+        indexes = [
+            # Analysis queries join SurveyAnswer ↔ FriendEvaluation on
+            # (evaluator → response.user, evaluated_user → target_user).
+            # An index on target_user keeps that join cheap.
+            models.Index(fields=['target_user']),
         ]
 
 
