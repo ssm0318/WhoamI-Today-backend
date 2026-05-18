@@ -91,7 +91,8 @@ class Command(BaseCommand):
             # Layer 6: Supporting tables
             ('Subscription', 'account_subscription', None),
 
-            # Layer 7: Pending friend requests only
+            # Layer 7: FriendEvaluation before FriendRequest (FK dependency)
+            ('FriendEvaluation', 'account_friendevaluation', None),
             ('FriendRequest (pending)', 'account_friendrequest', 'accepted IS NULL'),
         ]
 
