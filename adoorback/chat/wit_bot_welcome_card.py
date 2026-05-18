@@ -78,7 +78,7 @@ def build_welcome_card(user, now: datetime | None = None) -> dict[str, Any]:
     # Kickoff complete → audit / boss-quiz CTAs (V2_WINDOW_START still tracks the
     # "see you May 18 for the swap" silent state once the participant has finished
     # everything for V1).
-    if completed and version == 'version_w':
+    if completed:
         audit = progress.get('audit', {})
         last_missing = audit.get('last_missing_count')
         final_quiz = progress.get('final_quiz', {})

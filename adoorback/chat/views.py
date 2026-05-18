@@ -487,6 +487,8 @@ class MessageList(generics.ListCreateAPIView):
             if user_msg_id:
                 bot_replies_qs = chat_room.messages.filter(
                     id__gt=user_msg_id,
+                ).exclude(
+                    event_type='wit_welcome_card',
                 ).order_by('id')
                 response.data['bot_replies'] = MessageSerializer(
                     bot_replies_qs, many=True, context={'request': request},

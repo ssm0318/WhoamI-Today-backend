@@ -241,12 +241,17 @@ class EngineDispatchTests(TestCase):
         the welcome card shows a Resume CTA (not silenced by the kickoff_welcome
         special case)."""
         self._send_choice('start_onboarding')
+        original_welcome = Message.objects.get(
+            chat_room=self.room, event_type='wit_welcome_card',
+        )
         self._send_choice('kickoff_welcome_continue')
         welcome_msgs = Message.objects.filter(
             chat_room=self.room, event_type='wit_welcome_card',
         )
         self.assertEqual(welcome_msgs.count(), 1)
-        labels = [b['label'] for b in welcome_msgs.first().bot_payload['buttons']]
+        welcome_msg = welcome_msgs.first()
+        self.assertEqual(welcome_msg.id, original_welcome.id)
+        labels = [b['label'] for b in welcome_msg.bot_payload['buttons']]
         self.assertIn('Resume onboarding', labels)
 
     def test_welcome_card_silent_during_kickoff_welcome(self):

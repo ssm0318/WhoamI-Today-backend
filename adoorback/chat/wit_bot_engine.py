@@ -48,14 +48,29 @@ def _post_welcome(room, bot, user):
 
 
 def _refresh_welcome_card(room, bot, user):
-    """Delete any existing wit_welcome_card message and post a fresh one
-    reflecting current state."""
+    """Keep one stable wit_welcome_card message reflecting current state.
+
+    The welcome card is state chrome, not a conversational turn. Reusing the
+    same message prevents status text from reappearing inline after every user
+    action.
+    """
     from chat.models import Message as MessageModel
     from chat.wit_bot_welcome_card import build_welcome_card
-    MessageModel.objects.filter(
-        chat_room=room, event_type=WELCOME_EVENT_TYPE,
-    ).delete()
     card = build_welcome_card(user)
+    welcome_msg = MessageModel.objects.filter(
+        chat_room=room, event_type=WELCOME_EVENT_TYPE,
+    ).order_by('id').first()
+
+    if welcome_msg:
+        welcome_msg.sender = bot
+        welcome_msg.receiver = user
+        welcome_msg.content = card.get('intro', '')
+        welcome_msg.bot_payload = card
+        welcome_msg.save(update_fields=[
+            'sender', 'receiver', 'content', 'bot_payload', 'updated_at',
+        ])
+        return
+
     MessageModel.objects.create(
         chat_room=room, sender=bot, receiver=user,
         content=card.get('intro', ''),

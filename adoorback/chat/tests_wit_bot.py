@@ -180,7 +180,8 @@ class WitBotFastPathTests(TestCase):
     def test_bot_reply_returned_inline(self):
         """Engine still posts replies inline. With the new intent dispatch,
         an unrecognized payload from idle yields the idle nudge. The welcome
-        card refresh also lands as an inline reply."""
+        card is state chrome, not a conversational reply, so it must not ride
+        back in bot_replies."""
         from rest_framework.test import APIRequestFactory, force_authenticate
         from chat.views import MessageList
         factory = APIRequestFactory()
@@ -194,11 +195,8 @@ class WitBotFastPathTests(TestCase):
         resp = MessageList.as_view()(req, pk=self.bot.id)
         self.assertEqual(resp.status_code, 201)
         bot_replies = resp.data.get('bot_replies') or []
-        # Filter out welcome card refresh replies
-        non_welcome_replies = [
-            r for r in bot_replies if r.get('event_type') != 'wit_welcome_card'
-        ]
-        self.assertEqual(len(non_welcome_replies), 1)
-        self.assertEqual(non_welcome_replies[0]['sender']['username'], 'wit_bot')
+        self.assertFalse(any(r.get('event_type') == 'wit_welcome_card' for r in bot_replies))
+        self.assertEqual(len(bot_replies), 1)
+        self.assertEqual(bot_replies[0]['sender']['username'], 'wit_bot')
         # Idle handler posts a short nudge — no card.
-        self.assertIn('not sure', non_welcome_replies[0]['content'].lower())
+        self.assertIn('not sure', bot_replies[0]['content'].lower())

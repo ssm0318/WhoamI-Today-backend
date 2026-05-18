@@ -48,6 +48,16 @@ class WelcomeCardTests(TestCase):
         labels = [b['label'] for b in payload['buttons']]
         self.assertIn('Run audit', labels)
 
+    def test_q_kickoff_complete_shows_run_audit_button(self):
+        """Version Q needs the same post-kickoff audit CTA as version W."""
+        self.alice.current_ver = 'version_q'
+        self.alice.save(update_fields=['current_ver'])
+        state = state_mod.get_or_create_state(self.alice)
+        state_mod.set_progress(state, 'version_q', 'kickoff', {'completed': True})
+        payload = wc.build_welcome_card(self.alice, now=self._set_now(2026, 5, 18))
+        labels = [b['label'] for b in payload['buttons']]
+        self.assertIn('Run audit', labels)
+
     def test_audit_complete_shows_take_boss_quiz_cta(self):
         """After audit confirms 0 missing but boss quiz not yet passed, show Take boss quiz."""
         state = state_mod.get_or_create_state(self.alice)
