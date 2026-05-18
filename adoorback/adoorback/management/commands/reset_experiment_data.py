@@ -84,6 +84,7 @@ class Command(BaseCommand):
 
             # Layer 5: Check-in related
             ('Poke', 'check_in_poke', None),
+            ('CheckInRead', 'check_in_checkinread', None),
             ('CheckIn', 'check_in_checkin', None),
             ('Song', 'check_in_song', None),
 
@@ -174,7 +175,7 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT COUNT(*) FROM account_user "
-                "WHERE is_superuser = FALSE AND deleted IS NULL"
+                "WHERE deleted IS NULL"
             )
             user_count = cursor.fetchone()[0]
         self.stdout.write(f'\nUser profile fields to reset: {user_count} users')
@@ -241,7 +242,7 @@ class Command(BaseCommand):
                     interests_updated_at = NULL,
                     personas_updated_at = NULL,
                     last_interest_card_category = NULL
-                WHERE is_superuser = FALSE AND deleted IS NULL
+                WHERE deleted IS NULL
             """)
             profiles_reset = cursor.rowcount
             self.stdout.write(f'  Reset   {profiles_reset:>8,} user profiles')

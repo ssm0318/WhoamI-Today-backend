@@ -39,7 +39,7 @@ class Command(BaseCommand):
                 call_command('reset_experiment_data', no_input=True)
             self.stdout.write('')
 
-        queryset = User.objects.exclude(is_superuser=True)
+        queryset = User.objects.all()
         if options['user_ids']:
             queryset = queryset.filter(id__in=options['user_ids'])
 
