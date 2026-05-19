@@ -199,6 +199,10 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
     user_has_responded = serializers.SerializerMethodField()
     responder_count = serializers.SerializerMethodField()
     draft = serializers.SerializerMethodField()
+    point_locked_by_prereq_slug = serializers.SerializerMethodField()
+    point_locked_by_prereq_title_en = serializers.SerializerMethodField()
+    point_locked_by_prereq_title_ko = serializers.SerializerMethodField()
+    point_award = serializers.SerializerMethodField()
 
     class Meta:
         model = Survey
@@ -213,6 +217,12 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             'editable',
             'closed',
             'priority',
+            'point_value',
+            'point_prereq_slug',
+            'point_locked_by_prereq_slug',
+            'point_locked_by_prereq_title_en',
+            'point_locked_by_prereq_title_ko',
+            'point_award',
             'result_kind',
             'questions',
             'user_has_responded',
@@ -285,6 +295,38 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             return None
         return SurveyDraftSerializer(draft).data
 
+    def _point_lock(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        from surveys.points import point_prereq_lock_for_user
+        return point_prereq_lock_for_user(obj, request.user)
+
+    def get_point_locked_by_prereq_slug(self, obj):
+        lock = self._point_lock(obj)
+        return lock['slug'] if lock else None
+
+    def get_point_locked_by_prereq_title_en(self, obj):
+        lock = self._point_lock(obj)
+        return lock['title_en'] if lock else None
+
+    def get_point_locked_by_prereq_title_ko(self, obj):
+        lock = self._point_lock(obj)
+        return lock['title_ko'] if lock else None
+
+    def get_point_award(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        from surveys.points import get_point_award_for_survey, serialize_point_award
+        return serialize_point_award(
+            get_point_award_for_survey(
+                request.user,
+                obj,
+                scheduled_survey=self.context.get('scheduled_survey'),
+            )
+        )
+
 
 class SurveyAnswerInputSerializer(serializers.Serializer):
     question_id = serializers.IntegerField()
@@ -346,13 +388,19 @@ class PastSurveySerializer(serializers.ModelSerializer):
     used to produce, so the existing daily-archive frontend doesn't change.
     """
     date = serializers.DateField(source='window_start', read_only=True)
-    survey = SurveyDetailSerializer(read_only=True)
+    survey = serializers.SerializerMethodField()
     user_answered = serializers.SerializerMethodField()
     results_unlocked = serializers.SerializerMethodField()
 
     class Meta:
         model = ScheduledSurvey
-        fields = ['date', 'survey', 'user_answered', 'results_unlocked']
+        fields = ['id', 'date', 'survey', 'user_answered', 'results_unlocked']
+
+    def get_survey(self, obj):
+        return SurveyDetailSerializer(
+            obj.survey,
+            context={**self.context, 'scheduled_survey': obj},
+        ).data
 
     def get_user_answered(self, obj):
         request = self.context.get('request')
@@ -382,6 +430,11 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
     redirect_url = serializers.SerializerMethodField()
     results_unlocked = serializers.SerializerMethodField()
     draft = serializers.SerializerMethodField()
+    point_value = serializers.IntegerField(source='survey.point_value', read_only=True)
+    point_locked_by_prereq_slug = serializers.SerializerMethodField()
+    point_locked_by_prereq_title_en = serializers.SerializerMethodField()
+    point_locked_by_prereq_title_ko = serializers.SerializerMethodField()
+    point_award = serializers.SerializerMethodField()
 
     class Meta:
         model = ScheduledSurvey
@@ -393,6 +446,11 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
             'redirect_url',
             'results_unlocked',
             'draft',
+            'point_value',
+            'point_locked_by_prereq_slug',
+            'point_locked_by_prereq_title_en',
+            'point_locked_by_prereq_title_ko',
+            'point_award',
         ]
 
     def get_redirect_url(self, obj):
@@ -417,3 +475,29 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
         if draft is None:
             return None
         return SurveyDraftSummarySerializer(draft).data
+
+    def _point_lock(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        from surveys.points import point_prereq_lock_for_user
+        return point_prereq_lock_for_user(obj.survey, request.user)
+
+    def get_point_locked_by_prereq_slug(self, obj):
+        lock = self._point_lock(obj)
+        return lock['slug'] if lock else None
+
+    def get_point_locked_by_prereq_title_en(self, obj):
+        lock = self._point_lock(obj)
+        return lock['title_en'] if lock else None
+
+    def get_point_locked_by_prereq_title_ko(self, obj):
+        lock = self._point_lock(obj)
+        return lock['title_ko'] if lock else None
+
+    def get_point_award(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        from surveys.points import get_point_award_for_scheduled, serialize_point_award
+        return serialize_point_award(get_point_award_for_scheduled(request.user, obj))

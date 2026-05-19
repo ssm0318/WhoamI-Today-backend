@@ -1,8 +1,8 @@
 from django.contrib import admin
 
 from surveys.models import (
-    ScheduledSurvey, Survey, SurveyAnswer, SurveyOption, SurveyQuestion,
-    SurveyResponse,
+    PointAward, ScheduledSurvey, Survey, SurveyAnswer, SurveyOption,
+    SurveyQuestion, SurveyResponse,
 )
 
 
@@ -18,8 +18,11 @@ class SurveyQuestionInline(admin.StackedInline):
 
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
-    list_display = ('slug', 'title_en', 'friend_visible', 'results_hidden', 'last_used_date')
-    search_fields = ('slug', 'title_en', 'title_ko')
+    list_display = (
+        'slug', 'title_en', 'point_value', 'point_prereq_slug',
+        'friend_visible', 'results_hidden', 'last_used_date',
+    )
+    search_fields = ('slug', 'title_en', 'title_ko', 'point_prereq_slug')
     list_filter = ('friend_visible', 'results_hidden')
     inlines = [SurveyQuestionInline]
 
@@ -48,6 +51,19 @@ class SurveyResponseAdmin(admin.ModelAdmin):
     list_filter = ('survey',)
     search_fields = ('user__username',)
     readonly_fields = ('submitted_at',)
+
+
+@admin.register(PointAward)
+class PointAwardAdmin(admin.ModelAdmin):
+    list_display = (
+        'user', 'source_kind', 'source_slug', 'awarded_points',
+        'adjusted_points', 'effective_points', 'scheduled_survey', 'response',
+        'created_at',
+    )
+    list_filter = ('source_kind',)
+    search_fields = ('user__username', 'source_slug', 'note')
+    readonly_fields = ('created_at', 'updated_at')
+    raw_id_fields = ('user', 'scheduled_survey', 'response')
 
 
 admin.site.register(SurveyAnswer)

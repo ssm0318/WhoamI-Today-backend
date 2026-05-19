@@ -17,6 +17,10 @@ from surveys.models import (
     SurveyAnswer, SurveyDraft, SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
+from surveys.points import (
+    create_survey_point_award, reimbursement_state_for_user,
+    resolve_submit_scheduled_survey, serialize_point_award,
+)
 from surveys.scheduling import (
     _today_la_7am, get_survey_index, get_today_daily,
     get_today_daily_with_prereq, routes_to_user,
@@ -181,49 +185,22 @@ class SurveyResponseSubmitView(APIView):
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
-        # Reject submissions only when there is NO currently-valid window
-        # for this survey. Mirrors the bucketing logic in
-        # `get_survey_index`: a survey is answerable if it has at least
-        # one ScheduledSurvey row that is either (a) currently open
-        # [window_start <= today AND (window_end IS NULL OR
-        # window_end >= today)] or (b) past its window but flagged
-        # allow_late=True.
-        #
-        # The previous check fired 410 if ANY past row had
-        # allow_late=False, regardless of whether the survey ALSO had a
-        # currently-open row. That broke `daily_base` (28 ScheduledSurvey
-        # rows, allow_late=False on each, so every day after May 4 had
-        # at least one past expired row) and any other survey scheduled
-        # across multiple discrete daily windows. Manifested first on
-        # May 9 (Saturday), when weekend SOTD skip made daily_base the
-        # featured Survey-of-the-Day card.
-        today = _today_la_7am()
-        scheduled_for_survey = ScheduledSurvey.objects.filter(survey=survey)
-        if scheduled_for_survey.exists():
-            currently_open = Q(window_start__lte=today) & (
-                Q(window_end__isnull=True) | Q(window_end__gte=today)
+        schedule_resolution = resolve_submit_scheduled_survey(request.user, survey)
+        if schedule_resolution.rejection == 'not_routed':
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if schedule_resolution.rejection == 'future':
+            return Response(
+                {'detail': 'This survey is not yet open for responses.'},
+                status=status.HTTP_403_FORBIDDEN,
             )
-            late_accepted = Q(window_end__lt=today, allow_late=True)
-            has_valid_window = scheduled_for_survey.filter(
-                currently_open | late_accepted,
-            ).exists()
-            if not has_valid_window:
-                # Disambiguate "expired" vs "not yet open" so the
-                # frontend / dev tools see a helpful error.
-                future_only = scheduled_for_survey.filter(
-                    window_start__gt=today,
-                ).exists()
-                if future_only:
-                    return Response(
-                        {'detail': 'This survey is not yet open for responses.'},
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-                return Response(
-                    {'detail': 'This survey has expired and can no longer be answered.'},
-                    status=status.HTTP_410_GONE,
-                )
+        if schedule_resolution.rejection == 'expired':
+            return Response(
+                {'detail': 'This survey has expired and can no longer be answered.'},
+                status=status.HTTP_410_GONE,
+            )
         ser = SurveyResponseInputSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        point_award = None
         try:
             with transaction.atomic():
                 if is_edit:
@@ -281,11 +258,20 @@ class SurveyResponseSubmitView(APIView):
                 # via `{{slug}}` tokens or `serving_condition`.
                 _persist_embedded_data(request.user, response)
                 SurveyDraft.objects.filter(user=request.user, survey=survey).delete()
+                point_award = create_survey_point_award(
+                    user=request.user,
+                    survey=survey,
+                    response=response,
+                    scheduled_survey=schedule_resolution.scheduled_survey,
+                )
         except IntegrityError:
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
-        return Response({'id': response.id}, status=status.HTTP_201_CREATED)
+        return Response(
+            {'id': response.id, 'point_award': serialize_point_award(point_award)},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class SurveyDraftView(APIView):
@@ -538,3 +524,10 @@ class SurveyIndexView(APIView):
                 result['completed'], many=True, context=serializer_context,
             ).data,
         })
+
+
+class ReimbursementView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(reimbursement_state_for_user(request.user))

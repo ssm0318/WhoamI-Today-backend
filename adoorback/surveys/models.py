@@ -230,6 +230,23 @@ class Survey(AdoorTimestampedModel):
             '80 = daily / SOTD, 50 = weekly, 40 = mid/post/pre, 20 = anytime.'
         ),
     )
+    point_value = models.PositiveIntegerField(
+        default=0,
+        help_text=(
+            'Provisional max points credited on first submit. 0 = no points. '
+            'Researcher audit at study end may downgrade individual awards.'
+        ),
+    )
+    point_prereq_slug = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        help_text=(
+            'Slug of a survey that must be completed before this one credits '
+            'its full point_value. Blank = no prereq. Submission with prereq '
+            'unmet still creates a PointAward row with awarded_points=0.'
+        ),
+    )
 
     class Meta:
         ordering = ['slug']
@@ -495,6 +512,79 @@ class SurveyResponse(AdoorTimestampedModel):
         indexes = [
             models.Index(fields=['survey', 'user']),
         ]
+
+
+class PointAward(AdoorTimestampedModel):
+    SOURCE_SURVEY = 'survey'
+    SOURCE_WIT_BOT_AUDIT = 'wit_bot_audit'
+    SOURCE_INTERVIEW_SIGNUP = 'interview_signup'
+    SOURCE_KIND_CHOICES = (
+        (SOURCE_SURVEY, 'Survey response'),
+        (SOURCE_WIT_BOT_AUDIT, 'Wit_bot audit pass'),
+        (SOURCE_INTERVIEW_SIGNUP, 'Interview signup'),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='point_awards',
+    )
+    source_kind = models.CharField(max_length=32, choices=SOURCE_KIND_CHOICES)
+    source_slug = models.CharField(max_length=64)
+    scheduled_survey = models.ForeignKey(
+        ScheduledSurvey,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='point_awards',
+    )
+    response = models.ForeignKey(
+        SurveyResponse,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='point_awards',
+    )
+    awarded_points = models.PositiveIntegerField()
+    adjusted_points = models.PositiveIntegerField(null=True, blank=True)
+    note = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'response'],
+                condition=models.Q(source_kind='survey', response__isnull=False),
+                name='unique_award_per_user_per_response',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'scheduled_survey'],
+                condition=models.Q(
+                    source_kind='survey',
+                    scheduled_survey__isnull=False,
+                ),
+                name='unique_award_per_user_per_scheduled_survey',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'source_kind', 'source_slug'],
+                condition=models.Q(
+                    response__isnull=True,
+                    scheduled_survey__isnull=True,
+                ),
+                name='unique_award_per_user_per_non_survey_source',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'source_kind']),
+            models.Index(fields=['source_kind', 'source_slug']),
+        ]
+
+    @property
+    def effective_points(self):
+        return self.adjusted_points if self.adjusted_points is not None else self.awarded_points
+
+    def __str__(self):
+        return f'PointAward<{self.user_id}:{self.source_kind}:{self.source_slug}>'
 
 
 class SurveyAnswer(AdoorTimestampedModel):
