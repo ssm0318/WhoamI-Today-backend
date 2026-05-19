@@ -272,6 +272,18 @@ class Command(BaseCommand):
         )
         deadline_windows_module.apply_deadline_windows(django_apps, None)
 
+        # 5e. Current sidebar ordering / labels after final Phase 1 tuning:
+        #    closeness first, short Phase reflection before long Phase
+        #    reflection, W-feature survey due Sunday May 24, and the
+        #    always-on feedback channel without a deadline badge.
+        self.stdout.write(
+            self.style.NOTICE('[5e] Applying current survey priority order/windows ...')
+        )
+        priority_order_module = import_module(
+            'surveys.migrations.0035_survey_priority_order_and_weekend_due_dates'
+        )
+        priority_order_module.apply_priority_order_and_windows(django_apps, None)
+
         # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:
             mock_yaml = FIXTURES_DIR / '_archive' / 'mock_test_today.yaml'

@@ -51,12 +51,15 @@ class SurveyAuditTests(SimpleTestCase):
         feature_rows = sorted(by_slug['feature_eval_w'], key=lambda row: row['window_start'])
         self.assertEqual(feature_rows[0]['audience'], 'group_w_first')
         self.assertEqual(feature_rows[0]['window_start'], date(2026, 5, 8).isoformat())
-        self.assertEqual(feature_rows[0]['window_end'], date(2026, 5, 18).isoformat())
+        self.assertEqual(feature_rows[0]['window_end'], date(2026, 5, 24).isoformat())
         self.assertTrue(feature_rows[0]['allow_late'])
         self.assertEqual(feature_rows[1]['audience'], 'group_q_first')
         self.assertEqual(feature_rows[1]['window_start'], date(2026, 5, 22).isoformat())
-        self.assertEqual(feature_rows[1]['window_end'], date(2026, 5, 31).isoformat())
+        self.assertEqual(feature_rows[1]['window_end'], date(2026, 5, 24).isoformat())
         self.assertTrue(feature_rows[1]['allow_late'])
+
+        anytime = by_slug['anytime_reflection'][0]
+        self.assertIsNone(anytime['window_end'])
 
         habit = by_slug['habit_platform'][0]
         self.assertEqual(habit['cadence'], 'daily')
@@ -68,12 +71,12 @@ class SurveyAuditTests(SimpleTestCase):
         audit = build_survey_audit()
 
         expected_titles = {
-            'mid_study_w': 'Phase 1 reflection: Part 1',
-            'mid_study_q': 'Phase 1 reflection: Part 1',
-            'goal_comparison_p1': 'Phase 1 reflection: Part 2',
-            'post_study_w': 'Phase 2 reflection: Part 1',
-            'post_study_q': 'Phase 2 reflection: Part 1',
-            'goal_comparison_p2': 'Phase 2 reflection: Part 2',
+            'mid_study_w': 'Phase 1 reflection: Part 2',
+            'mid_study_q': 'Phase 1 reflection: Part 2',
+            'goal_comparison_p1': 'Phase 1 reflection: Part 1',
+            'post_study_w': 'Phase 2 reflection: Part 2',
+            'post_study_q': 'Phase 2 reflection: Part 2',
+            'goal_comparison_p2': 'Phase 2 reflection: Part 1',
         }
 
         for slug, title in expected_titles.items():
@@ -132,10 +135,11 @@ class SurveyAuditTests(SimpleTestCase):
         self.assertEqual(
             [entry['survey_slug'] for entry in w_first['buckets']['available_now']],
             [
-                'habit_platform',
-                'feature_eval_w',
-                'mid_study_w',
+                'phase1_friend_closeness',
                 'goal_comparison_p1',
+                'mid_study_w',
+                'feature_eval_w',
+                'habit_platform',
                 'daily_base',
                 'anytime_reflection',
             ],
@@ -143,9 +147,10 @@ class SurveyAuditTests(SimpleTestCase):
         self.assertEqual(
             [entry['survey_slug'] for entry in q_first['buckets']['available_now']],
             [
-                'habit_platform',
-                'mid_study_q',
+                'phase1_friend_closeness',
                 'goal_comparison_p1',
+                'mid_study_q',
+                'habit_platform',
                 'daily_base',
                 'anytime_reflection',
             ],
@@ -162,9 +167,17 @@ class SurveyAuditTests(SimpleTestCase):
             entry for entry in w_first['buckets']['available_now']
             if entry['survey_slug'] == 'goal_comparison_p1'
         )
-        self.assertEqual(w_mid['survey_title'], 'Phase 1 reflection: Part 1')
-        self.assertEqual(q_mid['survey_title'], 'Phase 1 reflection: Part 1')
-        self.assertEqual(phase1_goal['survey_title'], 'Phase 1 reflection: Part 2')
+        phase1_closeness = next(
+            entry for entry in w_first['buckets']['available_now']
+            if entry['survey_slug'] == 'phase1_friend_closeness'
+        )
+        self.assertEqual(w_mid['survey_title'], 'Phase 1 reflection: Part 2')
+        self.assertEqual(q_mid['survey_title'], 'Phase 1 reflection: Part 2')
+        self.assertEqual(phase1_goal['survey_title'], 'Phase 1 reflection: Part 1')
+        self.assertEqual(
+            phase1_closeness['survey_title'],
+            'Rate your closeness with each friend (Phase 1)',
+        )
         self.assertEqual(w_mid['window_start'], date(2026, 5, 18).isoformat())
         self.assertEqual(w_mid['window_end'], date(2026, 5, 18).isoformat())
         self.assertTrue(w_mid['allow_late'])

@@ -276,7 +276,20 @@ def _load_survey_entries(path: Path) -> list[dict[str, Any]]:
             if value
         ]
         provided_tokens = set((entry.get('tokens') or {}).keys())
-        required_tokens = sorted(_tokens_in_texts(survey_texts + question_texts) - provided_tokens)
+        required_tokens = _tokens_in_texts(survey_texts)
+        for question in questions:
+            question_tokens = _tokens_in_texts([
+                question['prompt'],
+                question['content'],
+                question['description'],
+                question['placeholder'],
+            ])
+            if str(question['type']).startswith('per_friend_'):
+                from surveys.tokens import PER_FRIEND_DYNAMIC_TOKENS
+
+                question_tokens -= PER_FRIEND_DYNAMIC_TOKENS
+            required_tokens.update(question_tokens)
+        required_tokens = sorted(required_tokens - provided_tokens)
 
         entries.append({
             'slug': slug,
@@ -394,6 +407,10 @@ def _build_schedule_rows() -> list[dict[str, Any]]:
             target_user_group=target_group,
         )
 
+    closeness = importlib.import_module('surveys.migrations.0021_seed_closeness_schedule')
+    for seq, slug, day in closeness.CLOSENESS_SCHEDULE:
+        _upsert_schedule(rows, 'biweekly', seq, slug, day, day, True)
+
     deadline_windows = importlib.import_module(
         'surveys.migrations.0032_survey_deadline_windows'
     )
@@ -471,6 +488,25 @@ def _build_schedule_rows() -> list[dict[str, Any]]:
         deadline_windows.PHASE1_DUE,
         True,
     )
+
+    priority_windows = importlib.import_module(
+        'surveys.migrations.0035_survey_priority_order_and_weekend_due_dates'
+    )
+    _update_schedule_date(
+        rows,
+        'endpoint',
+        2,
+        priority_windows.FEATURE_W_FIRST_START,
+        priority_windows.FEATURE_DUE_WEEKEND,
+    )
+    _update_schedule_date(
+        rows,
+        'endpoint',
+        3,
+        priority_windows.FEATURE_Q_FIRST_START,
+        priority_windows.FEATURE_DUE_WEEKEND,
+    )
+    _update_schedule_date(rows, 'anytime', 1, priority_windows.ANYTIME_START, None)
 
     for key, row in list(rows.items()):
         if is_retired_survey_slug(row['survey_slug']):

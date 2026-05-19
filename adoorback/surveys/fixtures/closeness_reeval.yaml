@@ -18,8 +18,7 @@
 #   - friend_visible: false       (private research data)
 #   - results_hidden: true        (no aggregate result panel)
 #   - allow_late: true (set on the ScheduledSurvey row)
-#   - priority: 50                (above weekly anytime / daily diary,
-#                                  below endpoint surveys at 100)
+#   - priority: 100               (high-priority end-of-phase survey)
 #
 # Per-friend types: see surveys/models.py PER_FRIEND_TYPES. At render time
 # the API expands each per_friend_* question into one virtual question per
@@ -41,7 +40,7 @@
     ko: "WIT에서 친구를 추가할 때 1~5점으로 친밀감을 평가하셨어요. Phase 1이 마무리되는 지금, 같은 친구들에 대해 다시 한 번 평가해 주세요. 직접 만나 얼마나 자주 교류하는지도 함께 알려주세요. 친구당 한 장씩, 몇 분이면 끝납니다."
   friend_visible: false
   results_hidden: true
-  priority: 50
+  priority: 100
   tokens:
     phase_label: "Phase 1"
 
