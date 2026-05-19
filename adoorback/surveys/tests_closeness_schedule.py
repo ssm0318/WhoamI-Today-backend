@@ -6,7 +6,13 @@ from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from surveys.models import CADENCE_BIWEEKLY, ScheduledSurvey, Survey, SurveyQuestion
+from surveys.models import (
+    CADENCE_BIWEEKLY,
+    ScheduledSurvey,
+    Survey,
+    SurveyQuestion,
+    SurveyResponse,
+)
 from surveys.scheduling import _required_tokens_for_survey, get_survey_index
 
 
@@ -63,3 +69,20 @@ class ClosenessScheduleTests(TestCase):
             late_after_due_date = get_survey_index(self.user)
         self.assertNotIn(phase1, late_after_due_date['available_now'])
         self.assertIn(phase1, late_after_due_date['late_but_accepted'])
+
+    def test_answered_phase1_closeness_does_not_stay_available_if_editable_flag_is_stale(self):
+        seed_module = import_module('surveys.migrations.0021_seed_closeness_schedule')
+        seed_module.seed_closeness(django_apps, None)
+
+        phase1 = Survey.objects.get(slug='phase1_friend_closeness')
+        phase1.editable = True
+        phase1.save(update_fields=['editable'])
+        SurveyResponse.objects.create(user=self.user, survey=phase1)
+
+        with patch('surveys.scheduling._today_la_7am', return_value=date(2026, 5, 18)):
+            index = get_survey_index(self.user)
+
+        available_slugs = {entry.survey.slug for entry in index['available_now']}
+        completed_slugs = {entry.survey.slug for entry in index['completed']}
+        self.assertNotIn('phase1_friend_closeness', available_slugs)
+        self.assertIn('phase1_friend_closeness', completed_slugs)

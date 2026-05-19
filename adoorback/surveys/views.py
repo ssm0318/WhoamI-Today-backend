@@ -346,17 +346,19 @@ class MyResponseView(APIView):
         ).prefetch_related('answers').order_by('-submitted_at').first()
         if response is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        answers = []
+        for answer in response.answers.all():
+            item = {
+                'question_id': answer.question_id,
+                'value': answer.value,
+            }
+            if answer.target_user_id is not None:
+                item['target_user_id'] = answer.target_user_id
+            answers.append(item)
         return Response({
             'id': response.id,
             'submitted_at': response.submitted_at.isoformat(),
-            'answers': [
-                {
-                    'question_id': a.question_id,
-                    'value': a.value,
-                    'target_user_id': a.target_user_id,
-                }
-                for a in response.answers.all()
-            ],
+            'answers': answers,
         })
 
 

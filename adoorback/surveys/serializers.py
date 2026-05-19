@@ -8,6 +8,51 @@ from surveys.models import (
 from surveys.scheduling import _today_la_7am
 
 
+def _page_count_for_questions(questions) -> int:
+    """Mirror the frontend's page grouping for draft/edit hydration."""
+    total = 0
+    in_per_friend_block = False
+    for question in questions:
+        if question.type in PER_FRIEND_TYPES:
+            if not in_per_friend_block:
+                total += 1
+                in_per_friend_block = True
+            continue
+        total += 1
+        in_per_friend_block = False
+    return total
+
+
+def _response_as_draft_payload(response: SurveyResponse) -> dict:
+    """Shape an existing editable response like SurveyDraftSerializer.
+
+    The frontend already knows how to hydrate answer state from `draft`.
+    Reusing that shape means edit mode opens with saved answers populated,
+    including per-friend answers grouped as question_id -> target_user_id.
+    """
+    answers = {}
+    for answer in response.answers.select_related('question').order_by(
+        'question__order', 'target_user_id',
+    ):
+        question_id = str(answer.question_id)
+        if answer.question.type in PER_FRIEND_TYPES:
+            if answer.target_user_id is None:
+                continue
+            answers.setdefault(question_id, {})[str(answer.target_user_id)] = answer.value
+            continue
+        answers[question_id] = answer.value
+
+    total_pages = _page_count_for_questions(response.survey.questions.order_by('order'))
+    return {
+        'answers': answers,
+        'current_page_index': 0,
+        'total_pages': total_pages,
+        'answered_pages': total_pages,
+        'progress_pct': 100 if total_pages else 0,
+        'saved_at': response.submitted_at,
+    }
+
+
 def validate_answer_value(question: SurveyQuestion, value) -> None:
     """Per-question-type validation for an inbound SurveyAnswer value.
 
@@ -288,7 +333,16 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return None
-        if SurveyResponse.objects.filter(survey=obj, user=request.user).exists():
+        existing = (
+            SurveyResponse.objects
+            .filter(survey=obj, user=request.user)
+            .select_related('survey')
+            .prefetch_related('answers__question')
+            .first()
+        )
+        if existing is not None:
+            if obj.editable and not obj.repeatable and not obj.closed:
+                return _response_as_draft_payload(existing)
             return None
         draft = SurveyDraft.objects.filter(survey=obj, user=request.user).first()
         if draft is None:
@@ -455,6 +509,8 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
 
     def get_redirect_url(self, obj):
         if getattr(obj, 'bucket', None) == 'completed':
+            if obj.survey.editable and not obj.survey.repeatable and not obj.survey.closed:
+                return f'/surveys/{obj.survey.slug}/answer'
             return f'/surveys/{obj.survey.slug}/results'
         return f'/surveys/{obj.survey.slug}/answer'
 

@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from surveys._test_helpers import make_likert_survey, make_user
-from surveys.models import CADENCE_ANYTIME, ScheduledSurvey, SurveyDraft
+from surveys.models import CADENCE_ANYTIME, ScheduledSurvey, SurveyAnswer, SurveyDraft, SurveyResponse
 
 
 class SurveyDraftApiTests(APITestCase):
@@ -90,6 +90,24 @@ class SurveyDraftApiTests(APITestCase):
         draft = response.json()['draft']
         self.assertEqual(draft['answers'], {str(self.questions[0].id): 4})
         self.assertEqual(draft['progress_pct'], 50)
+        self.assertIn('saved_at', draft)
+
+    def test_editable_detail_includes_existing_response_as_draft_for_editing(self):
+        self.survey.editable = True
+        self.survey.save(update_fields=['editable'])
+        response = SurveyResponse.objects.create(user=self.user, survey=self.survey)
+        SurveyAnswer.objects.create(response=response, question=self.questions[0], value=4)
+        SurveyAnswer.objects.create(response=response, question=self.questions[1], value=2)
+
+        detail = self.client.get(f'/api/surveys/{self.survey.slug}/')
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+
+        draft = detail.json()['draft']
+        self.assertEqual(
+            draft['answers'],
+            {str(self.questions[0].id): 4, str(self.questions[1].id): 2},
+        )
+        self.assertEqual(draft['progress_pct'], 100)
         self.assertIn('saved_at', draft)
 
     def test_submit_clears_existing_draft(self):

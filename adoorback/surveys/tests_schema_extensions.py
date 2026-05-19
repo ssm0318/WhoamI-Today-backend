@@ -39,7 +39,7 @@ from surveys.management.commands.load_surveys import (
     _wrap_top_level_anchor_blocks,
 )
 from surveys.scheduling import get_survey_index, get_today_daily
-from surveys.serializers import SurveyDetailSerializer
+from surveys.serializers import SurveyDetailSerializer, SurveyIndexEntrySerializer
 from surveys.tokens import build_token_map, substitute
 from surveys.models import (
     CADENCE_DAILY,
@@ -1348,7 +1348,7 @@ class EditableSurveyTests(TestCase):
         q = SurveyQuestion.objects.create(
             survey=s, order=1, type=LIKERT_5, prompt_en='p', prompt_ko='p',
         )
-        today = _date(2026, 5, 9)
+        today = _date(2026, 5, 8)
         # Five past rows + one current — all allow_late=False, mirroring
         # the daily_base / SOTD prod schedule.
         for offset in range(5, 0, -1):
@@ -1364,6 +1364,7 @@ class EditableSurveyTests(TestCase):
             allow_late=False, sequence_index=810,
         )
         with patch('surveys.scheduling._today_la_7am', return_value=today), \
+             patch('surveys.points._today_la_7am', return_value=today), \
              patch('surveys.views._today_la_7am', return_value=today):
             r = self.client.post(
                 f'/api/surveys/{s.slug}/responses/',
@@ -1392,6 +1393,7 @@ class EditableSurveyTests(TestCase):
                 allow_late=False, sequence_index=820 + offset,
             )
         with patch('surveys.scheduling._today_la_7am', return_value=today), \
+             patch('surveys.points._today_la_7am', return_value=today), \
              patch('surveys.views._today_la_7am', return_value=today):
             r = self.client.post(
                 f'/api/surveys/{s.slug}/responses/',
@@ -1531,9 +1533,13 @@ class PrioritySortTests(TestCase):
 
 
 class EditableIndexBucketingTests(TestCase):
-    """Editable surveys stay in available_now after submission until
-    `closed=True`, so respondents can re-open and edit their answers.
-    Once closed, the row drops to completed."""
+    """Editable one-response surveys move to completed after submission.
+
+    Respondents can still re-open them from Completed to edit; they should not
+    remain in To-do because that reads as "you still owe this survey."
+    Repeatable surveys remain in To-do because each visit creates another
+    response.
+    """
 
     def setUp(self):
         from datetime import date as _date
@@ -1557,7 +1563,7 @@ class EditableIndexBucketingTests(TestCase):
         )
         return s
 
-    def test_answered_editable_open_stays_in_available_not_completed(self):
+    def test_answered_editable_open_moves_to_completed_not_available(self):
         from unittest.mock import patch
 
         s = self._setup_editable('eb_open')
@@ -1566,8 +1572,20 @@ class EditableIndexBucketingTests(TestCase):
             idx = get_survey_index(self.user)
         avail_slugs = {x.survey.slug for x in idx['available_now']}
         comp_slugs = {x.survey.slug for x in idx['completed']}
-        self.assertIn('eb_open', avail_slugs)
-        self.assertNotIn('eb_open', comp_slugs)
+        self.assertNotIn('eb_open', avail_slugs)
+        self.assertIn('eb_open', comp_slugs)
+
+    def test_completed_editable_redirects_to_answer_for_editing(self):
+        from unittest.mock import patch
+
+        s = self._setup_editable('eb_redirect')
+        SurveyResponse.objects.create(user=self.user, survey=s)
+        with patch('surveys.scheduling._today_la_7am', return_value=self.today):
+            idx = get_survey_index(self.user)
+        row = next(x for x in idx['completed'] if x.survey.slug == 'eb_redirect')
+        row.bucket = 'completed'
+        data = SurveyIndexEntrySerializer(row).data
+        self.assertEqual(data['redirect_url'], '/surveys/eb_redirect/answer')
 
     def test_answered_editable_closed_moves_to_completed(self):
         from unittest.mock import patch

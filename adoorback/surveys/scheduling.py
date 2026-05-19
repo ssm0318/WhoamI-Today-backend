@@ -363,18 +363,12 @@ def get_survey_index(user):
         ScheduledSurvey.objects.select_related('survey'), user,
     )
 
-    # Persistent surveys that stay in available_now even after the user
-    # submits, until the researcher closes them:
-    #   - editable: one row per user, re-openable for editing.
-    #   - repeatable: multiple rows allowed (each visit is a fresh entry,
-    #     e.g. anytime_reflection drop-ins).
-    # Both carry `user_answered=True` after first submit, so the frontend
-    # can decide between "Edit" / "Add another" affordances. Once
-    # `survey.closed` flips to True, the row drops from available_now.
-    persistent_open = Q(
-        Q(survey__editable=True) | Q(survey__repeatable=True),
-        survey__closed=False,
-    )
+    # Repeatable surveys stay in available_now after the user submits because
+    # each visit creates another response (e.g. anytime_reflection drop-ins).
+    # Editable one-response surveys move to completed after submit; the
+    # completed row can still link back to /answer for editing without making
+    # the survey look like it is still owed.
+    persistent_open = Q(survey__repeatable=True, survey__closed=False)
 
     available = list(
         qs.filter(window_start__lte=today)
@@ -388,13 +382,12 @@ def get_survey_index(user):
             user_answered=False,
         )
     )
-    # Completed: answered AND (not editable AND not repeatable) OR closed.
-    # Persistent surveys live exclusively in available_now (single source
-    # of truth) while they're still accepting submissions.
+    # Completed: answered non-repeatable surveys, plus closed repeatable
+    # surveys. Open repeatable surveys live exclusively in available_now.
     completed = list(
         qs.filter(user_answered=True).filter(
             Q(survey__closed=True) |
-            Q(survey__editable=False, survey__repeatable=False)
+            Q(survey__repeatable=False)
         )
     )
 
