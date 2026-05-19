@@ -32,6 +32,21 @@ User = get_user_model()
 RECENT_POST_WINDOW = timedelta(hours=24)
 
 
+def validate_friend_evaluation_payload(data):
+    if data.get('evaluation_skipped'):
+        raise serializers.ValidationError({
+            "evaluation_skipped": "Skipping friend evaluation is no longer supported."
+        })
+    if 'evaluation_closeness' not in data:
+        raise serializers.ValidationError({"evaluation_closeness": "This field is required."})
+    if 'evaluation_relationship_type' not in data:
+        raise serializers.ValidationError({"evaluation_relationship_type": "This field is required."})
+    if data.get('evaluation_relationship_type') == 'other' and not data.get('evaluation_relationship_type_detail'):
+        raise serializers.ValidationError({
+            "evaluation_relationship_type_detail": "This field is required when relationship type is 'other'."
+        })
+
+
 def viewer_sees_check_in_component(check_in, profile_user, viewer, visibility_field, updated_at_field):
     """
     Whether `viewer` may see a check-in component's value on another user's profile.
@@ -1210,14 +1225,7 @@ class UserFriendRequestCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"requester_choice": "This field is required."})
 
         # Evaluation validation
-        if not data.get('evaluation_skipped'):
-            if 'evaluation_closeness' in data or 'evaluation_relationship_type' in data:
-                if 'evaluation_closeness' not in data:
-                    raise serializers.ValidationError({"evaluation_closeness": "This field is required when not skipping."})
-                if 'evaluation_relationship_type' not in data:
-                    raise serializers.ValidationError({"evaluation_relationship_type": "This field is required when not skipping."})
-            if data.get('evaluation_relationship_type') == 'other' and not data.get('evaluation_relationship_type_detail'):
-                raise serializers.ValidationError({"evaluation_relationship_type_detail": "This field is required when relationship type is 'other'."})
+        validate_friend_evaluation_payload(data)
 
         return data
 
@@ -1259,14 +1267,7 @@ class UserFriendRequestUpdateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"requestee_choice": "This field is required."})
 
             # Evaluation validation for acceptance
-            if not data.get('evaluation_skipped'):
-                if 'evaluation_closeness' in data or 'evaluation_relationship_type' in data:
-                    if 'evaluation_closeness' not in data:
-                        raise serializers.ValidationError({"evaluation_closeness": "This field is required when not skipping."})
-                    if 'evaluation_relationship_type' not in data:
-                        raise serializers.ValidationError({"evaluation_relationship_type": "This field is required when not skipping."})
-                if data.get('evaluation_relationship_type') == 'other' and not data.get('evaluation_relationship_type_detail'):
-                    raise serializers.ValidationError({"evaluation_relationship_type_detail": "This field is required when relationship type is 'other'."})
+            validate_friend_evaluation_payload(data)
 
         return data
 

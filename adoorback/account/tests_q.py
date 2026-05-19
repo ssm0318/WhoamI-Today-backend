@@ -266,6 +266,8 @@ class CrossVersionFriendRequestTests(APITestCase):
             'requester_id': self.user_w.id,
             'requestee_id': user_w2.id,
             'requester_choice': 'friend',
+            'evaluation_closeness': 4,
+            'evaluation_relationship_type': 'school_friend',
         }
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

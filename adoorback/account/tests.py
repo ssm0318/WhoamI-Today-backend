@@ -1,10 +1,107 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from account.models import Connection
+from django.urls import reverse
+from account.models import Connection, FriendEvaluation, FriendRequest
 from account.serializers import UserProfileSerializer
-from rest_framework.test import APIRequestFactory, APIClient
+from rest_framework import status
+from rest_framework.test import APIRequestFactory, APIClient, APITestCase
 
 User = get_user_model()
+
+
+class FriendEvaluationRequiredTests(APITestCase):
+    def setUp(self):
+        self.requester = User.objects.create_user(
+            username='friend_eval_requester',
+            email='friend_eval_requester@example.com',
+            password='password',
+        )
+        self.requestee = User.objects.create_user(
+            username='friend_eval_requestee',
+            email='friend_eval_requestee@example.com',
+            password='password',
+        )
+        User.objects.create_superuser(
+            username='friend_eval_admin',
+            email='friend_eval_admin@example.com',
+            password='password',
+        )
+        self.client.force_authenticate(user=self.requester)
+        self.create_url = reverse('user-friend-request-list')
+
+    def _valid_request_payload(self):
+        return {
+            'requester_id': self.requester.id,
+            'requestee_id': self.requestee.id,
+            'requester_choice': 'friend',
+            'evaluation_closeness': 4,
+            'evaluation_relationship_type': 'school_friend',
+        }
+
+    def _accept_url(self):
+        return reverse('user-friend-request-update', args=[self.requester.id])
+
+    def _create_pending_request(self):
+        return FriendRequest.objects.create(
+            requester=self.requester,
+            requestee=self.requestee,
+            requester_choice='friend',
+            accepted=None,
+        )
+
+    def test_sending_friend_request_requires_evaluation(self):
+        response = self.client.post(self.create_url, {
+            'requester_id': self.requester.id,
+            'requestee_id': self.requestee.id,
+            'requester_choice': 'friend',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(FriendRequest.objects.exists())
+        self.assertFalse(FriendEvaluation.objects.exists())
+
+    def test_sending_friend_request_rejects_skipped_evaluation(self):
+        payload = self._valid_request_payload()
+        payload.pop('evaluation_closeness')
+        payload.pop('evaluation_relationship_type')
+        payload['evaluation_skipped'] = True
+
+        response = self.client.post(self.create_url, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(FriendRequest.objects.exists())
+        self.assertFalse(FriendEvaluation.objects.exists())
+
+    def test_accepting_friend_request_requires_evaluation(self):
+        self._create_pending_request()
+        self.client.force_authenticate(user=self.requestee)
+
+        response = self.client.patch(self._accept_url(), {
+            'accepted': True,
+            'requestee_choice': 'friend',
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(FriendEvaluation.objects.filter(
+            evaluator=self.requestee,
+            evaluated_user=self.requester,
+        ).exists())
+
+    def test_accepting_friend_request_rejects_skipped_evaluation(self):
+        self._create_pending_request()
+        self.client.force_authenticate(user=self.requestee)
+
+        response = self.client.patch(self._accept_url(), {
+            'accepted': True,
+            'requestee_choice': 'friend',
+            'evaluation_skipped': True,
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(FriendEvaluation.objects.filter(
+            evaluator=self.requestee,
+            evaluated_user=self.requester,
+        ).exists())
 
 class ProfileCountTests(TestCase):
     def setUp(self):
