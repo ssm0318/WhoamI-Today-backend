@@ -506,6 +506,14 @@ def _build_schedule_rows() -> list[dict[str, Any]]:
         priority_windows.FEATURE_Q_FIRST_START,
         priority_windows.FEATURE_DUE_WEEKEND,
     )
+    for seq in (2, 3):
+        _update_schedule_date(
+            rows,
+            'biweekly',
+            seq,
+            priority_windows.PHASE1_DUE,
+            priority_windows.PHASE1_PART2_DUE,
+        )
     _update_schedule_date(rows, 'anytime', 1, priority_windows.ANYTIME_START, None)
 
     for key, row in list(rows.items()):
@@ -1225,6 +1233,17 @@ def render_survey_user_audit_html(audit: dict[str, Any]) -> str:
       likert_6: [1, 6],
       likert_7: [1, 7],
     };
+    const HIGH_PRIORITY_SURVEY_SLUGS = new Set([
+      'phase1_friend_closeness',
+      'phase2_friend_closeness',
+      'feature_eval_w',
+      'mid_study_w',
+      'mid_study_q',
+      'post_study_w',
+      'post_study_q',
+      'goal_comparison_p1',
+      'goal_comparison_p2',
+    ]);
     const state = {
       audience: (AUDIT_DATA.sidebar_simulations[0] || {}).audience || '',
       surveySlug: '',
@@ -1362,6 +1381,7 @@ def render_survey_user_audit_html(audit: dict[str, Any]) -> str:
         >
           <div class="survey-row-top">
             <span class="survey-row-title">${escapeHtml(entry.survey_title || entry.survey_slug)}</span>
+            ${HIGH_PRIORITY_SURVEY_SLUGS.has(entry.survey_slug) ? '<span class="pill red">High priority</span>' : ''}
             <span class="pill gray">${escapeHtml(entry.cadence_label || entry.cadence || '')}</span>
           </div>
           ${entry.subtitle_en ? `<div class="muted">${escapeHtml(entry.subtitle_en)}</div>` : ''}

@@ -179,10 +179,10 @@ class SurveyAuditTests(SimpleTestCase):
             'Rate your closeness with each friend (Phase 1)',
         )
         self.assertEqual(w_mid['window_start'], date(2026, 5, 18).isoformat())
-        self.assertEqual(w_mid['window_end'], date(2026, 5, 18).isoformat())
+        self.assertEqual(w_mid['window_end'], date(2026, 5, 19).isoformat())
         self.assertTrue(w_mid['allow_late'])
         self.assertEqual(q_mid['window_start'], date(2026, 5, 18).isoformat())
-        self.assertEqual(q_mid['window_end'], date(2026, 5, 18).isoformat())
+        self.assertEqual(q_mid['window_end'], date(2026, 5, 19).isoformat())
         self.assertTrue(q_mid['allow_late'])
         self.assertEqual(phase1_goal['window_start'], date(2026, 5, 18).isoformat())
         self.assertEqual(phase1_goal['window_end'], date(2026, 5, 18).isoformat())

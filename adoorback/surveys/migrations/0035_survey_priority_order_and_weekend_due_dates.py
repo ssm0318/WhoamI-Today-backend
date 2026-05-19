@@ -4,6 +4,7 @@ from django.db import migrations
 
 
 PHASE1_DUE = date(2026, 5, 18)
+PHASE1_PART2_DUE = date(2026, 5, 19)
 PHASE2_DUE = date(2026, 5, 31)
 FEATURE_W_FIRST_START = date(2026, 5, 8)
 FEATURE_Q_FIRST_START = date(2026, 5, 22)
@@ -106,11 +107,17 @@ def apply_priority_order_and_windows(apps, schema_editor):
             },
         )
 
-    for cadence, seq in [('endpoint', 4), ('biweekly', 2), ('biweekly', 3)]:
-        ScheduledSurvey.objects.filter(cadence=cadence, sequence_index=seq).update(
-            sidebar_order=SIDEBAR_ORDER[(cadence, seq)],
-        )
+    ScheduledSurvey.objects.filter(cadence='endpoint', sequence_index=4).update(
+        sidebar_order=SIDEBAR_ORDER[('endpoint', 4)],
+    )
 
+    for seq in (2, 3):
+        ScheduledSurvey.objects.filter(cadence='biweekly', sequence_index=seq).update(
+            window_start=PHASE1_DUE,
+            window_end=PHASE1_PART2_DUE,
+            allow_late=True,
+            sidebar_order=SIDEBAR_ORDER[('biweekly', seq)],
+        )
 
 def reverse_priority_order_and_windows(apps, schema_editor):
     Survey = apps.get_model('surveys', 'Survey')
@@ -141,6 +148,11 @@ def reverse_priority_order_and_windows(apps, schema_editor):
         sequence_index=1,
         survey__slug='anytime_reflection',
     ).update(window_start=ANYTIME_START, window_end=PHASE2_DUE)
+    ScheduledSurvey.objects.filter(cadence='biweekly', sequence_index__in=[2, 3]).update(
+        window_start=PHASE1_DUE,
+        window_end=PHASE1_DUE,
+        allow_late=True,
+    )
     for cadence, seq in SIDEBAR_ORDER:
         ScheduledSurvey.objects.filter(cadence=cadence, sequence_index=seq).update(
             sidebar_order=None,
