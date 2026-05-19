@@ -2021,6 +2021,25 @@ def render_survey_priority_audit_html(audit: dict[str, Any]) -> str:
       $("dateFilter").innerHTML = `<option value="${ALL}">All dates</option>` + allDates().map((date) => `<option value="${esc(date)}">${esc(date)}</option>`).join("");
       $("dateFilter").value = state.date;
     }
+    function dateWindowPills(row) {
+      const start = row.window_start || "missing";
+      const end = row.window_end || "none";
+      return `
+        <span class="pill gray">start ${esc(start)}</span>
+        <span class="${row.window_end ? "pill warn" : "pill gray"}">end ${esc(end)}</span>
+        <span class="${row.window_end ? "pill" : "pill gray"}">${row.window_end ? "has deadline" : "no deadline"}</span>
+      `;
+    }
+    function editabilityPill(row) {
+      return row.survey?.editable
+        ? '<span class="pill">editable</span>'
+        : '<span class="pill gray">not editable</span>';
+    }
+    function latePolicyPill(row) {
+      return row.allow_late
+        ? '<span class="pill">late accepted</span>'
+        : '<span class="pill gray">no late accepted</span>';
+    }
     function renderSurveyRow(row) {
       const current = currentOrder(row.id);
       const changed = current !== row.originalOrder;
@@ -2037,14 +2056,14 @@ def render_survey_priority_audit_html(audit: dict[str, Any]) -> str:
         <div class="pill-row">
           <span class="pill">${esc(row.source_file || "missing source")}</span>
           <span class="pill gray">${esc(row.cadence)} #${row.sequence_index}</span>
-          <span class="pill gray">${esc(row.window_start)}${row.window_end ? `-${esc(row.window_end)}` : "+"}</span>
+          ${dateWindowPills(row)}
           <span class="pill gray">${esc(row.audience_label || audienceLabels[row.audience] || row.audience || "")}</span>
           <span class="pill gray">priority ${row.priority}</span>
           <span class="pill gray">original ${row.originalOrder ?? "blank"}</span>
           ${changed ? '<span class="pill warn">changed</span>' : ""}
-          ${row.allow_late ? '<span class="pill">late accepted</span>' : '<span class="pill gray">expires</span>'}
+          ${latePolicyPill(row)}
           ${row.survey?.repeatable ? '<span class="pill">repeatable</span>' : ""}
-          ${row.survey?.editable ? '<span class="pill">editable</span>' : ""}
+          ${editabilityPill(row)}
         </div>
       </article>`;
     }
@@ -2084,6 +2103,11 @@ def render_survey_priority_audit_html(audit: dict[str, Any]) -> str:
           <span class="pill">${currentOrder(entry.id) ?? "blank"}</span>
           <code>${esc(entry.survey_slug)} · ${esc(entry.id)}</code>
           <span class="muted">${entry.window_end && entry.window_end < date ? `Was due ${esc(entry.window_end)}` : ""}</span>
+        </div>
+        <div class="pill-row">
+          ${dateWindowPills(entry)}
+          ${latePolicyPill(entry)}
+          ${editabilityPill(entry)}
         </div>
       </div>`;
     }

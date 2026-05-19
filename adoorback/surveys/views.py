@@ -261,14 +261,21 @@ class SurveyResponseSubmitView(APIView):
                                 ]
                             })
                         if friend_ids is None:
-                            friend_ids = set(
-                                request.user.connected_users.values_list('id', flat=True)
+                            from surveys.friend_scope import (
+                                eligible_friend_ids_for_survey,
+                                is_friend_closeness_survey,
                             )
+                            if is_friend_closeness_survey(survey):
+                                friend_ids = eligible_friend_ids_for_survey(request.user, survey)
+                            else:
+                                friend_ids = set(
+                                    request.user.connected_users.values_list('id', flat=True)
+                                )
                         if target_user_id not in friend_ids:
                             raise ValidationError({
                                 'answers': [
-                                    f'target_user_id {target_user_id} is not on the '
-                                    f'submitter\'s friend list'
+                                    f'target_user_id {target_user_id} is not eligible for '
+                                    f'this per-friend survey'
                                 ]
                             })
                         target_user = target_user_id  # FK by ID assignment

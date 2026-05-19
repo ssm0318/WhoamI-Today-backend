@@ -1374,12 +1374,49 @@ canonical_questions:
   - survey_slug: study_endpoint_part2
     question_slug: profile_carryover_other_text
     equivalence: exact
+- canonical_id: phase1_friend_closeness_part2.current
+  response_type: per_friend_likert_5
+  sources:
+  - survey_slug: phase1_friend_closeness_part2
+    question_slug: phase1_friend_closeness_part2_current
+    equivalence: exact
+- canonical_id: phase1_friend_closeness_part2.corrected_baseline
+  response_type: per_friend_likert_5
+  sources:
+  - survey_slug: phase1_friend_closeness_part2
+    question_slug: phase1_friend_closeness_part2_corrected_baseline
+    equivalence: exact
+- canonical_id: phase1_friend_closeness_part2.offline
+  response_type: per_friend_single_choice
+  sources:
+  - survey_slug: phase1_friend_closeness_part2
+    question_slug: phase1_friend_closeness_part2_offline
+    equivalence: exact
 recovery_surveys:
+- survey_slug: phase1_friend_closeness_part2
+  participant_title: 'Rate your closeness with each friend: Part 2'
+  base_survey_slug: phase1_friend_closeness
+  eligible_if:
+    answered_survey_slug: phase1_friend_closeness
+  full_resubmit_until_answered: true
+  show_all_if_base_unanswered: true
+  replace_base_if_unanswered: true
+  prefill_from_survey_slug: phase1_friend_closeness
+  prefill_question_slug_map:
+    phase1_friend_closeness_current: phase1_friend_closeness_part2_current
+    phase1_friend_closeness_corrected_baseline: phase1_friend_closeness_part2_corrected_baseline
+    phase1_friend_closeness_offline: phase1_friend_closeness_part2_offline
+  collects_canonical_ids:
+  - phase1_friend_closeness_part2.current
+  - phase1_friend_closeness_part2.corrected_baseline
+  - phase1_friend_closeness_part2.offline
 - survey_slug: study_endpoint_part2
   participant_title: 'What happens next with WIT: Part 2'
   base_survey_slug: study_endpoint
   eligible_if:
     answered_survey_slug: study_endpoint
+  show_all_if_base_unanswered: true
+  replace_base_if_unanswered: true
   collects_canonical_ids:
   - study_endpoint.cadence_dailyq_freq
   - study_endpoint.cadence_dailyq_satisfaction
@@ -1412,6 +1449,7 @@ recovery_surveys:
   eligible_if:
     answered_survey_slug: mid_study_w
     user_group: group_w_first
+  show_all_if_base_unanswered: true
   collects_canonical_ids:
   - mid_study_w.would_appreciate
   - mid_study_w.would_not_appreciate
@@ -1421,6 +1459,7 @@ recovery_surveys:
   eligible_if:
     answered_survey_slug: mid_study_q
     user_group: group_q_first
+  show_all_if_base_unanswered: true
   collects_canonical_ids:
   - mid_study_q.would_appreciate
   - mid_study_q.would_not_appreciate
@@ -1436,6 +1475,7 @@ recovery_surveys:
   eligible_if:
     answered_survey_slug: post_study_w
     user_group: group_w_first
+  show_all_if_base_unanswered: true
   collects_canonical_ids:
   - post_study_w.would_appreciate
   - post_study_w.would_not_appreciate
@@ -1447,6 +1487,7 @@ recovery_surveys:
   eligible_if:
     answered_survey_slug: post_study_q
     user_group: group_q_first
+  show_all_if_base_unanswered: true
   collects_canonical_ids:
   - post_study_q.would_appreciate
   - post_study_q.would_not_appreciate
@@ -1463,6 +1504,8 @@ recovery_surveys:
   base_survey_slug: feature_eval_w
   eligible_if:
     answered_survey_slug: feature_eval_w
+  show_all_if_base_unanswered: true
+  replace_base_if_unanswered: true
   collects_canonical_ids:
   - feature_eval_w.goal1_feat_dailyq
   - feature_eval_w.goal1_feat_dailyq_enjoy

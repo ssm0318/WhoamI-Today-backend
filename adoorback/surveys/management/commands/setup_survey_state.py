@@ -293,6 +293,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('[5f] Re-seeding dynamic recovery surveys ...'))
         recovery_module = import_module('surveys.migrations.0039_seed_recovery_surveys')
         recovery_module.seed_recovery_surveys(django_apps, None)
+        friend_closeness_part2_module = import_module(
+            'surveys.migrations.0042_seed_friend_closeness_part2_recovery'
+        )
+        friend_closeness_part2_module.seed_friend_closeness_part2_recovery(django_apps, None)
 
         # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:

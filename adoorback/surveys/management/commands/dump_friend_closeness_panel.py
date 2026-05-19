@@ -2,7 +2,8 @@
 
 Joins three sources at analysis time:
   - FriendEvaluation (per-friend baseline collected at friend-request time)
-  - phase1_friend_closeness SurveyAnswer rows (Day 15)
+  - phase1_friend_closeness_part2 SurveyAnswer rows when present, otherwise
+    phase1_friend_closeness SurveyAnswer rows (Day 15)
   - phase2_friend_closeness SurveyAnswer rows (Day 28)
 
 Each output row is one (evaluator, evaluated_user) pair with the baseline
@@ -34,9 +35,11 @@ from surveys.models import (
 )
 
 
-PHASE_SLUGS = {
-    1: 'phase1_friend_closeness',
-    2: 'phase2_friend_closeness',
+PHASE_SURVEY_SLUGS = {
+    # Part 2 is a clean resubmit of Phase 1 with the corrected prompt/UI, so it
+    # supersedes the original response for analysis when both exist.
+    1: ('phase1_friend_closeness_part2', 'phase1_friend_closeness'),
+    2: ('phase2_friend_closeness',),
 }
 
 # Question-slug suffixes that we surface as separate columns in the CSV.
@@ -73,23 +76,23 @@ class Command(BaseCommand):
             if not evaluator_qs.exists():
                 raise CommandError(f'No user named {user_filter!r}')
 
-        phase_surveys = {
-            phase: Survey.objects.filter(slug=slug).first()
-            for phase, slug in PHASE_SLUGS.items()
-        }
-        # Build {phase → {slug → SurveyQuestion}} so we can map per-phase
-        # answer rows back to the column suffix without re-querying.
-        questions_by_phase: dict[int, dict[str, SurveyQuestion]] = {}
-        for phase, survey in phase_surveys.items():
-            if survey is None:
+        phase_surveys = {}
+        questions_by_phase: dict[int, dict[int, dict[str, SurveyQuestion]]] = {}
+        for phase, slugs in PHASE_SURVEY_SLUGS.items():
+            by_slug = {
+                survey.slug: survey
+                for survey in Survey.objects.filter(slug__in=slugs).prefetch_related('questions')
+            }
+            missing = [slug for slug in slugs if slug not in by_slug]
+            for slug in missing:
                 self.stderr.write(
-                    f'warning: {PHASE_SLUGS[phase]} survey not loaded; '
-                    f'phase {phase} columns will be empty'
+                    f'warning: {slug} survey not loaded; it will be skipped for phase {phase}'
                 )
-                questions_by_phase[phase] = {}
-                continue
+            ordered_surveys = [by_slug[slug] for slug in slugs if slug in by_slug]
+            phase_surveys[phase] = ordered_surveys
             questions_by_phase[phase] = {
-                q.slug: q for q in survey.questions.all()
+                survey.id: {q.slug: q for q in survey.questions.all()}
+                for survey in ordered_surveys
             }
 
         out_stream = sys.stdout
@@ -143,7 +146,7 @@ class Command(BaseCommand):
                 phase_surveys.get(phase),
                 questions_by_phase.get(phase, {}),
             )
-            for phase in PHASE_SLUGS
+            for phase in PHASE_SURVEY_SLUGS
         }
 
         target_ids: set[int] = set(baselines.keys())
@@ -198,20 +201,30 @@ class Command(BaseCommand):
         return result
 
     def _answers_by_target(
-        self, evaluator, survey, slug_to_question,
+        self, evaluator, surveys, questions_by_survey,
     ) -> dict[int, dict[str, object]]:
         """{target_user_id → {column_suffix → answer.value}}.
 
-        Empty when the user has no response for this survey.
+        Empty when the user has no response for any preferred survey. When
+        multiple survey slugs are configured for a phase, the first one with
+        a response wins.
         """
-        if survey is None or not slug_to_question:
+        if not surveys:
             return {}
-        response = (
-            SurveyResponse.objects
-            .filter(survey=survey, user=evaluator)
-            .order_by('-submitted_at')
-            .first()
-        )
+        response = None
+        slug_to_question = {}
+        for survey in surveys:
+            slug_to_question = questions_by_survey.get(survey.id, {})
+            if not slug_to_question:
+                continue
+            response = (
+                SurveyResponse.objects
+                .filter(survey=survey, user=evaluator)
+                .order_by('-submitted_at', '-id')
+                .first()
+            )
+            if response is not None:
+                break
         if response is None:
             return {}
         result: dict[int, dict[str, object]] = {}
@@ -236,13 +249,13 @@ class Command(BaseCommand):
 def _column_suffix(question_slug: str) -> Optional[str]:
     """Map question slug to one of COLUMN_SUFFIXES, or None if not relevant.
 
-    phase{1,2}_friend_closeness_current        → 'current'
-    phase{1,2}_friend_closeness_corrected_baseline → 'corrected_baseline'
-    phase{1,2}_friend_closeness_offline        → 'offline'
+    phase1_friend_closeness_current              → 'current'
+    phase1_friend_closeness_part2_current        → 'current'
+    phase2_friend_closeness_corrected_baseline   → 'corrected_baseline'
+    phase2_friend_closeness_offline              → 'offline'
     """
     for suffix in COLUMN_SUFFIXES:
-        # Endswith match handles both phase1_ and phase2_ prefixes uniformly.
-        if question_slug.endswith(f'_closeness_{suffix}'):
+        if question_slug.endswith(f'_{suffix}'):
             return suffix
     return None
 

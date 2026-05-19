@@ -53,6 +53,79 @@ def _response_as_draft_payload(response: SurveyResponse) -> dict:
     }
 
 
+def _recovery_prefill_as_draft_payload(survey: Survey, user) -> dict | None:
+    """Build an initial draft for recovery surveys from a mapped source response.
+
+    This is intentionally read-only: the source survey response remains
+    unchanged, and the recovery survey gets its own response on submit. For
+    per-friend questions, only currently connected friends are copied so the
+    frontend does not re-submit target_user_ids that the submit endpoint would
+    reject as stale.
+    """
+    from surveys.recovery import recovery_definition_for_survey_slug
+
+    recovery = recovery_definition_for_survey_slug(survey.slug)
+    if not recovery:
+        return None
+    source_slug = recovery.get('prefill_from_survey_slug')
+    question_slug_map = recovery.get('prefill_question_slug_map') or {}
+    if not source_slug or not question_slug_map:
+        return None
+
+    source_response = (
+        SurveyResponse.objects
+        .filter(user=user, survey__slug=source_slug)
+        .select_related('survey')
+        .prefetch_related('answers__question')
+        .order_by('-submitted_at', '-id')
+        .first()
+    )
+    if source_response is None:
+        return None
+
+    target_questions = {
+        q.slug: q for q in survey.questions.all()
+    }
+    source_to_target = {
+        source_slug: target_questions[target_slug]
+        for source_slug, target_slug in question_slug_map.items()
+        if target_slug in target_questions
+    }
+    if not source_to_target:
+        return None
+
+    from surveys.friend_scope import eligible_friend_ids_for_survey
+
+    friend_ids = eligible_friend_ids_for_survey(user, survey)
+    answers = {}
+    for answer in source_response.answers.select_related('question').order_by(
+        'question__order', 'target_user_id',
+    ):
+        target_question = source_to_target.get(answer.question.slug)
+        if target_question is None:
+            continue
+        question_id = str(target_question.id)
+        if answer.question.type in PER_FRIEND_TYPES or target_question.type in PER_FRIEND_TYPES:
+            if answer.target_user_id is None or answer.target_user_id not in friend_ids:
+                continue
+            answers.setdefault(question_id, {})[str(answer.target_user_id)] = answer.value
+            continue
+        answers[question_id] = answer.value
+
+    if not answers:
+        return None
+
+    total_pages = _page_count_for_questions(survey.questions.order_by('order'))
+    return {
+        'answers': answers,
+        'current_page_index': 0,
+        'total_pages': total_pages,
+        'answered_pages': total_pages,
+        'progress_pct': 100 if total_pages else 0,
+        'saved_at': source_response.submitted_at,
+    }
+
+
 def validate_answer_value(question: SurveyQuestion, value) -> None:
     """Per-question-type validation for an inbound SurveyAnswer value.
 
@@ -175,7 +248,7 @@ class SurveyMinimalSerializer(serializers.ModelSerializer):
         return data
 
 
-def _expand_per_friend_questions(questions_data, questions_qs, *, viewer, survey_tokens):
+def _expand_per_friend_questions(questions_data, questions_qs, *, viewer, survey, survey_tokens):
     """Fan out per_friend_* question rows into one virtual row per friend.
 
     Per-friend question types render once per friend the viewer currently
@@ -196,7 +269,9 @@ def _expand_per_friend_questions(questions_data, questions_qs, *, viewer, survey
     if not has_per_friend:
         return questions_data
 
-    friends = list(viewer.connected_users.order_by('username'))
+    from surveys.friend_scope import eligible_friends_for_survey
+
+    friends = eligible_friends_for_survey(viewer, survey)
     if not friends:
         return [
             q for q, qm in zip(questions_data, questions_qs)
@@ -317,6 +392,7 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
                 question_data,
                 question_models,
                 viewer=viewer,
+                survey=instance,
                 survey_tokens=tokens,
             )
         return data
@@ -357,9 +433,9 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
                 return _response_as_draft_payload(existing)
             return None
         draft = SurveyDraft.objects.filter(survey=obj, user=request.user).first()
-        if draft is None:
-            return None
-        return SurveyDraftSerializer(draft).data
+        if draft is not None:
+            return SurveyDraftSerializer(draft).data
+        return _recovery_prefill_as_draft_payload(obj, request.user)
 
     def _point_lock(self, obj):
         request = self.context.get('request')

@@ -419,6 +419,9 @@ def get_survey_index(user):
                 continue
             if _skip_for_serving_condition(sched.survey, user_data):
                 continue
+            from surveys.recovery import replacement_recovery_slug_for_base_unanswered
+            if replacement_recovery_slug_for_base_unanswered(user, sched.survey):
+                continue
             if _has_unresolved_tokens(sched.survey):
                 # Hide the row from `available_now` / `late_but_accepted`
                 # — opening it would reveal literal `{{token}}` text. The

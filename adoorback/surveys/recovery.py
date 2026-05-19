@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +9,9 @@ import yaml
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from surveys.models import INPUT_LESS_TYPES, SurveyAnswer, SurveyQuestion, SurveyResponse
+from surveys.models import (
+    INPUT_LESS_TYPES, ScheduledSurvey, SurveyAnswer, SurveyQuestion, SurveyResponse,
+)
 
 
 DEFAULT_RECOVERY_MANIFEST_PATH = Path(__file__).resolve().parent / 'fixtures' / 'recovery_question_map.yaml'
@@ -17,6 +20,12 @@ MERGEABLE_EQUIVALENCE = frozenset({'exact', 'compatible'})
 
 def load_recovery_manifest(path: str | Path | None = None) -> dict[str, Any]:
     manifest_path = Path(path) if path else DEFAULT_RECOVERY_MANIFEST_PATH
+    return _load_recovery_manifest_cached(str(manifest_path), manifest_path.stat().st_mtime_ns)
+
+
+@lru_cache(maxsize=8)
+def _load_recovery_manifest_cached(path: str, _mtime_ns: int) -> dict[str, Any]:
+    manifest_path = Path(path)
     with manifest_path.open(encoding='utf-8') as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
@@ -132,8 +141,14 @@ def missing_recovery_question_slugs_for_user(user, survey, manifest: dict[str, A
     recovery = recovery_definition_for_survey_slug(survey.slug, manifest)
     if recovery is None:
         return None
+    if _user_should_answer_full_recovery(user, recovery):
+        return _all_input_question_slugs(survey)
     if not _user_matches_recovery_rule(user, recovery.get('eligible_if', {})):
         return set()
+    if recovery.get('full_resubmit_until_answered'):
+        if SurveyResponse.objects.filter(user=user, survey=survey).exists():
+            return set()
+        return _all_input_question_slugs(survey)
 
     canonical_by_id = {
         item['canonical_id']: item
@@ -177,6 +192,54 @@ def recovery_survey_has_visible_questions_for_user(user, survey) -> bool:
     return bool(question_ids)
 
 
+def replacement_recovery_slug_for_base_unanswered(user, base_survey) -> str | None:
+    """Return the replacement Part survey slug for an unanswered base survey.
+
+    This is an index-level routing helper: old base rows are hidden when a
+    replacement container exists, but direct old-survey URLs/submits remain
+    allowed so stale in-progress sessions do not lose their answers.
+    """
+    manifest = load_recovery_manifest()
+    if SurveyResponse.objects.filter(user=user, survey=base_survey).exists():
+        return None
+    for recovery in manifest.get('recovery_surveys', []):
+        if recovery.get('base_survey_slug') != base_survey.slug:
+            continue
+        if not recovery.get('replace_base_if_unanswered'):
+            continue
+        if not _user_matches_recovery_rule(
+            user,
+            recovery.get('eligible_if', {}),
+            require_answered=False,
+        ):
+            continue
+        recovery_slug = recovery.get('survey_slug', '')
+        if recovery_slug and ScheduledSurvey.objects.filter(survey__slug=recovery_slug).exists():
+            return recovery_slug
+    return None
+
+
+def _user_should_answer_full_recovery(user, recovery: dict[str, Any]) -> bool:
+    base_slug = recovery.get('base_survey_slug', '')
+    if not base_slug or not recovery.get('show_all_if_base_unanswered'):
+        return False
+    if not _user_matches_recovery_rule(
+        user,
+        recovery.get('eligible_if', {}),
+        require_answered=False,
+    ):
+        return False
+    return not SurveyResponse.objects.filter(user=user, survey__slug=base_slug).exists()
+
+
+def _all_input_question_slugs(survey) -> set[str]:
+    return set(
+        survey.questions
+        .exclude(type__in=INPUT_LESS_TYPES)
+        .values_list('slug', flat=True)
+    )
+
+
 def _eligible_users(rule: dict[str, Any]):
     User = get_user_model()
     qs = User.objects.filter(is_active=True, is_staff=False).order_by('username', 'id')
@@ -196,14 +259,19 @@ def _eligible_users(rule: dict[str, Any]):
     return list(qs)
 
 
-def _user_matches_recovery_rule(user, rule: dict[str, Any]) -> bool:
+def _user_matches_recovery_rule(
+    user,
+    rule: dict[str, Any],
+    *,
+    require_answered: bool = True,
+) -> bool:
     if not getattr(user, 'is_active', False) or getattr(user, 'is_staff', False):
         return False
     user_group = rule.get('user_group')
     if user_group and getattr(user, 'user_group', '') != user_group:
         return False
     answered_survey_slug = rule.get('answered_survey_slug')
-    if answered_survey_slug and not SurveyResponse.objects.filter(
+    if require_answered and answered_survey_slug and not SurveyResponse.objects.filter(
         user=user,
         survey__slug=answered_survey_slug,
     ).exists():

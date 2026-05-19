@@ -51,8 +51,8 @@
       slug: phase1_friend_closeness_intro
       type: display_only
       content:
-        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you interact in person. Tap their name to open their profile if you need a refresher on who they are."
-        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 직접 만나 얼마나 자주 교류하는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
+        en: "One card per friend. For each friend below, rate how close you feel now and how often you interact in person. If we have an earlier rating, you'll see an option to correct it only if it was a genuine mistake. If we don't have one, answer the earlier-rating item only if you can remember it accurately from a specific memory anchor; otherwise choose \"I'm not sure.\" Tap their name to open their profile if you need a refresher on who they are."
+        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 지금 얼마나 가까운지와 직접 만나 얼마나 자주 교류하는지를 평가해 주세요. 이전 평가가 있으면 진짜 실수였을 때만 수정할 수 있는 선택지가 보여요. 이전 평가가 없으면 구체적인 기억 근거로 정확히 떠올릴 수 있을 때만 그때의 평가를 답하고, 아니면 \"잘 모르겠어요\"를 선택해 주세요. 이름을 누르면 프로필이 열려요."
 
     - order: 2
       slug: phase1_friend_closeness_current
@@ -115,8 +115,8 @@
       slug: phase2_friend_closeness_intro
       type: display_only
       content:
-        en: "One card per friend. For each friend below you'll see what you said about them when you added them, then rate how close you feel now and how often you interact in person. Tap their name to open their profile if you need a refresher on who they are."
-        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 친구를 추가할 때 평가했던 내용이 먼저 보이고, 그 다음 지금 얼마나 가까운지와 직접 만나 얼마나 자주 교류하는지를 평가하시면 돼요. 이름을 누르면 프로필이 열려요."
+        en: "One card per friend. For each friend below, rate how close you feel now and how often you interact in person. If we have an earlier rating, you'll see an option to correct it only if it was a genuine mistake. If we don't have one, answer the earlier-rating item only if you can remember it accurately from a specific memory anchor; otherwise choose \"I'm not sure.\" Tap their name to open their profile if you need a refresher on who they are."
+        ko: "친구 한 명당 한 장씩 카드가 나옵니다. 지금 얼마나 가까운지와 직접 만나 얼마나 자주 교류하는지를 평가해 주세요. 이전 평가가 있으면 진짜 실수였을 때만 수정할 수 있는 선택지가 보여요. 이전 평가가 없으면 구체적인 기억 근거로 정확히 떠올릴 수 있을 때만 그때의 평가를 답하고, 아니면 \"잘 모르겠어요\"를 선택해 주세요. 이름을 누르면 프로필이 열려요."
 
     - order: 2
       slug: phase2_friend_closeness_current

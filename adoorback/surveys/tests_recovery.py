@@ -1,3 +1,5 @@
+import csv
+import datetime
 import tempfile
 from importlib import import_module
 from pathlib import Path
@@ -7,9 +9,11 @@ from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from account.models import Connection
 from surveys.models import (
     CADENCE_ENDPOINT, Survey, SurveyAnswer, SurveyQuestion, SurveyResponse,
     ScheduledSurvey,
@@ -341,6 +345,22 @@ class RecoverySurveyApiTests(APITestCase):
         available_slugs = [row['survey']['slug'] for row in response.json()['available_now']]
         self.assertNotIn('feature_eval_w_part2', available_slugs)
 
+    def test_recovery_replacement_shows_full_part_when_base_unanswered(self):
+        self._survey('feature_eval_w')
+        recovery = self._survey('feature_eval_w_part2', repeatable=True)
+        rating = self._question(recovery, 'goal1_feat_dailyq', 1, 'likert_5')
+        enjoy = self._question(recovery, 'goal1_feat_dailyq_enjoy', 2)
+        dislike = self._question(recovery, 'goal1_feat_dailyq_dislike', 3)
+        self._schedule_open(recovery)
+
+        response = self.client.get('/api/surveys/feature_eval_w_part2/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [q['slug'] for q in response.json()['questions']],
+            [rating.slug, enjoy.slug, dislike.slug],
+        )
+
     def test_recovery_submit_rejects_non_missing_question_and_accepts_missing_question(self):
         base = self._survey('feature_eval_w')
         rating = self._question(base, 'goal1_feat_dailyq', 1, 'likert_5')
@@ -371,6 +391,298 @@ class RecoverySurveyApiTests(APITestCase):
             SurveyAnswer.objects.filter(question=enjoy, response__user=self.user).exists()
         )
 
+    def test_full_resubmit_recovery_shows_all_questions_until_part2_answered(self):
+        friend = get_user_model().objects.create(
+            username='recover_friend',
+            email='recover_friend@example.com',
+        )
+        connection = Connection.objects.create(
+            user1=self.user,
+            user2=friend,
+            user1_choice='friend',
+            user2_choice='friend',
+        )
+        Connection.objects.filter(id=connection.id).update(
+            created_at=timezone.now() - datetime.timedelta(days=4),
+        )
+        base = self._survey('phase1_friend_closeness')
+        SurveyResponse.objects.create(user=self.user, survey=base)
+
+        recovery = self._survey('phase1_friend_closeness_part2', repeatable=True)
+        current = self._question(
+            recovery,
+            'phase1_friend_closeness_part2_current',
+            1,
+            'per_friend_likert_5',
+        )
+        corrected = self._question(
+            recovery,
+            'phase1_friend_closeness_part2_corrected_baseline',
+            2,
+            'per_friend_likert_5',
+        )
+        offline = self._question(
+            recovery,
+            'phase1_friend_closeness_part2_offline',
+            3,
+            'per_friend_single_choice',
+        )
+        self._schedule_open(recovery)
+
+        before = self.client.get('/api/surveys/index/')
+        self.assertEqual(before.status_code, status.HTTP_200_OK)
+        available_slugs = [row['survey']['slug'] for row in before.json()['available_now']]
+        self.assertIn('phase1_friend_closeness_part2', available_slugs)
+
+        detail = self.client.get('/api/surveys/phase1_friend_closeness_part2/')
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [q['slug'] for q in detail.json()['questions']],
+            [
+                current.slug,
+                corrected.slug,
+                offline.slug,
+            ],
+        )
+
+        submitted = self.client.post(
+            '/api/surveys/phase1_friend_closeness_part2/responses/',
+            {
+                'answers': [
+                    {
+                        'question_id': current.id,
+                        'target_user_id': friend.id,
+                        'value': 4,
+                    },
+                    {
+                        'question_id': offline.id,
+                        'target_user_id': friend.id,
+                        'value': 'weekly',
+                    },
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(submitted.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(
+            SurveyAnswer.objects.filter(question=corrected, response__user=self.user).exists()
+        )
+
+        after = self.client.get('/api/surveys/index/')
+        self.assertEqual(after.status_code, status.HTTP_200_OK)
+        available_slugs = [row['survey']['slug'] for row in after.json()['available_now']]
+        self.assertNotIn('phase1_friend_closeness_part2', available_slugs)
+
+    def test_friend_closeness_part2_prefills_from_part1_eligible_friends_only(self):
+        User = get_user_model()
+        friend = User.objects.create(
+            username='recover_friend',
+            email='recover_friend@example.com',
+        )
+        stale_nonfriend = User.objects.create(
+            username='stale_nonfriend',
+            email='stale_nonfriend@example.com',
+        )
+        connection = Connection.objects.create(
+            user1=self.user,
+            user2=friend,
+            user1_choice='friend',
+            user2_choice='friend',
+        )
+        Connection.objects.filter(id=connection.id).update(
+            created_at=timezone.now() - datetime.timedelta(days=4),
+        )
+        base = self._survey('phase1_friend_closeness')
+        base_current = self._question(
+            base,
+            'phase1_friend_closeness_current',
+            1,
+            'per_friend_likert_5',
+        )
+        base_corrected = self._question(
+            base,
+            'phase1_friend_closeness_corrected_baseline',
+            2,
+            'per_friend_likert_5',
+        )
+        base_offline = self._question(
+            base,
+            'phase1_friend_closeness_offline',
+            3,
+            'per_friend_single_choice',
+        )
+        source_response = SurveyResponse.objects.create(user=self.user, survey=base)
+        SurveyAnswer.objects.create(
+            response=source_response,
+            question=base_current,
+            target_user=friend,
+            value=4,
+        )
+        SurveyAnswer.objects.create(
+            response=source_response,
+            question=base_corrected,
+            target_user=friend,
+            value=2,
+        )
+        SurveyAnswer.objects.create(
+            response=source_response,
+            question=base_offline,
+            target_user=friend,
+            value='weekly',
+        )
+        SurveyAnswer.objects.create(
+            response=source_response,
+            question=base_current,
+            target_user=stale_nonfriend,
+            value=1,
+        )
+
+        recovery = self._survey('phase1_friend_closeness_part2', repeatable=True)
+        current = self._question(
+            recovery,
+            'phase1_friend_closeness_part2_current',
+            1,
+            'per_friend_likert_5',
+        )
+        corrected = self._question(
+            recovery,
+            'phase1_friend_closeness_part2_corrected_baseline',
+            2,
+            'per_friend_likert_5',
+        )
+        offline = self._question(
+            recovery,
+            'phase1_friend_closeness_part2_offline',
+            3,
+            'per_friend_single_choice',
+        )
+        self._schedule_open(recovery)
+
+        response = self.client.get('/api/surveys/phase1_friend_closeness_part2/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        draft = response.json()['draft']
+        self.assertIsNotNone(draft)
+        self.assertEqual(
+            draft['answers'][str(current.id)],
+            {str(friend.id): 4},
+        )
+        self.assertEqual(
+            draft['answers'][str(corrected.id)],
+            {str(friend.id): 2},
+        )
+        self.assertEqual(
+            draft['answers'][str(offline.id)],
+            {str(friend.id): 'weekly'},
+        )
+        self.assertNotIn(str(stale_nonfriend.id), draft['answers'][str(current.id)])
+
+
+class FriendClosenessPanelDumpTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create(
+            username='panel_user',
+            email='panel_user@example.com',
+        )
+        self.friend = User.objects.create(
+            username='panel_friend',
+            email='panel_friend@example.com',
+        )
+
+    def _survey(self, slug):
+        return Survey.objects.create(
+            slug=slug,
+            title_en=slug,
+            title_ko=slug,
+            results_hidden=True,
+        )
+
+    def _question(self, survey, slug, order, qtype='per_friend_likert_5'):
+        return SurveyQuestion.objects.create(
+            survey=survey,
+            slug=slug,
+            order=order,
+            type=qtype,
+            prompt_en=slug,
+            prompt_ko=slug,
+        )
+
+    def test_dump_prefers_phase1_part2_over_original_phase1_response(self):
+        phase1 = self._survey('phase1_friend_closeness')
+        phase1_current = self._question(
+            phase1,
+            'phase1_friend_closeness_current',
+            1,
+        )
+        part2 = self._survey('phase1_friend_closeness_part2')
+        part2_current = self._question(
+            part2,
+            'phase1_friend_closeness_part2_current',
+            1,
+        )
+        p1_response = SurveyResponse.objects.create(user=self.user, survey=phase1)
+        SurveyAnswer.objects.create(
+            response=p1_response,
+            question=phase1_current,
+            target_user=self.friend,
+            value=2,
+        )
+        part2_response = SurveyResponse.objects.create(user=self.user, survey=part2)
+        SurveyAnswer.objects.create(
+            response=part2_response,
+            question=part2_current,
+            target_user=self.friend,
+            value=5,
+        )
+        out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+        out.close()
+
+        call_command(
+            'dump_friend_closeness_panel',
+            '--user',
+            self.user.username,
+            '--out',
+            out.name,
+        )
+
+        with open(out.name, newline='') as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['evaluated_user_username'], self.friend.username)
+        self.assertEqual(rows[0]['phase1_current_closeness'], '5')
+
+    def test_dump_falls_back_to_original_phase1_when_part2_missing(self):
+        phase1 = self._survey('phase1_friend_closeness')
+        phase1_current = self._question(
+            phase1,
+            'phase1_friend_closeness_current',
+            1,
+        )
+        p1_response = SurveyResponse.objects.create(user=self.user, survey=phase1)
+        SurveyAnswer.objects.create(
+            response=p1_response,
+            question=phase1_current,
+            target_user=self.friend,
+            value=3,
+        )
+        out = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
+        out.close()
+
+        call_command(
+            'dump_friend_closeness_panel',
+            '--user',
+            self.user.username,
+            '--out',
+            out.name,
+        )
+
+        with open(out.name, newline='') as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['phase1_current_closeness'], '3')
+
 
 class RecoveryFixtureTests(TestCase):
     def test_recovery_fixture_loads_public_part_surveys_without_internal_copy(self):
@@ -383,6 +695,7 @@ class RecoveryFixtureTests(TestCase):
             'phase2_reflection_part3_w',
             'phase2_reflection_part3_q',
             'feature_eval_w_part2',
+            'phase1_friend_closeness_part2',
         }
         self.assertEqual(
             set(Survey.objects.filter(slug__in=expected_slugs).values_list('slug', flat=True)),
@@ -423,6 +736,19 @@ class RecoveryFixtureTests(TestCase):
             'group_q_first',
         )
         self.assertEqual(by_slug['feature_eval_w_part2'].target_user_group, '')
+
+    def test_friend_closeness_part2_schedule_seeder_creates_open_row(self):
+        call_command('load_surveys', str(RECOVERY_FIXTURE_PATH))
+        module = import_module('surveys.migrations.0042_seed_friend_closeness_part2_recovery')
+
+        module.seed_friend_closeness_part2_recovery(django_apps, None)
+
+        row = ScheduledSurvey.objects.get(
+            cadence=CADENCE_ENDPOINT,
+            sequence_index=26,
+        )
+        self.assertEqual(row.survey.slug, 'phase1_friend_closeness_part2')
+        self.assertTrue(row.allow_late)
 
     def test_recovery_manifest_sources_exist_in_recovery_fixture(self):
         call_command('load_surveys', str(RECOVERY_FIXTURE_PATH))

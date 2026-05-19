@@ -1730,3 +1730,56 @@
     result_hidden: true
     embedded_data: false
     min_length: 0
+
+- slug: phase1_friend_closeness_part2
+  type: per_friend_likert_5
+  title:
+    en: 'Rate your closeness with each friend: Part 2'
+    ko: '친구별 친밀감 평가: Part 2'
+  description:
+    en: 'Please re-answer these friend-by-friend closeness questions once more. This version includes a clearer prior-rating step.'
+    ko: '친구별 친밀감 질문에 한 번 더 답해 주세요. 이번 버전에는 이전 평가 단계를 더 명확하게 넣었습니다.'
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  priority: 100
+  point_value: 0
+  tokens:
+    phase_label: "Phase 1"
+  questions:
+  - order: 1
+    slug: phase1_friend_closeness_part2_current
+    type: per_friend_likert_5
+    prompt:
+      en: "How close do you feel to {{friend_name}} right now?"
+      ko: "지금 {{friend_name}} 님과 얼마나 가깝다고 느끼나요?"
+    low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
+    high_label: { en: "Extremely close",  ko: "매우 가까움" }
+    reverse_scored: false
+    required: true
+    result_hidden: true
+  - order: 2
+    slug: phase1_friend_closeness_part2_corrected_baseline
+    type: per_friend_likert_5
+    prompt:
+      en: "What should the earlier rating have been?"
+      ko: "그때의 평가는 몇 점이었어야 하나요?"
+    low_label:  { en: "Not at all close", ko: "전혀 가깝지 않음" }
+    high_label: { en: "Extremely close",  ko: "매우 가까움" }
+    reverse_scored: false
+    required: false
+    result_hidden: true
+  - order: 3
+    slug: phase1_friend_closeness_part2_offline
+    type: per_friend_single_choice
+    prompt:
+      en: "How often do you usually interact with {{friend_name}} in person?"
+      ko: "{{friend_name}} 님과 직접 만나 얼마나 자주 교류하나요?"
+    options:
+    - { order: 1, value: "never",     label: { en: "Never",                              ko: "전혀 만나지 않음" } }
+    - { order: 2, value: "rarely",    label: { en: "Rarely (a few times a year)",        ko: "드물게 (일 년에 몇 번)" } }
+    - { order: 3, value: "monthly",   label: { en: "About monthly",                      ko: "한 달에 한 번 정도" } }
+    - { order: 4, value: "weekly",    label: { en: "About weekly",                       ko: "일주일에 한 번 정도" } }
+    - { order: 5, value: "daily_ish", label: { en: "Daily or almost daily",              ko: "거의 매일" } }
+    required: true
+    result_hidden: true

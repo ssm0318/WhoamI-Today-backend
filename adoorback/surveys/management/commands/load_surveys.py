@@ -179,7 +179,10 @@ class Command(BaseCommand):
 
         should_replace_questions = replace_questions or created
         if not should_replace_questions and replace_questions_if_unanswered:
-            should_replace_questions = not survey.responses.exists()
+            should_replace_questions = (
+                not survey.responses.exists()
+                and not survey.drafts.exists()
+            )
 
         if should_replace_questions:
             survey.questions.all().delete()

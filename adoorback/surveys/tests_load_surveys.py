@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 
-from surveys.models import Survey, SurveyAnswer, SurveyResponse
+from surveys.models import Survey, SurveyAnswer, SurveyDraft, SurveyResponse
 
 
 PRE_FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'pre.yaml'
@@ -184,6 +184,55 @@ class LoadSurveysCommandTests(TestCase):
         question = survey.questions.get(slug='old_question')
         response = SurveyResponse.objects.create(user=user, survey=survey)
         SurveyAnswer.objects.create(response=response, question=question, value=4)
+        second = self._write_fixture([
+            {
+                'slug': 'unit_test_a',
+                'type': 'likert_5',
+                'title': {'en': 'Updated'},
+                'questions': [
+                    {
+                        'order': 1,
+                        'slug': 'new_question',
+                        'prompt': {'en': 'New question'},
+                    },
+                ],
+            },
+        ])
+
+        call_command('load_surveys', str(second), '--replace-questions-if-unanswered')
+
+        survey.refresh_from_db()
+        self.assertEqual(survey.title_en, 'Updated')
+        self.assertEqual(
+            list(survey.questions.order_by('order').values_list('slug', flat=True)),
+            ['old_question'],
+        )
+
+    def test_replace_questions_if_unanswered_preserves_survey_with_draft(self):
+        User = get_user_model()
+        user = User.objects.create(username='draft_user', email='draft_user@example.com')
+        first = self._write_fixture([
+            {
+                **SAMPLE[0],
+                'questions': [
+                    {
+                        **SAMPLE[0]['questions'][0],
+                        'slug': 'old_question',
+                    },
+                ],
+            },
+        ])
+        call_command('load_surveys', str(first))
+        survey = Survey.objects.get(slug='unit_test_a')
+        SurveyDraft.objects.create(
+            user=user,
+            survey=survey,
+            answers={'old_question': 4},
+            current_page_index=0,
+            total_pages=1,
+            answered_pages=1,
+            progress_pct=100,
+        )
         second = self._write_fixture([
             {
                 'slug': 'unit_test_a',

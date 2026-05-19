@@ -291,6 +291,9 @@ class SurveyAuditTests(SimpleTestCase):
         self.assertIn('Conflicting date orders', html)
         self.assertIn('apply_survey_sidebar_order', html)
         self.assertIn('habit_platform', html)
+        self.assertIn('has deadline', html)
+        self.assertIn('no deadline', html)
+        self.assertIn('not editable', html)
 
 
 class SurveySidebarOrderCommandTests(TestCase):
