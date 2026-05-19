@@ -306,7 +306,7 @@ class RecoverySurveyApiTests(APITestCase):
     def test_recovery_detail_only_returns_missing_final_questions(self):
         base = self._survey('feature_eval_w')
         answered_rating = self._question(base, 'goal1_feat_dailyq', 1, 'likert_5')
-        related_only = self._question(base, 'goal2_feat_chatstatus', 2, 'likert_5')
+        related_only = self._question(base, 'goal4_feat_social_battery', 2, 'likert_5')
         self._answer(self.user, base, answered_rating, value=4)
         self._answer(self.user, base, related_only, value=5)
 
@@ -452,7 +452,7 @@ class RecoveryFixtureTests(TestCase):
 
 
 class FeatureEvalWFinalSetMigrationTests(TestCase):
-    def test_migration_adds_final_social_battery_feature_and_hides_obsolete_features(self):
+    def test_migration_adds_final_social_battery_feature_and_hides_obsolete_feature(self):
         User = get_user_model()
         user = User.objects.create(username='feature_user', email='feature_user@example.com')
         survey = Survey.objects.create(slug='feature_eval_w', title_en='Ver.W features')
@@ -463,12 +463,12 @@ class FeatureEvalWFinalSetMigrationTests(TestCase):
             type='likert_5',
             prompt_en='**Browsing modes** — I liked this feature.',
         )
-        obsolete_chatstatus = SurveyQuestion.objects.create(
+        obsolete_availability = SurveyQuestion.objects.create(
             survey=survey,
             order=2,
             slug='goal2_feat_chatstatus',
             type='likert_5',
-            prompt_en='**Chat status options** — I liked this feature.',
+            prompt_en='**Obsolete availability item** — I liked this feature.',
         )
         obsolete_social = SurveyQuestion.objects.create(
             survey=survey,
@@ -485,7 +485,7 @@ class FeatureEvalWFinalSetMigrationTests(TestCase):
             prompt_en='**Granular subscription to friends** — I liked this feature.',
         )
         response = SurveyResponse.objects.create(user=user, survey=survey)
-        SurveyAnswer.objects.create(response=response, question=obsolete_chatstatus, value=4)
+        SurveyAnswer.objects.create(response=response, question=obsolete_availability, value=4)
         SurveyAnswer.objects.create(response=response, question=obsolete_social, value=5)
 
         module = import_module('surveys.migrations.0040_feature_eval_w_final_feature_set')
@@ -507,15 +507,75 @@ class FeatureEvalWFinalSetMigrationTests(TestCase):
         ]:
             self.assertTrue(SurveyQuestion.objects.filter(survey=survey, slug=slug).exists())
 
-        obsolete_chatstatus.refresh_from_db()
+        obsolete_availability.refresh_from_db()
         obsolete_social.refresh_from_db()
         expected_hidden_rule = {
             'depends_on': '__deprecated_feature_never_shown__',
             'show_when_value': '__show__',
         }
-        self.assertEqual(obsolete_chatstatus.conditional_display, expected_hidden_rule)
+        self.assertEqual(obsolete_availability.conditional_display, expected_hidden_rule)
         self.assertEqual(obsolete_social.conditional_display, expected_hidden_rule)
-        self.assertFalse(obsolete_chatstatus.required)
+        self.assertFalse(obsolete_availability.required)
         self.assertFalse(obsolete_social.required)
-        self.assertEqual(obsolete_chatstatus.answers.count(), 1)
+        self.assertEqual(obsolete_availability.answers.count(), 1)
         self.assertEqual(obsolete_social.answers.count(), 1)
+
+
+class FeatureEvalWCopyCleanupMigrationTests(TestCase):
+    def test_migration_removes_feature_descriptions_and_hides_deprecated_rows(self):
+        survey = Survey.objects.create(slug='feature_eval_w', title_en='Ver.W features')
+        SurveyQuestion.objects.create(
+            survey=survey,
+            order=1,
+            slug='goal8_feat_retroactive',
+            type='likert_5',
+            prompt_en='**Apply privacy changes to past posts** — I liked this feature.',
+            description_en='Old leading explanation.',
+            description_ko='Old leading explanation.',
+        )
+        survey_digest = SurveyQuestion.objects.create(
+            survey=survey,
+            order=2,
+            slug='goal6_feat_survey_digest',
+            type='likert_5',
+            prompt_en='**Old combined digest item** — I liked this feature.',
+            description_en='Old combined explanation.',
+            description_ko='Old combined explanation.',
+        )
+        daily_digest = SurveyQuestion.objects.create(
+            survey=survey,
+            order=3,
+            slug='goal7_feat_discover',
+            type='likert_5',
+            prompt_en='**Old digest item** — I liked this feature.',
+        )
+        deprecated = SurveyQuestion.objects.create(
+            survey=survey,
+            order=4,
+            slug='goal2_feat_chatstatus',
+            type='likert_5',
+            prompt_en='**Obsolete availability item** — I liked this feature.',
+        )
+
+        module = import_module('surveys.migrations.0041_feature_eval_w_copy_cleanup')
+        module.apply_feature_eval_w_copy_cleanup(django_apps, None)
+
+        survey_digest.refresh_from_db()
+        daily_digest.refresh_from_db()
+        deprecated.refresh_from_db()
+        retroactive = SurveyQuestion.objects.get(survey=survey, slug='goal8_feat_retroactive')
+
+        self.assertEqual(retroactive.description_en, '')
+        self.assertEqual(survey_digest.description_en, '')
+        self.assertEqual(survey_digest.prompt_en, '**Survey of the Day** — I liked this feature.')
+        self.assertEqual(daily_digest.prompt_en, '**Daily Digest** — I liked this feature.')
+        self.assertEqual(
+            deprecated.conditional_display,
+            {
+                'depends_on': '__deprecated_feature_never_shown__',
+                'show_when_value': '__show__',
+            },
+        )
+        self.assertEqual(deprecated.prompt_en, 'Deprecated feature (hidden)')
+        self.assertEqual(deprecated.description_en, '')
+        self.assertFalse(deprecated.required)

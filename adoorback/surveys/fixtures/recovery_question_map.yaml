@@ -250,17 +250,6 @@ canonical_questions:
   - survey_slug: feature_eval_w_part2
     question_slug: goal2_feat_social_battery_level
     equivalence: exact
-  related_sources:
-  - survey_slug: feature_eval_w
-    question_slug: goal2_feat_chatstatus
-    equivalence: related_only
-    reason: Legacy chat-status feature is related to availability signaling but is not the final social
-      battery level feature.
-  - survey_slug: feature_eval_w
-    question_slug: goal4_feat_social_battery
-    equivalence: related_only
-    reason: Legacy social-battery-after-long-chats feature is related but not the final social battery
-      level feature.
   notes:
   - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
     item.
@@ -273,15 +262,6 @@ canonical_questions:
   - survey_slug: feature_eval_w_part2
     question_slug: goal2_feat_social_battery_level_dislike
     equivalence: exact
-  related_sources:
-  - survey_slug: feature_eval_w
-    question_slug: goal2_feat_chatstatus_dislike
-    equivalence: related_only
-    reason: Legacy chat-status free response is related context only.
-  - survey_slug: feature_eval_w
-    question_slug: goal4_feat_social_battery_dislike
-    equivalence: related_only
-    reason: Legacy social-battery-after-long-chats free response is related context only.
 - canonical_id: feature_eval_w.goal2_feat_social_battery_level_enjoy
   response_type: free_text
   sources:
@@ -291,15 +271,6 @@ canonical_questions:
   - survey_slug: feature_eval_w_part2
     question_slug: goal2_feat_social_battery_level_enjoy
     equivalence: exact
-  related_sources:
-  - survey_slug: feature_eval_w
-    question_slug: goal2_feat_chatstatus_enjoy
-    equivalence: related_only
-    reason: Legacy chat-status free response is related context only.
-  - survey_slug: feature_eval_w
-    question_slug: goal4_feat_social_battery_enjoy
-    equivalence: related_only
-    reason: Legacy social-battery-after-long-chats free response is related context only.
 - canonical_id: feature_eval_w.goal3_feat_checkin_reactions
   response_type: likert_5
   sources:

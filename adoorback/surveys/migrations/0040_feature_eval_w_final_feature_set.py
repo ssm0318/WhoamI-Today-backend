@@ -13,7 +13,6 @@ SOCIAL_BATTERY_LEVEL_QUESTIONS = [
         'slug': 'goal2_feat_social_battery_level',
         'type': 'likert_5',
         'prompt': '**Social battery level** — I liked this feature.',
-        'description': 'Setting and showing your current social battery level so friends know how available you are for interaction.',
         'low_label': 'Strongly disagree',
         'high_label': 'Strongly agree',
         'required': True,

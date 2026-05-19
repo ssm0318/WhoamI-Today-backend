@@ -541,8 +541,6 @@ _goal1_features_w: &goal1_features_w
     type: likert_5
     prompt:
       en: "**Daily questions** — I liked this feature."
-    description:
-      en: "The daily question prompt that asks you something specific to answer and share."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -571,8 +569,6 @@ _goal1_features_w: &goal1_features_w
     type: likert_5
     prompt:
       en: "**Question sending** — I liked this feature."
-    description:
-      en: "Sending a question to a specific friend, prompting them to share something with you."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -603,8 +599,6 @@ _goal2_features_w: &goal2_features_w
     type: likert_5
     prompt:
       en: "**Browsing modes** (quiet vs. social mode) — I liked this feature."
-    description:
-      en: "Being able to browse without others knowing you're active, or signal that you're open to interaction."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -633,8 +627,6 @@ _goal2_features_w: &goal2_features_w
     type: likert_5
     prompt:
       en: "**Social battery level** — I liked this feature."
-    description:
-      en: "Setting and showing your current social battery level so friends know how available you are for interaction."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -693,8 +685,6 @@ _goal3_features_w: &goal3_features_w
     type: likert_5
     prompt:
       en: "**Emoji reactions** — I liked this feature."
-    description:
-      en: "Reacting to a post with a specific emoji rather than a comment."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -723,8 +713,6 @@ _goal3_features_w: &goal3_features_w
     type: likert_5
     prompt:
       en: "**Private comments** — I liked this feature."
-    description:
-      en: "Comments visible only to the post author and you, instead of going to the chat."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -752,7 +740,7 @@ _goal3_features_w: &goal3_features_w
     slug: goal3_feat_profile_list
     type: likert_5
     prompt:
-      en: "**Profile-list feed** (people-as-feed view alongside the regular feed) — I liked this feature."
+      en: "**Profile-list feed** — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -781,8 +769,6 @@ _goal3_features_w: &goal3_features_w
     type: likert_5
     prompt:
       en: "**Ping for check-in** — I liked this feature."
-    description:
-      en: "Sending a small nudge to a friend asking them to check in."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -813,8 +799,6 @@ _goal4_features_w: &goal4_features_w
     type: likert_5
     prompt:
       en: "**Close-friend filter** (in feed and chats) — I liked this feature."
-    description:
-      en: "Filtering your feed or chats to show only your close friends."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -843,8 +827,6 @@ _goal4_features_w: &goal4_features_w
     type: likert_5
     prompt:
       en: "**Granular subscription to friends** — I liked this feature."
-    description:
-      en: "Choosing exactly what kinds of activity from a friend you want to be notified about."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -875,8 +857,6 @@ _goal5_features_w: &goal5_features_w
     type: likert_5
     prompt:
       en: "**Structured posts** (mission of the day, photo of the day, question of the day) — I liked this feature."
-    description:
-      en: "Daily-cadence post types that give you a specific thing to share."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -905,8 +885,6 @@ _goal5_features_w: &goal5_features_w
     type: likert_5
     prompt:
       en: "**Check-ins** (mood, status, song, social battery — 12-hour expiry) — I liked this feature."
-    description:
-      en: "Lighter, shorter-lived sharing that disappears after 12 hours."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -937,8 +915,6 @@ _goal6_features_w: &goal6_features_w
     type: likert_5
     prompt:
       en: "**Shared playlist** — I liked this feature."
-    description:
-      en: "A playlist contributed to by everyone."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -967,8 +943,6 @@ _goal6_features_w: &goal6_features_w
     type: likert_5
     prompt:
       en: "**Widget** — I liked this feature."
-    description:
-      en: "The home-screen widget showing WIT activity."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -996,9 +970,7 @@ _goal6_features_w: &goal6_features_w
     slug: goal6_feat_survey_digest
     type: likert_5
     prompt:
-      en: "**Survey of the day + daily digest** — I liked this feature."
-    description:
-      en: "The daily survey question and the next-day digest showing how everyone answered."
+      en: "**Survey of the Day** — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -1008,7 +980,7 @@ _goal6_features_w: &goal6_features_w
     slug: goal6_feat_survey_digest_enjoy
     type: free_text
     prompt:
-      en: "What, if anything, did you enjoy most about the survey of the day + daily digest feature?"
+      en: "What, if anything, did you enjoy most about the survey of the day feature?"
     min_length: 0
     required: false
     result_hidden: true
@@ -1017,7 +989,7 @@ _goal6_features_w: &goal6_features_w
     slug: goal6_feat_survey_digest_dislike
     type: free_text
     prompt:
-      en: "What, if anything, did you dislike most about the survey of the day + daily digest feature?"
+      en: "What, if anything, did you dislike most about the survey of the day feature?"
     min_length: 0
     required: false
     result_hidden: true
@@ -1027,8 +999,6 @@ _goal6_features_w: &goal6_features_w
     type: likert_5
     prompt:
       en: "**Mission of the day** — I liked this feature."
-    description:
-      en: "A daily prompt or task shared across users."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -1058,7 +1028,7 @@ _goal7_features_w: &goal7_features_w
     slug: goal7_feat_discover
     type: likert_5
     prompt:
-      en: "**Discover feed** (limited new content with mutual-friend / trait filters) — I liked this feature."
+      en: "**Daily Digest** — I liked this feature."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -1068,7 +1038,7 @@ _goal7_features_w: &goal7_features_w
     slug: goal7_feat_discover_enjoy
     type: free_text
     prompt:
-      en: "What, if anything, did you enjoy most about the Discover feed feature?"
+      en: "What, if anything, did you enjoy most about the Daily Digest feature?"
     min_length: 0
     required: false
     result_hidden: true
@@ -1077,7 +1047,7 @@ _goal7_features_w: &goal7_features_w
     slug: goal7_feat_discover_dislike
     type: free_text
     prompt:
-      en: "What, if anything, did you dislike most about the Discover feed feature?"
+      en: "What, if anything, did you dislike most about the Daily Digest feature?"
     min_length: 0
     required: false
     result_hidden: true
@@ -1145,8 +1115,6 @@ _goal8_features_w: &goal8_features_w
     type: likert_5
     prompt:
       en: "**Non-public account with selective public sharing** — I liked this feature."
-    description:
-      en: "Your account being non-public by default but letting you share specific things publicly."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -1203,8 +1171,6 @@ _goal8_features_w: &goal8_features_w
     type: likert_5
     prompt:
       en: "**Apply privacy changes to past posts** — I liked this feature."
-    description:
-      en: "When you change your privacy settings, having those changes apply to things you already posted."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     reverse_scored: false
@@ -1243,8 +1209,6 @@ _goal1_features_q: &goal1_features_q
     type: likert_5_na
     prompt:
       en: "**Daily questions** — I liked this feature."
-    description:
-      en: "The daily question prompt that asks you something specific to answer and share."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
@@ -1275,8 +1239,6 @@ _goal1_features_q: &goal1_features_q
     type: likert_5_na
     prompt:
       en: "**Question sending** — I liked this feature."
-    description:
-      en: "Sending a question to a specific friend, prompting them to share something with you."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
@@ -1309,8 +1271,6 @@ _goal7_features_q: &goal7_features_q
     type: likert_5_na
     prompt:
       en: "**Scrollable Discover feed** — I liked this feature."
-    description:
-      en: "The scrollable feed of content from people you don't already follow."
     low_label:  { en: "Strongly disagree" }
     high_label: { en: "Strongly agree" }
     na_option:
