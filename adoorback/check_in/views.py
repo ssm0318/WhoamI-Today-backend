@@ -1156,6 +1156,34 @@ class CheckInPostStories(generics.ListAPIView):
     def get_exception_handler(self):
         return adoor_exception_handler
 
+    def _exclude_reported_posts(self, qs, user):
+        from content_report.models import ContentReport
+
+        post_ct = ContentType.objects.get_for_model(CheckInPost)
+        reported_ids = ContentReport.objects.filter(
+            user=user,
+            content_type=post_ct,
+        ).values_list('object_id', flat=True)
+        return qs.exclude(id__in=reported_ids)
+
+    def _latest_post_per_author(self, qs, user):
+        # Latest post per author
+        latest_ids = (
+            qs.order_by('author_id', '-created_at')
+              .distinct('author_id')
+              .values_list('id', flat=True)
+        )
+
+        # Annotate: does this author have any live post not yet read by viewer?
+        unread_by_author = qs.filter(
+            author_id=OuterRef('author_id'),
+        ).exclude(readers=user)
+        return (
+            CheckInPost.objects.filter(id__in=list(latest_ids))
+            .annotate(_has_unread=Exists(unread_by_author))
+            .order_by('-_has_unread', '-created_at')
+        )
+
     def get_queryset(self):
         # Include the viewer's own latest post so the feed strip surfaces it
         # right after sharing — otherwise users have to navigate to /my to
@@ -1175,29 +1203,30 @@ class CheckInPostStories(generics.ListAPIView):
         # older posts) is excluded. Older snippets stay reachable via /my and
         # the friend's profile archive.
         threshold = timezone.now() - timedelta(hours=CHECK_IN_POST_EXPIRY_HOURS)
+
+        if self.request.query_params.get('visibility') == 'public':
+            qs = CheckInPost.objects.filter(
+                visibility='public',
+                author__current_ver=user.current_ver,
+                created_at__gte=threshold,
+            ).exclude(
+                author_id__in=blocked_ids + [user.id],
+            ).exclude(
+                author__is_superuser=True,
+            )
+            qs = self._exclude_reported_posts(qs, user)
+            return self._latest_post_per_author(qs, user)
+
         qs = CheckInPost.objects.filter(
             author_id__in=author_ids,
             created_at__gte=threshold,
         ).filter(
+            Q(author=user) | Q(visibility__in=['friends', 'close_friends']),
+        ).filter(
             _check_in_post_visible_filter(user)
         )
-
-        # Latest post per author
-        latest_ids = (
-            qs.order_by('author_id', '-created_at')
-              .distinct('author_id')
-              .values_list('id', flat=True)
-        )
-
-        # Annotate: does this author have any live post not yet read by viewer?
-        unread_by_author = qs.filter(
-            author_id=OuterRef('author_id'),
-        ).exclude(readers=user)
-        return (
-            CheckInPost.objects.filter(id__in=list(latest_ids))
-            .annotate(_has_unread=Exists(unread_by_author))
-            .order_by('-_has_unread', '-created_at')
-        )
+        qs = self._exclude_reported_posts(qs, user)
+        return self._latest_post_per_author(qs, user)
 
 
 class CheckInPostRead(generics.UpdateAPIView):

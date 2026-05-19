@@ -149,6 +149,69 @@ class CheckInPostExpiryTests(TestCase):
         self.assertTrue(post.is_audience(self.author))
 
 
+class CheckInPostStoriesVisibilityTests(TestCase):
+    """Daily Snapshot rails are split by surface:
+    friends/close-friends snapshots stay on Friends, public snapshots go to Discover.
+    """
+
+    def setUp(self):
+        self.viewer = User.objects.create_user(
+            username='viewer', email='viewer@t.com', password='pw',
+            current_ver='version_q',
+        )
+        self.friend_author = User.objects.create_user(
+            username='friend_author', email='friend_author@t.com', password='pw',
+            current_ver='version_q',
+        )
+        self.close_author = User.objects.create_user(
+            username='close_author', email='close_author@t.com', password='pw',
+            current_ver='version_q',
+        )
+        self.public_author = User.objects.create_user(
+            username='public_author', email='public_author@t.com', password='pw',
+            current_ver='version_q',
+        )
+        connect(self.friend_author, self.viewer, author_choice='friend')
+        connect(self.close_author, self.viewer, author_choice='close_friend')
+        connect(self.public_author, self.viewer, author_choice='friend')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.viewer)
+
+    def _create_post(self, author, visibility, caption):
+        return CheckInPost.objects.create(
+            author=author,
+            image=make_image(f'{caption}.png'),
+            caption=caption,
+            visibility=visibility,
+        )
+
+    def test_friends_story_rail_excludes_public_snapshots(self):
+        friend_post = self._create_post(self.friend_author, 'friends', 'friends only')
+        close_post = self._create_post(self.close_author, 'close_friends', 'close friends only')
+        public_post = self._create_post(self.public_author, 'public', 'public snapshot')
+
+        resp = self.client.get(reverse('check-in-post-stories'))
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        ids = [row['id'] for row in resp.data['results']]
+        self.assertIn(friend_post.id, ids)
+        self.assertIn(close_post.id, ids)
+        self.assertNotIn(public_post.id, ids)
+
+    def test_public_story_rail_returns_only_public_snapshots(self):
+        friend_post = self._create_post(self.friend_author, 'friends', 'friends only')
+        close_post = self._create_post(self.close_author, 'close_friends', 'close friends only')
+        public_post = self._create_post(self.public_author, 'public', 'public snapshot')
+
+        resp = self.client.get(reverse('check-in-post-stories'), {'visibility': 'public'})
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        ids = [row['id'] for row in resp.data['results']]
+        self.assertEqual(ids, [public_post.id])
+        self.assertNotIn(friend_post.id, ids)
+        self.assertNotIn(close_post.id, ids)
+
+
 class CheckInPostPinToggleTests(TestCase):
     """Scenarios 6–10 — PATCH /pin/ and /pin_visibility/ behavior."""
 
