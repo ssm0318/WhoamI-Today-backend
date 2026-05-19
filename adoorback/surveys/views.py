@@ -2,6 +2,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,6 +27,7 @@ from surveys.scheduling import (
     get_today_daily_with_prereq, routes_to_user,
 )
 from surveys.retired import is_retired_survey_slug
+from surveys.recovery import missing_recovery_question_ids_for_user
 from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyDraftSerializer,
     SurveyIndexEntrySerializer, SurveyResponseInputSerializer, validate_answer_value,
@@ -149,7 +151,16 @@ class SurveyDetailView(APIView):
         # exists" doesn't leak through. Same predicate as the index queries.
         if not routes_to_user(survey, request.user):
             return Response(status=status.HTTP_404_NOT_FOUND)
-        ser = SurveyDetailSerializer(survey, context={'request': request})
+        recovery_question_ids = missing_recovery_question_ids_for_user(request.user, survey)
+        if recovery_question_ids is not None and not recovery_question_ids:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        ser = SurveyDetailSerializer(
+            survey,
+            context={
+                'request': request,
+                'recovery_question_ids': recovery_question_ids,
+            },
+        )
         return Response(ser.data)
 
 
@@ -174,6 +185,9 @@ class SurveyResponseSubmitView(APIView):
                 {'detail': 'This survey is closed.'},
                 status=status.HTTP_410_GONE,
             )
+        recovery_question_ids = missing_recovery_question_ids_for_user(request.user, survey)
+        if recovery_question_ids is not None and not recovery_question_ids:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         # Submit semantics depend on Survey.repeatable + Survey.editable:
         #   - repeatable=True: each submit creates a new SurveyResponse row.
         #   - editable=True (and not repeatable): one row per user, but the
@@ -200,6 +214,19 @@ class SurveyResponseSubmitView(APIView):
             )
         ser = SurveyResponseInputSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
+        if recovery_question_ids is not None:
+            invalid_question_ids = sorted({
+                answer['question_id']
+                for answer in ser.validated_data['answers']
+                if answer['question_id'] not in recovery_question_ids
+            })
+            if invalid_question_ids:
+                raise ValidationError({
+                    'answers': [
+                        'Some submitted questions are not currently needed for this participant.',
+                    ],
+                    'question_ids': invalid_question_ids,
+                })
         point_award = None
         try:
             with transaction.atomic():
@@ -227,7 +254,6 @@ class SurveyResponseSubmitView(APIView):
                     if question.type in PER_FRIEND_TYPES:
                         target_user_id = a.get('target_user_id')
                         if target_user_id is None:
-                            from rest_framework.exceptions import ValidationError
                             raise ValidationError({
                                 'answers': [
                                     f'target_user_id is required for {question.type} '
@@ -239,7 +265,6 @@ class SurveyResponseSubmitView(APIView):
                                 request.user.connected_users.values_list('id', flat=True)
                             )
                         if target_user_id not in friend_ids:
-                            from rest_framework.exceptions import ValidationError
                             raise ValidationError({
                                 'answers': [
                                     f'target_user_id {target_user_id} is not on the '

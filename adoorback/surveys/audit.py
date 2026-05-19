@@ -36,6 +36,7 @@ RUNTIME_FIXTURE_FILENAMES = (
     'sotd.yaml',
     'closeness_reeval.yaml',
     'habit_platform.yaml',
+    'recovery.yaml',
 )
 
 FIXTURES_DIR = Path(__file__).resolve().parent / 'fixtures'
@@ -517,6 +518,19 @@ def _build_schedule_rows() -> list[dict[str, Any]]:
             priority_windows.PHASE1_PART2_DUE,
         )
     _update_schedule_date(rows, 'anytime', 1, priority_windows.ANYTIME_START, None)
+
+    recovery = importlib.import_module('surveys.migrations.0039_seed_recovery_surveys')
+    for seq, slug, window_start, window_end, allow_late, target_group in recovery.RECOVERY_SCHEDULE:
+        _upsert_schedule(
+            rows,
+            'endpoint',
+            seq,
+            slug,
+            window_start,
+            window_end,
+            allow_late,
+            target_user_group=target_group,
+        )
 
     for key, row in list(rows.items()):
         if is_retired_survey_slug(row['survey_slug']):

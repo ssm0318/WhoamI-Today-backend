@@ -1,0 +1,1579 @@
+schema_version: 1
+purpose: Map final-schema survey questions to deployed/recovery sources for conservative response merging
+  and missing-response audits.
+merge_rules:
+  exact: Same survey construct and final-compatible response schema. Safe to merge automatically.
+  compatible: Wording changed slightly, but the same construct and response schema were asked. Safe to
+    merge automatically with provenance retained.
+  related_only: Useful context for human review, but not a valid substitute for the canonical final-schema
+    question.
+global_notes:
+- Canonical IDs are analysis variables, not participant-facing labels.
+- Only sources marked exact or compatible are counted as answered by audit_survey_recovery_coverage.
+- Sources marked related_only are reported separately and should not be merged automatically.
+- Run audit_survey_recovery_coverage on the production database to determine actual participant coverage.
+canonical_questions:
+- canonical_id: daily_base.effort
+  response_type: likert_5_na
+  sources:
+  - survey_slug: daily_base
+    question_slug: effort
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.inhibition_text
+  response_type: free_text
+  sources:
+  - survey_slug: daily_base
+    question_slug: inhibition_text
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.inhibition_yn
+  response_type: single_choice
+  sources:
+  - survey_slug: daily_base
+    question_slug: inhibition_yn
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.initiation
+  response_type: likert_5_na
+  sources:
+  - survey_slug: daily_base
+    question_slug: initiation
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.moment_text
+  response_type: free_text
+  sources:
+  - survey_slug: daily_base
+    question_slug: moment_text
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.mood_arousal
+  response_type: slider
+  sources:
+  - survey_slug: daily_base
+    question_slug: mood_arousal
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.mood_valence
+  response_type: slider
+  sources:
+  - survey_slug: daily_base
+    question_slug: mood_valence
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.reciprocation
+  response_type: likert_5_na
+  sources:
+  - survey_slug: daily_base
+    question_slug: reciprocation
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.repetition
+  response_type: likert_5_na
+  sources:
+  - survey_slug: daily_base
+    question_slug: repetition
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: daily_base.shared_belonging
+  response_type: likert_5
+  sources:
+  - survey_slug: daily_base
+    question_slug: shared_belonging
+    equivalence: exact
+  related_sources:
+  - survey_slug: daily_base
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy deployed daily question was a one-item mood prompt, not this final daily item.
+  recovery_policy: not_recoverable_for_past_dates; collect only going forward with the final daily_base
+    schema.
+- canonical_id: feature_eval_w.goal1_feat_dailyq
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal1_feat_dailyq
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal1_feat_dailyq
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal1_feat_dailyq_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal1_feat_dailyq_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal1_feat_dailyq_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal1_feat_dailyq_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal1_feat_dailyq_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal1_feat_dailyq_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal1_feat_qsend
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal1_feat_qsend
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal1_feat_qsend
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal1_feat_qsend_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal1_feat_qsend_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal1_feat_qsend_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal1_feat_qsend_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal1_feat_qsend_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal1_feat_qsend_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal2_feat_browse
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_browse
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal2_feat_browse
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal2_feat_browse_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_browse_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal2_feat_browse_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal2_feat_browse_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_browse_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal2_feat_browse_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal2_feat_social_battery_level
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_social_battery_level
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal2_feat_social_battery_level
+    equivalence: exact
+  related_sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_chatstatus
+    equivalence: related_only
+    reason: Legacy chat-status feature is related to availability signaling but is not the final social
+      battery level feature.
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_social_battery
+    equivalence: related_only
+    reason: Legacy social-battery-after-long-chats feature is related but not the final social battery
+      level feature.
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal2_feat_social_battery_level_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_social_battery_level_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal2_feat_social_battery_level_dislike
+    equivalence: exact
+  related_sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_chatstatus_dislike
+    equivalence: related_only
+    reason: Legacy chat-status free response is related context only.
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_social_battery_dislike
+    equivalence: related_only
+    reason: Legacy social-battery-after-long-chats free response is related context only.
+- canonical_id: feature_eval_w.goal2_feat_social_battery_level_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_social_battery_level_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal2_feat_social_battery_level_enjoy
+    equivalence: exact
+  related_sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal2_feat_chatstatus_enjoy
+    equivalence: related_only
+    reason: Legacy chat-status free response is related context only.
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_social_battery_enjoy
+    equivalence: related_only
+    reason: Legacy social-battery-after-long-chats free response is related context only.
+- canonical_id: feature_eval_w.goal3_feat_checkin_reactions
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_checkin_reactions
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_checkin_reactions
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal3_feat_checkin_reactions_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_checkin_reactions_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_checkin_reactions_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_checkin_reactions_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_checkin_reactions_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_checkin_reactions_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_emoji
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_emoji
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_emoji
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal3_feat_emoji_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_emoji_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_emoji_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_emoji_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_emoji_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_emoji_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_ping
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_ping
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_ping
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal3_feat_ping_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_ping_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_ping_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_ping_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_ping_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_ping_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_private
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_private
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_private
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal3_feat_private_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_private_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_private_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_private_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_private_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_private_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_profile_list
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_profile_list
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_profile_list
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal3_feat_profile_list_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_profile_list_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_profile_list_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal3_feat_profile_list_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal3_feat_profile_list_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal3_feat_profile_list_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal4_feat_close_filter
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_close_filter
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal4_feat_close_filter
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal4_feat_close_filter_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_close_filter_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal4_feat_close_filter_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal4_feat_close_filter_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_close_filter_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal4_feat_close_filter_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal4_feat_granular_sub
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_granular_sub
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal4_feat_granular_sub
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal4_feat_granular_sub_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_granular_sub_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal4_feat_granular_sub_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal4_feat_granular_sub_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal4_feat_granular_sub_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal4_feat_granular_sub_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal5_feat_checkins
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal5_feat_checkins
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal5_feat_checkins
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal5_feat_checkins_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal5_feat_checkins_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal5_feat_checkins_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal5_feat_checkins_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal5_feat_checkins_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal5_feat_checkins_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal5_feat_posts
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal5_feat_posts
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal5_feat_posts
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal5_feat_posts_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal5_feat_posts_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal5_feat_posts_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal5_feat_posts_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal5_feat_posts_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal5_feat_posts_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_mission
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_mission
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_mission
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal6_feat_mission_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_mission_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_mission_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_mission_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_mission_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_mission_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_playlist
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_playlist
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_playlist
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal6_feat_playlist_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_playlist_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_playlist_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_playlist_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_playlist_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_playlist_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_survey_digest
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_survey_digest
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_survey_digest
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal6_feat_survey_digest_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_survey_digest_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_survey_digest_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_survey_digest_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_survey_digest_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_survey_digest_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_widget
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_widget
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_widget
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal6_feat_widget_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_widget_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_widget_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal6_feat_widget_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal6_feat_widget_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal6_feat_widget_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal7_feat_discover
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_discover
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_discover
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal7_feat_discover_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_discover_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_discover_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal7_feat_discover_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_discover_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_discover_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal7_feat_nth_degree
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_nth_degree
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_nth_degree
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal7_feat_nth_degree_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_nth_degree_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_nth_degree_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal7_feat_nth_degree_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_nth_degree_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_nth_degree_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal7_feat_profile_decoration
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_profile_decoration
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_profile_decoration
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal7_feat_profile_decoration_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_profile_decoration_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_profile_decoration_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal7_feat_profile_decoration_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal7_feat_profile_decoration_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal7_feat_profile_decoration_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal8_feat_nonpublic
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_nonpublic
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_nonpublic
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal8_feat_nonpublic_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_nonpublic_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_nonpublic_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal8_feat_nonpublic_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_nonpublic_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_nonpublic_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal8_feat_retroactive
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_retroactive
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_retroactive
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal8_feat_retroactive_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_retroactive_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_retroactive_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal8_feat_retroactive_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_retroactive_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_retroactive_enjoy
+    equivalence: exact
+- canonical_id: feature_eval_w.goal8_feat_view_as
+  response_type: likert_5
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_view_as
+    equivalence: exact
+    exclude_values:
+    - null
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_view_as
+    equivalence: exact
+  notes:
+  - Null/N-A answers from the old deployed Ver.W rating schema do not satisfy the final no-N-A rating
+    item.
+- canonical_id: feature_eval_w.goal8_feat_view_as_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_view_as_dislike
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_view_as_dislike
+    equivalence: exact
+- canonical_id: feature_eval_w.goal8_feat_view_as_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: feature_eval_w
+    question_slug: goal8_feat_view_as_enjoy
+    equivalence: exact
+  - survey_slug: feature_eval_w_part2
+    question_slug: goal8_feat_view_as_enjoy
+    equivalence: exact
+- canonical_id: mid_study_q.goal1_feat_dailyq
+  response_type: likert_5_na
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal1_feat_dailyq
+    equivalence: compatible
+    reason: Older deployed prompt used feature satisfaction wording; same feature-level valence item and
+      likert_5_na schema.
+- canonical_id: mid_study_q.goal1_feat_dailyq_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal1_feat_dailyq_dislike
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: goal1_feat_dailyq_dislike
+    equivalence: exact
+- canonical_id: mid_study_q.goal1_feat_dailyq_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal1_feat_dailyq_enjoy
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: goal1_feat_dailyq_enjoy
+    equivalence: exact
+- canonical_id: mid_study_q.goal1_feat_qsend
+  response_type: likert_5_na
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal1_feat_qsend
+    equivalence: compatible
+    reason: Older deployed prompt used feature satisfaction wording; same feature-level valence item and
+      likert_5_na schema.
+- canonical_id: mid_study_q.goal1_feat_qsend_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal1_feat_qsend_dislike
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: goal1_feat_qsend_dislike
+    equivalence: exact
+- canonical_id: mid_study_q.goal1_feat_qsend_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal1_feat_qsend_enjoy
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: goal1_feat_qsend_enjoy
+    equivalence: exact
+- canonical_id: mid_study_q.goal7_feat_scrollable_discover
+  response_type: likert_5_na
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal7_feat_scrollable_discover
+    equivalence: compatible
+    reason: Older deployed prompt used feature satisfaction wording; same feature-level valence item and
+      likert_5_na schema.
+- canonical_id: mid_study_q.goal7_feat_scrollable_discover_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal7_feat_scrollable_discover_dislike
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: goal7_feat_scrollable_discover_dislike
+    equivalence: exact
+- canonical_id: mid_study_q.goal7_feat_scrollable_discover_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: goal7_feat_scrollable_discover_enjoy
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: goal7_feat_scrollable_discover_enjoy
+    equivalence: exact
+- canonical_id: mid_study_q.would_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: would_appreciate
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: would_appreciate
+    equivalence: exact
+- canonical_id: mid_study_q.would_not_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_q
+    question_slug: would_not_appreciate
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_q
+    question_slug: would_not_appreciate
+    equivalence: exact
+- canonical_id: mid_study_w.would_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_w
+    question_slug: would_appreciate
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_w
+    question_slug: would_appreciate
+    equivalence: exact
+- canonical_id: mid_study_w.would_not_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: mid_study_w
+    question_slug: would_not_appreciate
+    equivalence: exact
+  - survey_slug: phase1_reflection_part3_w
+    question_slug: would_not_appreciate
+    equivalence: exact
+- canonical_id: post_study_q.goal1_feat_dailyq
+  response_type: likert_5_na
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal1_feat_dailyq
+    equivalence: compatible
+    reason: Older deployed prompt used feature satisfaction wording; same feature-level valence item and
+      likert_5_na schema.
+- canonical_id: post_study_q.goal1_feat_dailyq_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal1_feat_dailyq_dislike
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: goal1_feat_dailyq_dislike
+    equivalence: exact
+- canonical_id: post_study_q.goal1_feat_dailyq_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal1_feat_dailyq_enjoy
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: goal1_feat_dailyq_enjoy
+    equivalence: exact
+- canonical_id: post_study_q.goal1_feat_qsend
+  response_type: likert_5_na
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal1_feat_qsend
+    equivalence: compatible
+    reason: Older deployed prompt used feature satisfaction wording; same feature-level valence item and
+      likert_5_na schema.
+- canonical_id: post_study_q.goal1_feat_qsend_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal1_feat_qsend_dislike
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: goal1_feat_qsend_dislike
+    equivalence: exact
+- canonical_id: post_study_q.goal1_feat_qsend_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal1_feat_qsend_enjoy
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: goal1_feat_qsend_enjoy
+    equivalence: exact
+- canonical_id: post_study_q.goal7_feat_scrollable_discover
+  response_type: likert_5_na
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal7_feat_scrollable_discover
+    equivalence: compatible
+    reason: Older deployed prompt used feature satisfaction wording; same feature-level valence item and
+      likert_5_na schema.
+- canonical_id: post_study_q.goal7_feat_scrollable_discover_dislike
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal7_feat_scrollable_discover_dislike
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: goal7_feat_scrollable_discover_dislike
+    equivalence: exact
+- canonical_id: post_study_q.goal7_feat_scrollable_discover_enjoy
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: goal7_feat_scrollable_discover_enjoy
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: goal7_feat_scrollable_discover_enjoy
+    equivalence: exact
+- canonical_id: post_study_q.preferred_version
+  response_type: single_choice
+  sources:
+  - survey_slug: post_study_q
+    question_slug: preferred_version
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: preferred_version
+    equivalence: exact
+- canonical_id: post_study_q.preferred_version_reason
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: preferred_version_reason
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: preferred_version_reason
+    equivalence: exact
+- canonical_id: post_study_q.would_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: would_appreciate
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: would_appreciate
+    equivalence: exact
+- canonical_id: post_study_q.would_not_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_q
+    question_slug: would_not_appreciate
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_q
+    question_slug: would_not_appreciate
+    equivalence: exact
+- canonical_id: post_study_w.preferred_version
+  response_type: single_choice
+  sources:
+  - survey_slug: post_study_w
+    question_slug: preferred_version
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_w
+    question_slug: preferred_version
+    equivalence: exact
+- canonical_id: post_study_w.preferred_version_reason
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_w
+    question_slug: preferred_version_reason
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_w
+    question_slug: preferred_version_reason
+    equivalence: exact
+- canonical_id: post_study_w.would_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_w
+    question_slug: would_appreciate
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_w
+    question_slug: would_appreciate
+    equivalence: exact
+- canonical_id: post_study_w.would_not_appreciate
+  response_type: free_text
+  sources:
+  - survey_slug: post_study_w
+    question_slug: would_not_appreciate
+    equivalence: exact
+  - survey_slug: phase2_reflection_part3_w
+    question_slug: would_not_appreciate
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_dailyq_freq
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_dailyq_freq
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_dailyq_freq
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_dailyq_reason
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_dailyq_reason
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_dailyq_reason
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_dailyq_satisfaction
+  response_type: likert_5
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_dailyq_satisfaction
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_dailyq_satisfaction
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_digest_freq
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_digest_freq
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_digest_freq
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_digest_reason
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_digest_reason
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_digest_reason
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_digest_satisfaction
+  response_type: likert_5
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_digest_satisfaction
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_digest_satisfaction
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_general_freq
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_general_freq
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_general_freq
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_general_reason
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_general_reason
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_general_reason
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_general_satisfaction
+  response_type: likert_5
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_general_satisfaction
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_general_satisfaction
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_mission_freq
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_mission_freq
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_mission_freq
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_mission_reason
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_mission_reason
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_mission_reason
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_mission_satisfaction
+  response_type: likert_5
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_mission_satisfaction
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_mission_satisfaction
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_sotd_freq
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_sotd_freq
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_sotd_freq
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_sotd_reason
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_sotd_reason
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_sotd_reason
+    equivalence: exact
+- canonical_id: study_endpoint.cadence_sotd_satisfaction
+  response_type: likert_5
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: cadence_sotd_satisfaction
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: cadence_sotd_satisfaction
+    equivalence: exact
+- canonical_id: study_endpoint.data_use
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: data_use
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: data_use
+    equivalence: exact
+- canonical_id: study_endpoint.data_use_other_text
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: data_use_other_text
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: data_use_other_text
+    equivalence: exact
+- canonical_id: study_endpoint.final_thoughts
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: final_thoughts
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: final_thoughts
+    equivalence: exact
+  related_sources:
+  - survey_slug: study_endpoint
+    question_slug: ''
+    equivalence: related_only
+    reason: Legacy endpoint was a broad final reflection. It may inform interpretation but is not the
+      final open feedback item.
+- canonical_id: study_endpoint.friend_graph_decision
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: friend_graph_decision
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: friend_graph_decision
+    equivalence: exact
+- canonical_id: study_endpoint.friend_graph_other_text
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: friend_graph_other_text
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: friend_graph_other_text
+    equivalence: exact
+- canonical_id: study_endpoint.future_contact
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: future_contact
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: future_contact
+    equivalence: exact
+- canonical_id: study_endpoint.keep_account
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: keep_account
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: keep_account
+    equivalence: exact
+- canonical_id: study_endpoint.keep_account_reason
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: keep_account_reason
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: keep_account_reason
+    equivalence: exact
+- canonical_id: study_endpoint.profile_carryover
+  response_type: single_choice
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: profile_carryover
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: profile_carryover
+    equivalence: exact
+- canonical_id: study_endpoint.profile_carryover_other_text
+  response_type: free_text
+  sources:
+  - survey_slug: study_endpoint
+    question_slug: profile_carryover_other_text
+    equivalence: exact
+  - survey_slug: study_endpoint_part2
+    question_slug: profile_carryover_other_text
+    equivalence: exact
+recovery_surveys:
+- survey_slug: study_endpoint_part2
+  participant_title: 'What happens next with WIT: Part 2'
+  base_survey_slug: study_endpoint
+  eligible_if:
+    answered_survey_slug: study_endpoint
+  collects_canonical_ids:
+  - study_endpoint.cadence_dailyq_freq
+  - study_endpoint.cadence_dailyq_satisfaction
+  - study_endpoint.cadence_dailyq_reason
+  - study_endpoint.cadence_mission_freq
+  - study_endpoint.cadence_mission_satisfaction
+  - study_endpoint.cadence_mission_reason
+  - study_endpoint.cadence_sotd_freq
+  - study_endpoint.cadence_sotd_satisfaction
+  - study_endpoint.cadence_sotd_reason
+  - study_endpoint.cadence_digest_freq
+  - study_endpoint.cadence_digest_satisfaction
+  - study_endpoint.cadence_digest_reason
+  - study_endpoint.cadence_general_freq
+  - study_endpoint.cadence_general_satisfaction
+  - study_endpoint.cadence_general_reason
+  - study_endpoint.data_use
+  - study_endpoint.data_use_other_text
+  - study_endpoint.keep_account
+  - study_endpoint.keep_account_reason
+  - study_endpoint.friend_graph_decision
+  - study_endpoint.friend_graph_other_text
+  - study_endpoint.profile_carryover
+  - study_endpoint.profile_carryover_other_text
+  - study_endpoint.final_thoughts
+  - study_endpoint.future_contact
+- survey_slug: phase1_reflection_part3_w
+  participant_title: 'Phase 1 reflection: Part 3'
+  base_survey_slug: mid_study_w
+  eligible_if:
+    answered_survey_slug: mid_study_w
+    user_group: group_w_first
+  collects_canonical_ids:
+  - mid_study_w.would_appreciate
+  - mid_study_w.would_not_appreciate
+- survey_slug: phase1_reflection_part3_q
+  participant_title: 'Phase 1 reflection: Part 3'
+  base_survey_slug: mid_study_q
+  eligible_if:
+    answered_survey_slug: mid_study_q
+    user_group: group_q_first
+  collects_canonical_ids:
+  - mid_study_q.would_appreciate
+  - mid_study_q.would_not_appreciate
+  - mid_study_q.goal1_feat_dailyq_enjoy
+  - mid_study_q.goal1_feat_dailyq_dislike
+  - mid_study_q.goal1_feat_qsend_enjoy
+  - mid_study_q.goal1_feat_qsend_dislike
+  - mid_study_q.goal7_feat_scrollable_discover_enjoy
+  - mid_study_q.goal7_feat_scrollable_discover_dislike
+- survey_slug: phase2_reflection_part3_w
+  participant_title: 'Phase 2 reflection: Part 3'
+  base_survey_slug: post_study_w
+  eligible_if:
+    answered_survey_slug: post_study_w
+    user_group: group_w_first
+  collects_canonical_ids:
+  - post_study_w.would_appreciate
+  - post_study_w.would_not_appreciate
+  - post_study_w.preferred_version
+  - post_study_w.preferred_version_reason
+- survey_slug: phase2_reflection_part3_q
+  participant_title: 'Phase 2 reflection: Part 3'
+  base_survey_slug: post_study_q
+  eligible_if:
+    answered_survey_slug: post_study_q
+    user_group: group_q_first
+  collects_canonical_ids:
+  - post_study_q.would_appreciate
+  - post_study_q.would_not_appreciate
+  - post_study_q.goal1_feat_dailyq_enjoy
+  - post_study_q.goal1_feat_dailyq_dislike
+  - post_study_q.goal1_feat_qsend_enjoy
+  - post_study_q.goal1_feat_qsend_dislike
+  - post_study_q.goal7_feat_scrollable_discover_enjoy
+  - post_study_q.goal7_feat_scrollable_discover_dislike
+  - post_study_q.preferred_version
+  - post_study_q.preferred_version_reason
+- survey_slug: feature_eval_w_part2
+  participant_title: 'Ver.W features: Part 2'
+  base_survey_slug: feature_eval_w
+  eligible_if:
+    answered_survey_slug: feature_eval_w
+  collects_canonical_ids:
+  - feature_eval_w.goal1_feat_dailyq
+  - feature_eval_w.goal1_feat_dailyq_enjoy
+  - feature_eval_w.goal1_feat_dailyq_dislike
+  - feature_eval_w.goal1_feat_qsend
+  - feature_eval_w.goal1_feat_qsend_enjoy
+  - feature_eval_w.goal1_feat_qsend_dislike
+  - feature_eval_w.goal2_feat_browse
+  - feature_eval_w.goal2_feat_browse_enjoy
+  - feature_eval_w.goal2_feat_browse_dislike
+  - feature_eval_w.goal2_feat_social_battery_level
+  - feature_eval_w.goal2_feat_social_battery_level_enjoy
+  - feature_eval_w.goal2_feat_social_battery_level_dislike
+  - feature_eval_w.goal3_feat_checkin_reactions
+  - feature_eval_w.goal3_feat_checkin_reactions_enjoy
+  - feature_eval_w.goal3_feat_checkin_reactions_dislike
+  - feature_eval_w.goal3_feat_emoji
+  - feature_eval_w.goal3_feat_emoji_enjoy
+  - feature_eval_w.goal3_feat_emoji_dislike
+  - feature_eval_w.goal3_feat_private
+  - feature_eval_w.goal3_feat_private_enjoy
+  - feature_eval_w.goal3_feat_private_dislike
+  - feature_eval_w.goal3_feat_profile_list
+  - feature_eval_w.goal3_feat_profile_list_enjoy
+  - feature_eval_w.goal3_feat_profile_list_dislike
+  - feature_eval_w.goal3_feat_ping
+  - feature_eval_w.goal3_feat_ping_enjoy
+  - feature_eval_w.goal3_feat_ping_dislike
+  - feature_eval_w.goal4_feat_close_filter
+  - feature_eval_w.goal4_feat_close_filter_enjoy
+  - feature_eval_w.goal4_feat_close_filter_dislike
+  - feature_eval_w.goal4_feat_granular_sub
+  - feature_eval_w.goal4_feat_granular_sub_enjoy
+  - feature_eval_w.goal4_feat_granular_sub_dislike
+  - feature_eval_w.goal5_feat_posts
+  - feature_eval_w.goal5_feat_posts_enjoy
+  - feature_eval_w.goal5_feat_posts_dislike
+  - feature_eval_w.goal5_feat_checkins
+  - feature_eval_w.goal5_feat_checkins_enjoy
+  - feature_eval_w.goal5_feat_checkins_dislike
+  - feature_eval_w.goal6_feat_playlist
+  - feature_eval_w.goal6_feat_playlist_enjoy
+  - feature_eval_w.goal6_feat_playlist_dislike
+  - feature_eval_w.goal6_feat_widget
+  - feature_eval_w.goal6_feat_widget_enjoy
+  - feature_eval_w.goal6_feat_widget_dislike
+  - feature_eval_w.goal6_feat_survey_digest
+  - feature_eval_w.goal6_feat_survey_digest_enjoy
+  - feature_eval_w.goal6_feat_survey_digest_dislike
+  - feature_eval_w.goal6_feat_mission
+  - feature_eval_w.goal6_feat_mission_enjoy
+  - feature_eval_w.goal6_feat_mission_dislike
+  - feature_eval_w.goal7_feat_discover
+  - feature_eval_w.goal7_feat_discover_enjoy
+  - feature_eval_w.goal7_feat_discover_dislike
+  - feature_eval_w.goal7_feat_nth_degree
+  - feature_eval_w.goal7_feat_nth_degree_enjoy
+  - feature_eval_w.goal7_feat_nth_degree_dislike
+  - feature_eval_w.goal7_feat_profile_decoration
+  - feature_eval_w.goal7_feat_profile_decoration_enjoy
+  - feature_eval_w.goal7_feat_profile_decoration_dislike
+  - feature_eval_w.goal8_feat_nonpublic
+  - feature_eval_w.goal8_feat_nonpublic_enjoy
+  - feature_eval_w.goal8_feat_nonpublic_dislike
+  - feature_eval_w.goal8_feat_view_as
+  - feature_eval_w.goal8_feat_view_as_enjoy
+  - feature_eval_w.goal8_feat_view_as_dislike
+  - feature_eval_w.goal8_feat_retroactive
+  - feature_eval_w.goal8_feat_retroactive_enjoy
+  - feature_eval_w.goal8_feat_retroactive_dislike
+non_recoverable_temporal_surveys:
+- survey_slug: daily_base
+  reason: Final daily questions ask about today/right now. Past missed final-schema daily states cannot
+    be reconstructed later without changing the construct.
+  canonical_ids:
+  - daily_base.initiation
+  - daily_base.reciprocation
+  - daily_base.repetition
+  - daily_base.effort
+  - daily_base.shared_belonging
+  - daily_base.mood_valence
+  - daily_base.mood_arousal
+  - daily_base.moment_text
+  - daily_base.inhibition_yn
+  - daily_base.inhibition_text

@@ -11,6 +11,7 @@ Brings a freshly-migrated DB to a working state for the long-form study:
        - sotd.yaml           — daily SOTD instruments
        - closeness_reeval.yaml — phase1/phase2 per-friend closeness re-rating
        - habit_platform.yaml — habitual platform prereq
+       - recovery.yaml       — dynamic Part 2/3 recovery containers
        - _archive/mock_test_today.yaml — May 1-3 mock dailies (only with --mock-dailies)
   2. Seeds the 4-week study schedule (37 ScheduledSurvey rows from
      `0004_seed_study_schedule.seed_schedule`).
@@ -75,6 +76,7 @@ LONG_FORM_FIXTURES = [
     'sotd.yaml',
     'closeness_reeval.yaml',
     'habit_platform.yaml',
+    'recovery.yaml',
 ]
 
 # May 1-3 mock daily slots — see mock_test_today.yaml for the matching Survey
@@ -131,7 +133,7 @@ class Command(BaseCommand):
                 self.stdout.write(f'    skip (missing): {filename}')
                 continue
             self.stdout.write(f'    {filename}')
-            call_command('load_surveys', str(path))
+            call_command('load_surveys', str(path), '--replace-questions-if-unanswered')
 
         # 2. Seed the 4-week study schedule. The seed migration short-circuits
         #    on a fresh DB (no Survey rows yet), so we always re-run after
@@ -283,6 +285,14 @@ class Command(BaseCommand):
             'surveys.migrations.0035_survey_priority_order_and_weekend_due_dates'
         )
         priority_order_module.apply_priority_order_and_windows(django_apps, None)
+
+        # 5f. Re-seed dynamic recovery containers. These rows are safe to keep
+        #    broadly scheduled because the API hides each row unless the
+        #    requesting user is missing at least one final-schema question
+        #    listed in recovery_question_map.yaml.
+        self.stdout.write(self.style.NOTICE('[5f] Re-seeding dynamic recovery surveys ...'))
+        recovery_module = import_module('surveys.migrations.0039_seed_recovery_surveys')
+        recovery_module.seed_recovery_surveys(django_apps, None)
 
         # 6. May 1-3 mock dailies (optional).
         if opts['mock_dailies']:

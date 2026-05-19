@@ -294,6 +294,18 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         if tokens:
             apply_to_survey_dict(data, tokens)
+        question_models = list(instance.questions.all())
+        question_data = data.get('questions', [])
+        recovery_question_ids = self.context.get('recovery_question_ids')
+        if recovery_question_ids is not None:
+            pairs = [
+                (q_data, q_model)
+                for q_data, q_model in zip(question_data, question_models)
+                if q_model.id in recovery_question_ids
+            ]
+            question_data = [q_data for q_data, _q_model in pairs]
+            question_models = [q_model for _q_data, q_model in pairs]
+            data['questions'] = question_data
         # Fan out per-friend question types: each per_friend_* source row in
         # `data['questions']` is replaced with N virtual rows, one per friend
         # the viewer currently has. Each virtual row carries a `target_user_id`
@@ -302,8 +314,8 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
         # untouched and the frontend will show an empty state.
         if viewer is not None and getattr(viewer, 'is_authenticated', False):
             data['questions'] = _expand_per_friend_questions(
-                data.get('questions', []),
-                instance.questions.all(),
+                question_data,
+                question_models,
                 viewer=viewer,
                 survey_tokens=tokens,
             )

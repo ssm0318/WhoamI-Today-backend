@@ -1,0 +1,1767 @@
+# ============================================================================
+# DYNAMIC RECOVERY SURVEYS
+# ============================================================================
+# These surveys are participant-facing containers for final-schema questions
+# that may still be needed from people who answered an older deployed version.
+# The API filters questions per user using recovery_question_map.yaml, so a
+# participant only sees questions they personally still need to answer.
+# ============================================================================
+
+- slug: study_endpoint_part2
+  type: likert_5
+  title:
+    en: 'What happens next with WIT: Part 2'
+  description:
+    en: A few follow-up questions about how you want WIT to fit into your life going forward.
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  priority: 100
+  point_value: 0
+  questions:
+  - order: 1
+    slug: cadence_dailyq_freq
+    type: single_choice
+    prompt:
+      en: '**Daily questions** — how often would feel right for you to receive a daily question prompt?'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: never
+      label:
+        en: Never
+    - order: 2
+      value: less_than_weekly
+      label:
+        en: Less than once a week
+    - order: 3
+      value: about_weekly
+      label:
+        en: About once a week
+    - order: 4
+      value: every_few_days
+      label:
+        en: Every few days
+    - order: 5
+      value: about_daily
+      label:
+        en: About once a day
+    - order: 6
+      value: multiple_daily
+      label:
+        en: Multiple times a day
+  - order: 2
+    slug: cadence_dailyq_satisfaction
+    type: likert_5
+    prompt:
+      en: How satisfied would you be with that rhythm?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: 1
+      label:
+        en: Very dissatisfied
+    - order: 2
+      value: 2
+      label:
+        en: Somewhat dissatisfied
+    - order: 3
+      value: 3
+      label:
+        en: Neither dissatisfied nor satisfied
+    - order: 4
+      value: 4
+      label:
+        en: Somewhat satisfied
+    - order: 5
+      value: 5
+      label:
+        en: Very satisfied
+  - order: 3
+    slug: cadence_dailyq_reason
+    type: free_text
+    prompt:
+      en: Briefly — why that rhythm for daily questions?
+    placeholder:
+      en: Could be a sentence or just a few words.
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 4
+    slug: cadence_mission_freq
+    type: single_choice
+    prompt:
+      en: '**Mission of the day** — how often would feel right for you to see a daily mission?'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: never
+      label:
+        en: Never
+    - order: 2
+      value: less_than_weekly
+      label:
+        en: Less than once a week
+    - order: 3
+      value: about_weekly
+      label:
+        en: About once a week
+    - order: 4
+      value: every_few_days
+      label:
+        en: Every few days
+    - order: 5
+      value: about_daily
+      label:
+        en: About once a day
+    - order: 6
+      value: multiple_daily
+      label:
+        en: Multiple times a day
+  - order: 5
+    slug: cadence_mission_satisfaction
+    type: likert_5
+    prompt:
+      en: How satisfied would you be with that rhythm?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: 1
+      label:
+        en: Very dissatisfied
+    - order: 2
+      value: 2
+      label:
+        en: Somewhat dissatisfied
+    - order: 3
+      value: 3
+      label:
+        en: Neither dissatisfied nor satisfied
+    - order: 4
+      value: 4
+      label:
+        en: Somewhat satisfied
+    - order: 5
+      value: 5
+      label:
+        en: Very satisfied
+  - order: 6
+    slug: cadence_mission_reason
+    type: free_text
+    prompt:
+      en: Briefly — why that rhythm for missions?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 7
+    slug: cadence_sotd_freq
+    type: single_choice
+    prompt:
+      en: '**Survey of the day** — how often would feel right for you to see a daily survey question (with
+        a digest the next day)?'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: never
+      label:
+        en: Never
+    - order: 2
+      value: less_than_weekly
+      label:
+        en: Less than once a week
+    - order: 3
+      value: about_weekly
+      label:
+        en: About once a week
+    - order: 4
+      value: every_few_days
+      label:
+        en: Every few days
+    - order: 5
+      value: about_daily
+      label:
+        en: About once a day
+    - order: 6
+      value: multiple_daily
+      label:
+        en: Multiple times a day
+  - order: 8
+    slug: cadence_sotd_satisfaction
+    type: likert_5
+    prompt:
+      en: How satisfied would you be with that rhythm?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: 1
+      label:
+        en: Very dissatisfied
+    - order: 2
+      value: 2
+      label:
+        en: Somewhat dissatisfied
+    - order: 3
+      value: 3
+      label:
+        en: Neither dissatisfied nor satisfied
+    - order: 4
+      value: 4
+      label:
+        en: Somewhat satisfied
+    - order: 5
+      value: 5
+      label:
+        en: Very satisfied
+  - order: 9
+    slug: cadence_sotd_reason
+    type: free_text
+    prompt:
+      en: Briefly — why that rhythm for survey of the day?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 10
+    slug: cadence_digest_freq
+    type: single_choice
+    prompt:
+      en: '**Daily digest** — how often would feel right for you to see the daily digest (yesterday''s
+        posts in one place)?'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: never
+      label:
+        en: Never
+    - order: 2
+      value: less_than_weekly
+      label:
+        en: Less than once a week
+    - order: 3
+      value: about_weekly
+      label:
+        en: About once a week
+    - order: 4
+      value: every_few_days
+      label:
+        en: Every few days
+    - order: 5
+      value: about_daily
+      label:
+        en: About once a day
+    - order: 6
+      value: multiple_daily
+      label:
+        en: Multiple times a day
+  - order: 11
+    slug: cadence_digest_satisfaction
+    type: likert_5
+    prompt:
+      en: How satisfied would you be with that rhythm?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: 1
+      label:
+        en: Very dissatisfied
+    - order: 2
+      value: 2
+      label:
+        en: Somewhat dissatisfied
+    - order: 3
+      value: 3
+      label:
+        en: Neither dissatisfied nor satisfied
+    - order: 4
+      value: 4
+      label:
+        en: Somewhat satisfied
+    - order: 5
+      value: 5
+      label:
+        en: Very satisfied
+  - order: 12
+    slug: cadence_digest_reason
+    type: free_text
+    prompt:
+      en: Briefly — why that rhythm for the daily digest?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 13
+    slug: cadence_general_freq
+    type: single_choice
+    prompt:
+      en: '**Overall** — how often would feel natural to actually open WIT and check in?'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: never
+      label:
+        en: Never — I'd stop using it
+    - order: 2
+      value: less_than_weekly
+      label:
+        en: Less than once a week
+    - order: 3
+      value: about_weekly
+      label:
+        en: About once a week
+    - order: 4
+      value: every_few_days
+      label:
+        en: Every few days
+    - order: 5
+      value: about_daily
+      label:
+        en: About once a day
+    - order: 6
+      value: multiple_daily
+      label:
+        en: Multiple times a day
+  - order: 14
+    slug: cadence_general_satisfaction
+    type: likert_5
+    prompt:
+      en: How satisfied would you be with that rhythm?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: 1
+      label:
+        en: Very dissatisfied
+    - order: 2
+      value: 2
+      label:
+        en: Somewhat dissatisfied
+    - order: 3
+      value: 3
+      label:
+        en: Neither dissatisfied nor satisfied
+    - order: 4
+      value: 4
+      label:
+        en: Somewhat satisfied
+    - order: 5
+      value: 5
+      label:
+        en: Very satisfied
+  - order: 15
+    slug: cadence_general_reason
+    type: free_text
+    prompt:
+      en: Briefly — why that overall rhythm?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 16
+    slug: data_use
+    type: single_choice
+    prompt:
+      en: If you continue using WIT, how would you like us to handle your data going forward?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: anonymized_aggregated
+      label:
+        en: I'm okay with you continuing to use anonymized, aggregated data — no individual data or personal
+          content, just group-level behavior
+    - order: 2
+      value: no_use
+      label:
+        en: I do not want my data used in any way
+    - order: 3
+      value: stopping_use
+      label:
+        en: I won't be using WIT anymore, so this doesn't apply to me
+    - order: 4
+      value: other
+      label:
+        en: Other (specify below)
+  - order: 17
+    slug: data_use_other_text
+    type: free_text
+    prompt:
+      en: Could you specify?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    conditional_display:
+      depends_on: data_use
+      show_when_value: other
+    min_length: 0
+  - order: 18
+    slug: keep_account
+    type: single_choice
+    prompt:
+      en: Would you like to keep your WIT account and continue using Ver.W?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: keep
+      label:
+        en: Yes, I'd like to keep using WIT (Ver.W)
+    - order: 2
+      value: delete
+      label:
+        en: No, I'd prefer to stop using it and delete my account
+    - order: 3
+      value: unsure
+      label:
+        en: I'm not sure yet
+    - order: 4
+      value: other
+      label:
+        en: Other (specify below)
+  - order: 19
+    slug: keep_account_reason
+    type: free_text
+    prompt:
+      en: Could you briefly explain your reason — and if you chose to keep your account, what changes
+        (if any) would make Ver.W feel more satisfying to keep using?
+    placeholder:
+      en: A few sentences is plenty.
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 20
+    slug: friend_graph_decision
+    type: single_choice
+    prompt:
+      en: What would you like to happen with your friend connections on WIT?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: keep_all
+      label:
+        en: Keep all my current connections as they are
+    - order: 2
+      value: keep_close_only
+      label:
+        en: Keep only my close friends; drop the rest
+    - order: 3
+      value: reset
+      label:
+        en: Reset my friend list and start fresh
+    - order: 4
+      value: delete_account
+      label:
+        en: I'm deleting my account, so this is moot
+    - order: 5
+      value: other
+      label:
+        en: Other (specify below)
+  - order: 21
+    slug: friend_graph_other_text
+    type: free_text
+    prompt:
+      en: Could you specify?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    conditional_display:
+      depends_on: friend_graph_decision
+      show_when_value: other
+    min_length: 0
+  - order: 22
+    slug: profile_carryover
+    type: single_choice
+    prompt:
+      en: What would you like to happen with your current profile setup (chips, pinned check-ins, persona)?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    conditional_display:
+      depends_on: keep_account
+      show_when_value_not: delete
+    options:
+    - order: 1
+      value: keep_all
+      label:
+        en: Keep my profile as-is
+    - order: 2
+      value: minor_edits
+      label:
+        en: Keep most of it but I'll edit a few things later
+    - order: 3
+      value: fresh_start
+      label:
+        en: Reset and start fresh on my profile
+    - order: 4
+      value: didnt_setup
+      label:
+        en: I didn't really set this up, so it doesn't matter
+    - order: 5
+      value: other
+      label:
+        en: Other (specify below)
+  - order: 23
+    slug: profile_carryover_other_text
+    type: free_text
+    prompt:
+      en: Could you specify?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    conditional_display:
+      depends_on: profile_carryover
+      show_when_value: other
+    min_length: 0
+  - order: 24
+    slug: final_thoughts
+    type: free_text
+    prompt:
+      en: Anything we should know as you leave or continue with WIT?
+    placeholder:
+      en: Could be a thank-you, a complaint, a hope, an idea, a story — whatever's on your mind. Take
+        as much space as you want.
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 25
+    slug: future_contact
+    type: single_choice
+    prompt:
+      en: Could we contact you in the future about WIT updates or follow-up opportunities?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: yes_anything
+      label:
+        en: Yes, anything related to WIT
+    - order: 2
+      value: yes_specific
+      label:
+        en: Yes, but only for follow-up questions
+    - order: 3
+      value: yes_product
+      label:
+        en: Yes, but only for product updates if I keep my account
+    - order: 4
+      value: 'no'
+      label:
+        en: No thanks
+- slug: phase1_reflection_part3_w
+  type: likert_5
+  title:
+    en: 'Phase 1 reflection: Part 3'
+  description:
+    en: A short follow-up about the version you used in Phase 1.
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  priority: 100
+  point_value: 0
+  questions:
+  - order: 1
+    slug: would_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would appreciate Ver.{{version_short_letter}} the most? Be
+        specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 2
+    slug: would_not_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would dislike Ver.{{version_short_letter}} the most? Be specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who don't like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+- slug: phase1_reflection_part3_q
+  type: likert_5
+  title:
+    en: 'Phase 1 reflection: Part 3'
+  description:
+    en: A short follow-up about the version you used in Phase 1.
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  priority: 100
+  point_value: 0
+  questions:
+  - order: 1
+    slug: would_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would appreciate Ver.{{version_short_letter}} the most? Be
+        specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 2
+    slug: would_not_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would dislike Ver.{{version_short_letter}} the most? Be specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who don't like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 3
+    slug: goal1_feat_dailyq_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the daily questions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 4
+    slug: goal1_feat_dailyq_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the daily questions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 5
+    slug: goal1_feat_qsend_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the question sending feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 6
+    slug: goal1_feat_qsend_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the question sending feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 7
+    slug: goal7_feat_scrollable_discover_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the scrollable Discover feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 8
+    slug: goal7_feat_scrollable_discover_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the scrollable Discover feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+- slug: phase2_reflection_part3_w
+  type: likert_5
+  title:
+    en: 'Phase 2 reflection: Part 3'
+  description:
+    en: A short follow-up about the version you used in Phase 2.
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  priority: 100
+  point_value: 0
+  questions:
+  - order: 1
+    slug: would_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would appreciate Ver.{{version_short_letter}} the most? Be
+        specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 2
+    slug: would_not_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would dislike Ver.{{version_short_letter}} the most? Be specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who don't like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 3
+    slug: preferred_version
+    type: single_choice
+    prompt:
+      en: Which version would you actually prefer to use going forward?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: ver_w
+      label:
+        en: Ver.W (with check-ins, missions, daily digest)
+    - order: 2
+      value: ver_q
+      label:
+        en: Ver.Q (with prominent daily questions and scrollable Discover)
+    - order: 3
+      value: cant_decide
+      label:
+        en: I really can't decide
+    - order: 4
+      value: neither
+      label:
+        en: Honestly, neither — I'd want something different
+    - order: 5
+      value: other
+      label:
+        en: Other (specify below)
+  - order: 4
+    slug: preferred_version_reason
+    type: free_text
+    prompt:
+      en: Could you briefly explain your choice?
+    placeholder:
+      en: Even a few sentences helps.
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+- slug: phase2_reflection_part3_q
+  type: likert_5
+  title:
+    en: 'Phase 2 reflection: Part 3'
+  description:
+    en: A short follow-up about the version you used in Phase 2.
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  priority: 100
+  point_value: 0
+  questions:
+  - order: 1
+    slug: would_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would appreciate Ver.{{version_short_letter}} the most? Be
+        specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 2
+    slug: would_not_appreciate
+    type: free_text
+    prompt:
+      en: What kinds of people do you think would dislike Ver.{{version_short_letter}} the most? Be specific.
+    placeholder:
+      en: Specific descriptors are more useful than 'people who don't like X.'
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 3
+    slug: goal1_feat_dailyq_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the daily questions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 4
+    slug: goal1_feat_dailyq_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the daily questions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 5
+    slug: goal1_feat_qsend_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the question sending feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 6
+    slug: goal1_feat_qsend_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the question sending feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 7
+    slug: goal7_feat_scrollable_discover_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the scrollable Discover feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 8
+    slug: goal7_feat_scrollable_discover_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the scrollable Discover feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 9
+    slug: preferred_version
+    type: single_choice
+    prompt:
+      en: Which version would you actually prefer to use going forward?
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    options:
+    - order: 1
+      value: ver_w
+      label:
+        en: Ver.W (with check-ins, missions, daily digest)
+    - order: 2
+      value: ver_q
+      label:
+        en: Ver.Q (with prominent daily questions and scrollable Discover)
+    - order: 3
+      value: cant_decide
+      label:
+        en: I really can't decide
+    - order: 4
+      value: neither
+      label:
+        en: Honestly, neither — I'd want something different
+    - order: 5
+      value: other
+      label:
+        en: Other (specify below)
+  - order: 10
+    slug: preferred_version_reason
+    type: free_text
+    prompt:
+      en: Could you briefly explain your choice?
+    placeholder:
+      en: Even a few sentences helps.
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+- slug: feature_eval_w_part2
+  type: likert_5
+  title:
+    en: 'Ver.W features: Part 2'
+  description:
+    en: A few follow-up questions about the Ver.W features you used.
+  friend_visible: false
+  results_hidden: true
+  repeatable: true
+  priority: 100
+  point_value: 0
+  questions:
+  - order: 1
+    slug: goal1_feat_dailyq
+    type: likert_5
+    prompt:
+      en: '**Daily questions** — I liked this feature.'
+    description:
+      en: The daily question prompt that asks you something specific to answer and share.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 2
+    slug: goal1_feat_dailyq_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the daily questions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 3
+    slug: goal1_feat_dailyq_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the daily questions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 4
+    slug: goal1_feat_qsend
+    type: likert_5
+    prompt:
+      en: '**Question sending** — I liked this feature.'
+    description:
+      en: Sending a question to a specific friend, prompting them to share something with you.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 5
+    slug: goal1_feat_qsend_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the question sending feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 6
+    slug: goal1_feat_qsend_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the question sending feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 7
+    slug: goal2_feat_browse
+    type: likert_5
+    prompt:
+      en: '**Browsing modes** (quiet vs. social mode) — I liked this feature.'
+    description:
+      en: Being able to browse without others knowing you're active, or signal that you're open to interaction.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 8
+    slug: goal2_feat_browse_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the browsing modes (quiet vs. social mode) feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 9
+    slug: goal2_feat_browse_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the browsing modes (quiet vs. social mode) feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 10
+    slug: goal2_feat_social_battery_level
+    type: likert_5
+    prompt:
+      en: '**Social battery level** — I liked this feature.'
+    description:
+      en: Setting and showing your current social battery level so friends know how available you are
+        for interaction.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 11
+    slug: goal2_feat_social_battery_level_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the social battery level feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 12
+    slug: goal2_feat_social_battery_level_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the social battery level feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 13
+    slug: goal3_feat_checkin_reactions
+    type: likert_5
+    prompt:
+      en: '**Check-in reactions** (notification-only reactions to others'' check-ins) — I liked this feature.'
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 14
+    slug: goal3_feat_checkin_reactions_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the check-in reactions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 15
+    slug: goal3_feat_checkin_reactions_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the check-in reactions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 16
+    slug: goal3_feat_emoji
+    type: likert_5
+    prompt:
+      en: '**Emoji reactions** — I liked this feature.'
+    description:
+      en: Reacting to a post with a specific emoji rather than a comment.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 17
+    slug: goal3_feat_emoji_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the emoji reactions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 18
+    slug: goal3_feat_emoji_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the emoji reactions feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 19
+    slug: goal3_feat_private
+    type: likert_5
+    prompt:
+      en: '**Private comments** — I liked this feature.'
+    description:
+      en: Comments visible only to the post author and you, instead of going to the chat.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 20
+    slug: goal3_feat_private_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the private comments feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 21
+    slug: goal3_feat_private_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the private comments feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 22
+    slug: goal3_feat_profile_list
+    type: likert_5
+    prompt:
+      en: '**Profile-list feed** (people-as-feed view alongside the regular feed) — I liked this feature.'
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 23
+    slug: goal3_feat_profile_list_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the profile-list feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 24
+    slug: goal3_feat_profile_list_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the profile-list feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 25
+    slug: goal3_feat_ping
+    type: likert_5
+    prompt:
+      en: '**Ping for check-in** — I liked this feature.'
+    description:
+      en: Sending a small nudge to a friend asking them to check in.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 26
+    slug: goal3_feat_ping_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the ping for check-in feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 27
+    slug: goal3_feat_ping_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the ping for check-in feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 28
+    slug: goal4_feat_close_filter
+    type: likert_5
+    prompt:
+      en: '**Close-friend filter** (in feed and chats) — I liked this feature.'
+    description:
+      en: Filtering your feed or chats to show only your close friends.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 29
+    slug: goal4_feat_close_filter_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the close-friend filter feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 30
+    slug: goal4_feat_close_filter_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the close-friend filter feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 31
+    slug: goal4_feat_granular_sub
+    type: likert_5
+    prompt:
+      en: '**Granular subscription to friends** — I liked this feature.'
+    description:
+      en: Choosing exactly what kinds of activity from a friend you want to be notified about.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 32
+    slug: goal4_feat_granular_sub_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the granular subscription to friends feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 33
+    slug: goal4_feat_granular_sub_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the granular subscription to friends feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 34
+    slug: goal5_feat_posts
+    type: likert_5
+    prompt:
+      en: '**Structured posts** (mission of the day, photo of the day, question of the day) — I liked
+        this feature.'
+    description:
+      en: Daily-cadence post types that give you a specific thing to share.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 35
+    slug: goal5_feat_posts_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the structured posts (mission of the day, photo
+        of the day, question of the day) feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 36
+    slug: goal5_feat_posts_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the structured posts (mission of the day, photo
+        of the day, question of the day) feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 37
+    slug: goal5_feat_checkins
+    type: likert_5
+    prompt:
+      en: '**Check-ins** (mood, status, song, social battery — 12-hour expiry) — I liked this feature.'
+    description:
+      en: Lighter, shorter-lived sharing that disappears after 12 hours.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 38
+    slug: goal5_feat_checkins_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the check-ins feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 39
+    slug: goal5_feat_checkins_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the check-ins feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 40
+    slug: goal6_feat_playlist
+    type: likert_5
+    prompt:
+      en: '**Shared playlist** — I liked this feature.'
+    description:
+      en: A playlist contributed to by everyone.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 41
+    slug: goal6_feat_playlist_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the shared playlist feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 42
+    slug: goal6_feat_playlist_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the shared playlist feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 43
+    slug: goal6_feat_widget
+    type: likert_5
+    prompt:
+      en: '**Widget** — I liked this feature.'
+    description:
+      en: The home-screen widget showing WIT activity.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 44
+    slug: goal6_feat_widget_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the widget feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 45
+    slug: goal6_feat_widget_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the widget feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 46
+    slug: goal6_feat_survey_digest
+    type: likert_5
+    prompt:
+      en: '**Survey of the day + daily digest** — I liked this feature.'
+    description:
+      en: The daily survey question and the next-day digest showing how everyone answered.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 47
+    slug: goal6_feat_survey_digest_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the survey of the day + daily digest feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 48
+    slug: goal6_feat_survey_digest_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the survey of the day + daily digest feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 49
+    slug: goal6_feat_mission
+    type: likert_5
+    prompt:
+      en: '**Mission of the day** — I liked this feature.'
+    description:
+      en: A daily prompt or task shared across users.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 50
+    slug: goal6_feat_mission_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the mission of the day feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 51
+    slug: goal6_feat_mission_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the mission of the day feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 52
+    slug: goal7_feat_discover
+    type: likert_5
+    prompt:
+      en: '**Discover feed** (limited new content with mutual-friend / trait filters) — I liked this feature.'
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 53
+    slug: goal7_feat_discover_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the Discover feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 54
+    slug: goal7_feat_discover_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the Discover feed feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 55
+    slug: goal7_feat_nth_degree
+    type: likert_5
+    prompt:
+      en: '**Nth-degree connections + mutual interests on profiles** — I liked this feature.'
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 56
+    slug: goal7_feat_nth_degree_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the Nth-degree connections + mutual interests on
+        profiles feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 57
+    slug: goal7_feat_nth_degree_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the Nth-degree connections + mutual interests
+        on profiles feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 58
+    slug: goal7_feat_profile_decoration
+    type: likert_5
+    prompt:
+      en: '**Profile decoration** (profile chips, pinned check-ins) — I liked this feature.'
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 59
+    slug: goal7_feat_profile_decoration_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the profile decoration feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 60
+    slug: goal7_feat_profile_decoration_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the profile decoration feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 61
+    slug: goal8_feat_nonpublic
+    type: likert_5
+    prompt:
+      en: '**Non-public account with selective public sharing** — I liked this feature.'
+    description:
+      en: Your account being non-public by default but letting you share specific things publicly.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 62
+    slug: goal8_feat_nonpublic_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the non-public account with selective public sharing
+        feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 63
+    slug: goal8_feat_nonpublic_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the non-public account with selective public sharing
+        feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 64
+    slug: goal8_feat_view_as
+    type: likert_5
+    prompt:
+      en: '**View as** (preview your profile as a specific other user would see it) — I liked this feature.'
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 65
+    slug: goal8_feat_view_as_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the View As feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 66
+    slug: goal8_feat_view_as_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the View As feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 67
+    slug: goal8_feat_retroactive
+    type: likert_5
+    prompt:
+      en: '**Apply privacy changes to past posts** — I liked this feature.'
+    description:
+      en: When you change your privacy settings, having those changes apply to things you already posted.
+    low_label:
+      en: Strongly disagree
+    high_label:
+      en: Strongly agree
+    required: true
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+  - order: 68
+    slug: goal8_feat_retroactive_enjoy
+    type: free_text
+    prompt:
+      en: What, if anything, did you enjoy most about the applying privacy changes to past posts feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0
+  - order: 69
+    slug: goal8_feat_retroactive_dislike
+    type: free_text
+    prompt:
+      en: What, if anything, did you dislike most about the applying privacy changes to past posts feature?
+    required: false
+    reverse_scored: false
+    result_hidden: true
+    embedded_data: false
+    min_length: 0

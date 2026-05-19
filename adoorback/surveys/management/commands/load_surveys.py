@@ -82,6 +82,15 @@ class Command(BaseCommand):
             action='store_true',
             help='If set, delete existing questions/options for matched surveys before re-creating them.',
         )
+        parser.add_argument(
+            '--replace-questions-if-unanswered',
+            action='store_true',
+            help=(
+                'For matched existing surveys with no SurveyResponse rows, '
+                'replace questions/options from the fixture. Answered surveys '
+                'preserve their existing question rows.'
+            ),
+        )
 
     def handle(self, *args, **opts):
         path = Path(opts['path'])
@@ -116,14 +125,26 @@ class Command(BaseCommand):
                 if slug.startswith(ANCHOR_ONLY_SLUG_PREFIX):
                     skipped_anchor_only += 1
                     continue
-                self._upsert(entry, anchors=anchors, replace_questions=opts['replace_questions'])
+                self._upsert(
+                    entry,
+                    anchors=anchors,
+                    replace_questions=opts['replace_questions'],
+                    replace_questions_if_unanswered=opts['replace_questions_if_unanswered'],
+                )
                 loaded += 1
         msg = f'Loaded {loaded} surveys from {path}'
         if skipped_anchor_only:
             msg += f' (skipped {skipped_anchor_only} anchor-only entries)'
         self.stdout.write(self.style.SUCCESS(msg))
 
-    def _upsert(self, entry, *, anchors: dict, replace_questions: bool):
+    def _upsert(
+        self,
+        entry,
+        *,
+        anchors: dict,
+        replace_questions: bool,
+        replace_questions_if_unanswered: bool,
+    ):
         slug = entry['slug']
         default_type = entry.get('type', SurveyQuestion._meta.get_field('type').default)
 
@@ -156,7 +177,11 @@ class Command(BaseCommand):
         }
         survey, created = Survey.objects.update_or_create(slug=slug, defaults=defaults)
 
-        if replace_questions or created:
+        should_replace_questions = replace_questions or created
+        if not should_replace_questions and replace_questions_if_unanswered:
+            should_replace_questions = not survey.responses.exists()
+
+        if should_replace_questions:
             survey.questions.all().delete()
             raw_questions = list(entry.get('questions', []))
             expanded = _expand_includes(raw_questions, anchors, context=f'survey {slug!r}')

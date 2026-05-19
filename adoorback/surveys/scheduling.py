@@ -426,6 +426,20 @@ def get_survey_index(user):
                 # survey is answered (token populates -> missing set
                 # shrinks -> filter passes).
                 continue
+            from surveys.recovery import recovery_survey_has_visible_questions_for_user
+            if not recovery_survey_has_visible_questions_for_user(user, sched.survey):
+                continue
+            out.append(sched)
+        return out
+
+    def _completed_filter(rows):
+        out = []
+        for sched in rows:
+            if not schedule_routes_to_user(sched, user):
+                continue
+            from surveys.recovery import recovery_survey_has_visible_questions_for_user
+            if not recovery_survey_has_visible_questions_for_user(user, sched.survey):
+                continue
             out.append(sched)
         return out
 
@@ -451,7 +465,5 @@ def get_survey_index(user):
         # the user already answered, so they should still see the entry in
         # their archive. Version routing IS applied (a Q user shouldn't
         # see a W-only completion in their list, even if they somehow have one).
-        'completed': _by_sidebar_order(
-            [s for s in completed if schedule_routes_to_user(s, user)]
-        ),
+        'completed': _by_sidebar_order(_completed_filter(completed)),
     }

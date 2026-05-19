@@ -2,10 +2,14 @@ import tempfile
 from pathlib import Path
 
 import yaml
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 
-from surveys.models import Survey
+from surveys.models import Survey, SurveyAnswer, SurveyResponse
+
+
+PRE_FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'pre.yaml'
 
 
 SAMPLE = [
@@ -99,3 +103,107 @@ class LoadSurveysCommandTests(TestCase):
         self.assertEqual(s.priority, 200)
         self.assertEqual(s.point_value, 25)
         self.assertEqual(s.point_prereq_slug, 'flags_prereq')
+
+    def test_feature_eval_w_fixture_has_two_text_followups_per_feature_without_na(self):
+        call_command('load_surveys', str(PRE_FIXTURE_PATH))
+
+        survey = Survey.objects.get(slug='feature_eval_w')
+        questions = list(survey.questions.order_by('order'))
+        by_slug = {q.slug: q for q in questions}
+        rating_questions = [
+            q for q in questions
+            if q.slug.startswith('goal') and not q.slug.endswith(('_enjoy', '_dislike'))
+        ]
+
+        self.assertGreater(len(rating_questions), 0)
+        for rating in rating_questions:
+            self.assertEqual(rating.type, 'likert_5')
+            self.assertEqual(rating.na_option_en, '')
+            enjoy = by_slug.get(f'{rating.slug}_enjoy')
+            dislike = by_slug.get(f'{rating.slug}_dislike')
+            self.assertIsNotNone(enjoy, rating.slug)
+            self.assertIsNotNone(dislike, rating.slug)
+            self.assertEqual(enjoy.type, 'free_text')
+            self.assertEqual(dislike.type, 'free_text')
+            self.assertEqual(enjoy.order, rating.order + 1)
+            self.assertEqual(dislike.order, rating.order + 2)
+
+    def test_replace_questions_if_unanswered_updates_unanswered_existing_survey(self):
+        first = self._write_fixture([
+            {
+                **SAMPLE[0],
+                'questions': [
+                    {
+                        **SAMPLE[0]['questions'][0],
+                        'slug': 'old_question',
+                    },
+                ],
+            },
+        ])
+        call_command('load_surveys', str(first))
+        second = self._write_fixture([
+            {
+                'slug': 'unit_test_a',
+                'type': 'likert_5',
+                'title': {'en': 'Updated'},
+                'questions': [
+                    {
+                        'order': 1,
+                        'slug': 'new_question',
+                        'prompt': {'en': 'New question'},
+                    },
+                ],
+            },
+        ])
+
+        call_command('load_surveys', str(second), '--replace-questions-if-unanswered')
+
+        survey = Survey.objects.get(slug='unit_test_a')
+        self.assertEqual(survey.title_en, 'Updated')
+        self.assertEqual(
+            list(survey.questions.values_list('slug', flat=True)),
+            ['new_question'],
+        )
+
+    def test_replace_questions_if_unanswered_preserves_answered_existing_survey(self):
+        User = get_user_model()
+        user = User.objects.create(username='answered_user', email='answered_user@example.com')
+        first = self._write_fixture([
+            {
+                **SAMPLE[0],
+                'questions': [
+                    {
+                        **SAMPLE[0]['questions'][0],
+                        'slug': 'old_question',
+                    },
+                ],
+            },
+        ])
+        call_command('load_surveys', str(first))
+        survey = Survey.objects.get(slug='unit_test_a')
+        question = survey.questions.get(slug='old_question')
+        response = SurveyResponse.objects.create(user=user, survey=survey)
+        SurveyAnswer.objects.create(response=response, question=question, value=4)
+        second = self._write_fixture([
+            {
+                'slug': 'unit_test_a',
+                'type': 'likert_5',
+                'title': {'en': 'Updated'},
+                'questions': [
+                    {
+                        'order': 1,
+                        'slug': 'new_question',
+                        'prompt': {'en': 'New question'},
+                    },
+                ],
+            },
+        ])
+
+        call_command('load_surveys', str(second), '--replace-questions-if-unanswered')
+
+        survey.refresh_from_db()
+        self.assertEqual(survey.title_en, 'Updated')
+        self.assertEqual(
+            list(survey.questions.order_by('order').values_list('slug', flat=True)),
+            ['old_question'],
+        )
