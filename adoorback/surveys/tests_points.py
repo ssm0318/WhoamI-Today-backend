@@ -10,6 +10,7 @@ from surveys.models import (
     CADENCE_DAILY, CADENCE_WEEKLY, PointAward, ScheduledSurvey, Survey,
     SurveyResponse,
 )
+from surveys.points import available_max_for_user, reimbursement_state_for_user
 
 
 class SurveyPointAwardSubmitTests(APITestCase):
@@ -234,16 +235,52 @@ class SurveyPointStateSerializerTests(APITestCase):
 
 
 class PointManualCreditCommandTests(TestCase):
-    def test_credit_wit_bot_audit_is_idempotent(self):
+    def test_credit_wit_bot_audit_credits_each_phase_separately(self):
         viewer = make_user('viewer')
+        viewer.user_group = 'group_w_first'
+        viewer.save(update_fields=['user_group'])
 
-        call_command('credit_wit_bot_audit', '--user', viewer.username, '--pts', '10')
-        call_command('credit_wit_bot_audit', '--user', viewer.username, '--pts', '10')
+        call_command('credit_wit_bot_audit', '--user', viewer.username, '--phase', '1', '--pts', '10')
+        call_command('credit_wit_bot_audit', '--user', viewer.username, '--phase', '2', '--pts', '12')
+        call_command('credit_wit_bot_audit', '--user', viewer.username, '--phase', '2', '--pts', '12')
 
         awards = PointAward.objects.filter(
             user=viewer,
             source_kind='wit_bot_audit',
-            source_slug='wit_bot_audit',
+        ).order_by('source_slug')
+        self.assertEqual(awards.count(), 2)
+        self.assertEqual(
+            [(award.source_slug, award.awarded_points) for award in awards],
+            [('wit_bot_audit_phase_1', 10), ('wit_bot_audit_phase_2', 12)],
         )
-        self.assertEqual(awards.count(), 1)
-        self.assertEqual(awards.get().awarded_points, 10)
+
+    def test_wit_bot_audit_titles_use_phase_version_for_group(self):
+        viewer = make_user('viewer')
+        viewer.user_group = 'group_q_first'
+        viewer.save(update_fields=['user_group'])
+        PointAward.objects.create(
+            user=viewer,
+            source_kind='wit_bot_audit',
+            source_slug='wit_bot_audit_phase_1',
+            awarded_points=10,
+        )
+        PointAward.objects.create(
+            user=viewer,
+            source_kind='wit_bot_audit',
+            source_slug='wit_bot_audit_phase_2',
+            awarded_points=12,
+        )
+
+        titles = [
+            award['title_en']
+            for award in reimbursement_state_for_user(viewer)['awards']
+            if award['source_kind'] == 'wit_bot_audit'
+        ]
+
+        self.assertIn('Wit_bot audit pass - Phase 1 (Ver.Q)', titles)
+        self.assertIn('Wit_bot audit pass - Phase 2 (Ver.W)', titles)
+
+    def test_available_max_counts_both_wit_bot_audit_phases(self):
+        viewer = make_user('viewer')
+
+        self.assertEqual(available_max_for_user(viewer), 30)

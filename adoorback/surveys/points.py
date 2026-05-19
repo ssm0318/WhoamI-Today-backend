@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from surveys.models import PointAward, ScheduledSurvey, Survey, SurveyResponse
 from surveys.reimbursement_config import (
-    INTERVIEW_SIGNUP_MAX_POINTS, POINTS_PER_DOLLAR, WIT_BOT_AUDIT_MAX_POINTS,
+    INTERVIEW_SIGNUP_MAX_POINTS, POINTS_PER_DOLLAR, WIT_BOT_AUDIT_PHASES,
 )
 from surveys.retired import is_retired_survey_slug
 from surveys.scheduling import (
@@ -107,6 +107,46 @@ def serialize_point_award(award: PointAward | None) -> dict | None:
     }
 
 
+def wit_bot_audit_version_for_group(user_group: str, phase: int) -> str:
+    if phase == 1:
+        return 'version_q' if user_group == 'group_q_first' else 'version_w'
+    if phase == 2:
+        return 'version_w' if user_group == 'group_q_first' else 'version_q'
+    raise ValueError(f'Unsupported Wit_bot audit phase: {phase}')
+
+
+def wit_bot_audit_source_for_phase(phase: int) -> dict:
+    try:
+        return WIT_BOT_AUDIT_PHASES[phase]
+    except KeyError as exc:
+        raise ValueError(f'Unsupported Wit_bot audit phase: {phase}') from exc
+
+
+def wit_bot_audit_phase_for_source_slug(source_slug: str) -> int | None:
+    for phase, source in WIT_BOT_AUDIT_PHASES.items():
+        if source['source_slug'] == source_slug:
+            return phase
+    return None
+
+
+def _version_label(version: str) -> str:
+    if version == 'version_q':
+        return 'Ver.Q'
+    if version == 'version_w':
+        return 'Ver.W'
+    return version
+
+
+def _wit_bot_audit_title(award: PointAward, language: str) -> str:
+    phase = wit_bot_audit_phase_for_source_slug(award.source_slug)
+    if phase is None:
+        return 'Wit_bot audit pass'
+    source = wit_bot_audit_source_for_phase(phase)
+    title = source[f'title_{language}']
+    version = wit_bot_audit_version_for_group(award.user.user_group, phase)
+    return f'{title} ({_version_label(version)})'
+
+
 def serialize_reimbursement_award(award: PointAward) -> dict:
     scheduled = award.scheduled_survey
     response = award.response
@@ -124,8 +164,8 @@ def serialize_reimbursement_award(award: PointAward) -> dict:
         title_en = substitute(survey.title_en, tokens)
         title_ko = substitute(survey.title_ko, tokens)
     elif award.source_kind == PointAward.SOURCE_WIT_BOT_AUDIT:
-        title_en = 'Wit_bot audit pass'
-        title_ko = 'Wit_bot audit pass'
+        title_en = _wit_bot_audit_title(award, 'en')
+        title_ko = _wit_bot_audit_title(award, 'ko')
     elif award.source_kind == PointAward.SOURCE_INTERVIEW_SIGNUP:
         title_en = 'Interview signup'
         title_ko = 'Interview signup'
@@ -241,7 +281,8 @@ def _visible_scheduled_surveys_for_points(user):
 
 
 def available_max_for_user(user) -> int:
-    total = WIT_BOT_AUDIT_MAX_POINTS + INTERVIEW_SIGNUP_MAX_POINTS
+    total = sum(source['max_points'] for source in WIT_BOT_AUDIT_PHASES.values())
+    total += INTERVIEW_SIGNUP_MAX_POINTS
     for scheduled in _visible_scheduled_surveys_for_points(user):
         total += scheduled.survey.point_value
     return total

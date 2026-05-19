@@ -10,9 +10,14 @@ const PORT = Number(process.env.PORT || 4177);
 
 const MANUAL_SOURCES = [
   {
-    slug: 'wit_bot_audit',
-    title_en: 'Wit_bot audit pass',
-    constant: 'WIT_BOT_AUDIT_MAX_POINTS',
+    slug: 'wit_bot_audit_phase_1',
+    title_en: 'Wit_bot audit pass - Phase 1',
+    constant: 'WIT_BOT_AUDIT_PHASE_1_MAX_POINTS',
+  },
+  {
+    slug: 'wit_bot_audit_phase_2',
+    title_en: 'Wit_bot audit pass - Phase 2',
+    constant: 'WIT_BOT_AUDIT_PHASE_2_MAX_POINTS',
   },
   {
     slug: 'interview_signup',

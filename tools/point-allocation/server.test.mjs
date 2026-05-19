@@ -12,7 +12,12 @@ test('readPointSources lists survey YAML and manual reimbursement sources', asyn
   await mkdir(path.join(root, 'adoorback', 'surveys'), { recursive: true });
   await writeFile(
     path.join(root, 'adoorback', 'surveys', 'reimbursement_config.py'),
-    'WIT_BOT_AUDIT_MAX_POINTS = 10\nINTERVIEW_SIGNUP_MAX_POINTS = 5\n',
+    [
+      'WIT_BOT_AUDIT_PHASE_1_MAX_POINTS = 10',
+      'WIT_BOT_AUDIT_PHASE_2_MAX_POINTS = 12',
+      'INTERVIEW_SIGNUP_MAX_POINTS = 5',
+      '',
+    ].join('\n'),
   );
   await mkdir(fixtures, { recursive: true });
   await writeFile(
@@ -40,7 +45,8 @@ test('readPointSources lists survey YAML and manual reimbursement sources', asyn
     [
       ['survey', 'daily_base', 'Daily diary', 3],
       ['survey', 'no_points', 'No points yet', 0],
-      ['manual', 'wit_bot_audit', 'Wit_bot audit pass', 10],
+      ['manual', 'wit_bot_audit_phase_1', 'Wit_bot audit pass - Phase 1', 10],
+      ['manual', 'wit_bot_audit_phase_2', 'Wit_bot audit pass - Phase 2', 12],
       ['manual', 'interview_signup', 'Interview signup', 5],
     ],
   );
@@ -53,13 +59,18 @@ test('writeAllocationFile persists only the researcher editable point inputs', a
 
   await writeAllocationFile(outputPath, [
     { kind: 'survey', slug: 'daily_base', points: 4 },
-    { kind: 'manual', slug: 'wit_bot_audit', points: 12 },
+    { kind: 'manual', slug: 'wit_bot_audit_phase_1', points: 12 },
   ]);
 
   const saved = JSON.parse(await readFile(outputPath, 'utf8'));
   assert.equal(saved.version, 1);
   assert.equal(saved.sources.length, 2);
   assert.deepEqual(saved.sources[0], { kind: 'survey', slug: 'daily_base', points: 4 });
+  assert.deepEqual(saved.sources[1], {
+    kind: 'manual',
+    slug: 'wit_bot_audit_phase_1',
+    points: 12,
+  });
   assert.match(saved.saved_at, /^\d{4}-\d{2}-\d{2}T/);
 });
 

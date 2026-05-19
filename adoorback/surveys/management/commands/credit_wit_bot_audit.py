@@ -2,8 +2,10 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
 from surveys.models import PointAward
-from surveys.points import credit_manual_award
-from surveys.reimbursement_config import WIT_BOT_AUDIT_MAX_POINTS
+from surveys.points import (
+    credit_manual_award, wit_bot_audit_source_for_phase,
+    wit_bot_audit_version_for_group,
+)
 
 
 class Command(BaseCommand):
@@ -12,10 +14,17 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--user', required=True, help='Username to credit.')
         parser.add_argument(
+            '--phase',
+            required=True,
+            type=int,
+            choices=(1, 2),
+            help='Study phase to credit. Phase determines the W/Q version by user group.',
+        )
+        parser.add_argument(
             '--pts',
             type=int,
-            default=WIT_BOT_AUDIT_MAX_POINTS,
-            help='Points to credit. Defaults to the configured Wit_bot audit max.',
+            default=None,
+            help='Points to credit. Defaults to the configured phase-specific Wit_bot audit max.',
         )
         parser.add_argument('--note', default='', help='Optional audit note.')
 
@@ -26,15 +35,21 @@ class Command(BaseCommand):
         except User.DoesNotExist as exc:
             raise CommandError(f"User not found: {opts['user']}") from exc
 
+        phase = opts['phase']
+        phase_source = wit_bot_audit_source_for_phase(phase)
+        phase_version = wit_bot_audit_version_for_group(user.user_group, phase)
+        points = opts['pts'] if opts['pts'] is not None else phase_source['max_points']
+
         award = credit_manual_award(
             user=user,
             source_kind=PointAward.SOURCE_WIT_BOT_AUDIT,
-            source_slug=PointAward.SOURCE_WIT_BOT_AUDIT,
-            points=opts['pts'],
+            source_slug=phase_source['source_slug'],
+            points=points,
             note=opts['note'],
         )
         self.stdout.write(
             self.style.SUCCESS(
-                f'Credited {award.awarded_points} Wit_bot audit points to {user.username}'
+                f'Credited {award.awarded_points} {phase_source["title_en"]} '
+                f'points to {user.username} ({phase_version})'
             )
         )
