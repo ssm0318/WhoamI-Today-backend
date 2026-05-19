@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Point Allocation</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f4ef;
+        --panel: #fffefa;
+        --ink: #1f2428;
+        --muted: #6f7378;
+        --line: #ded8ce;
+        --accent: #6b3fd6;
+        --accent-soft: #efe7ff;
+        --good: #197347;
+        --warn: #9a5b00;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 254, 250, 0.96);
+        backdrop-filter: blur(10px);
+      }
+
+      .header-inner,
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 18px 20px;
+      }
+
+      .header-inner {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 18px;
+        align-items: center;
+      }
+
+      h1 {
+        margin: 0 0 4px;
+        font-size: 24px;
+        line-height: 1.1;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        padding: 9px 12px;
+        cursor: pointer;
+      }
+
+      button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+        font-weight: 700;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) 190px 190px;
+        gap: 10px;
+        margin: 16px 0;
+      }
+
+      .toolbar input,
+      .toolbar select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 10px 12px;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .summary-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+      }
+
+      .summary-card strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 22px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      table {
+        width: 100%;
+        min-width: 860px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        position: sticky;
+        top: 81px;
+        z-index: 1;
+        background: #fbf7ef;
+        color: #3b3f43;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .slug {
+        color: var(--muted);
+        font-size: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .points-input {
+        width: 92px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+        text-align: right;
+      }
+
+      .changed {
+        border-color: var(--accent);
+        background: #fbf8ff;
+      }
+
+      .status {
+        min-height: 20px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .status.ok {
+        color: var(--good);
+      }
+
+      .status.error {
+        color: #b00020;
+      }
+
+      .empty {
+        padding: 24px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 760px) {
+        .header-inner {
+          grid-template-columns: 1fr;
+        }
+
+        .actions {
+          justify-content: flex-start;
+        }
+
+        .toolbar,
+        .summary {
+          grid-template-columns: 1fr;
+        }
+
+        th {
+          top: 156px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-inner">
+        <div>
+          <h1>Point allocation</h1>
+          <p class="muted">
+            Save writes a JSON handoff file in the backend repo. I can read that file and apply
+            the values to survey YAML/config when you ask.
+          </p>
+        </div>
+        <div class="actions">
+          <button id="zero-visible" type="button">Set visible to 0</button>
+          <button id="current-values" type="button">Use current values</button>
+          <button id="save" class="primary" type="button">Save allocation</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="summary" aria-label="Summary">
+        <div class="summary-card">
+          <span class="muted">Visible rows</span>
+          <strong id="visible-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span class="muted">Assigned total</span>
+          <strong id="assigned-total">0</strong>
+        </div>
+        <div class="summary-card">
+          <span class="muted">Nonzero items</span>
+          <strong id="nonzero-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span class="muted">Unsaved edits</span>
+          <strong id="changed-count">0</strong>
+        </div>
+      </section>
+
+      <section class="toolbar" aria-label="Filters">
+        <input id="search" type="search" placeholder="Search slug, title, or file" />
+        <select id="category"></select>
+        <select id="kind">
+          <option value="all">All kinds</option>
+          <option value="survey">Surveys</option>
+          <option value="manual">Manual activities</option>
+        </select>
+      </section>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Category</th>
+              <th>Kind</th>
+              <th>Prereq</th>
+              <th>Current</th>
+              <th>New points</th>
+              <th>File</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="empty" class="empty" hidden>No matching sources.</div>
+      </div>
+
+      <p id="status" class="status"></p>
+    </main>
+
+    <script>
+      const state = {
+        sources: [],
+        outputPath: '',
+      };
+
+      const byId = (id) => document.getElementById(id);
+      const rowsEl = byId('rows');
+      const emptyEl = byId('empty');
+      const statusEl = byId('status');
+
+      function setStatus(message, type = '') {
+        statusEl.textContent = message;
+        statusEl.className = `status ${type}`;
+      }
+
+      function sourceKey(source) {
+        return `${source.kind}:${source.slug}`;
+      }
+
+      function pointValue(source) {
+        return Number.parseInt(source.draft_points, 10) || 0;
+      }
+
+      function filteredSources() {
+        const search = byId('search').value.trim().toLowerCase();
+        const category = byId('category').value;
+        const kind = byId('kind').value;
+        return state.sources.filter((source) => {
+          if (category !== 'all' && source.category !== category) return false;
+          if (kind !== 'all' && source.kind !== kind) return false;
+          if (!search) return true;
+          return [source.slug, source.title_en, source.file, source.category_label]
+            .join(' ')
+            .toLowerCase()
+            .includes(search);
+        });
+      }
+
+      function renderCategories() {
+        const categories = Array.from(
+          new Map(state.sources.map((source) => [source.category, source.category_label])).entries(),
+        );
+        byId('category').innerHTML = [
+          '<option value="all">All categories</option>',
+          ...categories.map(([value, label]) => `<option value="${value}">${label}</option>`),
+        ].join('');
+      }
+
+      function renderSummary(visible) {
+        const all = state.sources;
+        const total = all.reduce((sum, source) => sum + pointValue(source), 0);
+        const nonzero = all.filter((source) => pointValue(source) > 0).length;
+        const changed = all.filter((source) => pointValue(source) !== source.point_value).length;
+        byId('visible-count').textContent = visible.length;
+        byId('assigned-total').textContent = total;
+        byId('nonzero-count').textContent = nonzero;
+        byId('changed-count').textContent = changed;
+      }
+
+      function renderRows() {
+        const visible = filteredSources();
+        renderSummary(visible);
+        emptyEl.hidden = visible.length > 0;
+        rowsEl.innerHTML = visible
+          .map((source) => {
+            const changed = pointValue(source) !== source.point_value;
+            return `
+              <tr>
+                <td>
+                  <div>${source.title_en}</div>
+                  <div class="slug">${source.slug}</div>
+                </td>
+                <td><span class="badge">${source.category_label}</span></td>
+                <td>${source.kind}</td>
+                <td class="slug">${source.point_prereq_slug || '-'}</td>
+                <td>${source.point_value}</td>
+                <td>
+                  <input
+                    class="points-input ${changed ? 'changed' : ''}"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="${pointValue(source)}"
+                    data-key="${sourceKey(source)}"
+                    aria-label="Points for ${source.slug}"
+                  />
+                </td>
+                <td class="slug">${source.file}</td>
+              </tr>
+            `;
+          })
+          .join('');
+      }
+
+      function updateSourcePoint(key, value) {
+        const source = state.sources.find((item) => sourceKey(item) === key);
+        if (!source) return;
+        source.draft_points = Math.max(0, Number.parseInt(value, 10) || 0);
+        renderRows();
+      }
+
+      async function loadSources() {
+        setStatus('Loading point sources...');
+        const response = await fetch('/api/sources');
+        if (!response.ok) throw new Error(await response.text());
+        const payload = await response.json();
+        state.sources = payload.sources;
+        state.outputPath = payload.output_path;
+        renderCategories();
+        renderRows();
+        setStatus(
+          payload.saved_at
+            ? `Loaded saved allocation from ${payload.output_path_relative}.`
+            : `No saved allocation yet. Saving will create ${payload.output_path_relative}.`,
+        );
+      }
+
+      async function saveAllocation() {
+        const sources = state.sources.map((source) => ({
+          kind: source.kind,
+          slug: source.slug,
+          points: pointValue(source),
+        }));
+        byId('save').disabled = true;
+        setStatus('Saving allocation...');
+        try {
+          const response = await fetch('/api/allocation', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ sources }),
+          });
+          if (!response.ok) throw new Error(await response.text());
+          const payload = await response.json();
+          setStatus(`Saved ${payload.count} values to ${payload.output_path}.`, 'ok');
+        } catch (error) {
+          setStatus(error.message, 'error');
+        } finally {
+          byId('save').disabled = false;
+        }
+      }
+
+      rowsEl.addEventListener('input', (event) => {
+        const input = event.target.closest('input[data-key]');
+        if (!input) return;
+        updateSourcePoint(input.dataset.key, input.value);
+      });
+
+      byId('search').addEventListener('input', renderRows);
+      byId('category').addEventListener('change', renderRows);
+      byId('kind').addEventListener('change', renderRows);
+      byId('zero-visible').addEventListener('click', () => {
+        const visibleKeys = new Set(filteredSources().map(sourceKey));
+        state.sources.forEach((source) => {
+          if (visibleKeys.has(sourceKey(source))) source.draft_points = 0;
+        });
+        renderRows();
+        setStatus('Visible rows set to 0. Click Save allocation to write the handoff file.');
+      });
+      byId('current-values').addEventListener('click', () => {
+        state.sources.forEach((source) => {
+          source.draft_points = source.point_value;
+        });
+        renderRows();
+        setStatus('Inputs restored to current backend values.');
+      });
+      byId('save').addEventListener('click', saveAllocation);
+
+      loadSources().catch((error) => setStatus(error.message, 'error'));
+    </script>
+  </body>
+</html>
