@@ -62,3 +62,17 @@ test('writeAllocationFile persists only the researcher editable point inputs', a
   assert.deepEqual(saved.sources[0], { kind: 'survey', slug: 'daily_base', points: 4 });
   assert.match(saved.saved_at, /^\d{4}-\d{2}-\d{2}T/);
 });
+
+test('app table header is not offset into body rows', async () => {
+  const html = await readFile(new URL('./app.html', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(html, /top:\s*(81|156)px/);
+  assert.match(html, /th\s*{[\s\S]*top:\s*0;/);
+});
+
+test('app can use localhost API when opened as a file', async () => {
+  const html = await readFile(new URL('./app.html', import.meta.url), 'utf8');
+
+  assert.match(html, /location\.protocol === 'file:'/);
+  assert.match(html, /http:\/\/localhost:4177/);
+});

@@ -219,6 +219,9 @@ function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'GET,POST,OPTIONS',
+    'access-control-allow-headers': 'content-type',
   });
   response.end(JSON.stringify(payload, null, 2));
 }
@@ -227,6 +230,9 @@ function sendText(response, statusCode, text, contentType = 'text/plain; charset
   response.writeHead(statusCode, {
     'content-type': contentType,
     'cache-control': 'no-store',
+    'access-control-allow-origin': '*',
+    'access-control-allow-methods': 'GET,POST,OPTIONS',
+    'access-control-allow-headers': 'content-type',
   });
   response.end(text);
 }
@@ -238,6 +244,11 @@ export function createPointAllocationServer({
   return createServer(async (request, response) => {
     try {
       const url = new URL(request.url, 'http://localhost');
+      if (request.method === 'OPTIONS') {
+        sendText(response, 204, '');
+        return;
+      }
+
       if (request.method === 'GET' && url.pathname === '/') {
         const html = await readFile(join(TOOL_DIR, 'app.html'), 'utf8');
         sendText(response, 200, html, 'text/html; charset=utf-8');

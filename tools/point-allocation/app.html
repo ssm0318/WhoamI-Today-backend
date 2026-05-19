@@ -153,7 +153,8 @@
       table {
         width: 100%;
         min-width: 860px;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
       }
 
       th,
@@ -166,7 +167,7 @@
 
       th {
         position: sticky;
-        top: 81px;
+        top: 0;
         z-index: 1;
         background: #fbf7ef;
         color: #3b3f43;
@@ -244,9 +245,6 @@
           grid-template-columns: 1fr;
         }
 
-        th {
-          top: 156px;
-        }
       }
     </style>
   </head>
@@ -324,6 +322,7 @@
         sources: [],
         outputPath: '',
       };
+      const API_BASE = location.protocol === 'file:' ? 'http://localhost:4177' : '';
 
       const byId = (id) => document.getElementById(id);
       const rowsEl = byId('rows');
@@ -423,7 +422,7 @@
 
       async function loadSources() {
         setStatus('Loading point sources...');
-        const response = await fetch('/api/sources');
+        const response = await fetch(`${API_BASE}/api/sources`);
         if (!response.ok) throw new Error(await response.text());
         const payload = await response.json();
         state.sources = payload.sources;
@@ -446,7 +445,7 @@
         byId('save').disabled = true;
         setStatus('Saving allocation...');
         try {
-          const response = await fetch('/api/allocation', {
+          const response = await fetch(`${API_BASE}/api/allocation`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ sources }),
