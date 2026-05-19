@@ -79,6 +79,8 @@ class LoadSurveysCommandTests(TestCase):
                 'editable': True,
                 'closed': False,
                 'priority': 200,
+                'point_value': 25,
+                'point_prereq_slug': 'flags_prereq',
                 'questions': [
                     {
                         'order': 1,
@@ -95,3 +97,5 @@ class LoadSurveysCommandTests(TestCase):
         self.assertTrue(s.editable)
         self.assertFalse(s.closed)
         self.assertEqual(s.priority, 200)
+        self.assertEqual(s.point_value, 25)
+        self.assertEqual(s.point_prereq_slug, 'flags_prereq')

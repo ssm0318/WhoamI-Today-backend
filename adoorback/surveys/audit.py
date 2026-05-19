@@ -310,6 +310,8 @@ def _load_survey_entries(path: Path) -> list[dict[str, Any]]:
             'editable': entry.get('editable', False),
             'closed': entry.get('closed', False),
             'priority': entry.get('priority', 0),
+            'point_value': entry.get('point_value', 0),
+            'point_prereq_slug': entry.get('point_prereq_slug', ''),
             'question_count': len(questions),
             'questions': questions,
         })
@@ -618,6 +620,8 @@ def _annotate_schedule_rows(rows: list[dict[str, Any]], surveys: dict[str, dict[
         row['source_file'] = survey['source_file']
         row['question_count'] = survey['question_count']
         row['title'] = survey['title']
+        row['point_value'] = survey['point_value']
+        row['point_prereq_slug'] = survey['point_prereq_slug']
 
 
 def _build_warnings(surveys: dict[str, dict[str, Any]], schedule_rows: list[dict[str, Any]]) -> list[str]:
@@ -636,6 +640,13 @@ def _build_warnings(surveys: dict[str, dict[str, Any]], schedule_rows: list[dict
             warnings.append(
                 f"Survey {slug} contains user-dependent tokens: "
                 + ', '.join(survey['required_tokens'])
+            )
+        if survey['point_value'] == 0 and any(
+            row['survey_slug'] == slug and row['source_found']
+            for row in schedule_rows
+        ):
+            warnings.append(
+                f"Scheduled survey {slug} has point_value=0. Confirm this is intentional."
             )
     return warnings
 
@@ -735,6 +746,8 @@ def _sidebar_entry(row: dict[str, Any], survey: dict[str, Any], bucket: str) -> 
         'window_end': row['window_end'],
         'allow_late': row['allow_late'],
         'priority': survey['priority'],
+        'point_value': survey['point_value'],
+        'point_prereq_slug': survey['point_prereq_slug'],
         'redirect_url': f"/surveys/{row['survey_slug']}/answer",
         'runtime_source_file': survey['source_file'],
         'source_found_in_selected_fixtures': row['source_found'],

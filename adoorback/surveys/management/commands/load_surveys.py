@@ -151,6 +151,8 @@ class Command(BaseCommand):
             'editable': entry.get('editable', False),
             'closed': entry.get('closed', False),
             'priority': entry.get('priority', 0),
+            'point_value': entry.get('point_value', 0),
+            'point_prereq_slug': entry.get('point_prereq_slug', ''),
         }
         survey, created = Survey.objects.update_or_create(slug=slug, defaults=defaults)
 

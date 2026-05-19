@@ -84,6 +84,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -195,6 +196,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -306,6 +308,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -419,6 +422,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
   score_formula: "rsq_brief_weighted"
 
   questions:
@@ -713,6 +717,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -842,6 +847,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -972,6 +978,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -1105,6 +1112,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -1279,6 +1287,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -1392,6 +1401,8 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
+  point_prereq_slug: habit_platform
   serving_condition:
     skip_if_user_embedded_data:
       habit_platform: "none"
@@ -1530,6 +1541,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -1640,6 +1652,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -1775,6 +1788,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -1884,6 +1898,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -1993,6 +2008,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -2103,6 +2119,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -2255,6 +2272,7 @@
     en: "Tomorrow's digest will show what surprised people most about their first day, and which features got the strongest first reactions."
   friend_visible: false
   results_hidden: false
+  point_value: 10
 
   questions:
     # Q1 single-choice with an "Other" escape hatch — preset emotion words
@@ -2351,6 +2369,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -2462,6 +2481,7 @@
   friend_visible: false
   results_hidden: false
   result_kind: scale_score_histogram
+  point_value: 10
 
   questions:
     - order: 1
@@ -2581,6 +2601,7 @@
     en: "Tomorrow's digest will show how the cohort summarized the month — favorite features, biggest changes, what people thought about social media in general after this experience."
   friend_visible: false
   results_hidden: false
+  point_value: 10
 
   questions:
     - order: 1

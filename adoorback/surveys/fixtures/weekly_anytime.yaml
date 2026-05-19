@@ -118,6 +118,7 @@ _weekly_questions: &weekly_questions
   # released after the study ends.
   results_hidden: true
   priority: 50
+  point_value: 12
   tokens:
     week_label: "Week 1"
     week_label_lower: "week 1"
@@ -143,6 +144,7 @@ _weekly_questions: &weekly_questions
   # released after the study ends.
   results_hidden: true
   priority: 50
+  point_value: 12
   tokens:
     week_label: "Week 2"
     week_label_lower: "week 2"
@@ -168,6 +170,7 @@ _weekly_questions: &weekly_questions
   # released after the study ends.
   results_hidden: true
   priority: 50
+  point_value: 12
   tokens:
     week_label: "Week 3"
     week_label_lower: "week 3"
@@ -193,6 +196,7 @@ _weekly_questions: &weekly_questions
   # released after the study ends.
   results_hidden: true
   priority: 50
+  point_value: 12
   tokens:
     week_label: "Week 4"
     week_label_lower: "week 4"
@@ -231,6 +235,7 @@ _weekly_questions: &weekly_questions
   # Always-on drop-in feedback channel; sits below endpoint / daily /
   # weekly cards in the index but stays accessible throughout the study.
   priority: 20
+  point_value: 3
 
   questions:
 

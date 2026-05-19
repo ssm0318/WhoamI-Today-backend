@@ -75,6 +75,7 @@
   # *below* anytime_reflection (priority=20) in the index, which is backwards —
   # the daily diary is the higher-engagement asset and should surface first.
   priority: 80
+  point_value: 3
 
   questions:
 

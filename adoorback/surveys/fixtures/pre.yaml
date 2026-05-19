@@ -1589,6 +1589,7 @@ _wrapup_block: &wrapup_block
   friend_visible: false
   results_hidden: true
   priority: 100
+  point_value: 50
   tokens:
     phase_label: "Phase 1"
     phase_window: "the past two weeks"
@@ -1641,6 +1642,7 @@ _wrapup_block: &wrapup_block
   friend_visible: false
   results_hidden: true
   priority: 100
+  point_value: 50
   tokens:
     phase_label: "Phase 1"
     phase_window: "the past two weeks"
@@ -1694,6 +1696,7 @@ _wrapup_block: &wrapup_block
   friend_visible: false
   results_hidden: true
   priority: 100
+  point_value: 50
   tokens:
     phase_label: "Phase 2"
     phase_window: "the second half"
@@ -1742,6 +1745,7 @@ _wrapup_block: &wrapup_block
   friend_visible: false
   results_hidden: true
   priority: 100
+  point_value: 50
   tokens:
     phase_label: "Phase 2"
     phase_window: "the second half"
@@ -1801,6 +1805,7 @@ _wrapup_block: &wrapup_block
   results_hidden: true
   editable: true
   priority: 100
+  point_value: 50
   tokens:
     phase_label: "Ver. W"
     phase_window: "your time on Ver. W"
@@ -1840,6 +1845,7 @@ _wrapup_block: &wrapup_block
   results_hidden: true
   editable: true
   priority: 100
+  point_value: 40
   tokens:
     phase_label: "Phase 1"
     phase_window: "the first two weeks"
@@ -1871,6 +1877,7 @@ _wrapup_block: &wrapup_block
   results_hidden: true
   editable: true
   priority: 100
+  point_value: 40
   tokens:
     phase_label: "Phase 2"
     phase_window: "the second two weeks"
