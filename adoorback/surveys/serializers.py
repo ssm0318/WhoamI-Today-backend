@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from surveys.models import (
-    DISPLAY_ONLY, INPUT_LESS_TYPES, LIKERT_5_NA, LIKERT_RANGES, NA_SENTINEL,
+    CADENCE_DAILY, DISPLAY_ONLY, INPUT_LESS_TYPES, LIKERT_5_NA, LIKERT_RANGES, NA_SENTINEL,
     PER_FRIEND_TYPES, SLIDER, ScheduledSurvey, Survey, SurveyOption,
     SurveyDraft, SurveyQuestion, SurveyResponse,
 )
@@ -380,6 +380,7 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
         source='user_submitted_at', allow_null=True, read_only=True,
     )
     redirect_url = serializers.SerializerMethodField()
+    results_unlocked = serializers.SerializerMethodField()
     draft = serializers.SerializerMethodField()
 
     class Meta:
@@ -390,6 +391,7 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
             'survey', 'bucket',
             'user_answered', 'submitted_at',
             'redirect_url',
+            'results_unlocked',
             'draft',
         ]
 
@@ -397,6 +399,15 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
         if getattr(obj, 'bucket', None) == 'completed':
             return f'/surveys/{obj.survey.slug}/results'
         return f'/surveys/{obj.survey.slug}/answer'
+
+    def get_results_unlocked(self, obj):
+        if not getattr(obj, 'user_answered', False):
+            return False
+        if obj.survey.results_hidden:
+            return False
+        if obj.cadence == CADENCE_DAILY:
+            return obj.window_start < _today_la_7am()
+        return True
 
     def get_draft(self, obj):
         if getattr(obj, 'user_answered', False):

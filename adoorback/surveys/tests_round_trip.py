@@ -13,6 +13,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from surveys._test_helpers import respond
 from surveys.models import (
     CADENCE_ANYTIME, CADENCE_BIWEEKLY, CADENCE_DAILY, CADENCE_ENDPOINT,
     CADENCE_WEEKLY, ScheduledSurvey, Survey,
@@ -145,3 +146,16 @@ class SurveyIndexRoundTripTests(TestCase):
         self.assertIs(daily['allow_late'], False)
         self.assertIs(anytime['allow_late'], True)
         self.assertIs(late_weekly['allow_late'], True)
+
+    def test_completed_entries_include_results_unlocked_flag(self):
+        respond(self.user, Survey.objects.get(slug='daily_base'), [3, 3])
+        respond(self.user, Survey.objects.get(slug='week1_reflection'), [4, 4, 4])
+        respond(self.user, Survey.objects.get(slug='mid_study'), [2, 2])
+
+        r = self.client.get('/api/surveys/index/')
+        self.assertEqual(r.status_code, 200)
+        completed = {e['survey']['slug']: e for e in r.json()['completed']}
+
+        self.assertFalse(completed['daily_base']['results_unlocked'])
+        self.assertTrue(completed['week1_reflection']['results_unlocked'])
+        self.assertFalse(completed['mid_study']['results_unlocked'])
