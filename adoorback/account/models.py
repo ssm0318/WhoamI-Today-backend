@@ -530,6 +530,7 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
     def unread_message_cnt(self):
         from chat.models import ChatRoom, Message, GroupReadCursor
         from chat.wit_admin import WIT_ADMIN_USERNAME, ALL_OPERATOR_EMAILS
+        from chat.wit_bot import WIT_BOT_USERNAME
         from django.db.models import Q
 
         blocked_ids = self.user_report_blocked_ids
@@ -545,9 +546,15 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         # Hide WIT Admin proxy rooms from non-operator viewers
         if self.email not in ALL_OPERATOR_EMAILS:
             dm_rooms = dm_rooms.exclude(is_wit_admin_proxy=True)
-        # Version isolation (exclude WIT Admin rooms which are version-agnostic)
+        # Version isolation (same carve-outs as ChatRoomList)
+        version_agnostic_rooms = (
+            Q(user1__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
+            | Q(user2__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
+        )
+        if self.email in ALL_OPERATOR_EMAILS:
+            version_agnostic_rooms = version_agnostic_rooms | Q(is_wit_admin_proxy=True)
         dm_rooms = dm_rooms.exclude(
-            ~Q(Q(user1__username=WIT_ADMIN_USERNAME) | Q(user2__username=WIT_ADMIN_USERNAME)) & (
+            ~version_agnostic_rooms & (
                 (Q(user1=self) & ~Q(user2__current_ver=self.current_ver)) |
                 (Q(user2=self) & ~Q(user1__current_ver=self.current_ver))
             )

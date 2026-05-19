@@ -261,12 +261,18 @@ class ChatRoomList(generics.ListAPIView):
             qs = qs.exclude(is_wit_admin_proxy=True)
 
         # Version isolation: hide 1-on-1 rooms where the other user is on a different version.
-        # System users (wit_admin, wit_bot) are version-agnostic — exempt them.
+        # System users (wit_admin, wit_bot) are version-agnostic. Operator proxy
+        # rooms are also version-agnostic, but only for operator viewers; regular
+        # users already had those proxy rooms removed above.
+        version_agnostic_rooms = (
+            Q(user1__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
+            | Q(user2__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
+        )
+        if user.email in ALL_OPERATOR_EMAILS:
+            version_agnostic_rooms = version_agnostic_rooms | Q(is_wit_admin_proxy=True)
+
         qs = qs.exclude(
-            Q(is_group=False) & ~Q(
-                Q(user1__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
-                | Q(user2__username__in=[WIT_ADMIN_USERNAME, WIT_BOT_USERNAME])
-            ) & (
+            Q(is_group=False) & ~version_agnostic_rooms & (
                 (Q(user1=user) & ~Q(user2__current_ver=user.current_ver)) |
                 (Q(user2=user) & ~Q(user1__current_ver=user.current_ver))
             )

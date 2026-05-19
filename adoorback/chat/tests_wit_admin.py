@@ -801,6 +801,43 @@ class AnnouncementsAndUXFixesTests(TestCase):
         self.assertIn(proxy.id, room_ids,
                       "Empty proxy rooms should appear in operator's chat list")
 
+    def test_operator_sees_proxy_rooms_for_users_on_other_versions(self):
+        self.bob.current_ver = 'version_q'
+        self.bob.save(update_fields=['current_ver'])
+
+        results = self._list(self.jaewon)
+        room_ids = {r['id'] for r in results}
+        u1, u2 = (self.bob, self.jaewon) if self.bob.id < self.jaewon.id else (self.jaewon, self.bob)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        self.assertIn(proxy.id, room_ids,
+                      "Operator proxy rooms must stay visible across user versions")
+
+    def test_operator_unread_count_includes_proxy_rooms_for_users_on_other_versions(self):
+        self.bob.current_ver = 'version_q'
+        self.bob.save(update_fields=['current_ver'])
+        u1, u2 = (self.bob, self.jaewon) if self.bob.id < self.jaewon.id else (self.jaewon, self.bob)
+        proxy = ChatRoom.objects.get(user1=u1, user2=u2, is_wit_admin_proxy=True)
+        Message.objects.create(
+            chat_room=proxy,
+            sender=self.bob,
+            receiver=self.jaewon,
+            content='help',
+            is_wit_admin_mirror=True,
+        )
+
+        self.assertEqual(self.jaewon.unread_message_cnt, 1)
+
+    def test_regular_user_chat_rooms_still_obey_version_isolation(self):
+        self.bob.current_ver = 'version_q'
+        self.bob.save(update_fields=['current_ver'])
+        room = ChatRoom.objects.create(user1=self.alice, user2=self.bob)
+        Message.objects.create(chat_room=room, sender=self.alice, receiver=self.bob, content='hello')
+
+        results = self._list(self.alice)
+        room_ids = {r['id'] for r in results}
+        self.assertNotIn(room.id, room_ids,
+                         "Regular cross-version chat rooms should stay hidden")
+
     def test_proxy_original_message_does_not_notify_user(self):
         from notification.models import Notification
         from django.contrib.contenttypes.models import ContentType
