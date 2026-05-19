@@ -3,7 +3,7 @@ from rest_framework import serializers
 from surveys.models import (
     DISPLAY_ONLY, INPUT_LESS_TYPES, LIKERT_5_NA, LIKERT_RANGES, NA_SENTINEL,
     PER_FRIEND_TYPES, SLIDER, ScheduledSurvey, Survey, SurveyOption,
-    SurveyQuestion, SurveyResponse,
+    SurveyDraft, SurveyQuestion, SurveyResponse,
 )
 from surveys.scheduling import _today_la_7am
 
@@ -198,6 +198,7 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
     questions = SurveyQuestionSerializer(many=True, read_only=True)
     user_has_responded = serializers.SerializerMethodField()
     responder_count = serializers.SerializerMethodField()
+    draft = serializers.SerializerMethodField()
 
     class Meta:
         model = Survey
@@ -216,6 +217,7 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             'questions',
             'user_has_responded',
             'responder_count',
+            'draft',
         ]
 
     def to_representation(self, instance):
@@ -272,6 +274,17 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             .count()
         )
 
+    def get_draft(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        if SurveyResponse.objects.filter(survey=obj, user=request.user).exists():
+            return None
+        draft = SurveyDraft.objects.filter(survey=obj, user=request.user).first()
+        if draft is None:
+            return None
+        return SurveyDraftSerializer(draft).data
+
 
 class SurveyAnswerInputSerializer(serializers.Serializer):
     question_id = serializers.IntegerField()
@@ -286,6 +299,45 @@ class SurveyAnswerInputSerializer(serializers.Serializer):
 
 class SurveyResponseInputSerializer(serializers.Serializer):
     answers = SurveyAnswerInputSerializer(many=True)
+
+
+class SurveyDraftSerializer(serializers.ModelSerializer):
+    saved_at = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = SurveyDraft
+        fields = [
+            'answers',
+            'current_page_index',
+            'total_pages',
+            'answered_pages',
+            'progress_pct',
+            'saved_at',
+        ]
+
+    def validate(self, attrs):
+        total_pages = attrs.get('total_pages', 0)
+        answered_pages = attrs.get('answered_pages', 0)
+        current_page_index = attrs.get('current_page_index', 0)
+        progress_pct = attrs.get('progress_pct', 0)
+
+        if progress_pct > 100:
+            raise serializers.ValidationError({'progress_pct': 'Must be between 0 and 100.'})
+        if answered_pages > total_pages:
+            raise serializers.ValidationError({'answered_pages': 'Cannot exceed total_pages.'})
+        if total_pages > 0 and current_page_index >= total_pages:
+            raise serializers.ValidationError({
+                'current_page_index': 'Must be lower than total_pages.',
+            })
+        return attrs
+
+
+class SurveyDraftSummarySerializer(serializers.ModelSerializer):
+    saved_at = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = SurveyDraft
+        fields = ['progress_pct', 'answered_pages', 'total_pages', 'saved_at']
 
 
 class PastSurveySerializer(serializers.ModelSerializer):
@@ -328,6 +380,7 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
         source='user_submitted_at', allow_null=True, read_only=True,
     )
     redirect_url = serializers.SerializerMethodField()
+    draft = serializers.SerializerMethodField()
 
     class Meta:
         model = ScheduledSurvey
@@ -337,9 +390,19 @@ class SurveyIndexEntrySerializer(serializers.ModelSerializer):
             'survey', 'bucket',
             'user_answered', 'submitted_at',
             'redirect_url',
+            'draft',
         ]
 
     def get_redirect_url(self, obj):
         if getattr(obj, 'bucket', None) == 'completed':
             return f'/surveys/{obj.survey.slug}/results'
         return f'/surveys/{obj.survey.slug}/answer'
+
+    def get_draft(self, obj):
+        if getattr(obj, 'user_answered', False):
+            return None
+        draft_by_survey_id = self.context.get('draft_by_survey_id') or {}
+        draft = draft_by_survey_id.get(obj.survey_id)
+        if draft is None:
+            return None
+        return SurveyDraftSummarySerializer(draft).data

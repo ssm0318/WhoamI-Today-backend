@@ -14,7 +14,7 @@ from surveys.aggregation import (
 )
 from surveys.models import (
     CADENCE_DAILY, INPUT_LESS_TYPES, PER_FRIEND_TYPES, ScheduledSurvey, Survey,
-    SurveyAnswer, SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
+    SurveyAnswer, SurveyDraft, SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.scheduling import (
@@ -23,8 +23,8 @@ from surveys.scheduling import (
 )
 from surveys.retired import is_retired_survey_slug
 from surveys.serializers import (
-    PastSurveySerializer, SurveyDetailSerializer, SurveyIndexEntrySerializer,
-    SurveyResponseInputSerializer, validate_answer_value,
+    PastSurveySerializer, SurveyDetailSerializer, SurveyDraftSerializer,
+    SurveyIndexEntrySerializer, SurveyResponseInputSerializer, validate_answer_value,
 )
 
 
@@ -280,11 +280,62 @@ class SurveyResponseSubmitView(APIView):
                 # store keyed by question.slug. Subsequent surveys read these
                 # via `{{slug}}` tokens or `serving_condition`.
                 _persist_embedded_data(request.user, response)
+                SurveyDraft.objects.filter(user=request.user, survey=survey).delete()
         except IntegrityError:
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
         return Response({'id': response.id}, status=status.HTTP_201_CREATED)
+
+
+class SurveyDraftView(APIView):
+    """Lifecycle-triggered backup for in-progress survey drafts.
+
+    The UI writes localStorage synchronously on every answer. This endpoint is
+    a best-effort mirror used for reinstall recovery, so callers never need to
+    block navigation on it.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _get_survey(self, request, slug):
+        if is_retired_survey_slug(slug):
+            return None
+        try:
+            survey = Survey.objects.get(slug=slug)
+        except Survey.DoesNotExist:
+            return None
+        if not routes_to_user(survey, request.user):
+            return None
+        return survey
+
+    def get(self, request, slug):
+        survey = self._get_survey(request, slug)
+        if survey is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        draft = SurveyDraft.objects.filter(user=request.user, survey=survey).first()
+        if draft is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(SurveyDraftSerializer(draft).data)
+
+    def put(self, request, slug):
+        survey = self._get_survey(request, slug)
+        if survey is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        ser = SurveyDraftSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        draft, _ = SurveyDraft.objects.update_or_create(
+            user=request.user,
+            survey=survey,
+            defaults=ser.validated_data,
+        )
+        return Response(SurveyDraftSerializer(draft).data)
+
+    def delete(self, request, slug):
+        survey = self._get_survey(request, slug)
+        if survey is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        SurveyDraft.objects.filter(user=request.user, survey=survey).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MyResponseView(APIView):
@@ -457,17 +508,33 @@ class SurveyIndexView(APIView):
 
     def get(self, request):
         result = get_survey_index(request.user)
+        all_entries = [
+            entry
+            for bucket_name in ('available_now', 'late_but_accepted', 'completed')
+            for entry in result[bucket_name]
+        ]
+        draft_by_survey_id = {
+            draft.survey_id: draft
+            for draft in SurveyDraft.objects.filter(
+                user=request.user,
+                survey_id__in=[entry.survey_id for entry in all_entries],
+            )
+        }
+        serializer_context = {
+            'request': request,
+            'draft_by_survey_id': draft_by_survey_id,
+        }
         for bucket_name in ('available_now', 'late_but_accepted', 'completed'):
             for entry in result[bucket_name]:
                 entry.bucket = bucket_name
         return Response({
             'available_now': SurveyIndexEntrySerializer(
-                result['available_now'], many=True, context={'request': request},
+                result['available_now'], many=True, context=serializer_context,
             ).data,
             'late_but_accepted': SurveyIndexEntrySerializer(
-                result['late_but_accepted'], many=True, context={'request': request},
+                result['late_but_accepted'], many=True, context=serializer_context,
             ).data,
             'completed': SurveyIndexEntrySerializer(
-                result['completed'], many=True, context={'request': request},
+                result['completed'], many=True, context=serializer_context,
             ).data,
         })

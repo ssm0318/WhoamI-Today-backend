@@ -558,6 +558,38 @@ class SurveyAnswer(AdoorTimestampedModel):
         ]
 
 
+class SurveyDraft(AdoorTimestampedModel):
+    """Best-effort backup of an in-progress client-side survey draft.
+
+    The frontend remains the instant save path. This row mirrors the latest
+    draft only when the WebView backgrounds or the user leaves the route, so
+    progress can be recovered after reinstall without adding per-question API
+    traffic.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='survey_drafts',
+    )
+    survey = models.ForeignKey(Survey, on_delete=models.CASCADE, related_name='drafts')
+    answers = models.JSONField(default=dict, blank=True)
+    current_page_index = models.PositiveIntegerField(default=0)
+    total_pages = models.PositiveIntegerField(default=0)
+    answered_pages = models.PositiveIntegerField(default=0)
+    progress_pct = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'survey'], name='unique_survey_draft_per_user'),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'survey']),
+        ]
+
+    def __str__(self):
+        return f'SurveyDraft<{self.user_id}:{self.survey.slug}>'
+
+
 class UserSurveyEmbeddedData(AdoorTimestampedModel):
     """Per-user key/value store populated by `embedded_data: true` questions.
 
