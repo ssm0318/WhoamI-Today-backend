@@ -21,6 +21,8 @@ class QResponseSerializer(AdoorBaseSerializer):
     author_detail = UserMinimalSerializer(source='author', read_only=True)
     question = QuestionMinimumSerializer(read_only=True)
     question_id = serializers.IntegerField(write_only=True)
+    image = serializers.SerializerMethodField(read_only=True)
+    video = serializers.SerializerMethodField(read_only=True)
     current_user_read = serializers.SerializerMethodField(read_only=True)
     like_count = serializers.SerializerMethodField(read_only=True)
     like_user_sample = serializers.SerializerMethodField(read_only=True)
@@ -37,6 +39,31 @@ class QResponseSerializer(AdoorBaseSerializer):
     def get_current_user_read(self, obj):
         current_user_id = self.context['request'].user.id
         return current_user_id in obj.reader_ids
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        try:
+            return obj.image.url
+        except Exception:
+            return None
+
+    def get_video(self, obj):
+        if not obj.video:
+            return None
+        try:
+            video_url = obj.video.url
+        except Exception:
+            return None
+        try:
+            thumbnail_url = obj.video_thumbnail.url if obj.video_thumbnail else None
+        except Exception:
+            thumbnail_url = None
+        return {
+            'url': video_url,
+            'thumbnail_url': thumbnail_url,
+            'duration_seconds': obj.video_duration_seconds,
+        }
 
     def get_like_count(self, obj):
         request = self.context.get('request')
@@ -58,7 +85,7 @@ class QResponseSerializer(AdoorBaseSerializer):
         fields = AdoorBaseSerializer.Meta.fields + [
             'id', 'type', 'author', 'author_detail', 'content',
             'current_user_like_id', 'question', 'question_id',
-            'created_at', 'current_user_read',
+            'image', 'video', 'created_at', 'current_user_read',
             'like_count', 'like_user_sample',
             'is_edited', 'visibility'
         ]

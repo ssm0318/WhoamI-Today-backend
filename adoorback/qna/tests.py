@@ -122,3 +122,40 @@ class QuestionResponsesTests(TestCase):
         response = anon.get(f'/api/qna/questions/{self.question.id}/responses/')
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class QResponseMediaTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username='q_author',
+            email='q_author@example.com',
+            password='password',
+            current_ver='version_q',
+        )
+        self.admin = User.objects.create_superuser(
+            username='q_admin',
+            email='q_admin@example.com',
+            password='password',
+        )
+        self.question = Question.objects.create(
+            author=self.admin,
+            content='What did you notice today?',
+            selected_dates=[date(2026, 5, 18)],
+        )
+        self.response = Response.objects.create(
+            author=self.author,
+            question=self.question,
+            content='A response with a photo',
+            visibility=['public'],
+            image='response_images/q_author/answer.jpg',
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.author)
+
+    def test_q_response_detail_includes_attached_image(self):
+        response = self.client.get(f'/api/q/qna/responses/{self.response.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn('image', response.data)
+        self.assertIsNotNone(response.data['image'])
+        self.assertTrue(response.data['image'].endswith('/media/response_images/q_author/answer.jpg'))
