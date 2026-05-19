@@ -321,6 +321,28 @@ class EngineDispatchTests(TestCase):
         latest = replies.order_by('-created_at').first()
         self.assertIn('⏳ Open Discover / Daily Digest', latest.content)
 
+    def test_survey_sidebar_event_satisfies_separate_audit_item(self):
+        from chat.models import OnboardingEvent
+
+        self._complete_kickoff()
+        self._send_choice('run_audit')
+        latest = self._bot_replies().exclude(
+            event_type='wit_welcome_card',
+        ).order_by('-created_at').first()
+        self.assertIn('⏳ Open Surveys from the sidebar', latest.content)
+
+        OnboardingEvent.objects.create(
+            user=self.alice,
+            version='version_w',
+            event_key='survey_sidebar_nav_tapped',
+        )
+
+        self._send_choice('run_audit')
+        latest = self._bot_replies().exclude(
+            event_type='wit_welcome_card',
+        ).order_by('-created_at').first()
+        self.assertIn('✓ Open Surveys from the sidebar', latest.content)
+
     def test_audit_walkthrough_button_enters_walkthrough(self):
         self._complete_kickoff()
         self._send_choice('run_audit')

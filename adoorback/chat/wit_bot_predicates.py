@@ -331,6 +331,15 @@ PREDICATES: list[FeaturePredicate] = [
 
     # ---- Goal 6: Foster sense of community ----
     FeaturePredicate(
+        feature_key='survey_sidebar_nav',
+        versions={'version_w', 'version_q'},
+        display_name='Open Surveys from the sidebar',
+        description='Open the hamburger menu and tap Surveys so you know where study surveys live.',
+        deep_link=None,
+        kind='event',
+        is_engaged=_make_event_predicate('survey_sidebar_nav_tapped'),
+    ),
+    FeaturePredicate(
         feature_key='daily_survey',
         versions={'version_w', 'version_q'},
         display_name='Complete a survey',
