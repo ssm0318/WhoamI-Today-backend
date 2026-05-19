@@ -89,7 +89,8 @@ for the full policy.
 | Source kind        | How it's awarded                                                | Slug                |
 |--------------------|-----------------------------------------------------------------|---------------------|
 | Survey             | Submit-view helper on first awarded scheduled opportunity       | `<survey.slug>`     |
-| Wit_bot audit      | Researcher / wit_bot manual credit                              | `wit_bot_audit`     |
+| Wit_bot audit      | Researcher / wit_bot manual credit for Phase 1                  | `wit_bot_audit_phase_1` |
+| Wit_bot audit      | Researcher / wit_bot manual credit for Phase 2                  | `wit_bot_audit_phase_2` |
 | Interview signup   | Researcher manual credit                                        | `interview_signup`  |
 
 **Per-survey point values are variable** and declared per-survey in
@@ -121,9 +122,12 @@ per-repeat point policy.
 - Has tried each of the in-app features (browse mode, check-ins,
   reactions, etc.)
 
-v1 awards this as a single line item ("Wit_bot audit pass: +X pts") on
-the reimbursement page. Per-criterion automation can be layered in
-later without changing the participant-visible UX.
+v1 awards this as two phase-specific line items on the reimbursement
+page. The displayed version depends on the participant's group:
+`group_w_first` earns Phase 1 for Ver.W and Phase 2 for Ver.Q;
+`group_q_first` earns Phase 1 for Ver.Q and Phase 2 for Ver.W.
+Per-criterion automation can be layered in later without changing the
+participant-visible UX.
 
 **Interview signup** is a single discrete event keyed by the user
 clicking through the signup flow. v1 credits manually via admin
@@ -315,9 +319,10 @@ class PointAward(AdoorTimestampedModel):
     for any unscheduled survey response. This keeps editable resubmits
     and repeatable same-opportunity submissions idempotent.
 - **Wit_bot audit:** Django admin action on a custom list-page button,
-  or `python manage.py credit_wit_bot_audit --user <username> --pts <n>`
+  or `python manage.py credit_wit_bot_audit --user <username> --phase <1|2> --pts <n>`
   management command. Idempotent via `get_or_create` on (user,
-  source_kind='wit_bot_audit', source_slug='wit_bot_audit').
+  source_kind='wit_bot_audit', source_slug=`wit_bot_audit_phase_1` or
+  `wit_bot_audit_phase_2`).
 - **Interview signup:** Same pattern as wit_bot audit. Admin action
   or management command.
 
@@ -375,8 +380,8 @@ survey slug.
     },
     {
       "source_kind": "wit_bot_audit",
-      "source_slug": "wit_bot_audit",
-      "title_en": "Wit_bot audit pass",
+      "source_slug": "wit_bot_audit_phase_1",
+      "title_en": "Wit_bot audit pass - Phase 1 (Ver.W)",
       "awarded_points": 10,
       "adjusted_points": null,
       "effective_points": 10,
