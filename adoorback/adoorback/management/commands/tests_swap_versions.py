@@ -41,13 +41,14 @@ class SwapVersionsCommandTests(TestCase):
         self.user_w.refresh_from_db()
         self.assertIsNotNone(self.user_w.ver_changed_at)
 
-    def test_swap_excludes_superusers(self):
-        """Superusers should not be swapped."""
+    def test_swap_includes_superusers(self):
+        """Superusers are swapped along with everyone else (help text: 'all users')."""
         old_ver = self.admin.current_ver
+        expected = 'version_q' if old_ver == 'version_w' else 'version_w'
         out = StringIO()
         call_command('swap_versions', stdout=out)
         self.admin.refresh_from_db()
-        self.assertEqual(self.admin.current_ver, old_ver)
+        self.assertEqual(self.admin.current_ver, expected)
 
     def test_dry_run_does_not_save(self):
         """Dry run should not modify the database."""
@@ -77,3 +78,24 @@ class SwapVersionsCommandTests(TestCase):
         self.user_q.refresh_from_db()
         self.assertEqual(self.user_w.current_ver, 'version_w')
         self.assertEqual(self.user_q.current_ver, 'version_q')
+
+    def test_swap_excludes_users_in_csv(self):
+        """Users whose email appears in the exclude CSV keep their current_ver."""
+        import csv as _csv
+        import os
+        import tempfile
+
+        fd, path = tempfile.mkstemp(suffix='.csv', prefix='exclude_')
+        with os.fdopen(fd, 'w', newline='') as f:
+            writer = _csv.writer(f)
+            writer.writerow(['email'])
+            writer.writerow(['w@test.com'])
+        self.addCleanup(os.unlink, path)
+
+        out = StringIO()
+        call_command('swap_versions', exclude_emails_csv=path, stdout=out)
+
+        self.user_w.refresh_from_db()
+        self.user_q.refresh_from_db()
+        self.assertEqual(self.user_w.current_ver, 'version_w')  # excluded
+        self.assertEqual(self.user_q.current_ver, 'version_w')  # swapped

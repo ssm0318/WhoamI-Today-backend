@@ -1,5 +1,9 @@
+import csv
+import os
+import tempfile
 from io import StringIO
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 from django.db import connection
@@ -227,12 +231,12 @@ class ResetExperimentDataCommandTests(TestCase):
         self.assertEqual(self.user1.persona, [])
         self.assertEqual(self.user2.persona, [])
 
-    def test_admin_persona_not_reset(self):
-        """Superuser profile fields should not be touched."""
+    def test_admin_persona_is_reset(self):
+        """Superuser profile fields ARE reset (no superuser filtering)."""
         self._run_command('--skip-backup', '--no-input')
 
         self.admin.refresh_from_db()
-        self.assertEqual(self.admin.persona, ['admin_persona'])
+        self.assertEqual(self.admin.persona, [])
 
     def test_interest_m2m_cleared(self):
         """Interest-user associations should be cleared but Interest rows preserved."""
@@ -279,3 +283,111 @@ class ResetExperimentDataCommandTests(TestCase):
 
         self.assertIn('Experiment data reset complete', output)
         self.assertIn('Total records deleted/cleared', output)
+
+    def _write_exclude_csv(self, emails):
+        """Helper: write a temp CSV with the given emails and return its path."""
+        fd, path = tempfile.mkstemp(suffix='.csv', prefix='exclude_')
+        with os.fdopen(fd, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['email'])
+            for e in emails:
+                writer.writerow([e])
+        self.addCleanup(os.unlink, path)
+        return path
+
+    def test_excluded_user_content_preserved(self):
+        """Content owned by excluded users must survive the reset."""
+        csv_path = self._write_exclude_csv(['alice@test.com'])
+        self._run_command('--skip-backup', '--no-input', exclude_emails_csv=csv_path)
+
+        self.assertTrue(Note.objects.filter(id=self.note.id).exists())
+        self.assertTrue(Response.objects.filter(id=self.response.id).exists())
+        self.assertTrue(CheckIn.objects.filter(id=self.check_in.id).exists())
+        self.assertTrue(CustomChip.objects.filter(id=self.chip.id).exists())
+
+    def test_excluded_user_profile_not_reset(self):
+        """Excluded users' persona field must not be wiped."""
+        csv_path = self._write_exclude_csv(['alice@test.com'])
+        self._run_command('--skip-backup', '--no-input', exclude_emails_csv=csv_path)
+
+        self.user1.refresh_from_db()
+        self.user2.refresh_from_db()
+        self.assertEqual(self.user1.persona, ['creative', 'adventurous'])
+        self.assertEqual(self.user2.persona, [])
+
+    def test_excluded_user_m2m_preserved(self):
+        """M2M rows touching an excluded user survive."""
+        csv_path = self._write_exclude_csv(['alice@test.com'])
+        self._run_command('--skip-backup', '--no-input', exclude_emails_csv=csv_path)
+
+        self.user1.refresh_from_db()
+        self.assertEqual(self.user1.favorites.count(), 1)
+        self.assertEqual(self.user1.hidden.count(), 1)
+        self.assertEqual(self.interest.users.count(), 1)
+        self.assertEqual(self.persona_obj.users.count(), 1)
+
+    def test_excluded_user_friendrequest_preserved(self):
+        """Pending FriendRequest with an excluded user on either side survives."""
+        csv_path = self._write_exclude_csv(['alice@test.com'])
+        self._run_command('--skip-backup', '--no-input', exclude_emails_csv=csv_path)
+
+        self.assertTrue(FriendRequest.objects.filter(id=self.pending_fr.id).exists())
+
+    def test_non_excluded_user_content_still_deleted(self):
+        """Content owned only by non-excluded users is still deleted."""
+        # bob (user2) makes a note that nobody on the exclude list authored
+        bob_note = Note.objects.create(author=self.user2, content='bob note')
+        bob_checkin = CheckIn.objects.create(user=self.user2, is_active=True)
+
+        csv_path = self._write_exclude_csv(['alice@test.com'])
+        self._run_command('--skip-backup', '--no-input', exclude_emails_csv=csv_path)
+
+        self.assertFalse(Note.objects.filter(id=bob_note.id).exists())
+        self.assertFalse(CheckIn.objects.filter(id=bob_checkin.id).exists())
+
+    def test_exclude_csv_missing_email_column_raises(self):
+        """CSV without an 'email' column must abort cleanly."""
+        from django.core.management.base import CommandError
+        fd, path = tempfile.mkstemp(suffix='.csv')
+        with os.fdopen(fd, 'w', newline='') as f:
+            f.write('username\nalice\n')
+        self.addCleanup(os.unlink, path)
+
+        with self.assertRaises(CommandError):
+            self._run_command('--skip-backup', '--no-input', exclude_emails_csv=path)
+
+    def test_note_images_renamed_without_exclusion(self):
+        """Without exclusion, note_images/ should be renamed (not deleted)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            note_images = os.path.join(tmp, 'note_images')
+            os.makedirs(note_images)
+            sentinel = os.path.join(note_images, 'keep.txt')
+            with open(sentinel, 'w') as f:
+                f.write('preserve me')
+            with override_settings(MEDIA_ROOT=tmp):
+                self._run_command('--skip-backup', '--no-input')
+
+            # Original dir exists (recreated empty)
+            self.assertTrue(os.path.isdir(note_images))
+            self.assertEqual(os.listdir(note_images), [])
+            # Renamed backup dir contains the sentinel
+            backups = [d for d in os.listdir(tmp) if d.startswith('note_images_backup_')]
+            self.assertEqual(len(backups), 1)
+            preserved = os.path.join(tmp, backups[0], 'keep.txt')
+            self.assertTrue(os.path.isfile(preserved))
+
+    def test_note_images_not_renamed_with_exclusion(self):
+        """With exclusion active, note_images/ is left intact (no rename)."""
+        csv_path = self._write_exclude_csv(['alice@test.com'])
+        with tempfile.TemporaryDirectory() as tmp:
+            note_images = os.path.join(tmp, 'note_images')
+            os.makedirs(note_images)
+            sentinel = os.path.join(note_images, 'keep.txt')
+            with open(sentinel, 'w') as f:
+                f.write('preserve me in place')
+            with override_settings(MEDIA_ROOT=tmp):
+                self._run_command('--skip-backup', '--no-input', exclude_emails_csv=csv_path)
+
+            self.assertTrue(os.path.isfile(sentinel))
+            backups = [d for d in os.listdir(tmp) if d.startswith('note_images_backup_')]
+            self.assertEqual(backups, [])
