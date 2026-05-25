@@ -7,25 +7,40 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f7f4ef;
+        --bg: #f5f1ea;
         --panel: #fffefa;
-        --ink: #1f2428;
-        --muted: #6f7378;
-        --line: #ded8ce;
+        --panel-strong: #fbf7ef;
+        --ink: #202429;
+        --muted: #6e7379;
+        --line: #ddd6cb;
         --accent: #6b3fd6;
         --accent-soft: #efe7ff;
-        --good: #197347;
+        --blue: #0c5f99;
+        --blue-soft: #e8f3fb;
+        --good: #187044;
+        --good-soft: #e8f6ee;
         --warn: #9a5b00;
+        --warn-soft: #fff5df;
+        --danger: #b00020;
       }
 
       * {
         box-sizing: border-box;
       }
 
+      html {
+        height: 100%;
+      }
+
       body {
         margin: 0;
+        height: 100%;
+        min-height: 100%;
+        overflow: hidden;
         background: var(--bg);
         color: var(--ink);
+        display: flex;
+        flex-direction: column;
         font-family:
           ui-sans-serif,
           -apple-system,
@@ -35,9 +50,10 @@
       }
 
       header {
+        flex: 0 0 auto;
         position: sticky;
         top: 0;
-        z-index: 2;
+        z-index: 3;
         border-bottom: 1px solid var(--line);
         background: rgba(255, 254, 250, 0.96);
         backdrop-filter: blur(10px);
@@ -45,26 +61,37 @@
 
       .header-inner,
       main {
-        max-width: 1180px;
-        margin: 0 auto;
+        width: 100%;
+        max-width: none;
+        margin: 0;
         padding: 18px 20px;
+      }
+
+      main {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
       }
 
       .header-inner {
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 18px;
         align-items: center;
       }
 
-      h1 {
-        margin: 0 0 4px;
-        font-size: 24px;
-        line-height: 1.1;
-      }
-
+      h1,
+      h2,
+      h3,
       p {
         margin: 0;
+      }
+
+      h1 {
+        margin-bottom: 5px;
+        font-size: 24px;
+        line-height: 1.1;
       }
 
       .muted {
@@ -86,13 +113,22 @@
         font: inherit;
       }
 
-      button {
+      button,
+      .link-button {
+        min-height: 38px;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: #fff;
         color: var(--ink);
-        padding: 9px 12px;
+        padding: 8px 12px;
         cursor: pointer;
+        text-decoration: none;
+      }
+
+      .link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
 
       button.primary {
@@ -109,25 +145,27 @@
 
       .toolbar {
         display: grid;
-        grid-template-columns: minmax(220px, 1fr) 190px 190px;
+        grid-template-columns: minmax(240px, 1fr) 190px 190px;
         gap: 10px;
-        margin: 16px 0;
+        margin: 0 0 12px;
       }
 
       .toolbar input,
-      .toolbar select {
+      .toolbar select,
+      .draft-input {
         width: 100%;
+        min-height: 36px;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: #fff;
-        padding: 10px 12px;
+        padding: 8px 10px;
       }
 
       .summary {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 10px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
       }
 
       .summary-card {
@@ -144,15 +182,19 @@
       }
 
       .table-wrap {
+        min-height: 0;
+        height: 100%;
         overflow: auto;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel);
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
       }
 
       table {
         width: 100%;
-        min-width: 860px;
+        min-width: 1780px;
         border-collapse: separate;
         border-spacing: 0;
       }
@@ -160,7 +202,7 @@
       th,
       td {
         border-bottom: 1px solid var(--line);
-        padding: 11px 12px;
+        padding: 10px 12px;
         text-align: left;
         vertical-align: middle;
       }
@@ -168,22 +210,81 @@
       th {
         position: sticky;
         top: 0;
-        z-index: 1;
-        background: #fbf7ef;
+        z-index: 2;
+        background: var(--panel-strong);
+        box-shadow: 0 1px 0 var(--line);
         color: #3b3f43;
         font-size: 12px;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0;
+      }
+
+      .sort-button {
+        display: flex;
+        width: 100%;
+        min-height: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        font: inherit;
+        text-align: left;
+        text-transform: inherit;
+      }
+
+      .sort-button:hover,
+      .sort-button:focus-visible {
+        color: var(--accent);
+      }
+
+      .sort-indicator {
+        min-width: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        text-align: right;
+      }
+
+      .sort-button[aria-pressed='true'] .sort-indicator {
+        color: var(--accent);
       }
 
       tbody tr:last-child td {
         border-bottom: 0;
       }
 
-      .slug {
+      .source-cell {
+        min-width: 270px;
+      }
+
+      .source-title {
+        max-width: 310px;
+        font-weight: 700;
+        line-height: 1.25;
+      }
+
+      .slug,
+      .file {
         color: var(--muted);
         font-size: 12px;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .file {
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
       }
 
       .badge {
@@ -198,17 +299,88 @@
         white-space: nowrap;
       }
 
-      .points-input {
+      .badge.secondary {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .badge.neutral {
+        background: #f2efe8;
+        color: #5d6268;
+      }
+
+      .draft-input.points {
         width: 92px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 8px 10px;
         text-align: right;
+      }
+
+      .draft-input.compact {
+        width: 86px;
+        text-align: right;
+      }
+
+      .draft-input.priority {
+        width: 82px;
+      }
+
+      .draft-input.text {
+        width: 160px;
       }
 
       .changed {
         border-color: var(--accent);
         background: #fbf8ff;
+      }
+
+      .inspect-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 120px;
+      }
+
+      .question-metric {
+        min-width: 72px;
+        white-space: nowrap;
+      }
+
+      .metric-value {
+        display: block;
+        font-weight: 800;
+      }
+
+      .metric-source {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.2;
+      }
+
+      .save-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--muted);
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .save-state.dirty {
+        border-color: var(--warn);
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .save-state.saved {
+        border-color: var(--good);
+        background: var(--good-soft);
+        color: var(--good);
       }
 
       .status {
@@ -223,12 +395,136 @@
       }
 
       .status.error {
-        color: #b00020;
+        color: var(--danger);
       }
 
       .empty {
         padding: 24px;
         color: var(--muted);
+      }
+
+      dialog {
+        width: min(1040px, calc(100vw - 28px));
+        max-height: min(820px, calc(100vh - 28px));
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--ink);
+        padding: 0;
+        box-shadow: 0 24px 80px rgba(32, 36, 41, 0.2);
+      }
+
+      dialog::backdrop {
+        background: rgba(32, 36, 41, 0.42);
+      }
+
+      .modal-shell {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        max-height: inherit;
+      }
+
+      .modal-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: start;
+        border-bottom: 1px solid var(--line);
+        padding: 18px;
+        background: var(--panel-strong);
+      }
+
+      .modal-head h2 {
+        margin: 4px 0 6px;
+        font-size: 22px;
+        line-height: 1.2;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .modal-body {
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .modal-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 18px;
+      }
+
+      .section-title {
+        margin: 0 0 10px;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .question-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .question-card,
+      .policy-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      .question-card h3 {
+        margin-bottom: 6px;
+        font-size: 15px;
+        line-height: 1.25;
+      }
+
+      .question-meta,
+      .policy-row {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
+      .policy-panel {
+        position: sticky;
+        top: 0;
+        align-self: start;
+      }
+
+      .policy-form {
+        display: grid;
+        gap: 10px;
+      }
+
+      .policy-form label {
+        display: grid;
+        gap: 5px;
+        color: #3b3f43;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      @media (max-width: 980px) {
+        .summary {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .modal-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .policy-panel {
+          position: static;
+        }
       }
 
       @media (max-width: 760px) {
@@ -244,7 +540,6 @@
         .summary {
           grid-template-columns: 1fr;
         }
-
       }
     </style>
   </head>
@@ -254,11 +549,12 @@
         <div>
           <h1>Point allocation</h1>
           <p class="muted">
-            Save writes a JSON handoff file in the backend repo. I can read that file and apply
-            the values to survey YAML/config when you ask.
+            Configure points, recurring caps, prerequisite gates, late-credit percentages, and
+            priority ratings. Save writes the JSON handoff file that can be applied to the app.
           </p>
         </div>
         <div class="actions">
+          <span id="save-state" class="save-state idle" role="status" aria-live="polite">Nothing saved yet</span>
           <button id="zero-visible" type="button">Set visible to 0</button>
           <button id="current-values" type="button">Use current values</button>
           <button id="save" class="primary" type="button">Save allocation</button>
@@ -277,8 +573,16 @@
           <strong id="assigned-total">0</strong>
         </div>
         <div class="summary-card">
-          <span class="muted">Nonzero items</span>
-          <strong id="nonzero-count">0</strong>
+          <span class="muted">Capped groups</span>
+          <strong id="cap-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span class="muted">Gated items</span>
+          <strong id="gate-count">0</strong>
+        </div>
+        <div class="summary-card">
+          <span class="muted">Late penalties</span>
+          <strong id="late-count">0</strong>
         </div>
         <div class="summary-card">
           <span class="muted">Unsaved edits</span>
@@ -287,7 +591,7 @@
       </section>
 
       <section class="toolbar" aria-label="Filters">
-        <input id="search" type="search" placeholder="Search slug, title, or file" />
+        <input id="search" type="search" placeholder="Search slug, title, file, cap, or gate" />
         <select id="category"></select>
         <select id="kind">
           <option value="all">All kinds</option>
@@ -296,17 +600,92 @@
         </select>
       </section>
 
+      <datalist id="gate-options"></datalist>
+      <datalist id="cap-group-options">
+        <option value="daily_diary"></option>
+        <option value="survey_of_the_day"></option>
+        <option value="feature_evaluation"></option>
+        <option value="endpoint_surveys"></option>
+        <option value="wit_bot_audit"></option>
+      </datalist>
+
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Source</th>
-              <th>Category</th>
-              <th>Kind</th>
-              <th>Prereq</th>
-              <th>Current</th>
-              <th>New points</th>
-              <th>File</th>
+              <th aria-sort="ascending">
+                <button class="sort-button" type="button" data-sort-key="source" data-sort-label="Source" aria-pressed="true">
+                  <span>Source</span>
+                  <span class="sort-indicator" aria-hidden="true">^</span>
+                </button>
+              </th>
+              <th>Review</th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="visible_questions" data-sort-label="Visible questions" aria-pressed="false">
+                  <span>Visible qs</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="mcq_questions" data-sort-label="MCQ questions" aria-pressed="false">
+                  <span>MCQ</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="frq_questions" data-sort-label="FRQ questions" aria-pressed="false">
+                  <span>FRQ</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="current" data-sort-label="Current points" aria-pressed="false">
+                  <span>Current</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="points" data-sort-label="New points" aria-pressed="false">
+                  <span>New points</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="priority" data-sort-label="Priority" aria-pressed="false">
+                  <span>Priority</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="cap_group" data-sort-label="Cap group" aria-pressed="false">
+                  <span>Cap group</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="cap_points" data-sort-label="Cap points" aria-pressed="false">
+                  <span>Cap pts</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="gate_slug" data-sort-label="Gate survey" aria-pressed="false">
+                  <span>Gate survey</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="late_percent" data-sort-label="Late percent" aria-pressed="false">
+                  <span>Late %</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="file" data-sort-label="File" aria-pressed="false">
+                  <span>File</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
@@ -317,17 +696,64 @@
       <p id="status" class="status"></p>
     </main>
 
+    <dialog id="inspect-modal" aria-labelledby="inspect-title">
+      <div class="modal-shell">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow" id="inspect-kicker">Survey preview</p>
+            <h2 id="inspect-title"></h2>
+            <p id="inspect-subtitle" class="muted"></p>
+          </div>
+          <form method="dialog">
+            <button type="submit">Close</button>
+          </form>
+        </div>
+        <div id="inspect-content" class="modal-body"></div>
+      </div>
+    </dialog>
+
     <script>
+      const POLICY_DEFAULTS = {
+        priority_rating: 0,
+        cap_group: '',
+        cap_points: null,
+        gate_slug: '',
+        late_percent: 100,
+      };
+      const POLICY_FIELDS = ['priority_rating', 'cap_group', 'cap_points', 'gate_slug', 'late_percent'];
       const state = {
         sources: [],
         outputPath: '',
+        savedValues: new Map(),
+        lastSavedAt: null,
+        sortKey: 'source',
+        sortDirection: 'asc',
       };
       const API_BASE = location.protocol === 'file:' ? 'http://localhost:4177' : '';
+      const DRAFT_SORT_KEYS = {
+        points: 'points',
+        priority_rating: 'priority',
+        cap_group: 'cap_group',
+        cap_points: 'cap_points',
+        gate_slug: 'gate_slug',
+        late_percent: 'late_percent',
+      };
 
       const byId = (id) => document.getElementById(id);
       const rowsEl = byId('rows');
       const emptyEl = byId('empty');
       const statusEl = byId('status');
+      const inspectModal = byId('inspect-modal');
+      const inspectContent = byId('inspect-content');
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
 
       function setStatus(message, type = '') {
         statusEl.textContent = message;
@@ -338,8 +764,88 @@
         return `${source.kind}:${source.slug}`;
       }
 
+      function clampInt(value, min, max, fallback) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(max, Math.max(min, parsed));
+      }
+
       function pointValue(source) {
-        return Number.parseInt(source.draft_points, 10) || 0;
+        return clampInt(source.draft_points, 0, Number.MAX_SAFE_INTEGER, 0);
+      }
+
+      function currentPointLabel(source) {
+        return source.current_points_label || source.point_value || 0;
+      }
+
+      function policyDraftValue(source, field) {
+        const raw = source[`draft_${field}`];
+        if (field === 'priority_rating') return clampInt(raw, 0, 5, POLICY_DEFAULTS.priority_rating);
+        if (field === 'late_percent') return clampInt(raw, 0, 100, POLICY_DEFAULTS.late_percent);
+        if (field === 'cap_points') {
+          if (raw === '' || raw === null || raw === undefined) return null;
+          return clampInt(raw, 0, Number.MAX_SAFE_INTEGER, 0);
+        }
+        return String(raw ?? POLICY_DEFAULTS[field] ?? '');
+      }
+
+      function inputValueFor(source, field) {
+        const value = policyDraftValue(source, field);
+        return value === null ? '' : value;
+      }
+
+      function snapshotFor(source) {
+        return {
+          points: pointValue(source),
+          priority_rating: policyDraftValue(source, 'priority_rating'),
+          cap_group: policyDraftValue(source, 'cap_group'),
+          cap_points: policyDraftValue(source, 'cap_points'),
+          gate_slug: policyDraftValue(source, 'gate_slug'),
+          late_percent: policyDraftValue(source, 'late_percent'),
+        };
+      }
+
+      function baselineFor(source) {
+        return (
+          state.savedValues.get(sourceKey(source)) || {
+            points: source.point_value || 0,
+            ...POLICY_DEFAULTS,
+          }
+        );
+      }
+
+      function isFieldUnsaved(source, field) {
+        const draft = snapshotFor(source);
+        const saved = baselineFor(source);
+        return draft[field] !== saved[field];
+      }
+
+      function isUnsaved(source) {
+        return ['points', ...POLICY_FIELDS].some((field) => isFieldUnsaved(source, field));
+      }
+
+      function formatSavedTime(iso) {
+        if (!iso) return '';
+        return new Date(iso).toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+      }
+
+      function renderSaveState() {
+        const el = byId('save-state');
+        const unsaved = state.sources.filter(isUnsaved).length;
+        if (unsaved > 0) {
+          el.className = 'save-state dirty';
+          el.textContent = `${unsaved} unsaved ${unsaved === 1 ? 'row' : 'rows'}`;
+        } else if (state.lastSavedAt) {
+          el.className = 'save-state saved';
+          el.textContent = `All saved - ${formatSavedTime(state.lastSavedAt)}`;
+        } else {
+          el.className = 'save-state idle';
+          el.textContent = 'Nothing saved yet';
+        }
       }
 
       function filteredSources() {
@@ -350,10 +856,126 @@
           if (category !== 'all' && source.category !== category) return false;
           if (kind !== 'all' && source.kind !== kind) return false;
           if (!search) return true;
-          return [source.slug, source.title_en, source.file, source.category_label]
+          const draft = snapshotFor(source);
+          return [
+            source.slug,
+            source.title_en,
+            source.file,
+            source.category_label,
+            draft.cap_group,
+            draft.gate_slug,
+          ]
             .join(' ')
             .toLowerCase()
             .includes(search);
+        });
+      }
+
+      function rangeLabel(range) {
+        if (!range) return '-';
+        if (range.min === range.max) return String(range.min);
+        return `${range.min}-${range.max}`;
+      }
+
+      function metricRange(source, key) {
+        const metrics = source.question_metrics || {};
+        return metrics[`visible_${key}_range`] || { min: 0, max: 0 };
+      }
+
+      function metricSortNumber(source, key) {
+        const range = metricRange(source, key);
+        return range.max ?? range.min ?? 0;
+      }
+
+      function questionMetricCell(source, key) {
+        if (source.kind === 'manual') return '<td class="question-metric">-</td>';
+        const metrics = source.question_metrics || {};
+        const label = metrics.depends_on_user && !metrics.exact_range ? 'varies' : rangeLabel(metricRange(source, key));
+        const sourceLabel = metrics.exact_range && metrics.depends_on_user
+          ? `DB, ${metrics.range_user_count || 0} users`
+          : metrics.depends_on_user
+            ? 'per-user'
+            : '';
+        const title = metrics.exact_range
+          ? `Exact current DB range across ${metrics.range_user_count || 0} routed users. Authored counts: ${metrics.authored_total || 0} total, ${metrics.authored_mcq || 0} MCQ, ${metrics.authored_frq || 0} FRQ.`
+          : `Authored fixture count. This survey has per-friend questions, so the rendered count depends on each user's eligible friends.`;
+        return `
+          <td class="question-metric" title="${escapeHtml(title)}">
+            <span class="metric-value">${escapeHtml(label)}</span>
+            ${sourceLabel ? `<span class="metric-source">${escapeHtml(sourceLabel)}</span>` : ''}
+          </td>
+        `;
+      }
+
+      function sortValue(source, key) {
+        const draft = snapshotFor(source);
+        if (key === 'source') return `${source.title_en || ''} ${source.slug || ''}`;
+        if (key === 'visible_questions') return metricSortNumber(source, 'total');
+        if (key === 'mcq_questions') return metricSortNumber(source, 'mcq');
+        if (key === 'frq_questions') return metricSortNumber(source, 'frq');
+        if (key === 'current') return source.point_value || 0;
+        if (key === 'points') return draft.points;
+        if (key === 'priority') return draft.priority_rating;
+        if (key === 'cap_group') return draft.cap_group;
+        if (key === 'cap_points') return draft.cap_points;
+        if (key === 'gate_slug') return draft.gate_slug;
+        if (key === 'late_percent') return draft.late_percent;
+        if (key === 'file') return source.file || '';
+        return '';
+      }
+
+      function isBlankSortValue(value) {
+        return value === null || value === undefined || value === '';
+      }
+
+      function compareSortValues(aValue, bValue) {
+        const aBlank = isBlankSortValue(aValue);
+        const bBlank = isBlankSortValue(bValue);
+        if (aBlank || bBlank) {
+          if (aBlank === bBlank) return 0;
+          return aBlank ? 1 : -1;
+        }
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return aValue - bValue;
+        }
+        return String(aValue).localeCompare(String(bValue), undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      }
+
+      function sourceTieBreak(a, b) {
+        return `${a.title_en || ''} ${a.slug || ''}`.localeCompare(`${b.title_en || ''} ${b.slug || ''}`, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      }
+
+      function sortedSources(sources) {
+        const direction = state.sortDirection === 'desc' ? -1 : 1;
+        return [...sources].sort((a, b) => {
+          const compared = compareSortValues(sortValue(a, state.sortKey), sortValue(b, state.sortKey));
+          if (compared !== 0) return compared * direction;
+          return sourceTieBreak(a, b);
+        });
+      }
+
+      function visibleSources() {
+        return sortedSources(filteredSources());
+      }
+
+      function renderSortHeaders() {
+        document.querySelectorAll('[data-sort-key]').forEach((button) => {
+          const active = button.dataset.sortKey === state.sortKey;
+          const directionLabel = state.sortDirection === 'asc' ? 'ascending' : 'descending';
+          const nextDirection = active && state.sortDirection === 'asc' ? 'descending' : 'ascending';
+          const label = button.dataset.sortLabel || button.textContent.trim();
+          button.setAttribute('aria-pressed', active ? 'true' : 'false');
+          button.setAttribute('aria-label', `Sort by ${label} ${nextDirection}`);
+          const indicator = button.querySelector('.sort-indicator');
+          if (indicator) indicator.textContent = active ? (state.sortDirection === 'asc' ? '^' : 'v') : '';
+          const th = button.closest('th');
+          if (th) th.setAttribute('aria-sort', active ? directionLabel : 'none');
         });
       }
 
@@ -363,61 +985,301 @@
         );
         byId('category').innerHTML = [
           '<option value="all">All categories</option>',
-          ...categories.map(([value, label]) => `<option value="${value}">${label}</option>`),
+          ...categories.map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`),
         ].join('');
+      }
+
+      function renderGateOptions() {
+        byId('gate-options').innerHTML = state.sources
+          .filter((source) => source.kind === 'survey')
+          .map((source) => `<option value="${escapeHtml(source.slug)}">${escapeHtml(source.title_en)}</option>`)
+          .join('');
       }
 
       function renderSummary(visible) {
         const all = state.sources;
         const total = all.reduce((sum, source) => sum + pointValue(source), 0);
-        const nonzero = all.filter((source) => pointValue(source) > 0).length;
-        const changed = all.filter((source) => pointValue(source) !== source.point_value).length;
+        const caps = all.filter((source) => policyDraftValue(source, 'cap_group') || policyDraftValue(source, 'cap_points') !== null).length;
+        const gates = all.filter((source) => policyDraftValue(source, 'gate_slug')).length;
+        const late = all.filter((source) => policyDraftValue(source, 'late_percent') < 100).length;
+        const changed = all.filter(isUnsaved).length;
         byId('visible-count').textContent = visible.length;
         byId('assigned-total').textContent = total;
-        byId('nonzero-count').textContent = nonzero;
+        byId('cap-count').textContent = caps;
+        byId('gate-count').textContent = gates;
+        byId('late-count').textContent = late;
         byId('changed-count').textContent = changed;
       }
 
+      function priorityOptions(value) {
+        return [0, 1, 2, 3, 4, 5]
+          .map((option) => `<option value="${option}" ${option === value ? 'selected' : ''}>${option}</option>`)
+          .join('');
+      }
+
+      function draftInputClasses(source, field, extra = '') {
+        return `draft-input ${extra} ${isFieldUnsaved(source, field) ? 'changed' : ''}`.trim();
+      }
+
+      function renderSourceBadges(source) {
+        const badges = [
+          `<span class="badge">${escapeHtml(source.category_label)}</span>`,
+          `<span class="badge secondary">${escapeHtml(source.kind)}</span>`,
+        ];
+        if (source.repeatable) badges.push('<span class="badge neutral">recurring</span>');
+        if (source.editable) badges.push('<span class="badge neutral">editable</span>');
+        if (source.point_prereq_slug) {
+          badges.push(`<span class="badge neutral">prereq: ${escapeHtml(source.point_prereq_slug)}</span>`);
+        }
+        return badges.join('');
+      }
+
       function renderRows() {
-        const visible = filteredSources();
+        const visible = visibleSources();
         renderSummary(visible);
+        renderSortHeaders();
         emptyEl.hidden = visible.length > 0;
         rowsEl.innerHTML = visible
           .map((source) => {
-            const changed = pointValue(source) !== source.point_value;
+            const key = sourceKey(source);
+            const appLink = source.app_url
+              ? `<a class="link-button" href="${escapeHtml(source.app_url)}" target="_blank" rel="noreferrer">Open in app</a>`
+              : '';
             return `
               <tr>
-                <td>
-                  <div>${source.title_en}</div>
-                  <div class="slug">${source.slug}</div>
+                <td class="source-cell">
+                  <div class="source-title">${escapeHtml(source.title_en)}</div>
+                  <div class="slug">${escapeHtml(source.slug)}</div>
+                  <div class="badges">${renderSourceBadges(source)}</div>
                 </td>
-                <td><span class="badge">${source.category_label}</span></td>
-                <td>${source.kind}</td>
-                <td class="slug">${source.point_prereq_slug || '-'}</td>
-                <td>${source.point_value}</td>
+                <td>
+                  <div class="inspect-actions">
+                    <button type="button" data-inspect-key="${escapeHtml(key)}">Inspect</button>
+                    ${appLink}
+                  </div>
+                </td>
+                ${questionMetricCell(source, 'total')}
+                ${questionMetricCell(source, 'mcq')}
+                ${questionMetricCell(source, 'frq')}
+                <td>${escapeHtml(currentPointLabel(source))}</td>
                 <td>
                   <input
-                    class="points-input ${changed ? 'changed' : ''}"
+                    class="${draftInputClasses(source, 'points', 'points')}"
                     type="number"
                     min="0"
                     step="1"
                     value="${pointValue(source)}"
-                    data-key="${sourceKey(source)}"
-                    aria-label="Points for ${source.slug}"
+                    data-key="${escapeHtml(key)}"
+                    data-draft-field="points"
+                    aria-label="Points for ${escapeHtml(source.slug)}"
                   />
                 </td>
-                <td class="slug">${source.file}</td>
+                <td>
+                  <select
+                    class="${draftInputClasses(source, 'priority_rating', 'priority')}"
+                    data-key="${escapeHtml(key)}"
+                    data-draft-field="priority_rating"
+                    aria-label="Priority for ${escapeHtml(source.slug)}"
+                  >${priorityOptions(policyDraftValue(source, 'priority_rating'))}</select>
+                </td>
+                <td>
+                  <input
+                    class="${draftInputClasses(source, 'cap_group', 'text')}"
+                    list="cap-group-options"
+                    value="${escapeHtml(inputValueFor(source, 'cap_group'))}"
+                    data-key="${escapeHtml(key)}"
+                    data-draft-field="cap_group"
+                    placeholder="optional"
+                    aria-label="Cap group for ${escapeHtml(source.slug)}"
+                  />
+                </td>
+                <td>
+                  <input
+                    class="${draftInputClasses(source, 'cap_points', 'compact')}"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="${escapeHtml(inputValueFor(source, 'cap_points'))}"
+                    data-key="${escapeHtml(key)}"
+                    data-draft-field="cap_points"
+                    placeholder="-"
+                    aria-label="Cap points for ${escapeHtml(source.slug)}"
+                  />
+                </td>
+                <td>
+                  <input
+                    class="${draftInputClasses(source, 'gate_slug', 'text')}"
+                    list="gate-options"
+                    value="${escapeHtml(inputValueFor(source, 'gate_slug'))}"
+                    data-key="${escapeHtml(key)}"
+                    data-draft-field="gate_slug"
+                    placeholder="none"
+                    aria-label="Gate survey for ${escapeHtml(source.slug)}"
+                  />
+                </td>
+                <td>
+                  <input
+                    class="${draftInputClasses(source, 'late_percent', 'compact')}"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value="${escapeHtml(inputValueFor(source, 'late_percent'))}"
+                    data-key="${escapeHtml(key)}"
+                    data-draft-field="late_percent"
+                    aria-label="Late percent for ${escapeHtml(source.slug)}"
+                  />
+                </td>
+                <td><div class="file" title="${escapeHtml(source.file)}">${escapeHtml(source.file)}</div></td>
               </tr>
             `;
           })
           .join('');
+        renderSaveState();
       }
 
-      function updateSourcePoint(key, value) {
-        const source = state.sources.find((item) => sourceKey(item) === key);
+      function findSource(key) {
+        return state.sources.find((item) => sourceKey(item) === key);
+      }
+
+      function setDraftValue(source, field, value) {
+        if (field === 'points') {
+          source.draft_points = Math.max(0, Number.parseInt(value, 10) || 0);
+          return;
+        }
+        if (field === 'priority_rating') {
+          source.draft_priority_rating = clampInt(value, 0, 5, POLICY_DEFAULTS.priority_rating);
+        } else if (field === 'late_percent') {
+          source.draft_late_percent = value === '' ? '' : clampInt(value, 0, 100, POLICY_DEFAULTS.late_percent);
+        } else if (field === 'cap_points') {
+          source.draft_cap_points = value === '' ? null : Math.max(0, Number.parseInt(value, 10) || 0);
+        } else if (field === 'cap_group') {
+          source.draft_cap_group = value;
+        } else if (field === 'gate_slug') {
+          source.draft_gate_slug = value;
+        }
+      }
+
+      function syncMatchingInputs(source, field, originEl) {
+        const key = sourceKey(source);
+        document.querySelectorAll(`[data-key="${key}"][data-draft-field="${field}"]`).forEach((el) => {
+          if (el !== originEl) {
+            if (field === 'points') {
+              el.value = pointValue(source);
+            } else {
+              el.value = inputValueFor(source, field);
+            }
+          }
+          el.classList.toggle('changed', isFieldUnsaved(source, field));
+        });
+      }
+
+      function handleDraftInput(event) {
+        const input = event.target.closest('[data-key][data-draft-field]');
+        if (!input) return;
+        const source = findSource(input.dataset.key);
         if (!source) return;
-        source.draft_points = Math.max(0, Number.parseInt(value, 10) || 0);
-        renderRows();
+        const field = input.dataset.draftField;
+        setDraftValue(source, field, input.value);
+        syncMatchingInputs(source, field, input);
+        if (event.type === 'change' && DRAFT_SORT_KEYS[field] === state.sortKey) {
+          renderRows();
+          return;
+        }
+        renderSummary(visibleSources());
+        renderSaveState();
+      }
+
+      function renderPolicyEditor(source) {
+        const key = escapeHtml(sourceKey(source));
+        return `
+          <div class="policy-panel">
+            <h3 class="section-title">Allocation controls</h3>
+            <div class="policy-form">
+              <label>
+                New points
+                <input class="${draftInputClasses(source, 'points', 'points')}" type="number" min="0" step="1" value="${pointValue(source)}" data-key="${key}" data-draft-field="points" />
+              </label>
+              <label>
+                Priority
+                <select class="${draftInputClasses(source, 'priority_rating', 'priority')}" data-key="${key}" data-draft-field="priority_rating">
+                  ${priorityOptions(policyDraftValue(source, 'priority_rating'))}
+                </select>
+              </label>
+              <label>
+                Cap group
+                <input class="${draftInputClasses(source, 'cap_group')}" list="cap-group-options" value="${escapeHtml(inputValueFor(source, 'cap_group'))}" data-key="${key}" data-draft-field="cap_group" placeholder="optional" />
+              </label>
+              <label>
+                Cap points
+                <input class="${draftInputClasses(source, 'cap_points')}" type="number" min="0" step="1" value="${escapeHtml(inputValueFor(source, 'cap_points'))}" data-key="${key}" data-draft-field="cap_points" placeholder="blank = no cap" />
+              </label>
+              <label>
+                Gate survey
+                <input class="${draftInputClasses(source, 'gate_slug')}" list="gate-options" value="${escapeHtml(inputValueFor(source, 'gate_slug'))}" data-key="${key}" data-draft-field="gate_slug" placeholder="none" />
+              </label>
+              <label>
+                Late %
+                <input class="${draftInputClasses(source, 'late_percent')}" type="number" min="0" max="100" step="1" value="${escapeHtml(inputValueFor(source, 'late_percent'))}" data-key="${key}" data-draft-field="late_percent" />
+              </label>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderQuestion(question) {
+        const labels = [
+          question.low_label_en ? `Low: ${question.low_label_en}` : '',
+          question.high_label_en ? `High: ${question.high_label_en}` : '',
+          question.na_option_en ? `N/A: ${question.na_option_en}` : '',
+        ].filter(Boolean);
+        const options = Array.isArray(question.options)
+          ? question.options
+              .filter((option) => option.value || option.label_en)
+              .map((option) => `${option.value}${option.label_en ? ` - ${option.label_en}` : ''}`)
+          : [];
+        return `
+          <article class="question-card">
+            <h3>${escapeHtml(question.order || '')}. ${escapeHtml(question.prompt_en || question.content_en || question.slug || 'Untitled question')}</h3>
+            <p class="question-meta">
+              ${escapeHtml(question.slug || 'no slug')} / ${escapeHtml(question.type || 'unknown type')} / ${question.required === false ? 'optional' : 'required'}
+            </p>
+            ${labels.length ? `<p class="question-meta">${escapeHtml(labels.join(' | '))}</p>` : ''}
+            ${options.length ? `<p class="question-meta">Options: ${escapeHtml(options.join(' | '))}</p>` : ''}
+          </article>
+        `;
+      }
+
+      function renderInspectModal(source) {
+        byId('inspect-kicker').textContent = source.kind === 'survey' ? 'Survey preview' : 'Manual activity';
+        byId('inspect-title').textContent = source.title_en || source.slug;
+        byId('inspect-subtitle').textContent = `${source.slug} / ${source.question_count || 0} parsed questions`;
+        const appLink = source.app_url
+          ? `<a class="link-button" href="${escapeHtml(source.app_url)}" target="_blank" rel="noreferrer">Open in app</a>`
+          : '';
+        const questions = Array.isArray(source.questions) ? source.questions : [];
+        inspectContent.innerHTML = `
+          <div class="modal-grid">
+            <div>
+              <div class="badges" style="margin-bottom: 12px;">
+                ${renderSourceBadges(source)}
+                    <span class="badge neutral">current: ${escapeHtml(currentPointLabel(source))}${source.current_points_label ? '' : ' pts'}</span>
+                <span class="badge neutral">priority: ${escapeHtml(source.priority || 0)}</span>
+                ${appLink}
+              </div>
+              ${source.description_en ? `<p class="muted" style="margin-bottom: 16px;">${escapeHtml(source.description_en)}</p>` : ''}
+              <h3 class="section-title">Questions</h3>
+              <div class="question-list">
+                ${
+                  questions.length
+                    ? questions.map(renderQuestion).join('')
+                    : '<div class="question-card"><p class="muted">No questions were parsed from this source. Use the app link or fixture file to inspect it directly.</p></div>'
+                }
+              </div>
+            </div>
+            ${renderPolicyEditor(source)}
+          </div>
+        `;
       }
 
       async function loadSources() {
@@ -427,7 +1289,10 @@
         const payload = await response.json();
         state.sources = payload.sources;
         state.outputPath = payload.output_path;
+        state.savedValues = new Map(payload.sources.map((source) => [sourceKey(source), snapshotFor(source)]));
+        state.lastSavedAt = payload.saved_at || null;
         renderCategories();
+        renderGateOptions();
         renderRows();
         setStatus(
           payload.saved_at
@@ -440,9 +1305,12 @@
         const sources = state.sources.map((source) => ({
           kind: source.kind,
           slug: source.slug,
-          points: pointValue(source),
+          ...snapshotFor(source),
         }));
         byId('save').disabled = true;
+        const stateEl = byId('save-state');
+        stateEl.className = 'save-state idle';
+        stateEl.textContent = 'Saving...';
         setStatus('Saving allocation...');
         try {
           const response = await fetch(`${API_BASE}/api/allocation`, {
@@ -452,25 +1320,52 @@
           });
           if (!response.ok) throw new Error(await response.text());
           const payload = await response.json();
+          state.savedValues = new Map(state.sources.map((source) => [sourceKey(source), snapshotFor(source)]));
+          state.lastSavedAt = payload.saved_at;
+          renderRows();
+          if (inspectModal.open) {
+            const source = findSource(inspectContent.querySelector('[data-key]')?.dataset.key || '');
+            if (source) renderInspectModal(source);
+          }
           setStatus(`Saved ${payload.count} values to ${payload.output_path}.`, 'ok');
         } catch (error) {
+          renderSaveState();
           setStatus(error.message, 'error');
         } finally {
           byId('save').disabled = false;
         }
       }
 
-      rowsEl.addEventListener('input', (event) => {
-        const input = event.target.closest('input[data-key]');
-        if (!input) return;
-        updateSourcePoint(input.dataset.key, input.value);
+      rowsEl.addEventListener('input', handleDraftInput);
+      rowsEl.addEventListener('change', handleDraftInput);
+      inspectContent.addEventListener('input', handleDraftInput);
+      inspectContent.addEventListener('change', handleDraftInput);
+      rowsEl.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-inspect-key]');
+        if (!button) return;
+        const source = findSource(button.dataset.inspectKey);
+        if (!source) return;
+        renderInspectModal(source);
+        inspectModal.showModal();
       });
 
       byId('search').addEventListener('input', renderRows);
       byId('category').addEventListener('change', renderRows);
       byId('kind').addEventListener('change', renderRows);
+      document.querySelector('thead').addEventListener('click', (event) => {
+        const button = event.target.closest('[data-sort-key]');
+        if (!button) return;
+        const nextKey = button.dataset.sortKey;
+        if (state.sortKey === nextKey) {
+          state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortKey = nextKey;
+          state.sortDirection = 'asc';
+        }
+        renderRows();
+      });
       byId('zero-visible').addEventListener('click', () => {
-        const visibleKeys = new Set(filteredSources().map(sourceKey));
+        const visibleKeys = new Set(visibleSources().map(sourceKey));
         state.sources.forEach((source) => {
           if (visibleKeys.has(sourceKey(source))) source.draft_points = 0;
         });
@@ -480,9 +1375,14 @@
       byId('current-values').addEventListener('click', () => {
         state.sources.forEach((source) => {
           source.draft_points = source.point_value;
+          source.draft_priority_rating = POLICY_DEFAULTS.priority_rating;
+          source.draft_cap_group = POLICY_DEFAULTS.cap_group;
+          source.draft_cap_points = POLICY_DEFAULTS.cap_points;
+          source.draft_gate_slug = POLICY_DEFAULTS.gate_slug;
+          source.draft_late_percent = POLICY_DEFAULTS.late_percent;
         });
         renderRows();
-        setStatus('Inputs restored to current backend values.');
+        setStatus('Inputs restored to current backend point values and default policy controls.');
       });
       byId('save').addEventListener('click', saveAllocation);
 
