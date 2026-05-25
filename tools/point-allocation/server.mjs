@@ -178,6 +178,75 @@ function authoredQuestionMetrics(questions = [], dbMetrics = null) {
   return metrics;
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+function remoteCdCommand(remoteDir) {
+  if (remoteDir.startsWith('~') || remoteDir.startsWith('$')) {
+    return `cd ${remoteDir}`;
+  }
+  return `cd ${shellQuote(remoteDir)}`;
+}
+
+function buildRemoteParticipantCountsSql() {
+  return [
+    'SELECT s.slug, COUNT(DISTINCT r.user_id)',
+    'FROM surveys_surveyresponse r',
+    'JOIN surveys_survey s ON s.id = r.survey_id',
+    'WHERE r.user_id BETWEEN 8 AND 87',
+    'GROUP BY s.slug',
+    'ORDER BY s.slug;',
+  ].join(' ');
+}
+
+function parseParticipantCountRows(stdout) {
+  const counts = new Map();
+  for (const line of stdout.trim().split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const [slug, rawCount] = line.split('|');
+    const count = Number.parseInt(rawCount, 10);
+    if (slug && Number.isFinite(count)) {
+      counts.set(slug, count);
+    }
+  }
+  return counts;
+}
+
+function shouldReadRemoteParticipantCounts(repoRoot) {
+  if (process.env.POINT_ALLOCATION_REMOTE_COUNTS === '0') return false;
+  return Boolean(process.env.POINT_ALLOCATION_REMOTE_SSH) || resolve(repoRoot) === DEFAULT_REPO_ROOT;
+}
+
+async function readRemoteParticipantResponseCounts(repoRoot) {
+  if (!shouldReadRemoteParticipantCounts(repoRoot)) {
+    return { attempted: false, available: false, counts: new Map() };
+  }
+
+  const sshCommand = process.env.POINT_ALLOCATION_SSH_COMMAND || 'ssh';
+  const sshTarget = process.env.POINT_ALLOCATION_REMOTE_SSH || 'whoami';
+  const remoteDir = process.env.POINT_ALLOCATION_REMOTE_DIR || '$HOME/WhoamI-Today-backend';
+  const sql = buildRemoteParticipantCountsSql();
+  const remoteCommand = [
+    remoteCdCommand(remoteDir),
+    `docker compose -f docker-compose.production.yml exec -T db psql -U postgres -d whoamitoday -At -c ${shellQuote(sql)}`,
+  ].join(' && ');
+
+  try {
+    const { stdout } = await execFileAsync(
+      sshCommand,
+      ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', sshTarget, remoteCommand],
+      {
+        timeout: 15000,
+        maxBuffer: 1024 * 1024,
+      },
+    );
+    return { attempted: true, available: true, counts: parseParticipantCountRows(stdout) };
+  } catch {
+    return { attempted: true, available: false, counts: new Map() };
+  }
+}
+
 function buildDbMetricsScript() {
   return String.raw`
 import json
@@ -199,6 +268,7 @@ from surveys.models import (
     SINGLE_CHOICE,
     ScheduledSurvey,
     Survey,
+    SurveyResponse,
 )
 from surveys.friend_scope import eligible_friends_for_survey
 from surveys.recovery import missing_recovery_question_ids_for_user
@@ -269,11 +339,20 @@ for survey in Survey.objects.prefetch_related('questions').all():
         mcqs.append(mcq)
         frqs.append(frq)
 
+    participant_response_count = (
+        SurveyResponse.objects
+        .filter(survey=survey, user_id__gte=8, user_id__lte=87)
+        .values('user_id')
+        .distinct()
+        .count()
+    )
+
     payload[survey.slug] = {
         'visible_total_range': metric_range(totals),
         'visible_mcq_range': metric_range(mcqs),
         'visible_frq_range': metric_range(frqs),
         'user_count': len(routed_users),
+        'participant_response_count': participant_response_count,
     }
 
 print(json.dumps(payload))
@@ -558,6 +637,8 @@ async function readManualSources(repoRoot) {
       editable: false,
       question_count: 0,
       question_metrics: emptyQuestionMetrics(),
+      participant_response_count: null,
+      participant_response_label: '-',
       questions: [],
       app_url: '',
       file: source.file || 'adoorback/surveys/reimbursement_config.py',
@@ -578,10 +659,29 @@ export async function readPointSources(repoRoot = DEFAULT_REPO_ROOT) {
   }
 
   const dbQuestionMetrics = await readDbQuestionMetrics(repoRoot);
-  const surveysWithMetrics = surveys.map((source) => ({
-    ...source,
-    question_metrics: authoredQuestionMetrics(source.questions, dbQuestionMetrics.get(source.slug)),
-  }));
+  const remoteParticipantCounts = await readRemoteParticipantResponseCounts(repoRoot);
+  const surveysWithMetrics = surveys.map((source) => {
+    const dbMetrics = dbQuestionMetrics.get(source.slug);
+    const localParticipantResponseCount = dbMetrics?.participant_response_count;
+    let participantResponseCount = localParticipantResponseCount;
+    let participantResponseSource = 'local';
+    if (remoteParticipantCounts.available) {
+      participantResponseCount = remoteParticipantCounts.counts.get(source.slug) ?? 0;
+      participantResponseSource = 'remote';
+    } else if (remoteParticipantCounts.attempted) {
+      participantResponseCount = null;
+      participantResponseSource = 'remote_unavailable';
+    }
+    return {
+      ...source,
+      question_metrics: authoredQuestionMetrics(source.questions, dbMetrics),
+      participant_response_count: Number.isFinite(participantResponseCount) ? participantResponseCount : null,
+      participant_response_label: Number.isFinite(participantResponseCount)
+        ? String(participantResponseCount)
+        : 'Remote unavailable',
+      participant_response_source: participantResponseSource,
+    };
+  });
   const manual = await readManualSources(repoRoot);
   return [...surveysWithMetrics, ...manual];
 }

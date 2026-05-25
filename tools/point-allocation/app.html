@@ -194,7 +194,7 @@
 
       table {
         width: 100%;
-        min-width: 1780px;
+        min-width: 1880px;
         border-collapse: separate;
         border-spacing: 0;
       }
@@ -621,6 +621,12 @@
               </th>
               <th>Review</th>
               <th aria-sort="none">
+                <button class="sort-button" type="button" data-sort-key="answered_participants" data-sort-label="Answered participants" aria-pressed="false">
+                  <span>Answered (8-87)</span>
+                  <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
+              </th>
+              <th aria-sort="none">
                 <button class="sort-button" type="button" data-sort-key="visible_questions" data-sort-label="Visible questions" aria-pressed="false">
                   <span>Visible qs</span>
                   <span class="sort-indicator" aria-hidden="true"></span>
@@ -907,9 +913,28 @@
         `;
       }
 
+      function participantResponseCell(source) {
+        const label = source.participant_response_label || '-';
+        const sourceLabel = source.participant_response_source === 'remote'
+          ? 'remote DB'
+          : source.participant_response_source === 'remote_unavailable'
+            ? 'remote unavailable'
+            : 'local DB';
+        const title = source.kind === 'survey'
+          ? `Distinct participants with user IDs 8-87 who submitted this survey in the ${sourceLabel}.`
+          : 'Manual activities are not survey responses.';
+        return `
+          <td class="question-metric" title="${escapeHtml(title)}">
+            <span class="metric-value">${escapeHtml(label)}</span>
+            ${source.kind === 'survey' ? `<span class="metric-source">${escapeHtml(sourceLabel)}</span>` : ''}
+          </td>
+        `;
+      }
+
       function sortValue(source, key) {
         const draft = snapshotFor(source);
         if (key === 'source') return `${source.title_en || ''} ${source.slug || ''}`;
+        if (key === 'answered_participants') return source.participant_response_count;
         if (key === 'visible_questions') return metricSortNumber(source, 'total');
         if (key === 'mcq_questions') return metricSortNumber(source, 'mcq');
         if (key === 'frq_questions') return metricSortNumber(source, 'frq');
@@ -1058,6 +1083,7 @@
                     ${appLink}
                   </div>
                 </td>
+                ${participantResponseCell(source)}
                 ${questionMetricCell(source, 'total')}
                 ${questionMetricCell(source, 'mcq')}
                 ${questionMetricCell(source, 'frq')}
@@ -1265,6 +1291,7 @@
                 ${renderSourceBadges(source)}
                     <span class="badge neutral">current: ${escapeHtml(currentPointLabel(source))}${source.current_points_label ? '' : ' pts'}</span>
                 <span class="badge neutral">priority: ${escapeHtml(source.priority || 0)}</span>
+                <span class="badge neutral">answered 8-87: ${escapeHtml(source.participant_response_label || '-')}</span>
                 ${appLink}
               </div>
               ${source.description_en ? `<p class="muted" style="margin-bottom: 16px;">${escapeHtml(source.description_en)}</p>` : ''}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -174,6 +174,193 @@ test('readPointSources marks per-friend question metrics as user-dependent', asy
   assert.equal(survey.question_metrics.exact_range, false);
 });
 
+test('readPointSources includes DB participant response counts for participant ids 8-87', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'point-allocation-'));
+  const fixtures = path.join(root, 'adoorback', 'surveys', 'fixtures');
+  const fakePython = path.join(root, 'fake-python.sh');
+  await mkdir(fixtures, { recursive: true });
+  await writeFile(path.join(root, 'adoorback', 'manage.py'), '');
+  await writeFile(
+    fakePython,
+    [
+      '#!/bin/sh',
+      'case "$2" in',
+      '  *"user_id__gte=8"*"user_id__lte=87"*) ;;',
+      '  *) echo "missing participant id range" >&2; exit 1 ;;',
+      'esac',
+      'cat <<\'JSON\'',
+      '{"daily_base":{"visible_total_range":{"min":2,"max":2},"visible_mcq_range":{"min":1,"max":1},"visible_frq_range":{"min":1,"max":1},"user_count":80,"participant_response_count":17}}',
+      'JSON',
+      '',
+    ].join('\n'),
+  );
+  await chmod(fakePython, 0o755);
+  await writeFile(
+    path.join(fixtures, 'daily.yaml'),
+    [
+      '- slug: daily_base',
+      '  title_en: Daily diary',
+      '  questions:',
+      '    - order: 1',
+      '      slug: mood',
+      '      type: single_choice',
+      '    - order: 2',
+      '      slug: note',
+      '      type: free_text',
+      '',
+    ].join('\n'),
+  );
+
+  const previousPython = process.env.POINT_ALLOCATION_PYTHON;
+  process.env.POINT_ALLOCATION_PYTHON = fakePython;
+  try {
+    const sources = await readPointSources(root);
+    const survey = sources.find((source) => source.slug === 'daily_base');
+
+    assert.equal(survey.participant_response_count, 17);
+    assert.equal(survey.participant_response_label, '17');
+    assert.deepEqual(survey.question_metrics.visible_total_range, { min: 2, max: 2 });
+  } finally {
+    if (previousPython === undefined) {
+      delete process.env.POINT_ALLOCATION_PYTHON;
+    } else {
+      process.env.POINT_ALLOCATION_PYTHON = previousPython;
+    }
+  }
+});
+
+test('readPointSources prefers remote DB participant counts when remote SSH is configured', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'point-allocation-'));
+  const fixtures = path.join(root, 'adoorback', 'surveys', 'fixtures');
+  const fakePython = path.join(root, 'fake-python.sh');
+  const fakeSsh = path.join(root, 'fake-ssh.sh');
+  await mkdir(fixtures, { recursive: true });
+  await writeFile(path.join(root, 'adoorback', 'manage.py'), '');
+  await writeFile(
+    fakePython,
+    [
+      '#!/bin/sh',
+      'cat <<\'JSON\'',
+      '{"daily_base":{"visible_total_range":{"min":2,"max":2},"visible_mcq_range":{"min":1,"max":1},"visible_frq_range":{"min":1,"max":1},"user_count":80,"participant_response_count":0}}',
+      'JSON',
+      '',
+    ].join('\n'),
+  );
+  await chmod(fakePython, 0o755);
+  await writeFile(
+    fakeSsh,
+    [
+      '#!/bin/sh',
+      'case "$*" in',
+      '  *"BETWEEN 8 AND 87"*) ;;',
+      '  *) echo "missing participant id range" >&2; exit 1 ;;',
+      'esac',
+      'printf "daily_base|13\\n"',
+      '',
+    ].join('\n'),
+  );
+  await chmod(fakeSsh, 0o755);
+  await writeFile(
+    path.join(fixtures, 'daily.yaml'),
+    [
+      '- slug: daily_base',
+      '  title_en: Daily diary',
+      '  questions:',
+      '    - order: 1',
+      '      slug: mood',
+      '      type: single_choice',
+      '    - order: 2',
+      '      slug: note',
+      '      type: free_text',
+      '',
+    ].join('\n'),
+  );
+
+  const previousPython = process.env.POINT_ALLOCATION_PYTHON;
+  const previousRemoteSsh = process.env.POINT_ALLOCATION_REMOTE_SSH;
+  const previousSshCommand = process.env.POINT_ALLOCATION_SSH_COMMAND;
+  const previousRemoteDir = process.env.POINT_ALLOCATION_REMOTE_DIR;
+  try {
+    process.env.POINT_ALLOCATION_PYTHON = fakePython;
+    process.env.POINT_ALLOCATION_REMOTE_SSH = 'fake-host';
+    process.env.POINT_ALLOCATION_SSH_COMMAND = fakeSsh;
+    process.env.POINT_ALLOCATION_REMOTE_DIR = '/tmp/remote-whoami';
+
+    const sources = await readPointSources(root);
+    const survey = sources.find((source) => source.slug === 'daily_base');
+
+    assert.equal(survey.participant_response_count, 13);
+    assert.equal(survey.participant_response_label, '13');
+    assert.equal(survey.participant_response_source, 'remote');
+  } finally {
+    if (previousPython === undefined) delete process.env.POINT_ALLOCATION_PYTHON;
+    else process.env.POINT_ALLOCATION_PYTHON = previousPython;
+    if (previousRemoteSsh === undefined) delete process.env.POINT_ALLOCATION_REMOTE_SSH;
+    else process.env.POINT_ALLOCATION_REMOTE_SSH = previousRemoteSsh;
+    if (previousSshCommand === undefined) delete process.env.POINT_ALLOCATION_SSH_COMMAND;
+    else process.env.POINT_ALLOCATION_SSH_COMMAND = previousSshCommand;
+    if (previousRemoteDir === undefined) delete process.env.POINT_ALLOCATION_REMOTE_DIR;
+    else process.env.POINT_ALLOCATION_REMOTE_DIR = previousRemoteDir;
+  }
+});
+
+test('readPointSources does not fall back to local participant counts when remote SSH fails', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'point-allocation-'));
+  const fixtures = path.join(root, 'adoorback', 'surveys', 'fixtures');
+  const fakePython = path.join(root, 'fake-python.sh');
+  const fakeSsh = path.join(root, 'fake-ssh.sh');
+  await mkdir(fixtures, { recursive: true });
+  await writeFile(path.join(root, 'adoorback', 'manage.py'), '');
+  await writeFile(
+    fakePython,
+    [
+      '#!/bin/sh',
+      'cat <<\'JSON\'',
+      '{"daily_base":{"visible_total_range":{"min":2,"max":2},"visible_mcq_range":{"min":1,"max":1},"visible_frq_range":{"min":1,"max":1},"user_count":80,"participant_response_count":99}}',
+      'JSON',
+      '',
+    ].join('\n'),
+  );
+  await chmod(fakePython, 0o755);
+  await writeFile(fakeSsh, '#!/bin/sh\nexit 1\n');
+  await chmod(fakeSsh, 0o755);
+  await writeFile(
+    path.join(fixtures, 'daily.yaml'),
+    [
+      '- slug: daily_base',
+      '  title_en: Daily diary',
+      '  questions:',
+      '    - order: 1',
+      '      slug: mood',
+      '      type: single_choice',
+      '',
+    ].join('\n'),
+  );
+
+  const previousPython = process.env.POINT_ALLOCATION_PYTHON;
+  const previousRemoteSsh = process.env.POINT_ALLOCATION_REMOTE_SSH;
+  const previousSshCommand = process.env.POINT_ALLOCATION_SSH_COMMAND;
+  try {
+    process.env.POINT_ALLOCATION_PYTHON = fakePython;
+    process.env.POINT_ALLOCATION_REMOTE_SSH = 'fake-host';
+    process.env.POINT_ALLOCATION_SSH_COMMAND = fakeSsh;
+
+    const sources = await readPointSources(root);
+    const survey = sources.find((source) => source.slug === 'daily_base');
+
+    assert.equal(survey.participant_response_count, null);
+    assert.equal(survey.participant_response_label, 'Remote unavailable');
+    assert.equal(survey.participant_response_source, 'remote_unavailable');
+  } finally {
+    if (previousPython === undefined) delete process.env.POINT_ALLOCATION_PYTHON;
+    else process.env.POINT_ALLOCATION_PYTHON = previousPython;
+    if (previousRemoteSsh === undefined) delete process.env.POINT_ALLOCATION_REMOTE_SSH;
+    else process.env.POINT_ALLOCATION_REMOTE_SSH = previousRemoteSsh;
+    if (previousSshCommand === undefined) delete process.env.POINT_ALLOCATION_SSH_COMMAND;
+    else process.env.POINT_ALLOCATION_SSH_COMMAND = previousSshCommand;
+  }
+});
+
 test('writeAllocationFile persists point inputs and reimbursement policy controls', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'point-allocation-'));
   const outputPath = path.join(root, 'point-allocation.values.json');
@@ -236,11 +423,19 @@ test('app table fills the viewport with its own scroll area', async () => {
 test('app exposes sortable allocation table headers', async () => {
   const html = await readFile(new URL('./app.html', import.meta.url), 'utf8');
 
-  for (const key of ['source', 'visible_questions', 'mcq_questions', 'frq_questions', 'current', 'points', 'priority', 'cap_group', 'cap_points', 'gate_slug', 'late_percent', 'file']) {
+  for (const key of ['source', 'answered_participants', 'visible_questions', 'mcq_questions', 'frq_questions', 'current', 'points', 'priority', 'cap_group', 'cap_points', 'gate_slug', 'late_percent', 'file']) {
     assert.match(html, new RegExp(`data-sort-key="${key}"`));
   }
   assert.match(html, /function sortedSources\(sources\)/);
   assert.match(html, /aria-sort/);
+});
+
+test('app exposes participant response counts scoped to ids 8-87', async () => {
+  const html = await readFile(new URL('./app.html', import.meta.url), 'utf8');
+
+  assert.match(html, /Answered \(8-87\)/);
+  assert.match(html, /participantResponseCell\(source\)/);
+  assert.match(html, /participant_response_count/);
 });
 
 test('app can use localhost API when opened as a file', async () => {
