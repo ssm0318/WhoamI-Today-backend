@@ -309,6 +309,16 @@
         color: #5d6268;
       }
 
+      .badge.priority-must {
+        background: #ffe8e8;
+        color: #9f1239;
+      }
+
+      .badge.priority-high {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
       .draft-input.points {
         width: 92px;
         text-align: right;
@@ -1046,11 +1056,24 @@
         return `draft-input ${extra} ${isFieldUnsaved(source, field) ? 'changed' : ''}`.trim();
       }
 
+      function priorityBadge(source) {
+        const priority = policyDraftValue(source, 'priority_rating');
+        if (priority === 1) {
+          return '<span class="badge priority-must">Prerequisite/Must Complete</span>';
+        }
+        if (priority === 2) {
+          return '<span class="badge priority-high">High Priority</span>';
+        }
+        return '';
+      }
+
       function renderSourceBadges(source) {
         const badges = [
           `<span class="badge">${escapeHtml(source.category_label)}</span>`,
           `<span class="badge secondary">${escapeHtml(source.kind)}</span>`,
         ];
+        const priority = priorityBadge(source);
+        if (priority) badges.push(priority);
         if (source.repeatable) badges.push('<span class="badge neutral">recurring</span>');
         if (source.editable) badges.push('<span class="badge neutral">editable</span>');
         if (source.point_prereq_slug) {
@@ -1208,7 +1231,10 @@
         const field = input.dataset.draftField;
         setDraftValue(source, field, input.value);
         syncMatchingInputs(source, field, input);
-        if (event.type === 'change' && DRAFT_SORT_KEYS[field] === state.sortKey) {
+        if (
+          event.type === 'change' &&
+          (DRAFT_SORT_KEYS[field] === state.sortKey || field === 'priority_rating')
+        ) {
           renderRows();
           return;
         }
@@ -1290,7 +1316,7 @@
               <div class="badges" style="margin-bottom: 12px;">
                 ${renderSourceBadges(source)}
                     <span class="badge neutral">current: ${escapeHtml(currentPointLabel(source))}${source.current_points_label ? '' : ' pts'}</span>
-                <span class="badge neutral">priority: ${escapeHtml(source.priority || 0)}</span>
+                <span class="badge neutral">priority: ${escapeHtml(policyDraftValue(source, 'priority_rating'))}</span>
                 <span class="badge neutral">answered 8-87: ${escapeHtml(source.participant_response_label || '-')}</span>
                 ${appLink}
               </div>
