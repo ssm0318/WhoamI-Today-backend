@@ -168,7 +168,40 @@ def missing_recovery_question_slugs_for_user(user, survey, manifest: dict[str, A
                 question_slug = source.get('question_slug', '')
                 if question_slug:
                     visible_slugs.add(question_slug)
-    return visible_slugs
+    return _expand_feature_recovery_blocks(survey, visible_slugs)
+
+
+def _feature_block_root_slug(question_slug: str) -> str:
+    root_slug = question_slug
+    for suffix in ('_enjoy', '_dislike'):
+        if root_slug.endswith(suffix):
+            root_slug = root_slug[:-len(suffix)]
+            break
+    if root_slug.startswith('goal') and '_feat_' in root_slug:
+        return root_slug
+    return ''
+
+
+def _expand_feature_recovery_blocks(survey, visible_slugs: set[str]) -> set[str]:
+    block_roots = {
+        root_slug
+        for root_slug in (_feature_block_root_slug(slug) for slug in visible_slugs)
+        if root_slug
+    }
+    if not block_roots:
+        return visible_slugs
+
+    block_slugs = set()
+    for root_slug in block_roots:
+        block_slugs.update({root_slug, f'{root_slug}_enjoy', f'{root_slug}_dislike'})
+
+    existing_block_slugs = set(
+        SurveyQuestion.objects
+        .filter(survey=survey, slug__in=block_slugs)
+        .exclude(type__in=INPUT_LESS_TYPES)
+        .values_list('slug', flat=True)
+    )
+    return visible_slugs | existing_block_slugs
 
 
 def missing_recovery_question_ids_for_user(user, survey) -> set[int] | None:

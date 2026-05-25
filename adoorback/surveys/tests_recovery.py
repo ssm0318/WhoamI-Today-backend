@@ -307,7 +307,7 @@ class RecoverySurveyApiTests(APITestCase):
             allow_late=True,
         )
 
-    def test_recovery_detail_only_returns_missing_final_questions(self):
+    def test_recovery_detail_expands_missing_feature_followups_to_blocks(self):
         base = self._survey('feature_eval_w')
         answered_rating = self._question(base, 'goal1_feat_dailyq', 1, 'likert_5')
         related_only = self._question(base, 'goal4_feat_social_battery', 2, 'likert_5')
@@ -325,18 +325,44 @@ class RecoverySurveyApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         slugs = [q['slug'] for q in response.json()['questions']]
-        self.assertNotIn('goal1_feat_dailyq', slugs)
+        self.assertIn('goal1_feat_dailyq', slugs)
         self.assertIn('goal1_feat_dailyq_enjoy', slugs)
         self.assertIn('goal1_feat_dailyq_dislike', slugs)
         self.assertIn('goal2_feat_social_battery_level', slugs)
 
+    def test_feature_recovery_detail_preserves_feature_blocks_when_followups_missing(self):
+        base = self._survey('feature_eval_w')
+        answered_rating = self._question(base, 'goal1_feat_dailyq', 1, 'likert_5')
+        self._answer(self.user, base, answered_rating, value=4)
+
+        recovery = self._survey('feature_eval_w_part2', repeatable=True)
+        rating = self._question(recovery, 'goal1_feat_dailyq', 1, 'likert_5')
+        enjoy = self._question(recovery, 'goal1_feat_dailyq_enjoy', 2)
+        dislike = self._question(recovery, 'goal1_feat_dailyq_dislike', 3)
+        self._schedule_open(recovery)
+
+        response = self.client.get('/api/surveys/feature_eval_w_part2/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [q['slug'] for q in response.json()['questions']],
+            [rating.slug, enjoy.slug, dislike.slug],
+        )
+        self.assertEqual(response.json()['draft']['answers'], {str(rating.id): 4})
+
     def test_recovery_index_hides_survey_when_user_has_no_visible_missing_questions(self):
         base = self._survey('feature_eval_w')
         rating = self._question(base, 'goal1_feat_dailyq', 1, 'likert_5')
+        enjoy = self._question(base, 'goal1_feat_dailyq_enjoy', 2)
+        dislike = self._question(base, 'goal1_feat_dailyq_dislike', 3)
         self._answer(self.user, base, rating, value=4)
+        self._answer(self.user, base, enjoy, value='Useful')
+        self._answer(self.user, base, dislike, value='None')
 
         recovery = self._survey('feature_eval_w_part2', repeatable=True)
         self._question(recovery, 'goal1_feat_dailyq', 1, 'likert_5')
+        self._question(recovery, 'goal1_feat_dailyq_enjoy', 2)
+        self._question(recovery, 'goal1_feat_dailyq_dislike', 3)
         self._schedule_open(recovery)
 
         response = self.client.get('/api/surveys/index/')
@@ -361,7 +387,7 @@ class RecoverySurveyApiTests(APITestCase):
             [rating.slug, enjoy.slug, dislike.slug],
         )
 
-    def test_recovery_submit_rejects_non_missing_question_and_accepts_missing_question(self):
+    def test_recovery_submit_accepts_visible_feature_block_and_rejects_unrelated_question(self):
         base = self._survey('feature_eval_w')
         rating = self._question(base, 'goal1_feat_dailyq', 1, 'likert_5')
         self._answer(self.user, base, rating, value=4)
@@ -369,26 +395,35 @@ class RecoverySurveyApiTests(APITestCase):
         recovery = self._survey('feature_eval_w_part2', repeatable=True)
         repeated_rating = self._question(recovery, 'goal1_feat_dailyq', 1, 'likert_5')
         enjoy = self._question(recovery, 'goal1_feat_dailyq_enjoy', 2)
+        unrelated = self._question(recovery, 'unrelated_question', 3)
         self._schedule_open(recovery)
 
         rejected = self.client.post(
             '/api/surveys/feature_eval_w_part2/responses/',
-            {'answers': [{'question_id': repeated_rating.id, 'value': 5}]},
+            {'answers': [{'question_id': unrelated.id, 'value': 'Nope'}]},
             format='json',
         )
         accepted = self.client.post(
             '/api/surveys/feature_eval_w_part2/responses/',
-            {'answers': [{'question_id': enjoy.id, 'value': 'Useful'}]},
+            {
+                'answers': [
+                    {'question_id': repeated_rating.id, 'value': 5},
+                    {'question_id': enjoy.id, 'value': 'Useful'},
+                ],
+            },
             format='json',
         )
 
         self.assertEqual(rejected.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(accepted.status_code, status.HTTP_201_CREATED)
-        self.assertFalse(
+        self.assertTrue(
             SurveyAnswer.objects.filter(question=repeated_rating, response__user=self.user).exists()
         )
         self.assertTrue(
             SurveyAnswer.objects.filter(question=enjoy, response__user=self.user).exists()
+        )
+        self.assertFalse(
+            SurveyAnswer.objects.filter(question=unrelated, response__user=self.user).exists()
         )
 
     def test_full_resubmit_recovery_shows_all_questions_until_part2_answered(self):

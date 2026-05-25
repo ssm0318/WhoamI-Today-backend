@@ -5,7 +5,7 @@ from rest_framework import serializers
 from surveys.models import (
     CADENCE_DAILY, DISPLAY_ONLY, INPUT_LESS_TYPES, LIKERT_5_NA, LIKERT_RANGES, NA_SENTINEL,
     PER_FRIEND_TYPES, SLIDER, ScheduledSurvey, Survey, SurveyOption,
-    SurveyDraft, SurveyQuestion, SurveyResponse,
+    SurveyAnswer, SurveyDraft, SurveyQuestion, SurveyResponse,
 )
 from surveys.scheduling import _today_la_7am
 
@@ -55,7 +55,11 @@ def _response_as_draft_payload(response: SurveyResponse) -> dict:
     }
 
 
-def _recovery_prefill_as_draft_payload(survey: Survey, user) -> dict | None:
+def _recovery_prefill_as_draft_payload(
+    survey: Survey,
+    user,
+    target_question_ids: set[int] | None = None,
+) -> dict | None:
     """Build an initial draft for recovery surveys from a mapped source response.
 
     This is intentionally read-only: the source survey response remains
@@ -64,55 +68,136 @@ def _recovery_prefill_as_draft_payload(survey: Survey, user) -> dict | None:
     frontend does not re-submit target_user_ids that the submit endpoint would
     reject as stale.
     """
-    from surveys.recovery import recovery_definition_for_survey_slug
+    from collections import defaultdict
 
-    recovery = recovery_definition_for_survey_slug(survey.slug)
-    if not recovery:
-        return None
-    source_slug = recovery.get('prefill_from_survey_slug')
-    question_slug_map = recovery.get('prefill_question_slug_map') or {}
-    if not source_slug or not question_slug_map:
-        return None
-
-    source_response = (
-        SurveyResponse.objects
-        .filter(user=user, survey__slug=source_slug)
-        .select_related('survey')
-        .prefetch_related('answers__question')
-        .order_by('-submitted_at', '-id')
-        .first()
+    from surveys.recovery import (
+        MERGEABLE_EQUIVALENCE, _value_is_excluded, load_recovery_manifest,
+        recovery_definition_for_survey_slug,
     )
-    if source_response is None:
+
+    manifest = load_recovery_manifest()
+    recovery = recovery_definition_for_survey_slug(survey.slug, manifest)
+    if not recovery:
         return None
 
     target_questions = {
         q.slug: q for q in survey.questions.all()
     }
-    source_to_target = {
-        source_slug: target_questions[target_slug]
-        for source_slug, target_slug in question_slug_map.items()
-        if target_slug in target_questions
+    allowed_target_ids = set(target_question_ids) if target_question_ids is not None else None
+    mappings: list[dict] = []
+    seen_mappings = set()
+
+    def add_mapping(source_survey_slug, source_question_slug, target_question_slug, exclude_values=None):
+        target_question = target_questions.get(target_question_slug)
+        if target_question is None:
+            return
+        if allowed_target_ids is not None and target_question.id not in allowed_target_ids:
+            return
+        key = (source_survey_slug, source_question_slug, target_question.id)
+        if key in seen_mappings:
+            return
+        seen_mappings.add(key)
+        mappings.append({
+            'source_survey_slug': source_survey_slug,
+            'source_question_slug': source_question_slug,
+            'target_question': target_question,
+            'exclude_values': exclude_values or [],
+        })
+
+    source_slug = recovery.get('prefill_from_survey_slug')
+    question_slug_map = recovery.get('prefill_question_slug_map') or {}
+    if source_slug and question_slug_map:
+        for source_question_slug, target_question_slug in question_slug_map.items():
+            add_mapping(source_slug, source_question_slug, target_question_slug)
+
+    canonical_by_id = {
+        item['canonical_id']: item
+        for item in manifest.get('canonical_questions', [])
     }
-    if not source_to_target:
+    base_survey_slug = recovery.get('base_survey_slug', '')
+    for canonical_id in recovery.get('collects_canonical_ids', []):
+        canonical = canonical_by_id.get(canonical_id)
+        if canonical is None:
+            continue
+        mergeable_sources = [
+            source
+            for source in canonical.get('sources', [])
+            if source.get('equivalence') in MERGEABLE_EQUIVALENCE
+        ]
+        target_sources = [
+            source
+            for source in mergeable_sources
+            if source.get('survey_slug') == survey.slug
+        ]
+        source_candidates = [
+            source
+            for source in mergeable_sources
+            if source.get('survey_slug') != survey.slug
+        ]
+        if base_survey_slug:
+            source_candidates.sort(
+                key=lambda source: 0 if source.get('survey_slug') == base_survey_slug else 1
+            )
+        for target_source in target_sources:
+            target_question_slug = target_source.get('question_slug', '')
+            for source in source_candidates:
+                add_mapping(
+                    source.get('survey_slug', ''),
+                    source.get('question_slug', ''),
+                    target_question_slug,
+                    source.get('exclude_values', []),
+                )
+
+    if not mappings:
         return None
 
     from surveys.friend_scope import eligible_friend_ids_for_survey
 
-    friend_ids = eligible_friend_ids_for_survey(user, survey)
+    mappings_by_source = defaultdict(list)
+    for mapping in mappings:
+        mappings_by_source[(
+            mapping['source_survey_slug'],
+            mapping['source_question_slug'],
+        )].append(mapping)
+
+    source_survey_slugs = {mapping['source_survey_slug'] for mapping in mappings}
+    source_question_slugs = {mapping['source_question_slug'] for mapping in mappings}
+    source_answers = (
+        SurveyAnswer.objects
+        .filter(
+            response__user=user,
+            question__survey__slug__in=source_survey_slugs,
+            question__slug__in=source_question_slugs,
+        )
+        .select_related('question', 'question__survey', 'response')
+        .order_by('-response__submitted_at', '-id')
+    )
+
+    friend_ids = None
     answers = {}
-    for answer in source_response.answers.select_related('question').order_by(
-        'question__order', 'target_user_id',
-    ):
-        target_question = source_to_target.get(answer.question.slug)
-        if target_question is None:
-            continue
-        question_id = str(target_question.id)
-        if answer.question.type in PER_FRIEND_TYPES or target_question.type in PER_FRIEND_TYPES:
-            if answer.target_user_id is None or answer.target_user_id not in friend_ids:
+    saved_at = None
+    for answer in source_answers:
+        source_key = (answer.question.survey.slug, answer.question.slug)
+        for mapping in mappings_by_source.get(source_key, []):
+            target_question = mapping['target_question']
+            question_id = str(target_question.id)
+            if question_id in answers and target_question.type not in PER_FRIEND_TYPES:
                 continue
-            answers.setdefault(question_id, {})[str(answer.target_user_id)] = answer.value
-            continue
-        answers[question_id] = answer.value
+            if _value_is_excluded(answer.value, mapping['exclude_values']):
+                continue
+            if answer.question.type in PER_FRIEND_TYPES or target_question.type in PER_FRIEND_TYPES:
+                if friend_ids is None:
+                    friend_ids = eligible_friend_ids_for_survey(user, survey)
+                if answer.target_user_id is None or answer.target_user_id not in friend_ids:
+                    continue
+                target_key = str(answer.target_user_id)
+                if target_key in answers.setdefault(question_id, {}):
+                    continue
+                answers[question_id][target_key] = answer.value
+            else:
+                answers[question_id] = answer.value
+            if saved_at is None or answer.response.submitted_at > saved_at:
+                saved_at = answer.response.submitted_at
 
     if not answers:
         return None
@@ -124,7 +209,19 @@ def _recovery_prefill_as_draft_payload(survey: Survey, user) -> dict | None:
         'total_pages': total_pages,
         'answered_pages': total_pages,
         'progress_pct': 100 if total_pages else 0,
-        'saved_at': source_response.submitted_at,
+        'saved_at': saved_at,
+    }
+
+
+def _merge_draft_with_prefill(draft_payload: dict, prefill_payload: dict | None) -> dict:
+    if not prefill_payload:
+        return draft_payload
+    return {
+        **draft_payload,
+        'answers': {
+            **prefill_payload.get('answers', {}),
+            **draft_payload.get('answers', {}),
+        },
     }
 
 
@@ -434,10 +531,15 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             if obj.editable and not obj.repeatable and not obj.closed:
                 return _response_as_draft_payload(existing)
             return None
+        recovery_prefill = _recovery_prefill_as_draft_payload(
+            obj,
+            request.user,
+            self.context.get('recovery_question_ids'),
+        )
         draft = SurveyDraft.objects.filter(survey=obj, user=request.user).first()
         if draft is not None:
-            return SurveyDraftSerializer(draft).data
-        return _recovery_prefill_as_draft_payload(obj, request.user)
+            return _merge_draft_with_prefill(SurveyDraftSerializer(draft).data, recovery_prefill)
+        return recovery_prefill
 
     def _point_lock(self, obj):
         request = self.context.get('request')
