@@ -655,7 +655,7 @@ test('buildReimbursementPreview applies reimbursement-specific deadline override
       slug: 'interview_signup',
       title_en: 'Interview signup',
       category_label: 'Manual activities',
-      draft_points: 150,
+      draft_points: 200,
     },
     {
       kind: 'manual',
