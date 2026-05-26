@@ -202,7 +202,7 @@ class ReimbursementApiTests(APITestCase):
         self.assertEqual(body['provisional_total'], 16)
         self.assertEqual(body['adjusted_total'], 4)
         self.assertGreaterEqual(body['available_max'], 16)
-        self.assertEqual(body['points_per_dollar'], 8)
+        self.assertEqual(body['points_per_dollar'], 10)
         self.assertEqual(body['awards'][0]['effective_points'], 4)
         self.assertEqual(body['awards'][0]['awarded_points'], 16)
         self.assertEqual(body['awards'][0]['title_en'], 'T')

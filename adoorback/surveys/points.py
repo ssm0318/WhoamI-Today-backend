@@ -311,6 +311,8 @@ def available_max_for_user(user) -> int:
 
 
 def pending_prereqs_for_user(user) -> list[dict]:
+    from surveys.tokens import build_token_map, substitute
+
     pending = []
     for scheduled in _visible_scheduled_surveys_for_points(user):
         survey = scheduled.survey
@@ -319,11 +321,12 @@ def pending_prereqs_for_user(user) -> list[dict]:
         lock = point_prereq_lock_for_user(survey, user)
         if lock is None:
             continue
+        tokens = build_token_map(survey, viewer=user)
         pending.append({
             'survey_slug': survey.slug,
             'scheduled_survey_id': scheduled.id,
-            'title_en': survey.title_en,
-            'title_ko': survey.title_ko,
+            'title_en': substitute(survey.title_en, tokens),
+            'title_ko': substitute(survey.title_ko, tokens),
             'potential_points': survey.point_value,
             'prereq_slug': lock['slug'],
             'prereq_title_en': lock['title_en'],
