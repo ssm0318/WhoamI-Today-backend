@@ -961,7 +961,7 @@
   friend_visible: false
   results_hidden: true
   repeatable: true
-  priority: 100
+  priority: 200
   point_value: 0
   questions:
   - order: 1

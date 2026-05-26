@@ -12,12 +12,13 @@ from typing import Any
 
 
 SIDEBAR_ORDER: dict[str, int] = {
-    'biweekly:6': 1,
-    'endpoint:4': 2,
-    'biweekly:2': 3,
-    'biweekly:3': 3,
-    'endpoint:2': 4,
-    'endpoint:3': 4,
+    'endpoint:2': 1,
+    'endpoint:3': 1,
+    'endpoint:22': 1,
+    'biweekly:6': 2,
+    'endpoint:4': 3,
+    'biweekly:2': 4,
+    'biweekly:3': 4,
 }
 
 

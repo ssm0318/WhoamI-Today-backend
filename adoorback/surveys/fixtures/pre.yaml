@@ -1718,7 +1718,7 @@ _wrapup_block: &wrapup_block
   friend_visible: false
   results_hidden: true
   editable: true
-  priority: 100
+  priority: 200
   point_value: 50
   tokens:
     phase_label: "Ver. W"
