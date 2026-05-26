@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
 const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
@@ -12,7 +12,11 @@ const PORT = Number(process.env.PORT || 4177);
 const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:3000';
 const PREVIEW_POINTS_PER_DOLLAR = Number(process.env.POINT_ALLOCATION_POINTS_PER_DOLLAR || 10);
 const DEFAULT_ANALYSIS_DB_NAME = 'whoamitoday_merged';
+const REIMBURSEMENT_PREVIEW_CACHE_TTL_MS = Number(
+  process.env.POINT_ALLOCATION_PREVIEW_CACHE_TTL_MS || 60_000,
+);
 const execFileAsync = promisify(execFile);
+const reimbursementPreviewCache = new Map();
 
 const INPUT_LESS_TYPES = new Set(['display_only']);
 const MCQ_TYPES = new Set(['single_choice', 'multi_choice', 'per_friend_single_choice']);
@@ -1307,6 +1311,60 @@ async function readReimbursementPreview(repoRoot, outputPath, requestedUserId) {
   });
 }
 
+async function fileMtimeMs(path) {
+  try {
+    return (await stat(path)).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+function normalizedRequestedUserId(requestedUserId) {
+  const parsed = Number.parseInt(requestedUserId, 10);
+  return Number.isFinite(parsed) ? String(parsed) : '';
+}
+
+async function reimbursementPreviewCacheKey(repoRoot, outputPath, requestedUserId) {
+  const outputMtimeMs = await fileMtimeMs(outputPath);
+  return JSON.stringify({
+    repoRoot: resolve(repoRoot),
+    outputPath: resolve(outputPath),
+    outputMtimeMs,
+    requestedUserId: normalizedRequestedUserId(requestedUserId),
+  });
+}
+
+async function readReimbursementPreviewCached(repoRoot, outputPath, requestedUserId) {
+  const key = await reimbursementPreviewCacheKey(repoRoot, outputPath, requestedUserId);
+  const now = Date.now();
+  const cached = reimbursementPreviewCache.get(key);
+  if (cached?.preview && now - cached.createdAt <= REIMBURSEMENT_PREVIEW_CACHE_TTL_MS) {
+    return cached.preview;
+  }
+  if (cached?.promise) return cached.promise;
+
+  const promise = readReimbursementPreview(repoRoot, outputPath, requestedUserId).then(
+    (preview) => {
+      reimbursementPreviewCache.clear();
+      reimbursementPreviewCache.set(key, {
+        createdAt: Date.now(),
+        preview,
+      });
+      return preview;
+    },
+    (error) => {
+      const current = reimbursementPreviewCache.get(key);
+      if (current?.promise === promise) reimbursementPreviewCache.delete(key);
+      throw error;
+    },
+  );
+  reimbursementPreviewCache.set(key, {
+    createdAt: now,
+    promise,
+  });
+  return promise;
+}
+
 async function readJsonBody(request) {
   const chunks = [];
   for await (const chunk of request) {
@@ -1381,7 +1439,7 @@ export function createPointAllocationServer({
       }
 
       if (request.method === 'GET' && url.pathname === '/api/reimbursement-preview') {
-        const preview = await readReimbursementPreview(
+        const preview = await readReimbursementPreviewCached(
           repoRoot,
           outputPath,
           url.searchParams.get('user_id'),
@@ -1398,6 +1456,7 @@ export function createPointAllocationServer({
       if (request.method === 'POST' && url.pathname === '/api/allocation') {
         const body = await readJsonBody(request);
         const allocation = await writeAllocationFile(outputPath, body.sources);
+        reimbursementPreviewCache.clear();
         sendJson(response, 200, {
           ok: true,
           output_path: outputPath,
