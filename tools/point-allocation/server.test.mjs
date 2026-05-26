@@ -15,6 +15,8 @@ test('readPointSources lists survey YAML and manual reimbursement sources', asyn
     [
       'WIT_BOT_AUDIT_PHASE_1_MAX_POINTS = 10',
       'WIT_BOT_AUDIT_PHASE_2_MAX_POINTS = 12',
+      'APP_USAGE_PHASE_1_FULL_POINTS = 50',
+      'APP_USAGE_PHASE_2_FULL_POINTS = 50',
       'INTERVIEW_SIGNUP_MAX_POINTS = 5',
       'FRIEND_INVITE_MAX_POINTS = 500',
       '',
@@ -65,6 +67,8 @@ test('readPointSources lists survey YAML and manual reimbursement sources', asyn
       ['survey', 'no_points', 'No points yet', 0],
       ['manual', 'wit_bot_audit_phase_1', 'Wit_bot audit pass - Phase 1', 10],
       ['manual', 'wit_bot_audit_phase_2', 'Wit_bot audit pass - Phase 2', 12],
+      ['manual', 'app_usage_phase_1', 'App usage - Phase 1', 50],
+      ['manual', 'app_usage_phase_2', 'App usage - Phase 2', 50],
       ['manual', 'interview_signup', 'Interview signup', 5],
       ['manual', 'friend_invite', 'Friend invite reimbursement', 500],
     ],

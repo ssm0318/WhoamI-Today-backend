@@ -5,7 +5,11 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from account.models import FriendEvaluation, FriendRequest
+from check_in.models import CheckInPost
+from note.models import Note
 from surveys._test_helpers import make_likert_survey, make_user
+from surveys.app_usage import app_usage_metrics_for_user, sync_app_usage_award_for_user
 from surveys.models import (
     CADENCE_DAILY, CADENCE_WEEKLY, PointAward, ScheduledSurvey, Survey,
     SurveyResponse,
@@ -235,6 +239,24 @@ class SurveyPointStateSerializerTests(APITestCase):
 
 
 class PointManualCreditCommandTests(TestCase):
+    def _set_created_at(self, obj, day):
+        moment = datetime.datetime.combine(
+            day,
+            datetime.time(hour=12),
+            tzinfo=datetime.timezone.utc,
+        )
+        obj.__class__.objects.filter(pk=obj.pk).update(created_at=moment, updated_at=moment)
+
+    def _note_on(self, user, day):
+        note = Note.objects.create(author=user, content=f'note {day.isoformat()}')
+        self._set_created_at(note, day)
+        return note
+
+    def _checkin_post_on(self, user, day):
+        post = CheckInPost.objects.create(author=user, caption=f'post {day.isoformat()}')
+        self._set_created_at(post, day)
+        return post
+
     def test_credit_wit_bot_audit_credits_each_phase_separately(self):
         viewer = make_user('viewer')
         viewer.user_group = 'group_w_first'
@@ -283,4 +305,83 @@ class PointManualCreditCommandTests(TestCase):
     def test_available_max_counts_both_wit_bot_audit_phases(self):
         viewer = make_user('viewer')
 
-        self.assertEqual(available_max_for_user(viewer), 30)
+        self.assertEqual(available_max_for_user(viewer), 130)
+
+    def test_app_usage_full_credit_requires_first_four_and_later_activity(self):
+        viewer = make_user('app_full')
+        for day in [
+            datetime.date(2026, 5, 4),
+            datetime.date(2026, 5, 5),
+            datetime.date(2026, 5, 6),
+            datetime.date(2026, 5, 7),
+            datetime.date(2026, 5, 8),
+            datetime.date(2026, 5, 10),
+        ]:
+            self._note_on(viewer, day)
+
+        award, metrics, status = sync_app_usage_award_for_user(viewer, 1)
+
+        self.assertEqual(metrics.points, 50)
+        self.assertEqual(status, 'created')
+        self.assertEqual(award.source_kind, 'app_usage')
+        self.assertEqual(award.source_slug, 'app_usage_phase_1')
+        self.assertEqual(award.awarded_points, 50)
+
+    def test_app_usage_partial_credit_requires_core_app_use(self):
+        viewer = make_user('app_partial')
+        self._checkin_post_on(viewer, datetime.date(2026, 5, 4))
+        self._checkin_post_on(viewer, datetime.date(2026, 5, 8))
+
+        metrics = app_usage_metrics_for_user(viewer, 1)
+
+        self.assertEqual(metrics.points, 20)
+
+    def test_app_usage_does_not_credit_friend_setup_only(self):
+        viewer = make_user('friend_only')
+        other = make_user('friend_other')
+        request = FriendRequest.objects.create(requester=viewer, requestee=other, accepted=True)
+        self._set_created_at(request, datetime.date(2026, 5, 4))
+        FriendRequest.objects.filter(pk=request.pk).update(
+            updated_at=datetime.datetime(
+                2026, 5, 8, 12, tzinfo=datetime.timezone.utc,
+            ),
+        )
+        evaluation = FriendEvaluation.objects.create(
+            evaluator=viewer,
+            evaluated_user=other,
+            friend_request=request,
+            closeness=3,
+        )
+        self._set_created_at(evaluation, datetime.date(2026, 5, 8))
+
+        award, metrics, status = sync_app_usage_award_for_user(viewer, 1)
+
+        self.assertEqual(metrics.active_days, 2)
+        self.assertEqual(metrics.core_event_count, 0)
+        self.assertEqual(metrics.points, 0)
+        self.assertIsNone(award)
+        self.assertEqual(status, 'skipped')
+
+    def test_app_usage_credit_upgrades_partial_to_full(self):
+        viewer = make_user('app_upgrade')
+        self._note_on(viewer, datetime.date(2026, 5, 4))
+        self._note_on(viewer, datetime.date(2026, 5, 8))
+
+        award, _metrics, status = sync_app_usage_award_for_user(viewer, 1)
+        self.assertEqual(status, 'created')
+        self.assertEqual(award.awarded_points, 20)
+
+        for day in [
+            datetime.date(2026, 5, 5),
+            datetime.date(2026, 5, 6),
+            datetime.date(2026, 5, 7),
+            datetime.date(2026, 5, 10),
+        ]:
+            self._note_on(viewer, day)
+
+        award, metrics, status = sync_app_usage_award_for_user(viewer, 1)
+
+        self.assertEqual(metrics.points, 50)
+        self.assertEqual(status, 'upgraded')
+        award.refresh_from_db()
+        self.assertEqual(award.awarded_points, 50)

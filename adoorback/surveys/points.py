@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from surveys.models import PointAward, ScheduledSurvey, Survey, SurveyResponse
 from surveys.reimbursement_config import (
-    INTERVIEW_SIGNUP_MAX_POINTS, POINTS_PER_DOLLAR, WIT_BOT_AUDIT_PHASES,
+    APP_USAGE_PHASES, INTERVIEW_SIGNUP_MAX_POINTS, POINTS_PER_DOLLAR,
+    WIT_BOT_AUDIT_PHASES,
 )
 from surveys.retired import is_retired_survey_slug
 from surveys.scheduling import (
@@ -129,6 +130,20 @@ def wit_bot_audit_phase_for_source_slug(source_slug: str) -> int | None:
     return None
 
 
+def app_usage_source_for_phase(phase: int) -> dict:
+    try:
+        return APP_USAGE_PHASES[phase]
+    except KeyError as exc:
+        raise ValueError(f'Unsupported app usage phase: {phase}') from exc
+
+
+def app_usage_phase_for_source_slug(source_slug: str) -> int | None:
+    for phase, source in APP_USAGE_PHASES.items():
+        if source['source_slug'] == source_slug:
+            return phase
+    return None
+
+
 def _version_label(version: str) -> str:
     if version == 'version_q':
         return 'Ver.Q'
@@ -166,6 +181,12 @@ def serialize_reimbursement_award(award: PointAward) -> dict:
     elif award.source_kind == PointAward.SOURCE_WIT_BOT_AUDIT:
         title_en = _wit_bot_audit_title(award, 'en')
         title_ko = _wit_bot_audit_title(award, 'ko')
+    elif award.source_kind == PointAward.SOURCE_APP_USAGE:
+        phase = app_usage_phase_for_source_slug(award.source_slug)
+        if phase is not None:
+            source = app_usage_source_for_phase(phase)
+            title_en = source['title_en']
+            title_ko = source['title_ko']
     elif award.source_kind == PointAward.SOURCE_INTERVIEW_SIGNUP:
         title_en = 'Interview signup'
         title_ko = 'Interview signup'
@@ -282,6 +303,7 @@ def _visible_scheduled_surveys_for_points(user):
 
 def available_max_for_user(user) -> int:
     total = sum(source['max_points'] for source in WIT_BOT_AUDIT_PHASES.values())
+    total += sum(source['max_points'] for source in APP_USAGE_PHASES.values())
     total += INTERVIEW_SIGNUP_MAX_POINTS
     for scheduled in _visible_scheduled_surveys_for_points(user):
         total += scheduled.survey.point_value
