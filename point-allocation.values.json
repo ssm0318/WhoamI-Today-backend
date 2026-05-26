@@ -1,0 +1,506 @@
+{
+  "version": 1,
+  "saved_at": "2026-05-26T00:50:07.872Z",
+  "sources": [
+    {
+      "kind": "survey",
+      "slug": "phase1_friend_closeness",
+      "points": 15,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "phase2_friend_closeness",
+      "points": 25,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "daily_base",
+      "points": 3,
+      "priority_rating": 5,
+      "cap_group": "daily_diary",
+      "cap_points": 30,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "study_endpoint",
+      "points": 0,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "habit_platform",
+      "points": 3,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "mid_study_w",
+      "points": 40,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "goal_comparison_p1",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "mid_study_q",
+      "points": 45,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "goal_comparison_p1",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "post_study_w",
+      "points": 40,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "post_study_q",
+      "points": 45,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "feature_eval_w",
+      "points": 50,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "goal_comparison_p1",
+      "points": 5,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "goal_comparison_p2",
+      "points": 5,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "study_endpoint_part2",
+      "points": 20,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "study_endpoint",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "phase1_reflection_part3_w",
+      "points": 5,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "mid_study_w",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "phase1_reflection_part3_q",
+      "points": 10,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "mid_study_q",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "phase2_reflection_part3_w",
+      "points": 5,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "phase2_reflection_part3_q",
+      "points": 5,
+      "priority_rating": 2,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "feature_eval_w_part2",
+      "points": 50,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "phase1_friend_closeness_part2",
+      "points": 15,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d02_rsds",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d03_iscs_bond",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d04_iscs_bridge",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d05_rsq",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d08_singelis_ind",
+      "points": 10,
+      "priority_rating": 4,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d09_singelis_int",
+      "points": 10,
+      "priority_rating": 4,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d10_woodAS",
+      "points": 10,
+      "priority_rating": 4,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d11_ucla8",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d12_ntb",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d15_shi",
+      "points": 10,
+      "priority_rating": 4,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d16_hexaco_hh",
+      "points": 10,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d17_hexaco_em",
+      "points": 10,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d18_hexaco_ex",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d19_hexaco_ag",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d22_hexaco_co",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d23_hexaco_op",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d01_honeymoon",
+      "points": 10,
+      "priority_rating": 3,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d24_ceii",
+      "points": 10,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d25_iuipc",
+      "points": 10,
+      "priority_rating": 4,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "sotd_d26_transition",
+      "points": 10,
+      "priority_rating": 4,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "week1_reflection",
+      "points": 5,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "week2_reflection",
+      "points": 5,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "week3_reflection",
+      "points": 5,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "week4_reflection",
+      "points": 5,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "survey",
+      "slug": "anytime_reflection",
+      "points": 3,
+      "priority_rating": 5,
+      "cap_group": "daily_diary",
+      "cap_points": 30,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "manual",
+      "slug": "wit_bot_audit_phase_1",
+      "points": 50,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "manual",
+      "slug": "wit_bot_audit_phase_2",
+      "points": 50,
+      "priority_rating": 1,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "manual",
+      "slug": "app_usage_phase_1",
+      "points": 50,
+      "priority_rating": 0,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "manual",
+      "slug": "app_usage_phase_2",
+      "points": 50,
+      "priority_rating": 0,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "manual",
+      "slug": "interview_signup",
+      "points": 150,
+      "priority_rating": 5,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    },
+    {
+      "kind": "manual",
+      "slug": "friend_invite",
+      "points": 500,
+      "priority_rating": 0,
+      "cap_group": "",
+      "cap_points": null,
+      "gate_slug": "",
+      "late_percent": 100
+    }
+  ]
+}
