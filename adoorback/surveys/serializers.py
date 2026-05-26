@@ -649,6 +649,9 @@ class PastSurveySerializer(serializers.ModelSerializer):
         ).data
 
     def get_user_answered(self, obj):
+        answered_scheduled_ids = self.context.get('answered_scheduled_ids')
+        if answered_scheduled_ids is not None:
+            return obj.id in answered_scheduled_ids
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False

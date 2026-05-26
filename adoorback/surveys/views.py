@@ -1,5 +1,7 @@
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+
 from django.db import IntegrityError, transaction
-from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -15,7 +17,8 @@ from surveys.aggregation import (
 )
 from surveys.models import (
     CADENCE_DAILY, INPUT_LESS_TYPES, PER_FRIEND_TYPES, ScheduledSurvey, Survey,
-    SurveyAnswer, SurveyDraft, SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
+    PointAward, SurveyAnswer, SurveyDraft, SurveyQuestion, SurveyResponse,
+    UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.points import (
@@ -32,6 +35,9 @@ from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyDraftSerializer,
     SurveyIndexEntrySerializer, SurveyResponseInputSerializer, validate_answer_value,
 )
+
+DAILY_ARCHIVE_SURVEY_SLUG = 'daily_base'
+LA_TZ = ZoneInfo('America/Los_Angeles')
 
 
 def _persist_embedded_data(user, response: SurveyResponse) -> None:
@@ -481,36 +487,65 @@ class SurveyResultsView(APIView):
 
 
 class PastSurveysView(APIView):
-    """Daily-only archive of past dailies.
+    """Answered Today on WIT archive.
 
-    Includes:
-      - rows the user has answered (any allow_late) → results page
-      - unanswered rows with allow_late=True → still submittable from the
-        archive's "Answer to view results" chip
-
-    Excludes unanswered rows with allow_late=False (real-study missed dailies):
-    they can no longer be submitted and have no results to view, matching the
-    "expired hidden" semantics in the bucketed index.
+    This endpoint backs the grouped "Today on WIT" row in the survey index.
+    It intentionally excludes SOTD-style daily surveys and unanswered/missed
+    rows; those are separate surveys, not part of the completed daily diary
+    results archive.
     """
     permission_classes = [IsAuthenticated]
 
+    def _answered_daily_base_schedule_ids(self, user):
+        awarded_ids = set(
+            PointAward.objects.filter(
+                user=user,
+                source_kind=PointAward.SOURCE_SURVEY,
+                scheduled_survey__survey__slug=DAILY_ARCHIVE_SURVEY_SLUG,
+            ).values_list('scheduled_survey_id', flat=True)
+        )
+
+        response_dates = {
+            (submitted_at.astimezone(LA_TZ) - timedelta(hours=7)).date()
+            for submitted_at in SurveyResponse.objects.filter(
+                user=user,
+                survey__slug=DAILY_ARCHIVE_SURVEY_SLUG,
+            ).values_list('submitted_at', flat=True)
+        }
+        fallback_ids = set()
+        if response_dates:
+            fallback_ids = set(
+                ScheduledSurvey.objects.filter(
+                    cadence=CADENCE_DAILY,
+                    survey__slug=DAILY_ARCHIVE_SURVEY_SLUG,
+                    window_start__in=response_dates,
+                ).values_list('id', flat=True)
+            )
+        return awarded_ids | fallback_ids
+
     def get(self, request):
         today = _today_la_7am()
-        answered_survey_ids = list(
-            SurveyResponse.objects.filter(user=request.user).values_list('survey_id', flat=True)
-        )
+        answered_scheduled_ids = self._answered_daily_base_schedule_ids(request.user)
         qs = (
             ScheduledSurvey.objects
             .filter(
                 cadence=CADENCE_DAILY,
+                survey__slug=DAILY_ARCHIVE_SURVEY_SLUG,
                 survey__results_hidden=False,
                 window_start__lte=today,
+                id__in=answered_scheduled_ids,
             )
-            .filter(Q(survey_id__in=answered_survey_ids) | Q(allow_late=True))
             .select_related('survey')
             .order_by('-window_start')
         )
-        ser = PastSurveySerializer(qs, many=True, context={'request': request})
+        ser = PastSurveySerializer(
+            qs,
+            many=True,
+            context={
+                'request': request,
+                'answered_scheduled_ids': answered_scheduled_ids,
+            },
+        )
         return Response({'results': ser.data})
 
 
