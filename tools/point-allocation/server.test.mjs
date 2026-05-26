@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { readPointSources, writeAllocationFile } from './server.mjs';
+import { buildReimbursementPreview, readPointSources, writeAllocationFile } from './server.mjs';
 
 test('readPointSources lists survey YAML and manual reimbursement sources', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'point-allocation-'));
@@ -403,6 +403,355 @@ test('writeAllocationFile persists point inputs and reimbursement policy control
     late_percent: 100,
   });
   assert.match(saved.saved_at, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('buildReimbursementPreview applies merged DB responses, gates, and recurring caps', () => {
+  const preview = buildReimbursementPreview({
+    sources: [
+      {
+        kind: 'survey',
+        id: 'survey:daily_base',
+        slug: 'daily_base',
+        title_en: 'Daily diary',
+        category_label: 'Daily diary',
+        draft_points: 3,
+        draft_priority_rating: 1,
+        draft_cap_group: 'daily',
+        draft_cap_points: 30,
+        draft_gate_slug: '',
+        draft_late_percent: 100,
+      },
+      {
+        kind: 'survey',
+        id: 'survey:feature_eval_w',
+        slug: 'feature_eval_w',
+        title_en: 'W feature evaluation',
+        category_label: 'Phase / feature surveys',
+        draft_points: 50,
+        draft_priority_rating: 2,
+        draft_cap_group: '',
+        draft_cap_points: null,
+        draft_gate_slug: 'goal_comparison_p1',
+        draft_late_percent: 100,
+      },
+      {
+        kind: 'survey',
+        id: 'survey:goal_comparison_p1',
+        slug: 'goal_comparison_p1',
+        title_en: 'Goal comparison',
+        category_label: 'Phase / feature surveys',
+        draft_points: 10,
+        draft_cap_group: '',
+        draft_cap_points: null,
+        draft_gate_slug: '',
+        draft_late_percent: 50,
+      },
+      {
+        kind: 'manual',
+        id: 'manual:wit_bot_audit_phase_1',
+        slug: 'wit_bot_audit_phase_1',
+        title_en: 'Wit_bot audit pass - Phase 1',
+        category_label: 'Manual activities',
+        draft_points: 20,
+        draft_cap_group: '',
+        draft_cap_points: null,
+        draft_gate_slug: '',
+        draft_late_percent: 100,
+      },
+    ],
+    participants: [
+      { id: 8, username: 'participant_8', userGroup: 'group_w_first' },
+      { id: 9, username: 'participant_9', userGroup: 'group_q_first' },
+    ],
+    responseCounts: new Map([
+      [8, new Map([['daily_base', 12], ['feature_eval_w', 1]])],
+      [9, new Map([['daily_base', 2], ['goal_comparison_p1', 1]])],
+    ]),
+    pointAwardCounts: new Map([[8, new Map([['wit_bot_audit_phase_1', 1]])]]),
+    requestedUserId: 8,
+  });
+
+  assert.equal(preview.db.name, 'whoamitoday_merged');
+  assert.equal(preview.selectedUser.id, 8);
+  assert.equal(preview.availableMax, 110);
+  assert.equal(preview.earnedPoints, 50);
+  assert.equal(preview.estimatedDollars, '5.00');
+  assert.equal(preview.capRules[0].group, 'daily');
+  assert.equal(preview.capRules[0].earnedPoints, 30);
+  assert.equal(preview.gateRules[0].slug, 'feature_eval_w');
+
+  const daily = preview.rows.find((row) => row.slug === 'daily_base');
+  assert.equal(daily.completedCount, 12);
+  assert.equal(daily.points, 30);
+  assert.equal(daily.priorityRating, 1);
+  assert.equal(daily.status, 'earned');
+
+  const gated = preview.rows.find((row) => row.slug === 'feature_eval_w');
+  assert.equal(gated.completedCount, 1);
+  assert.equal(gated.points, 0);
+  assert.equal(gated.priorityRating, 2);
+  assert.equal(gated.status, 'locked');
+  assert.match(gated.note, /goal_comparison_p1/);
+
+  const manual = preview.rows.find((row) => row.slug === 'wit_bot_audit_phase_1');
+  assert.equal(manual.completedCount, 1);
+  assert.equal(manual.points, 20);
+  assert.equal(manual.status, 'earned');
+});
+
+test('buildReimbursementPreview filters versioned surveys to the selected participant route', () => {
+  const preview = buildReimbursementPreview({
+    sources: [
+      {
+        kind: 'survey',
+        id: 'survey:mid_study_w',
+        slug: 'mid_study_w',
+        title_en: 'Mid study W',
+        category_label: 'Phase / feature surveys',
+        draft_points: 30,
+      },
+      {
+        kind: 'survey',
+        id: 'survey:mid_study_q',
+        slug: 'mid_study_q',
+        title_en: 'Mid study Q',
+        category_label: 'Phase / feature surveys',
+        draft_points: 35,
+      },
+      {
+        kind: 'survey',
+        id: 'survey:feature_eval_w',
+        slug: 'feature_eval_w',
+        title_en: 'Feature eval W',
+        category_label: 'Phase / feature surveys',
+        draft_points: 50,
+      },
+    ],
+    participants: [{ id: 9, username: 'participant_9', userGroup: 'group_q_first' }],
+    responseCounts: new Map([[9, new Map([['mid_study_q', 1], ['feature_eval_w', 1]])]]),
+    sourceRoutings: new Map([['feature_eval_w', new Set(['group_q_first'])]]),
+    requestedUserId: 9,
+  });
+
+  assert.deepEqual(
+    preview.rows.map((row) => row.slug),
+    ['mid_study_q', 'feature_eval_w'],
+  );
+  assert.equal(preview.availableMax, 85);
+  assert.equal(preview.earnedPoints, 85);
+});
+
+test('buildReimbursementPreview marks answerable and expired survey actions', () => {
+  const preview = buildReimbursementPreview({
+    sources: [
+      {
+        kind: 'survey',
+        id: 'survey:open_survey',
+        slug: 'open_survey',
+        title_en: 'Open survey',
+        category_label: 'Survey',
+        draft_points: 10,
+        app_url: 'http://localhost:3000/surveys/open_survey/answer',
+      },
+      {
+        kind: 'survey',
+        id: 'survey:expired_survey',
+        slug: 'expired_survey',
+        title_en: 'Expired survey',
+        category_label: 'Survey',
+        draft_points: 12,
+        app_url: 'http://localhost:3000/surveys/expired_survey/answer',
+      },
+      {
+        kind: 'survey',
+        id: 'survey:future_survey',
+        slug: 'future_survey',
+        title_en: 'Future survey',
+        category_label: 'Survey',
+        draft_points: 15,
+        app_url: 'http://localhost:3000/surveys/future_survey/answer',
+      },
+      {
+        kind: 'manual',
+        id: 'manual:wit_bot_audit_phase_1',
+        slug: 'wit_bot_audit_phase_1',
+        title_en: 'Wit_bot audit pass - Phase 1',
+        category_label: 'Manual activities',
+        draft_points: 20,
+      },
+    ],
+    participants: [{ id: 8, username: 'participant_8', userGroup: 'group_w_first' }],
+    responseCounts: new Map([[8, new Map()]]),
+    sourceSchedules: new Map([
+      [
+        'open_survey',
+        [
+          {
+            targetUserGroup: 'group_w_first',
+            windowStart: '2026-05-01',
+            windowEnd: '2026-05-30',
+            allowLate: false,
+          },
+        ],
+      ],
+      [
+        'expired_survey',
+        [
+          {
+            targetUserGroup: 'group_w_first',
+            windowStart: '2026-05-01',
+            windowEnd: '2026-05-10',
+            allowLate: false,
+          },
+        ],
+      ],
+      [
+        'future_survey',
+        [
+          {
+            targetUserGroup: 'group_w_first',
+            windowStart: '2026-06-01',
+            windowEnd: '2026-06-10',
+            allowLate: false,
+          },
+        ],
+      ],
+    ]),
+    requestedUserId: 8,
+    currentDate: '2026-05-25',
+  });
+
+  const open = preview.rows.find((row) => row.slug === 'open_survey');
+  assert.equal(open.appUrl, 'http://localhost:3000/surveys/open_survey/answer');
+  assert.equal(open.canEarn, true);
+
+  const expired = preview.rows.find((row) => row.slug === 'expired_survey');
+  assert.equal(expired.appUrl, 'http://localhost:3000/surveys/expired_survey/answer');
+  assert.equal(expired.canEarn, false);
+  assert.equal(expired.availability, 'deadline');
+  assert.match(expired.note, /deadline/i);
+
+  const future = preview.rows.find((row) => row.slug === 'future_survey');
+  assert.equal(future.canEarn, false);
+  assert.equal(future.availability, 'future');
+  assert.match(future.note, /not available yet/i);
+
+  const witBot = preview.rows.find((row) => row.slug === 'wit_bot_audit_phase_1');
+  assert.equal(witBot.appUrl, '/users/7/chat');
+  assert.equal(witBot.canEarn, false);
+  assert.equal(witBot.availability, 'deadline');
+  assert.match(witBot.note, /deadline/i);
+});
+
+test('buildReimbursementPreview applies reimbursement-specific deadline overrides', () => {
+  const baseSources = [
+    {
+      kind: 'manual',
+      id: 'manual:interview_signup',
+      slug: 'interview_signup',
+      title_en: 'Interview signup',
+      category_label: 'Manual activities',
+      draft_points: 150,
+    },
+    {
+      kind: 'manual',
+      id: 'manual:friend_invite',
+      slug: 'friend_invite',
+      title_en: 'Friend invite reimbursement',
+      category_label: 'Manual activities',
+      draft_points: 500,
+    },
+    {
+      kind: 'survey',
+      id: 'survey:feature_eval_w',
+      slug: 'feature_eval_w',
+      title_en: 'Ver. W features',
+      category_label: 'Survey',
+      draft_points: 20,
+      draft_late_percent: 50,
+      app_url: 'http://localhost:3000/surveys/feature_eval_w/answer',
+    },
+  ];
+  const sourceSchedules = new Map([
+    [
+      'feature_eval_w',
+      [
+        {
+          targetUserGroup: 'group_w_first',
+          windowStart: '2026-05-08',
+          windowEnd: '2026-05-24',
+          allowLate: true,
+        },
+        {
+          targetUserGroup: 'group_q_first',
+          windowStart: '2026-05-22',
+          windowEnd: '2026-05-24',
+          allowLate: true,
+        },
+      ],
+    ],
+  ]);
+
+  const qFirstPreview = buildReimbursementPreview({
+    sources: baseSources,
+    participants: [{ id: 9, username: 'q_first', userGroup: 'group_q_first' }],
+    responseCounts: new Map([[9, new Map()]]),
+    sourceRoutings: new Map([['feature_eval_w', new Set(['group_w_first', 'group_q_first'])]]),
+    sourceSchedules,
+    requestedUserId: 9,
+    currentDate: '2026-05-25',
+  });
+
+  assert.equal(qFirstPreview.rows.find((row) => row.slug === 'interview_signup').canEarn, false);
+  assert.equal(
+    qFirstPreview.rows.find((row) => row.slug === 'interview_signup').availability,
+    'future',
+  );
+  assert.match(qFirstPreview.rows.find((row) => row.slug === 'interview_signup').note, /not available yet/i);
+  assert.equal(qFirstPreview.rows.find((row) => row.slug === 'friend_invite').canEarn, false);
+  assert.equal(
+    qFirstPreview.rows.find((row) => row.slug === 'friend_invite').availability,
+    'deadline',
+  );
+  assert.equal(qFirstPreview.rows.find((row) => row.slug === 'feature_eval_w').canEarn, true);
+  assert.equal(
+    qFirstPreview.rows.find((row) => row.slug === 'feature_eval_w').availability,
+    'late',
+  );
+  assert.equal(qFirstPreview.rows.find((row) => row.slug === 'feature_eval_w').currentPossiblePoints, 10);
+  assert.match(qFirstPreview.rows.find((row) => row.slug === 'feature_eval_w').note, /late/i);
+
+  const afterOpenPreview = buildReimbursementPreview({
+    sources: baseSources,
+    participants: [{ id: 9, username: 'q_first', userGroup: 'group_q_first' }],
+    responseCounts: new Map([[9, new Map()]]),
+    sourceRoutings: new Map([['feature_eval_w', new Set(['group_w_first', 'group_q_first'])]]),
+    sourceSchedules,
+    requestedUserId: 9,
+    currentDate: '2026-06-01',
+  });
+  assert.equal(afterOpenPreview.rows.find((row) => row.slug === 'interview_signup').canEarn, true);
+  assert.equal(
+    afterOpenPreview.rows.find((row) => row.slug === 'interview_signup').availability,
+    'available',
+  );
+
+  const wFirstPreview = buildReimbursementPreview({
+    sources: baseSources,
+    participants: [{ id: 8, username: 'w_first', userGroup: 'group_w_first' }],
+    responseCounts: new Map([[8, new Map()]]),
+    sourceRoutings: new Map([['feature_eval_w', new Set(['group_w_first', 'group_q_first'])]]),
+    sourceSchedules,
+    requestedUserId: 8,
+    currentDate: '2026-05-25',
+  });
+
+  assert.equal(wFirstPreview.rows.find((row) => row.slug === 'feature_eval_w').canEarn, true);
+  assert.equal(
+    wFirstPreview.rows.find((row) => row.slug === 'feature_eval_w').availability,
+    'available',
+  );
+  assert.equal(wFirstPreview.rows.find((row) => row.slug === 'feature_eval_w').currentPossiblePoints, 20);
 });
 
 test('app table header is not offset into body rows', async () => {
