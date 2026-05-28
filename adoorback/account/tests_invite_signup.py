@@ -107,3 +107,86 @@ class InviteOnlySignupTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Note.objects.filter(author=new_user).exists())
+
+
+class CaseInsensitiveSignupTests(APITestCase):
+    """Regression for the bug where capitalizing the first letter of an email
+    let the same person create a second account. Email AND username uniqueness
+    must be case-insensitive across the precheck endpoints, the final signup
+    endpoint, and the login lookup."""
+
+    def setUp(self):
+        self.existing = User.objects.create_user(
+            username='existing_user',
+            email='existing@example.com',
+            password='password123',
+            current_ver='version_q',
+            user_group='group_q_first',
+        )
+        self.inviter = User.objects.create_user(
+            username='inviter',
+            email='inviter@example.com',
+            password='password123',
+            current_ver='version_q',
+            user_group='group_q_first',
+        )
+
+    def test_email_precheck_rejects_case_variant(self):
+        # Precheck endpoints map the unique-code ValidationError to the
+        # project's ExistingEmail exception, which returns 406 Not Acceptable
+        # (see adoorback/utils/exceptions.py).
+        response = self.client.post('/api/user/signup/email/', {'email': 'EXISTING@example.com'})
+        self.assertEqual(response.status_code, status.HTTP_406_NOT_ACCEPTABLE)
+
+    def test_username_precheck_rejects_case_variant(self):
+        response = self.client.post('/api/user/signup/username/', {'username': 'Existing_User'})
+        self.assertEqual(response.status_code, status.HTTP_406_NOT_ACCEPTABLE)
+
+    def test_signup_rejects_case_variant_of_existing_email(self):
+        payload = {
+            'email': 'Existing@example.com',
+            'username': 'someone_new',
+            'password': 'password123',
+            'inviter_id': self.inviter.id,
+        }
+        response = self.client.post('/api/user/signup/', payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # No second account got created
+        self.assertEqual(User.objects.filter(email__iexact='existing@example.com').count(), 1)
+
+    def test_signup_rejects_case_variant_of_existing_username(self):
+        payload = {
+            'email': 'brand_new@example.com',
+            'username': 'EXISTING_USER',
+            'password': 'password123',
+            'inviter_id': self.inviter.id,
+        }
+        response = self.client.post('/api/user/signup/', payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(User.objects.filter(username__iexact='existing_user').count(), 1)
+
+    def test_signup_normalizes_email_and_username_to_lowercase(self):
+        payload = {
+            'email': 'NewPerson@Example.Com',
+            'username': 'NewPerson',
+            'password': 'password123',
+            'inviter_id': self.inviter.id,
+        }
+        response = self.client.post('/api/user/signup/', payload)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = User.objects.get(email='newperson@example.com')
+        self.assertEqual(created.username, 'newperson')
+
+    def test_login_accepts_case_variant_of_stored_email(self):
+        response = self.client.post('/api/user/login/', {
+            'username': 'EXISTING@example.com',
+            'password': 'password123',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_login_accepts_case_variant_of_stored_username(self):
+        response = self.client.post('/api/user/login/', {
+            'username': 'Existing_User',
+            'password': 'password123',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

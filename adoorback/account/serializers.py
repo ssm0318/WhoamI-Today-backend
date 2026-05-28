@@ -319,6 +319,31 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
 class CurrentUserSignupSerializer(CurrentUserSerializer):
     inviter_id = serializers.IntegerField(write_only=True, required=True, allow_null=False)
 
+    def validate_email(self, value):
+        # Defense in depth — even if the frontend skips the /signup/email/
+        # precheck, the actual signup endpoint must still reject
+        # case-insensitive duplicates and persist the canonical lowercase form.
+        qs = User.objects.filter(email__iexact=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'user with this email address already exists.',
+                code='unique',
+            )
+        return value.lower()
+
+    def validate_username(self, value):
+        qs = User.objects.filter(username__iexact=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'A user with that username already exists.',
+                code='unique',
+            )
+        return value.lower()
+
     def validate(self, attrs):
         # inviter_id is not a User model field; pull it out before parent validate
         # (parent validate constructs User(**attrs) for password validation).
@@ -406,11 +431,42 @@ class UserEmailSerializer(serializers.ModelSerializer):
         model = User
         fields = ['email']
 
+    def validate_email(self, value):
+        # Case-insensitive duplicate detection. The default UniqueValidator
+        # (auto-generated from email's unique=True) does a case-sensitive DB
+        # compare, which is what let `Jane@gmail.com` and `jane@gmail.com`
+        # register as different accounts. Raise with code='unique' so the
+        # view's error handler maps this to ExistingEmail.
+        qs = User.objects.filter(email__iexact=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'user with this email address already exists.',
+                code='unique',
+            )
+        # Normalize to lowercase so any consumer that persists this value
+        # (CurrentUserSignupSerializer.create) stores the canonical form.
+        return value.lower()
+
 
 class UserUsernameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username']
+
+    def validate_username(self, value):
+        # Same rationale as email: the username UniqueConstraint is
+        # case-sensitive, so case-only variants collided as separate accounts.
+        qs = User.objects.filter(username__iexact=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'A user with that username already exists.',
+                code='unique',
+            )
+        return value.lower()
 
 
 class UserBirthDateSerializer(serializers.ModelSerializer):

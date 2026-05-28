@@ -248,7 +248,12 @@ class UserLogin(APIView):
         username = data.get('username', None)
         password = data.get('password', None)
         try:
-            user = User.objects.get(Q(username=username) | Q(email=username))
+            # __iexact so that pre-fix legacy users (stored with mixed-case
+            # emails/usernames) can still sign in regardless of the case the
+            # user types, and so new lowercase-normalized accounts match too.
+            user = User.objects.get(
+                Q(username__iexact=username) | Q(email__iexact=username)
+            )
         except:
             raise NoUsername()
 
