@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from account.models import FriendEvaluation, FriendRequest
 from check_in.models import CheckInPost
+from chat.models import WitBotConversationState
 from note.models import Note
 from surveys._test_helpers import make_likert_survey, make_user
 from surveys.app_usage import app_usage_metrics_for_user, sync_app_usage_award_for_user
@@ -302,10 +303,84 @@ class PointManualCreditCommandTests(TestCase):
         self.assertIn('Wit_bot audit pass - Phase 1 (Ver.Q)', titles)
         self.assertIn('Wit_bot audit pass - Phase 2 (Ver.W)', titles)
 
+    def test_reimbursement_state_computes_wit_bot_audit_credit_from_saved_phase_state(self):
+        viewer = make_user('viewer')
+        viewer.user_group = 'group_q_first'
+        viewer.save(update_fields=['user_group'])
+        WitBotConversationState.objects.create(
+            user=viewer,
+            context={
+                'version_q': {'audit': {'last_missing_count': 0}},
+                'version_w': {'audit': {'last_missing_count': 2}},
+            },
+        )
+
+        state = reimbursement_state_for_user(viewer)
+        awards = [
+            award for award in state['awards']
+            if award['source_kind'] == 'wit_bot_audit'
+        ]
+
+        self.assertEqual(state['provisional_total'], 10)
+        self.assertEqual(state['adjusted_total'], 10)
+        self.assertEqual(len(awards), 1)
+        self.assertEqual(awards[0]['source_slug'], 'wit_bot_audit_phase_1')
+        self.assertEqual(awards[0]['title_en'], 'Wit_bot audit pass - Phase 1 (Ver.Q)')
+        self.assertEqual(awards[0]['awarded_points'], 10)
+
+    def test_reimbursement_state_maps_saved_wit_bot_audit_version_to_phase_two(self):
+        viewer = make_user('viewer')
+        viewer.user_group = 'group_w_first'
+        viewer.save(update_fields=['user_group'])
+        WitBotConversationState.objects.create(
+            user=viewer,
+            context={
+                'version_w': {'audit': {'last_missing_count': 1}},
+                'version_q': {'audit': {'last_missing_count': 0}},
+            },
+        )
+
+        awards = [
+            award for award in reimbursement_state_for_user(viewer)['awards']
+            if award['source_kind'] == 'wit_bot_audit'
+        ]
+
+        self.assertEqual(len(awards), 1)
+        self.assertEqual(awards[0]['source_slug'], 'wit_bot_audit_phase_2')
+        self.assertEqual(awards[0]['title_en'], 'Wit_bot audit pass - Phase 2 (Ver.Q)')
+
+    def test_manual_wit_bot_audit_award_overrides_computed_phase_credit(self):
+        viewer = make_user('viewer')
+        viewer.user_group = 'group_w_first'
+        viewer.save(update_fields=['user_group'])
+        WitBotConversationState.objects.create(
+            user=viewer,
+            context={'version_w': {'audit': {'last_missing_count': 0}}},
+        )
+        PointAward.objects.create(
+            user=viewer,
+            source_kind='wit_bot_audit',
+            source_slug='wit_bot_audit_phase_1',
+            awarded_points=10,
+            adjusted_points=4,
+        )
+
+        state = reimbursement_state_for_user(viewer)
+        awards = [
+            award for award in state['awards']
+            if award['source_kind'] == 'wit_bot_audit'
+        ]
+
+        self.assertEqual(state['provisional_total'], 10)
+        self.assertEqual(state['adjusted_total'], 4)
+        self.assertEqual(len(awards), 1)
+        self.assertEqual(awards[0]['source_slug'], 'wit_bot_audit_phase_1')
+        self.assertEqual(awards[0]['adjusted_points'], 4)
+
     def test_available_max_counts_both_wit_bot_audit_phases(self):
         viewer = make_user('viewer')
 
-        self.assertEqual(available_max_for_user(viewer), 130)
+        self.assertEqual(available_max_for_user(viewer), 320)
 
     def test_app_usage_full_credit_requires_first_four_and_later_activity(self):
         viewer = make_user('app_full')

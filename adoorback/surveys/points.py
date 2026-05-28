@@ -162,6 +162,50 @@ def _wit_bot_audit_title(award: PointAward, language: str) -> str:
     return f'{title} ({_version_label(version)})'
 
 
+def _computed_wit_bot_audit_awards_for_user(user, existing_awards: list[PointAward]) -> list[dict]:
+    from chat.models import WitBotConversationState
+
+    existing_source_slugs = {
+        award.source_slug
+        for award in existing_awards
+        if award.source_kind == PointAward.SOURCE_WIT_BOT_AUDIT
+    }
+    state = WitBotConversationState.objects.filter(user=user).first()
+    if state is None:
+        return []
+
+    context = state.context or {}
+    awards = []
+    for phase, source in WIT_BOT_AUDIT_PHASES.items():
+        source_slug = source['source_slug']
+        if source_slug in existing_source_slugs:
+            continue
+
+        version = wit_bot_audit_version_for_group(user.user_group, phase)
+        version_context = context.get(version) or {}
+        audit = version_context.get('audit') or {}
+        if audit.get('last_missing_count') != 0:
+            continue
+
+        points = source['max_points']
+        awards.append({
+            'source_kind': PointAward.SOURCE_WIT_BOT_AUDIT,
+            'source_slug': source_slug,
+            'scheduled_survey_id': None,
+            'title_en': f"{source['title_en']} ({_version_label(version)})",
+            'title_ko': f"{source['title_ko']} ({_version_label(version)})",
+            'cadence': None,
+            'window_start': None,
+            'window_end': None,
+            'awarded_points': points,
+            'adjusted_points': None,
+            'effective_points': points,
+            'note': '',
+            'submitted_at': state.updated_at,
+        })
+    return awards
+
+
 def serialize_reimbursement_award(award: PointAward) -> dict:
     scheduled = award.scheduled_survey
     response = award.response
@@ -342,15 +386,17 @@ def reimbursement_state_for_user(user) -> dict:
         .select_related('scheduled_survey__survey', 'response__survey')
         .order_by('-created_at', '-id')
     )
-    provisional_total = sum(award.awarded_points for award in awards)
-    adjusted_total = sum(award.effective_points for award in awards)
+    serialized_awards = [serialize_reimbursement_award(award) for award in awards]
+    serialized_awards.extend(_computed_wit_bot_audit_awards_for_user(user, awards))
+    provisional_total = sum(award['awarded_points'] for award in serialized_awards)
+    adjusted_total = sum(award['effective_points'] for award in serialized_awards)
     return {
         'provisional_total': provisional_total,
         'adjusted_total': adjusted_total,
         'available_max': available_max_for_user(user),
         'dollar_estimate_cents': round(adjusted_total * 100 / POINTS_PER_DOLLAR),
         'points_per_dollar': POINTS_PER_DOLLAR,
-        'awards': [serialize_reimbursement_award(award) for award in awards],
+        'awards': serialized_awards,
         'pending_prereqs': pending_prereqs_for_user(user),
     }
 
