@@ -256,6 +256,66 @@ class ReimbursementApiTests(APITestCase):
         self.assertEqual(award['title_en'], 'Interview')
         self.assertEqual(award['title_ko'], 'Interview')
 
+    def test_reimbursement_state_counts_existing_response_without_point_award(self):
+        viewer = make_user('viewer')
+        survey = make_likert_survey('legacy_reward')
+        survey.point_value = 12
+        survey.save(update_fields=['point_value'])
+        scheduled = ScheduledSurvey.objects.create(
+            survey=survey,
+            cadence=CADENCE_WEEKLY,
+            window_start=datetime.date(2026, 5, 5),
+            window_end=datetime.date(2026, 5, 5),
+            allow_late=True,
+            sequence_index=1,
+        )
+        response = SurveyResponse.objects.create(user=viewer, survey=survey)
+        submitted_at = datetime.datetime(
+            2026, 5, 5, 20, 0, tzinfo=datetime.timezone.utc,
+        )
+        SurveyResponse.objects.filter(pk=response.pk).update(submitted_at=submitted_at)
+
+        self.client.force_authenticate(user=viewer)
+        result = self.client.get('/api/surveys/reimbursement/')
+
+        self.assertEqual(result.status_code, status.HTTP_200_OK)
+        body = result.json()
+        self.assertEqual(body['provisional_total'], 12)
+        self.assertEqual(body['adjusted_total'], 12)
+        self.assertEqual(body['awards'][0]['source_slug'], 'legacy_reward')
+        self.assertEqual(body['awards'][0]['scheduled_survey_id'], scheduled.id)
+        self.assertEqual(PointAward.objects.filter(user=viewer).count(), 0)
+
+    def test_reimbursement_state_does_not_duplicate_existing_point_award(self):
+        viewer = make_user('viewer')
+        survey = make_likert_survey('already_awarded')
+        survey.point_value = 12
+        survey.save(update_fields=['point_value'])
+        scheduled = ScheduledSurvey.objects.create(
+            survey=survey,
+            cadence=CADENCE_WEEKLY,
+            window_start=datetime.date(2026, 5, 5),
+            window_end=datetime.date(2026, 5, 5),
+            allow_late=True,
+            sequence_index=1,
+        )
+        response = SurveyResponse.objects.create(user=viewer, survey=survey)
+        PointAward.objects.create(
+            user=viewer,
+            source_kind=PointAward.SOURCE_SURVEY,
+            source_slug=survey.slug,
+            scheduled_survey=scheduled,
+            response=response,
+            awarded_points=12,
+            adjusted_points=4,
+        )
+
+        state = reimbursement_state_for_user(viewer)
+
+        self.assertEqual(state['provisional_total'], 12)
+        self.assertEqual(state['adjusted_total'], 4)
+        self.assertEqual(len(state['awards']), 1)
+
 
 class SurveyPointStateSerializerTests(APITestCase):
     def test_index_entries_include_point_state_and_prereq_lock(self):

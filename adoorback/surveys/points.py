@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from surveys.models import PointAward, ScheduledSurvey, Survey, SurveyResponse
 from surveys.reimbursement_config import (
@@ -217,10 +219,7 @@ def serialize_reimbursement_award(award: PointAward) -> dict:
     title_en = award.source_slug
     title_ko = award.source_slug
     if survey is not None:
-        from surveys.tokens import build_token_map, substitute
-        tokens = build_token_map(survey, viewer=award.user)
-        title_en = substitute(survey.title_en, tokens)
-        title_ko = substitute(survey.title_ko, tokens)
+        title_en, title_ko = _survey_titles_for_user(survey, award.user)
     elif award.source_kind == PointAward.SOURCE_WIT_BOT_AUDIT:
         title_en = _wit_bot_audit_title(award, 'en')
         title_ko = _wit_bot_audit_title(award, 'ko')
@@ -250,6 +249,118 @@ def serialize_reimbursement_award(award: PointAward) -> dict:
         'note': award.note,
         'submitted_at': submitted_at,
     }
+
+
+def _survey_titles_for_user(survey: Survey, user) -> tuple[str, str]:
+    from surveys.tokens import build_token_map, substitute
+
+    tokens = build_token_map(survey, viewer=user)
+    return (
+        substitute(survey.title_en, tokens),
+        substitute(survey.title_ko, tokens),
+    )
+
+
+def _logical_response_date(response: SurveyResponse):
+    la_tz = ZoneInfo('America/Los_Angeles')
+    return (response.submitted_at.astimezone(la_tz) - timedelta(hours=7)).date()
+
+
+def _scheduled_survey_for_existing_response(response: SurveyResponse) -> ScheduledSurvey | None:
+    rows = [
+        row
+        for row in (
+            ScheduledSurvey.objects
+            .filter(survey=response.survey)
+            .select_related('survey')
+        )
+        if schedule_routes_to_user(row, response.user)
+    ]
+    if not rows:
+        return None
+    if len(rows) == 1:
+        return rows[0]
+
+    logical_date = _logical_response_date(response)
+    matching_window = [
+        row for row in rows
+        if row.window_start <= logical_date and (
+            row.window_end is None or row.window_end >= logical_date
+        )
+    ]
+    if matching_window:
+        return sorted(matching_window, key=lambda row: (row.window_start, row.sequence_index))[0]
+
+    return None
+
+
+def _point_prereq_lock_for_response(response: SurveyResponse) -> dict | None:
+    prereq_slug = response.survey.point_prereq_slug or ''
+    if not prereq_slug:
+        return None
+    if SurveyResponse.objects.filter(
+        user=response.user,
+        survey__slug=prereq_slug,
+        submitted_at__lte=response.submitted_at,
+    ).exists():
+        return None
+    prereq = Survey.objects.filter(slug=prereq_slug).first()
+    return {
+        'slug': prereq_slug,
+        'title_en': prereq.title_en if prereq else '',
+        'title_ko': prereq.title_ko if prereq else '',
+    }
+
+
+def _computed_missing_survey_awards_for_user(
+    user,
+    existing_awards: list[PointAward],
+) -> list[dict]:
+    awarded_response_ids = {
+        award.response_id
+        for award in existing_awards
+        if award.source_kind == PointAward.SOURCE_SURVEY and award.response_id
+    }
+    awarded_scheduled_ids = {
+        award.scheduled_survey_id
+        for award in existing_awards
+        if award.source_kind == PointAward.SOURCE_SURVEY and award.scheduled_survey_id
+    }
+    computed = []
+    responses = (
+        SurveyResponse.objects
+        .filter(user=user, survey__point_value__gt=0)
+        .exclude(id__in=awarded_response_ids)
+        .select_related('survey', 'user')
+        .order_by('submitted_at', 'id')
+    )
+    for response in responses:
+        scheduled = _scheduled_survey_for_existing_response(response)
+        if scheduled is not None and scheduled.id in awarded_scheduled_ids:
+            continue
+
+        lock = _point_prereq_lock_for_response(response)
+        awarded_points = 0 if lock else response.survey.point_value
+        note = f"Prereq {lock['slug']} not completed at submit time." if lock else ''
+        title_en, title_ko = _survey_titles_for_user(response.survey, user)
+        computed.append({
+            'source_kind': PointAward.SOURCE_SURVEY,
+            'source_slug': response.survey.slug,
+            'scheduled_survey_id': scheduled.id if scheduled is not None else None,
+            'title_en': title_en,
+            'title_ko': title_ko,
+            'cadence': scheduled.cadence if scheduled is not None else None,
+            'window_start': scheduled.window_start if scheduled is not None else None,
+            'window_end': scheduled.window_end if scheduled is not None else None,
+            'awarded_points': awarded_points,
+            'adjusted_points': None,
+            'effective_points': awarded_points,
+            'note': note,
+            'submitted_at': response.submitted_at,
+        })
+        if scheduled is not None:
+            awarded_scheduled_ids.add(scheduled.id)
+    return computed
 
 
 def get_point_award_for_scheduled(user, scheduled: ScheduledSurvey) -> PointAward | None:
@@ -384,6 +495,7 @@ def reimbursement_state_for_user(user) -> dict:
         .order_by('-created_at', '-id')
     )
     serialized_awards = [serialize_reimbursement_award(award) for award in awards]
+    serialized_awards.extend(_computed_missing_survey_awards_for_user(user, awards))
     serialized_awards.extend(_computed_wit_bot_audit_awards_for_user(user, awards))
     provisional_total = sum(award['awarded_points'] for award in serialized_awards)
     adjusted_total = sum(award['effective_points'] for award in serialized_awards)
