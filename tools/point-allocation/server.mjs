@@ -37,8 +37,7 @@ const REIMBURSEMENT_ACTION_POLICIES = {
     deadline: '2026-05-17',
   },
   interview_signup: {
-    actionUrl: '/chats',
-    availableFrom: '2026-06-01',
+    actionUrl: 'https://calendly.com/jaewonkim/60min',
     deadline: '2026-06-30',
   },
   friend_invite: {

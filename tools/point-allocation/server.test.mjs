@@ -706,12 +706,15 @@ test('buildReimbursementPreview applies reimbursement-specific deadline override
     currentDate: '2026-05-25',
   });
 
-  assert.equal(qFirstPreview.rows.find((row) => row.slug === 'interview_signup').canEarn, false);
+  assert.equal(qFirstPreview.rows.find((row) => row.slug === 'interview_signup').canEarn, true);
   assert.equal(
     qFirstPreview.rows.find((row) => row.slug === 'interview_signup').availability,
-    'future',
+    'available',
   );
-  assert.match(qFirstPreview.rows.find((row) => row.slug === 'interview_signup').note, /not available yet/i);
+  assert.equal(
+    qFirstPreview.rows.find((row) => row.slug === 'interview_signup').appUrl,
+    'https://calendly.com/jaewonkim/60min',
+  );
   assert.equal(qFirstPreview.rows.find((row) => row.slug === 'friend_invite').canEarn, false);
   assert.equal(
     qFirstPreview.rows.find((row) => row.slug === 'friend_invite').availability,
