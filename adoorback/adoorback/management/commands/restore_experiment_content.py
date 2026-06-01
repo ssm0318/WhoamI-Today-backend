@@ -34,6 +34,8 @@ The companion shell script `scripts/restore_experiment_content.sh` restores the
 backup into a temp DB and then runs this command against it.
 """
 
+from contextlib import contextmanager
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -41,14 +43,9 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import m2m_changed, post_save
 from django.utils import timezone
 
-import comment.models as comment_models
-import like.models as like_models
-import note.models as note_models
-import qna.models as qna_models
-import reaction.models as reaction_models
 from account.models import CustomChip, Interest, User
 from check_in.models import CheckIn, CheckInComponentEntry, Song
 from comment.models import Comment
@@ -56,6 +53,33 @@ from like.models import Like
 from note.models import Note, NoteImage, NoteVideo
 from qna.models import Question, Response
 from reaction.models import Reaction
+
+
+@contextmanager
+def _muted_signals():
+    """Disable ALL post_save / m2m_changed receivers in THIS process for a restore.
+
+    A restore must not fire notifications, Firebase push threads, reader
+    auto-adds, etc. Disconnecting receivers individually is fragile: a receiver
+    wrapped by ``@transaction.atomic`` stacked above ``@receiver`` is registered
+    under a *different* object than the module attribute, so
+    ``disconnect(module.func)`` silently misses it (this caused a push-
+    notification storm on the first run). Instead we swap out the receiver lists
+    wholesale and restore them afterward. Safe because the management command
+    runs in its own process — live gunicorn workers keep their signals.
+    """
+    saved = []
+    for sig in (post_save, m2m_changed):
+        saved.append((sig, sig.receivers))
+        sig.receivers = []
+        sig.sender_receivers_cache.clear()
+    try:
+        yield
+    finally:
+        for sig, receivers in saved:
+            sig.receivers = receivers
+            sig.sender_receivers_cache.clear()
+
 
 # Profile scalar fields restored fill-empty (only when the live value is blank).
 _PROFILE_SCALAR_FIELDS = ['bio', 'pronouns', 'name', 'profile_image']
@@ -288,50 +312,54 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR('Aborted.'))
                 return
 
-        # --- Steps 1-4: content (capture old->new id maps) ----------------- #
-        note_id_map = self._restore_notes(data, _live_for)
-        response_id_map = self._restore_responses(data, _live_for)
-        checkin_id_map = self._restore_checkins(data, _live_for)
-        self._restore_songs(data, _live_for)
-        entry_id_map = self._restore_entries(data, _live_for)
+        # All writes run with signals muted: a restore must not fire any
+        # notifications / Firebase push threads / reader auto-adds. See
+        # _muted_signals() for why this is global rather than per-receiver.
+        with _muted_signals():
+            # --- Steps 1-4: content (capture old->new id maps) ------------- #
+            note_id_map = self._restore_notes(data, _live_for)
+            response_id_map = self._restore_responses(data, _live_for)
+            checkin_id_map = self._restore_checkins(data, _live_for)
+            self._restore_songs(data, _live_for)
+            entry_id_map = self._restore_entries(data, _live_for)
 
-        # --- Step 5-6: Interests / CustomChips / persona / profile --------- #
-        self._restore_profile_and_chips(data, _live_for)
+            # --- Step 5-6: Interests / CustomChips / persona / profile ----- #
+            self._restore_profile_and_chips(data, _live_for)
 
-        # --- Engagement: Comment -> Like/Reaction -> readers --------------- #
-        comment_id_map = self._restore_comments(
-            data, user_map, note_id_map, response_id_map, checkin_id_map, entry_id_map,
-        )
-        target_maps = {
-            ('note', 'note'): (note_id_map, Note),
-            ('qna', 'response'): (response_id_map, Response),
-            ('check_in', 'checkin'): (checkin_id_map, CheckIn),
-            ('check_in', 'checkincomponententry'): (entry_id_map, CheckInComponentEntry),
-            ('comment', 'comment'): (comment_id_map, Comment),
-        }
-        self._restore_likes(data, user_map, target_maps)
-        self._restore_reactions(data, user_map, target_maps)
-        self._restore_readers(data, user_map, note_id_map, response_id_map, checkin_id_map)
-
-        # --- Step 7: set everyone to version_w ----------------------------- #
-        if not skip_version_set:
-            now = timezone.now()
-            updated = (
-                User.objects.filter(deleted__isnull=True)
-                .exclude(email__endswith='@whoami.test')
-                .update(current_ver='version_w', ver_changed_at=now)
+            # --- Engagement: Comment -> Like/Reaction -> readers ----------- #
+            comment_id_map = self._restore_comments(
+                data, user_map, note_id_map, response_id_map, checkin_id_map, entry_id_map,
             )
-            self.stdout.write(self.style.SUCCESS(
-                f'\n  Set {updated} users to version_w.'
-            ))
+            target_maps = {
+                ('note', 'note'): (note_id_map, Note),
+                ('qna', 'response'): (response_id_map, Response),
+                ('check_in', 'checkin'): (checkin_id_map, CheckIn),
+                ('check_in', 'checkincomponententry'): (entry_id_map, CheckInComponentEntry),
+                ('comment', 'comment'): (comment_id_map, Comment),
+            }
+            self._restore_likes(data, user_map, target_maps)
+            self._restore_reactions(data, user_map, target_maps)
+            self._restore_readers(data, user_map, note_id_map, response_id_map, checkin_id_map)
 
-        # --- Step 8: regenerate Discover feed ------------------------------ #
-        if not skip_regen:
-            self.stdout.write('\n--- Regenerating DiscoverFeed (version_w users) ---')
-            w_count = self._regen_discover_feeds()
-            self.stdout.write(self.style.SUCCESS(
-                f'  Regenerated feed for {w_count} version_w users.'
-            ))
+            # --- Step 7: set everyone to version_w ------------------------- #
+            if not skip_version_set:
+                now = timezone.now()
+                updated = (
+                    User.objects.filter(deleted__isnull=True)
+                    .exclude(email__endswith='@whoami.test')
+                    .update(current_ver='version_w', ver_changed_at=now)
+                )
+                self.stdout.write(self.style.SUCCESS(
+                    f'\n  Set {updated} users to version_w.'
+                ))
+
+            # --- Step 8: regenerate Discover feed -------------------------- #
+            if not skip_regen:
+                self.stdout.write('\n--- Regenerating DiscoverFeed (version_w users) ---')
+                w_count = self._regen_discover_feeds()
+                self.stdout.write(self.style.SUCCESS(
+                    f'  Regenerated feed for {w_count} version_w users.'
+                ))
 
         self.stdout.write(self.style.SUCCESS('\nRestore complete.'))
 
@@ -481,42 +509,37 @@ class Command(BaseCommand):
         """
         note_id_map = {}
         created = 0
-        # Avoid notifying current subscribers about resurrected old posts.
-        post_save.disconnect(note_models.send_notifications_to_subscribers, sender=Note)
-        try:
-            with transaction.atomic():
-                for n in data['notes']:
-                    live = live_for(n['author_id'])
-                    if live is None:
-                        continue
-                    note = Note.objects.create(
-                        author=live,
-                        content=n['content'],
-                        visibility=n['visibility'] or [],
-                        share_type=n['share_type'] or 'regular',
-                        mission_id=n['mission_id'],
-                        mission_prompt=n['mission_prompt'],
-                        mission_attempt_number=n['mission_attempt_number'],
-                        is_edited=bool(n['is_edited']),
-                    )
-                    self._set_created_at(Note, note.pk, n['created_at'])
-                    note_id_map[n['id']] = note.pk
-                    created += 1
+        with transaction.atomic():
+            for n in data['notes']:
+                live = live_for(n['author_id'])
+                if live is None:
+                    continue
+                note = Note.objects.create(
+                    author=live,
+                    content=n['content'],
+                    visibility=n['visibility'] or [],
+                    share_type=n['share_type'] or 'regular',
+                    mission_id=n['mission_id'],
+                    mission_prompt=n['mission_prompt'],
+                    mission_attempt_number=n['mission_attempt_number'],
+                    is_edited=bool(n['is_edited']),
+                )
+                self._set_created_at(Note, note.pk, n['created_at'])
+                note_id_map[n['id']] = note.pk
+                created += 1
 
-                for img in data['note_images']:
-                    new_id = note_id_map.get(img['note_id'])
-                    if new_id and img.get('image'):
-                        NoteImage.objects.create(note_id=new_id, image=img['image'])
-                for vid in data['note_videos']:
-                    new_id = note_id_map.get(vid['note_id'])
-                    if new_id and vid.get('video'):
-                        NoteVideo.objects.create(
-                            note_id=new_id, video=vid['video'],
-                            thumbnail=vid.get('thumbnail') or '',
-                            duration_seconds=vid.get('duration_seconds'),
-                        )
-        finally:
-            post_save.connect(note_models.send_notifications_to_subscribers, sender=Note)
+            for img in data['note_images']:
+                new_id = note_id_map.get(img['note_id'])
+                if new_id and img.get('image'):
+                    NoteImage.objects.create(note_id=new_id, image=img['image'])
+            for vid in data['note_videos']:
+                new_id = note_id_map.get(vid['note_id'])
+                if new_id and vid.get('video'):
+                    NoteVideo.objects.create(
+                        note_id=new_id, video=vid['video'],
+                        thumbnail=vid.get('thumbnail') or '',
+                        duration_seconds=vid.get('duration_seconds'),
+                    )
         self.stdout.write(self.style.SUCCESS(f'  Restored {created} notes.'))
         return note_id_map
 
@@ -528,34 +551,28 @@ class Command(BaseCommand):
         response_id_map = {}
         live_question_ids = set(Question.objects.values_list('id', flat=True))
         created = skipped = 0
-        post_save.disconnect(qna_models.send_notifications_to_subscribers, sender=Response)
-        post_save.disconnect(qna_models.create_request_answered_noti, sender=Response)
-        try:
-            with transaction.atomic():
-                for r in data['responses']:
-                    live = live_for(r['author_id'])
-                    if live is None:
-                        continue
-                    if r['question_id'] not in live_question_ids:
-                        skipped += 1
-                        continue
-                    resp = Response.objects.create(
-                        author=live,
-                        question_id=r['question_id'],
-                        content=r['content'],
-                        visibility=r['visibility'] or [],
-                        image=r['image'] or '',
-                        video=r['video'] or '',
-                        video_thumbnail=r['video_thumbnail'] or '',
-                        video_duration_seconds=r['video_duration_seconds'],
-                        is_edited=bool(r['is_edited']),
-                    )
-                    self._set_created_at(Response, resp.pk, r['created_at'])
-                    response_id_map[r['id']] = resp.pk
-                    created += 1
-        finally:
-            post_save.connect(qna_models.send_notifications_to_subscribers, sender=Response)
-            post_save.connect(qna_models.create_request_answered_noti, sender=Response)
+        with transaction.atomic():
+            for r in data['responses']:
+                live = live_for(r['author_id'])
+                if live is None:
+                    continue
+                if r['question_id'] not in live_question_ids:
+                    skipped += 1
+                    continue
+                resp = Response.objects.create(
+                    author=live,
+                    question_id=r['question_id'],
+                    content=r['content'],
+                    visibility=r['visibility'] or [],
+                    image=r['image'] or '',
+                    video=r['video'] or '',
+                    video_thumbnail=r['video_thumbnail'] or '',
+                    video_duration_seconds=r['video_duration_seconds'],
+                    is_edited=bool(r['is_edited']),
+                )
+                self._set_created_at(Response, resp.pk, r['created_at'])
+                response_id_map[r['id']] = resp.pk
+                created += 1
         msg = f'  Restored {created} responses.'
         if skipped:
             msg += f' (skipped {skipped} with missing question)'
@@ -754,32 +771,25 @@ class Command(BaseCommand):
             return ct_cache[model], new_id
 
         created = 0
-        # Notification + UserTag side effects are out of scope for a restore.
-        post_save.disconnect(comment_models.create_noti, sender=Comment)
-        post_save.disconnect(comment_models.create_user_tag, sender=Comment)
-        try:
-            with transaction.atomic():
-                for c in sorted(data['comments'], key=lambda r: r['id']):
-                    live = user_map.get(c['author_id'])
-                    if live is None:
-                        continue
-                    if not (c['content'] or '').strip():
-                        continue  # AdoorModel requires content length >= 1
-                    resolved = _resolve(c['content_type_id'], c['object_id'])
-                    if resolved is None:
-                        continue
-                    live_ct, new_obj_id = resolved
-                    cm = Comment.objects.create(
-                        author=live, content=c['content'],
-                        is_private=bool(c['is_private']),
-                        content_type=live_ct, object_id=new_obj_id,
-                    )
-                    self._set_created_at(Comment, cm.pk, c['created_at'])
-                    comment_id_map[c['id']] = cm.pk
-                    created += 1
-        finally:
-            post_save.connect(comment_models.create_noti, sender=Comment)
-            post_save.connect(comment_models.create_user_tag, sender=Comment)
+        with transaction.atomic():
+            for c in sorted(data['comments'], key=lambda r: r['id']):
+                live = user_map.get(c['author_id'])
+                if live is None:
+                    continue
+                if not (c['content'] or '').strip():
+                    continue  # AdoorModel requires content length >= 1
+                resolved = _resolve(c['content_type_id'], c['object_id'])
+                if resolved is None:
+                    continue
+                live_ct, new_obj_id = resolved
+                cm = Comment.objects.create(
+                    author=live, content=c['content'],
+                    is_private=bool(c['is_private']),
+                    content_type=live_ct, object_id=new_obj_id,
+                )
+                self._set_created_at(Comment, cm.pk, c['created_at'])
+                comment_id_map[c['id']] = cm.pk
+                created += 1
         self.stdout.write(self.style.SUCCESS(f'  Restored {created} comments.'))
         return comment_id_map
 
@@ -804,48 +814,40 @@ class Command(BaseCommand):
     def _restore_likes(self, data, user_map, target_maps):
         resolve = self._target_resolver(data['content_types'], target_maps)
         created = 0
-        post_save.disconnect(like_models.create_like_noti, sender=Like)
-        try:
-            with transaction.atomic():
-                for l in data['likes']:
-                    live = user_map.get(l['user_id'])
-                    if live is None:
-                        continue
-                    resolved = resolve(l['content_type_id'], l['object_id'])
-                    if resolved is None:
-                        continue
-                    live_ct, new_obj_id = resolved
-                    lk = Like.objects.create(
-                        user=live, content_type=live_ct, object_id=new_obj_id,
-                    )
-                    self._set_created_at(Like, lk.pk, l['created_at'])
-                    created += 1
-        finally:
-            post_save.connect(like_models.create_like_noti, sender=Like)
+        with transaction.atomic():
+            for l in data['likes']:
+                live = user_map.get(l['user_id'])
+                if live is None:
+                    continue
+                resolved = resolve(l['content_type_id'], l['object_id'])
+                if resolved is None:
+                    continue
+                live_ct, new_obj_id = resolved
+                lk = Like.objects.create(
+                    user=live, content_type=live_ct, object_id=new_obj_id,
+                )
+                self._set_created_at(Like, lk.pk, l['created_at'])
+                created += 1
         self.stdout.write(self.style.SUCCESS(f'  Restored {created} likes.'))
 
     def _restore_reactions(self, data, user_map, target_maps):
         resolve = self._target_resolver(data['content_types'], target_maps)
         created = 0
-        post_save.disconnect(reaction_models.create_reaction_noti, sender=Reaction)
-        try:
-            with transaction.atomic():
-                for rx in data['reactions']:
-                    live = user_map.get(rx['user_id'])
-                    if live is None:
-                        continue
-                    resolved = resolve(rx['content_type_id'], rx['object_id'])
-                    if resolved is None:
-                        continue
-                    live_ct, new_obj_id = resolved
-                    react = Reaction.objects.create(
-                        user=live, emoji=rx['emoji'], component=rx['component'],
-                        content_type=live_ct, object_id=new_obj_id,
-                    )
-                    self._set_created_at(Reaction, react.pk, rx['created_at'])
-                    created += 1
-        finally:
-            post_save.connect(reaction_models.create_reaction_noti, sender=Reaction)
+        with transaction.atomic():
+            for rx in data['reactions']:
+                live = user_map.get(rx['user_id'])
+                if live is None:
+                    continue
+                resolved = resolve(rx['content_type_id'], rx['object_id'])
+                if resolved is None:
+                    continue
+                live_ct, new_obj_id = resolved
+                react = Reaction.objects.create(
+                    user=live, emoji=rx['emoji'], component=rx['component'],
+                    content_type=live_ct, object_id=new_obj_id,
+                )
+                self._set_created_at(Reaction, react.pk, rx['created_at'])
+                created += 1
         self.stdout.write(self.style.SUCCESS(f'  Restored {created} reactions.'))
 
     def _restore_readers(self, data, user_map, note_id_map, response_id_map, checkin_id_map):
