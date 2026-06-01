@@ -117,11 +117,6 @@ def _resolve_missing_token_to_source(scheduled_survey: 'Survey', user) -> 'Surve
     return None
 
 
-# Saturdays = weekday 5, Sundays = weekday 6. Weekend skipping: standard
-# SOTD surveys are not served on these days; daily_base diary continues.
-_WEEKEND_DAYS = frozenset({5, 6})
-
-
 def _today_la_7am():
     """Return the current 'logical date' using a 7 AM America/Los_Angeles boundary.
     Before 7 AM LA, this returns yesterday's date."""
@@ -219,21 +214,6 @@ def schedule_routes_to_user(scheduled, user) -> bool:
 _routes_to_user = routes_to_user
 
 
-def _is_weekend_skipped(scheduled, today) -> bool:
-    """True when this scheduled row is a SOTD-style daily that should be
-    skipped on weekends.
-
-    `daily_base` (the every-day diary) is exempt — research design is to keep
-    the daily diary running through the weekend even when assessment SOTDs
-    pause. Other daily rows are skipped on Sat/Sun.
-    """
-    if scheduled.cadence != CADENCE_DAILY:
-        return False
-    if scheduled.survey.slug == 'daily_base':
-        return False
-    return today.weekday() in _WEEKEND_DAYS
-
-
 def get_today_daily(user):
     """Return today's daily ScheduledSurvey for `user`, or None.
 
@@ -242,9 +222,7 @@ def get_today_daily(user):
          to the user's matching `user_group`. Today's daily can be either
          a single un-suffixed survey (most common) or one of a w/q pair
          where the schedule has both rows on the same date.
-      2. Weekend skip — non-`daily_base` daily SOTDs are not served on
-         Sat/Sun.
-      3. `serving_condition.skip_if_user_embedded_data` — surveys whose
+      2. `serving_condition.skip_if_user_embedded_data` — surveys whose
          skip rule matches the user's embedded data are not returned.
 
     On weekdays of the study window, both daily_base (the diary) AND a
@@ -270,8 +248,6 @@ def get_today_daily(user):
     visible = []
     for sched in candidates:
         if not schedule_routes_to_user(sched, user):
-            continue
-        if _is_weekend_skipped(sched, today):
             continue
         if _skip_for_serving_condition(sched.survey, user_data):
             continue
@@ -355,8 +331,7 @@ def get_survey_index(user):
     i.e. missed dailies) appear in NONE of the buckets and are never returned.
 
     Rows are also filtered to honor version routing (slugs ending `_w` /
-    `_q` route to matching user_group only), weekend skip (non-daily_base
-    dailies skipped on Sat/Sun), and `serving_condition` (skip rule).
+    `_q` route to matching user_group only) and `serving_condition` (skip rule).
     """
     today = _today_la_7am()
     qs = _annotate_user_response(
@@ -415,8 +390,6 @@ def get_survey_index(user):
                 continue
             if not schedule_routes_to_user(sched, user):
                 continue
-            if _is_weekend_skipped(sched, today):
-                continue
             if _skip_for_serving_condition(sched.survey, user_data):
                 continue
             from surveys.recovery import replacement_recovery_slug_for_base_unanswered
@@ -464,7 +437,7 @@ def get_survey_index(user):
     return {
         'available_now': _by_sidebar_order(_filter(available)),
         'late_but_accepted': _by_sidebar_order(_filter(late)),
-        # Completed rows aren't filtered by serving_condition / weekend —
+        # Completed rows aren't filtered by serving_condition —
         # the user already answered, so they should still see the entry in
         # their archive. Version routing IS applied (a Q user shouldn't
         # see a W-only completion in their list, even if they somehow have one).

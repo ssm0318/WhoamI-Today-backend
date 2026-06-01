@@ -9,8 +9,8 @@ from surveys.reimbursement_config import (
 )
 from surveys.retired import is_retired_survey_slug
 from surveys.scheduling import (
-    _is_weekend_skipped, _skip_for_serving_condition, _today_la_7am,
-    _user_embedded_data, schedule_routes_to_user,
+    _skip_for_serving_condition, _today_la_7am, _user_embedded_data,
+    schedule_routes_to_user,
 )
 
 
@@ -64,8 +64,7 @@ def resolve_submit_scheduled_survey(user, survey: Survey) -> SubmitScheduleResol
     user_data = _user_embedded_data(user)
     visible = [
         row for row in routed
-        if not _is_weekend_skipped(row, today)
-        and not _skip_for_serving_condition(row.survey, user_data)
+        if not _skip_for_serving_condition(row.survey, user_data)
     ]
     if not visible:
         return SubmitScheduleResolution(scheduled_survey=None, rejection='not_routed')
@@ -336,8 +335,6 @@ def _visible_scheduled_surveys_for_points(user):
         if is_retired_survey_slug(survey.slug):
             continue
         if not schedule_routes_to_user(scheduled, user):
-            continue
-        if _is_weekend_skipped(scheduled, scheduled.window_start):
             continue
         if _skip_for_serving_condition(survey, user_data):
             continue

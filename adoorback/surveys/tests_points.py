@@ -1,4 +1,5 @@
 import datetime
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.test import TestCase
@@ -166,6 +167,35 @@ class SurveyPointAwardSubmitTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIsNone(response.json()['point_award'])
         self.assertFalse(PointAward.objects.filter(user=viewer, source_slug=survey.slug).exists())
+
+    def test_late_sotd_submit_on_weekend_creates_award(self):
+        viewer = make_user('viewer')
+        survey = make_likert_survey('sotd_d26_transition')
+        survey.point_value = 12
+        survey.save(update_fields=['point_value'])
+        friday = datetime.date(2026, 5, 29)
+        sunday = datetime.date(2026, 5, 31)
+        scheduled = ScheduledSurvey.objects.create(
+            survey=survey,
+            cadence=CADENCE_DAILY,
+            window_start=friday,
+            window_end=friday,
+            allow_late=True,
+            sequence_index=126,
+        )
+        self.client.force_authenticate(user=viewer)
+
+        with patch('surveys.points._today_la_7am', return_value=sunday):
+            response = self.client.post(
+                f'/api/surveys/{survey.slug}/responses/',
+                self._payload_for(survey),
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        award = PointAward.objects.get(user=viewer, scheduled_survey=scheduled)
+        self.assertEqual(award.awarded_points, 12)
+        self.assertEqual(response.json()['point_award']['effective_points'], 12)
 
 
 class ReimbursementApiTests(APITestCase):

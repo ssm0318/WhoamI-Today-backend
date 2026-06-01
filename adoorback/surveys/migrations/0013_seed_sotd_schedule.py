@@ -4,8 +4,7 @@
 # Slug convention: `sotd_dNN_*` where NN = the study day number
 # (1-indexed from May 4 kickoff). Weekend study days (6, 7, 13, 14, 20,
 # 21, 27, 28) have no SOTD assigned — the slug numbering already skips
-# them, and `_is_weekend_skipped` defends against accidentally serving
-# any future SOTD that lands on a weekend.
+# them.
 #
 # Sequence index 100+day_number to stay clear of:
 #   - daily_base    (seq 1..28, from 0004)

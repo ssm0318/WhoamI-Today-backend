@@ -633,7 +633,7 @@ class SurveyLevelResultKindTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Scheduling: serving_condition + version routing + weekend skip
+# Scheduling: serving_condition + version routing + weekend visibility
 # ---------------------------------------------------------------------------
 class SchedulingFiltersTests(TestCase):
     def setUp(self):
@@ -687,7 +687,7 @@ class SchedulingFiltersTests(TestCase):
             slugs_q = [r.survey.slug for r in res['available_now']]
         self.assertEqual(slugs_q, ['post_study_q'])
 
-    def test_weekend_skip_for_non_daily_base_dailies(self):
+    def test_weekend_keeps_non_daily_base_dailies_visible(self):
         from datetime import date as _date
         from unittest.mock import patch
 
@@ -703,8 +703,8 @@ class SchedulingFiltersTests(TestCase):
         with patch('surveys.scheduling._today_la_7am', return_value=saturday):
             res = get_survey_index(self.user_w)
             slugs = sorted(r.survey.slug for r in res['available_now'])
-        # SOTD is hidden on Saturday; daily_base survives.
-        self.assertEqual(slugs, ['daily_base'])
+        # Weekends now show scheduled surveys the same way regular days do.
+        self.assertEqual(slugs, ['daily_base', 'sotd_d05_rsq'])
 
     def test_serving_condition_skips_when_user_data_matches(self):
         from unittest.mock import patch

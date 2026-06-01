@@ -1,4 +1,5 @@
 import datetime
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -96,6 +97,23 @@ class SchedulingTests(TestCase):
         result = get_survey_index(self.user)
         self.assertEqual(result['available_now'], [])
         self.assertEqual(result['late_but_accepted'], [])
+        self.assertEqual(result['completed'], [])
+
+    def test_late_weekday_sotd_remains_visible_on_weekend(self):
+        s = self._survey('sotd_d26_transition')
+        friday = datetime.date(2026, 5, 29)
+        sunday = datetime.date(2026, 5, 31)
+        ScheduledSurvey.objects.create(
+            survey=s, cadence=CADENCE_DAILY,
+            window_start=friday, window_end=friday,
+            allow_late=True, sequence_index=126,
+        )
+
+        with patch('surveys.scheduling._today_la_7am', return_value=sunday):
+            result = get_survey_index(self.user)
+
+        self.assertEqual(result['available_now'], [])
+        self.assertEqual([row.survey.slug for row in result['late_but_accepted']], [s.slug])
         self.assertEqual(result['completed'], [])
 
     def test_index_buckets_completed(self):
