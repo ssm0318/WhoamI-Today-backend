@@ -22,6 +22,13 @@ class SubmitScheduleResolution:
     rejection: str | None = None
 
 
+@dataclass(frozen=True)
+class SurveyPointAwardBackfillResult:
+    scanned: int
+    created: int
+    skipped_existing: int
+
+
 def _is_currently_open(scheduled: ScheduledSurvey, today) -> bool:
     if scheduled.window_start > today:
         return False
@@ -312,6 +319,13 @@ def _point_prereq_lock_for_response(response: SurveyResponse) -> dict | None:
     }
 
 
+def _survey_award_values_for_response(response: SurveyResponse) -> tuple[int, str]:
+    lock = _point_prereq_lock_for_response(response)
+    if lock is None:
+        return response.survey.point_value, ''
+    return 0, f"Prereq {lock['slug']} not completed at submit time."
+
+
 def _computed_missing_survey_awards_for_user(
     user,
     existing_awards: list[PointAward],
@@ -339,9 +353,7 @@ def _computed_missing_survey_awards_for_user(
         if scheduled is not None and scheduled.id in awarded_scheduled_ids:
             continue
 
-        lock = _point_prereq_lock_for_response(response)
-        awarded_points = 0 if lock else response.survey.point_value
-        note = f"Prereq {lock['slug']} not completed at submit time." if lock else ''
+        awarded_points, note = _survey_award_values_for_response(response)
         title_en, title_ko = _survey_titles_for_user(response.survey, user)
         computed.append({
             'source_kind': PointAward.SOURCE_SURVEY,
@@ -361,6 +373,82 @@ def _computed_missing_survey_awards_for_user(
         if scheduled is not None:
             awarded_scheduled_ids.add(scheduled.id)
     return computed
+
+
+def backfill_missing_survey_point_awards(*, user=None) -> SurveyPointAwardBackfillResult:
+    """Materialize PointAward rows for responses submitted before the ledger existed."""
+    awarded_response_ids = set(
+        PointAward.objects
+        .filter(source_kind=PointAward.SOURCE_SURVEY, response__isnull=False)
+        .values_list('response_id', flat=True)
+    )
+    awarded_scheduled_ids_by_user: dict[int, set[int]] = {}
+    scheduled_awards = (
+        PointAward.objects
+        .filter(source_kind=PointAward.SOURCE_SURVEY, scheduled_survey__isnull=False)
+        .values_list('user_id', 'scheduled_survey_id')
+    )
+    for user_id, scheduled_id in scheduled_awards:
+        awarded_scheduled_ids_by_user.setdefault(user_id, set()).add(scheduled_id)
+
+    responses = (
+        SurveyResponse.objects
+        .filter(survey__point_value__gt=0)
+        .exclude(id__in=awarded_response_ids)
+        .select_related('survey', 'user')
+        .order_by('user_id', 'submitted_at', 'id')
+    )
+    if user is not None:
+        responses = responses.filter(user=user)
+
+    scanned = 0
+    created = 0
+    skipped_existing = 0
+    for response in responses:
+        scanned += 1
+        scheduled = _scheduled_survey_for_existing_response(response)
+        user_scheduled_ids = awarded_scheduled_ids_by_user.setdefault(response.user_id, set())
+        if scheduled is not None and scheduled.id in user_scheduled_ids:
+            skipped_existing += 1
+            continue
+
+        awarded_points, note = _survey_award_values_for_response(response)
+        defaults = {
+            'source_slug': response.survey.slug,
+            'response': response,
+            'awarded_points': awarded_points,
+            'note': note,
+        }
+        if scheduled is not None:
+            _award, was_created = PointAward.objects.get_or_create(
+                user=response.user,
+                source_kind=PointAward.SOURCE_SURVEY,
+                scheduled_survey=scheduled,
+                defaults=defaults,
+            )
+            if was_created:
+                user_scheduled_ids.add(scheduled.id)
+                created += 1
+            else:
+                skipped_existing += 1
+            continue
+
+        _award, was_created = PointAward.objects.get_or_create(
+            user=response.user,
+            source_kind=PointAward.SOURCE_SURVEY,
+            response=response,
+            defaults=defaults,
+        )
+        if was_created:
+            created += 1
+        else:
+            skipped_existing += 1
+
+    return SurveyPointAwardBackfillResult(
+        scanned=scanned,
+        created=created,
+        skipped_existing=skipped_existing,
+    )
 
 
 def get_point_award_for_scheduled(user, scheduled: ScheduledSurvey) -> PointAward | None:

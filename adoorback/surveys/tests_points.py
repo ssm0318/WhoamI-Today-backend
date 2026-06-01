@@ -16,7 +16,10 @@ from surveys.models import (
     CADENCE_DAILY, CADENCE_WEEKLY, PointAward, ScheduledSurvey, Survey,
     SurveyResponse,
 )
-from surveys.points import available_max_for_user, reimbursement_state_for_user
+from surveys.points import (
+    available_max_for_user, backfill_missing_survey_point_awards,
+    reimbursement_state_for_user,
+)
 
 
 class SurveyPointAwardSubmitTests(APITestCase):
@@ -56,6 +59,36 @@ class SurveyPointAwardSubmitTests(APITestCase):
         self.assertEqual(award.source_slug, 'rewarded')
         self.assertEqual(award.awarded_points, 12)
         self.assertEqual(response.json()['point_award']['effective_points'], 12)
+
+    def test_backfill_missing_survey_point_awards_creates_legacy_award_once(self):
+        viewer = make_user('viewer')
+        survey = make_likert_survey('legacy_reward')
+        survey.point_value = 12
+        survey.save(update_fields=['point_value'])
+        scheduled = ScheduledSurvey.objects.create(
+            survey=survey,
+            cadence=CADENCE_WEEKLY,
+            window_start=datetime.date(2026, 5, 5),
+            window_end=datetime.date(2026, 5, 5),
+            allow_late=True,
+            sequence_index=1,
+        )
+        response = SurveyResponse.objects.create(user=viewer, survey=survey)
+        submitted_at = datetime.datetime(
+            2026, 5, 5, 20, 0, tzinfo=datetime.timezone.utc,
+        )
+        SurveyResponse.objects.filter(pk=response.pk).update(submitted_at=submitted_at)
+        response.refresh_from_db()
+
+        first_result = backfill_missing_survey_point_awards()
+        second_result = backfill_missing_survey_point_awards()
+
+        self.assertEqual(first_result.created, 1)
+        self.assertEqual(second_result.created, 0)
+        award = PointAward.objects.get(user=viewer, scheduled_survey=scheduled)
+        self.assertEqual(award.response_id, response.id)
+        self.assertEqual(award.source_slug, 'legacy_reward')
+        self.assertEqual(award.awarded_points, 12)
 
     def test_editable_resubmit_does_not_create_second_award(self):
         viewer = make_user('viewer')
