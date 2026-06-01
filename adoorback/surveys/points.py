@@ -231,8 +231,8 @@ def serialize_reimbursement_award(award: PointAward) -> dict:
             title_en = source['title_en']
             title_ko = source['title_ko']
     elif award.source_kind == PointAward.SOURCE_INTERVIEW_SIGNUP:
-        title_en = 'Interview signup'
-        title_ko = 'Interview signup'
+        title_en = 'Interview'
+        title_ko = 'Interview'
 
     submitted_at = response.submitted_at if response is not None else award.created_at
     return {

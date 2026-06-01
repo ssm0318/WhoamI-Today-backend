@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { buildReimbursementPreview, readPointSources, writeAllocationFile } from './server.mjs';
+import {
+  buildReimbursementPreview,
+  readAllocationFile,
+  readPointSources,
+  writeAllocationFile,
+} from './server.mjs';
 
 test('readPointSources lists survey YAML and manual reimbursement sources', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'point-allocation-'));
@@ -69,12 +74,13 @@ test('readPointSources lists survey YAML and manual reimbursement sources', asyn
       ['manual', 'wit_bot_audit_phase_2', 'Wit_bot audit pass - Phase 2', 12],
       ['manual', 'app_usage_phase_1', 'App usage - Phase 1', 50],
       ['manual', 'app_usage_phase_2', 'App usage - Phase 2', 50],
-      ['manual', 'interview_signup', 'Interview signup', 5],
+      ['manual', 'interview_signup', 'Interview', 5],
       ['manual', 'friend_invite', 'Friend invite reimbursement', 500],
     ],
   );
   assert.equal(sources[0].point_prereq_slug, 'habit_platform');
   assert.equal(sources[0].priority, 80);
+  assert.equal(sources.find((source) => source.slug === 'interview_signup').priority_rating, 2);
   assert.equal(sources[0].repeatable, true);
   assert.equal(sources[0].question_count, 2);
   assert.deepEqual(sources[0].question_metrics.visible_total_range, { min: 2, max: 2 });
@@ -409,6 +415,15 @@ test('writeAllocationFile persists point inputs and reimbursement policy control
   assert.match(saved.saved_at, /^\d{4}-\d{2}-\d{2}T/);
 });
 
+test('saved allocation leaves study endpoint part 2 answerable for late credit', async () => {
+  const allocation = await readAllocationFile(
+    new URL('../../point-allocation.values.json', import.meta.url),
+  );
+  const source = allocation.sources.find((candidate) => candidate.slug === 'study_endpoint_part2');
+
+  assert.equal(source.gate_slug, '');
+});
+
 test('buildReimbursementPreview applies merged DB responses, gates, and recurring caps', () => {
   const preview = buildReimbursementPreview({
     sources: [
@@ -675,6 +690,16 @@ test('buildReimbursementPreview applies reimbursement-specific deadline override
       draft_late_percent: 50,
       app_url: 'http://localhost:3000/surveys/feature_eval_w/answer',
     },
+    {
+      kind: 'survey',
+      id: 'survey:study_endpoint_part2',
+      slug: 'study_endpoint_part2',
+      title_en: 'What happens next with WIT: Part 2',
+      category_label: 'Survey',
+      draft_points: 20,
+      draft_gate_slug: 'study_endpoint',
+      app_url: 'http://localhost:3000/surveys/study_endpoint_part2/answer',
+    },
   ];
   const sourceSchedules = new Map([
     [
@@ -694,12 +719,23 @@ test('buildReimbursementPreview applies reimbursement-specific deadline override
         },
       ],
     ],
+    [
+      'study_endpoint_part2',
+      [
+        {
+          targetUserGroup: '',
+          windowStart: '2026-05-31',
+          windowEnd: '2026-05-31',
+          allowLate: false,
+        },
+      ],
+    ],
   ]);
 
   const qFirstPreview = buildReimbursementPreview({
     sources: baseSources,
     participants: [{ id: 9, username: 'q_first', userGroup: 'group_q_first' }],
-    responseCounts: new Map([[9, new Map()]]),
+    responseCounts: new Map([[9, new Map([['study_endpoint', 1]])]]),
     sourceRoutings: new Map([['feature_eval_w', new Set(['group_w_first', 'group_q_first'])]]),
     sourceSchedules,
     requestedUserId: 9,
@@ -731,7 +767,7 @@ test('buildReimbursementPreview applies reimbursement-specific deadline override
   const afterOpenPreview = buildReimbursementPreview({
     sources: baseSources,
     participants: [{ id: 9, username: 'q_first', userGroup: 'group_q_first' }],
-    responseCounts: new Map([[9, new Map()]]),
+    responseCounts: new Map([[9, new Map([['study_endpoint', 1]])]]),
     sourceRoutings: new Map([['feature_eval_w', new Set(['group_w_first', 'group_q_first'])]]),
     sourceSchedules,
     requestedUserId: 9,
@@ -742,11 +778,17 @@ test('buildReimbursementPreview applies reimbursement-specific deadline override
     afterOpenPreview.rows.find((row) => row.slug === 'interview_signup').availability,
     'available',
   );
+  assert.equal(afterOpenPreview.rows.find((row) => row.slug === 'study_endpoint_part2').canEarn, true);
+  assert.equal(
+    afterOpenPreview.rows.find((row) => row.slug === 'study_endpoint_part2').availability,
+    'late',
+  );
+  assert.match(afterOpenPreview.rows.find((row) => row.slug === 'study_endpoint_part2').note, /late/i);
 
   const wFirstPreview = buildReimbursementPreview({
     sources: baseSources,
     participants: [{ id: 8, username: 'w_first', userGroup: 'group_w_first' }],
-    responseCounts: new Map([[8, new Map()]]),
+    responseCounts: new Map([[8, new Map([['study_endpoint', 1]])]]),
     sourceRoutings: new Map([['feature_eval_w', new Set(['group_w_first', 'group_q_first'])]]),
     sourceSchedules,
     requestedUserId: 8,

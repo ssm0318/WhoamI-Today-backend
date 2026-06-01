@@ -129,7 +129,7 @@
       "priority_rating": 2,
       "cap_group": "",
       "cap_points": null,
-      "gate_slug": "study_endpoint",
+      "gate_slug": "",
       "late_percent": 100
     },
     {
@@ -486,7 +486,7 @@
       "kind": "manual",
       "slug": "interview_signup",
       "points": 200,
-      "priority_rating": 5,
+      "priority_rating": 2,
       "cap_group": "",
       "cap_points": null,
       "gate_slug": "",

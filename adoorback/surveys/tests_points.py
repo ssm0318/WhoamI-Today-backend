@@ -239,6 +239,23 @@ class ReimbursementApiTests(APITestCase):
         self.assertEqual(body['awards'][0]['title_en'], 'T')
         self.assertEqual(body['awards'][0]['scheduled_survey_id'], scheduled.id)
 
+    def test_reimbursement_state_labels_interview_award_as_interview(self):
+        viewer = make_user('viewer')
+        PointAward.objects.create(
+            user=viewer,
+            source_kind=PointAward.SOURCE_INTERVIEW_SIGNUP,
+            source_slug=PointAward.SOURCE_INTERVIEW_SIGNUP,
+            awarded_points=200,
+        )
+        self.client.force_authenticate(user=viewer)
+
+        result = self.client.get('/api/surveys/reimbursement/')
+
+        self.assertEqual(result.status_code, status.HTTP_200_OK)
+        award = result.json()['awards'][0]
+        self.assertEqual(award['title_en'], 'Interview')
+        self.assertEqual(award['title_ko'], 'Interview')
+
 
 class SurveyPointStateSerializerTests(APITestCase):
     def test_index_entries_include_point_state_and_prereq_lock(self):

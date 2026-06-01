@@ -53,6 +53,8 @@ const GROUP_DEADLINE_OVERRIDES = {
   },
 };
 
+const LATE_CREDIT_SURVEY_SLUGS = new Set(['study_endpoint_part2']);
+
 const MANUAL_SOURCES = [
   {
     slug: 'wit_bot_audit_phase_1',
@@ -76,8 +78,9 @@ const MANUAL_SOURCES = [
   },
   {
     slug: 'interview_signup',
-    title_en: 'Interview signup',
+    title_en: 'Interview',
     constant: 'INTERVIEW_SIGNUP_MAX_POINTS',
+    priority_rating: 2,
   },
   {
     slug: 'friend_invite',
@@ -675,6 +678,7 @@ async function readManualSources(repoRoot) {
       point_value: pointValue,
       current_points_label: source.current_points_label || '',
       point_prereq_slug: '',
+      priority_rating: source.priority_rating ?? 0,
       priority: 0,
       repeatable: false,
       editable: false,
@@ -780,7 +784,7 @@ function withSavedPoints(sources, allocation) {
   );
   return sources.map((source) => {
     const savedSource = saved.get(source.id);
-    const policy = normalizePolicy(savedSource || {});
+    const policy = normalizePolicy(savedSource || source);
     return withPolicyDefaults({
       ...source,
       ...policy,
@@ -1078,6 +1082,18 @@ function sourceAvailability({ source, participant, sourceSchedules, currentDate 
     if (String(currentDate) <= groupDeadline) return 'available';
     if (routed.some((schedule) => schedule.allowLate)) return 'late';
     return 'deadline';
+  }
+
+  if (LATE_CREDIT_SURVEY_SLUGS.has(source.slug) && schedules.length > 0) {
+    if (routed.some((schedule) => isScheduleOpenNow(schedule, currentDate))) {
+      return 'available';
+    }
+    if (routed.some((schedule) => schedule.windowStart && schedule.windowStart > currentDate)) {
+      return 'future';
+    }
+    if (routed.some((schedule) => schedule.windowStart && schedule.windowStart <= currentDate)) {
+      return 'late';
+    }
   }
 
   const actionPolicy = REIMBURSEMENT_ACTION_POLICIES[source.slug];
