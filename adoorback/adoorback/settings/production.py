@@ -46,6 +46,11 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = [
     'https://whoami.gina-park.site',    
     "https://*.gina-park.site",
+    'https://jaewonkim.me',
+    'https://www.jaewonkim.me',
+    'https://ssm0318.github.io',
+    'http://localhost:4178',
+    'http://127.0.0.1:4178',
 ]
 
 ALLOWED_HOSTS = [
@@ -61,6 +66,11 @@ ALLOWED_HOSTS = [
 CORS_ALLOWED_ORIGINS = [
     "https://ec2-43-203-123-225.ap-northeast-2.compute.amazonaws.com",  # Public DNS name
     "https://43.203.123.225",
+    "https://jaewonkim.me",
+    "https://www.jaewonkim.me",
+    "https://ssm0318.github.io",
+    "http://localhost:4178",
+    "http://127.0.0.1:4178",
 ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [

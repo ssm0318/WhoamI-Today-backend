@@ -240,11 +240,6 @@ class UserLogin(APIView):
 
     def post(self, request, format=None):
         data = request.data
-        response = Response(
-            data={"message": "Login successful"},
-            content_type="application/json"
-        )
-
         username = data.get('username', None)
         password = data.get('password', None)
         try:
@@ -260,6 +255,10 @@ class UserLogin(APIView):
         user = authenticate(username=user.username, password=password)
         if user is not None:
             access_token = get_access_token_for_user(user)
+            response = Response(
+                data={"message": "Login successful", "access": access_token},
+                content_type="application/json"
+            )
             response.set_cookie(
                 key=settings.SIMPLE_JWT['AUTH_COOKIE'],
                 value=access_token,

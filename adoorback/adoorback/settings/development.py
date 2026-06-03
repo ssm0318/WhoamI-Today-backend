@@ -31,8 +31,18 @@ DATABASES = {
 
 ALLOWED_HOSTS = ['*']
 
-CORS_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://localhost:3001']
-CSRF_TRUSTED_ORIGINS = ['http://localhost:3000', 'http://localhost:3001']
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4178',
+    'http://127.0.0.1:4178',
+]
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:4178',
+    'http://127.0.0.1:4178',
+]
 CORS_ALLOW_CREDENTIALS = True
 from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = [*default_headers, 'x-current-page']

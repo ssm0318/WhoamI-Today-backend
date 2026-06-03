@@ -183,6 +183,7 @@ class CaseInsensitiveSignupTests(APITestCase):
             'password': 'password123',
         })
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
 
     def test_login_accepts_case_variant_of_stored_username(self):
         response = self.client.post('/api/user/login/', {
@@ -190,3 +191,4 @@ class CaseInsensitiveSignupTests(APITestCase):
             'password': 'password123',
         })
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
