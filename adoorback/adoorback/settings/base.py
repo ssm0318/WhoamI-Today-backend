@@ -114,7 +114,6 @@ CRON_CLASSES = [
     "account.cron.SendDailyWhoAmINotiCronJob",
     "account.cron.AutoCloseSessionsCronJob",
     "account.cron.SendDailySurveyNotiCronJob",
-    "account.cron.CrossoverPhaseFlipCronJob",
     "check_in.cron.ExpireCheckInsCronJob",
 ]
 
