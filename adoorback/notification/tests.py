@@ -137,3 +137,14 @@ class NotifyFirebaseIosAlertTest(TestCase):
         web_device.send_message.assert_called_once()
         sent_message = web_device.send_message.call_args[0][0]
         self.assertEqual(sent_message.webpush.notification.title, 'WhoAmI Today')
+
+    @patch('notification.models.CustomFCMDevice.objects.filter')
+    def test_push_disabled_skips_all_firebase_delivery(self, mock_filter):
+        """Account-level push opt-out must leave the FCM token active but skip delivery."""
+        self.user.push_enabled = False
+        noti = _make_notification(self.user)
+
+        from notification.models import notify_firebase
+        notify_firebase(noti)
+
+        mock_filter.assert_not_called()

@@ -268,6 +268,14 @@ class User(AbstractUser, AdoorTimestampedModel, SafeDeleteModel):
         default=default_noti_period_days,
         help_text="Days of the week for notifications, where 0=Sunday, 1=Monday, etc."
     )
+    push_enabled = models.BooleanField(
+        default=True,
+        help_text="Whether this user receives any push notifications."
+    )
+    daily_prompt_push_enabled = models.BooleanField(
+        default=True,
+        help_text="Whether this user receives daily prompt push reminders."
+    )
     name = models.CharField(null=True, blank=True, max_length=50)
     pronouns = models.CharField(null=True, max_length=30)
     bio = models.CharField(null=True, max_length=118)

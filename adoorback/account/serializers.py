@@ -308,7 +308,7 @@ class CurrentUserSerializer(CountryFieldMixin, RecentPostsMixin, serializers.Hyp
                   'on_my_mind_visibility', 'as_a_friend_visibility', 'online_persona_visibility',
                   'favorite_platform_visibility', 'least_favorite_platform_visibility',
                   'signature', 'date_of_signature', 'unread_noti', 'unread_noti_cnt', 
-                  'noti_time', 'noti_period_days',
+                  'noti_time', 'noti_period_days', 'push_enabled', 'daily_prompt_push_enabled',
                   'timezone', 'current_ver', 'user_group', 'user_type',
                   'has_changed_pw', 'unread_message_cnt', 'is_public',
                   'friend_count', 'username_history', 'recent_posts', 'invite_code',

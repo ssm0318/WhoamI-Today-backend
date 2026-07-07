@@ -252,6 +252,9 @@ def get_notification_tag(instance):
 
 
 def notify_firebase(instance):
+    if not getattr(instance.user, 'push_enabled', True):
+        return
+
     devices = CustomFCMDevice.objects.filter(user_id=instance.user.id, active=True)
     tag = get_notification_tag(instance)
     for device in devices:

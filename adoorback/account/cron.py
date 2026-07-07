@@ -73,12 +73,15 @@ class SendDailyWhoAmINotiCronJob(CronJobBase):
                 )
                 redirect_url = f'/questions/{daily_question.id}/new'
 
-            noti = Notification.objects.create(user=user,
-                                            target=admin,
-                                            origin=admin,
-                                            message_ko=message_ko,
-                                            message_en=message_en,
-                                            redirect_url=redirect_url)
+            noti = Notification(user=user,
+                                target=admin,
+                                origin=admin,
+                                message_ko=message_ko,
+                                message_en=message_en,
+                                redirect_url=redirect_url)
+            if not user.daily_prompt_push_enabled:
+                noti._skip_push = True
+            noti.save()
             NotificationActor.objects.create(user=admin, notification=noti)
 
         num_notis_after = Notification.objects.admin_only().count()
@@ -119,12 +122,15 @@ class SendDailySurveyNotiCronJob(CronJobBase):
             noti_time = user_now.replace(hour=20, minute=0, second=0, microsecond=0)
             time_diff = abs(user_now - noti_time)
             if time_diff <= timedelta(minutes=10):
-                noti = Notification.objects.create(user=user,
-                                                target=bot,
-                                                origin=bot,
-                                                message_ko=f"{user.username}님, 데일리 설문을 작성해주세요!",
-                                                message_en=f"{user.username}, time to fill out the daily survey!",
-                                                redirect_url='/share')
+                noti = Notification(user=user,
+                                    target=bot,
+                                    origin=bot,
+                                    message_ko=f"{user.username}님, 데일리 설문을 작성해주세요!",
+                                    message_en=f"{user.username}, time to fill out the daily survey!",
+                                    redirect_url='/share')
+                if not user.daily_prompt_push_enabled:
+                    noti._skip_push = True
+                noti.save()
                 NotificationActor.objects.create(user=bot, notification=noti)
 
         num_notis_after = Notification.objects.admin_only().count()
