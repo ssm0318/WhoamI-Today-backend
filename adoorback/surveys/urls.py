@@ -1,12 +1,14 @@
 from django.urls import path
 
 from surveys.views import (
-    MyResponseView, PastSurveysView, ReimbursementView, SurveyDetailView,
-    SurveyDraftView, SurveyIndexView, SurveyOfTheDayView, SurveyResponseSubmitView,
-    SurveyResultsView,
+    DropoutSurveyContextView, DropoutSurveyResponseSubmitView, MyResponseView,
+    PastSurveysView, ReimbursementView, SurveyDetailView, SurveyDraftView,
+    SurveyIndexView, SurveyOfTheDayView, SurveyResponseSubmitView, SurveyResultsView,
 )
 
 urlpatterns = [
+    path('dropout/context/', DropoutSurveyContextView.as_view(), name='dropout-survey-context'),
+    path('dropout/responses/', DropoutSurveyResponseSubmitView.as_view(), name='dropout-survey-submit'),
     path('today/', SurveyOfTheDayView.as_view(), name='survey-today'),
     path('index/', SurveyIndexView.as_view(), name='survey-index'),
     path('past/', PastSurveysView.as_view(), name='survey-past'),

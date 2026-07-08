@@ -1,11 +1,16 @@
+import hashlib
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core import signing
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -17,13 +22,14 @@ from surveys.aggregation import (
 )
 from surveys.models import (
     CADENCE_DAILY, INPUT_LESS_TYPES, PER_FRIEND_TYPES, ScheduledSurvey, Survey,
-    PointAward, SurveyAnswer, SurveyDraft, SurveyQuestion, SurveyResponse,
-    UserSurveyEmbeddedData,
+    DropoutSurveyResponse, PointAward, SurveyAnswer, SurveyDraft,
+    SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.points import (
     create_survey_point_award, reimbursement_state_for_user,
     resolve_submit_scheduled_survey, serialize_point_award,
+    wit_bot_audit_version_for_group,
 )
 from surveys.scheduling import (
     _today_la_7am, get_survey_index, get_today_daily,
@@ -35,9 +41,113 @@ from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyDraftSerializer,
     SurveyIndexEntrySerializer, SurveyResponseInputSerializer, validate_answer_value,
 )
+from surveys.app_usage import (
+    PARTICIPANT_ID_MAX, PARTICIPANT_ID_MIN, PARTICIPANT_REPLACED_ID,
+    PARTICIPANT_REPLACEMENT_ID,
+)
 
 DAILY_ARCHIVE_SURVEY_SLUG = 'daily_base'
 LA_TZ = ZoneInfo('America/Los_Angeles')
+DROPOUT_LOOKUP_TOKEN_SALT = 'surveys.dropout.lookup'
+DROPOUT_LOOKUP_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 6
+DROPOUT_PHASES = {
+    'phase1': {'label': 'Phase 1', 'date_range': 'May 4-May 17'},
+    'phase2': {'label': 'Phase 2', 'date_range': 'May 18-May 31'},
+}
+DROPOUT_VERSION_LABELS = {
+    'version_w': 'Ver.W',
+    'version_q': 'Ver.Q',
+    '': '',
+}
+
+
+def _dropout_participant_queryset():
+    User = get_user_model()
+    return (
+        User.objects
+        .filter(is_superuser=False)
+        .filter(
+            Q(id__gte=PARTICIPANT_ID_MIN, id__lte=PARTICIPANT_ID_MAX)
+            | Q(id=PARTICIPANT_REPLACEMENT_ID)
+        )
+        .exclude(id=PARTICIPANT_REPLACED_ID)
+    )
+
+
+def _normalize_dropout_identifier(identifier) -> str:
+    return str(identifier or '').strip()
+
+
+def _dropout_identifier_hash(identifier: str) -> str:
+    normalized = _normalize_dropout_identifier(identifier).casefold()
+    if not normalized:
+        return ''
+    raw = f'{settings.SECRET_KEY}:dropout-survey:{normalized}'
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+
+def _dropout_phase_payload(user_group: str) -> dict:
+    if not user_group:
+        phase1_version = ''
+        phase2_version = ''
+    else:
+        phase1_version = wit_bot_audit_version_for_group(user_group, 1)
+        phase2_version = wit_bot_audit_version_for_group(user_group, 2)
+
+    return {
+        'phase1': {
+            **DROPOUT_PHASES['phase1'],
+            'version': phase1_version,
+            'version_label': DROPOUT_VERSION_LABELS.get(phase1_version, phase1_version),
+        },
+        'phase2': {
+            **DROPOUT_PHASES['phase2'],
+            'version': phase2_version,
+            'version_label': DROPOUT_VERSION_LABELS.get(phase2_version, phase2_version),
+        },
+    }
+
+
+def _dropout_lookup_user(identifier: str):
+    cleaned = _normalize_dropout_identifier(identifier)
+    if not cleaned:
+        return None, DropoutSurveyResponse.MATCHED_UNMATCHED
+
+    participants = _dropout_participant_queryset().order_by('id')
+    email_match = participants.filter(email__iexact=cleaned).first()
+    if email_match is not None:
+        return email_match, DropoutSurveyResponse.MATCHED_EMAIL
+
+    username_match = participants.filter(username__iexact=cleaned).first()
+    if username_match is not None:
+        return username_match, DropoutSurveyResponse.MATCHED_USERNAME
+
+    return None, DropoutSurveyResponse.MATCHED_UNMATCHED
+
+
+def _dropout_lookup_payload(identifier: str, user, matched_identifier_type: str) -> dict:
+    user_group = user.user_group if user is not None else ''
+    phases = _dropout_phase_payload(user_group)
+    identifier_hash = _dropout_identifier_hash(identifier)
+    token_payload = {
+        'user_id': user.id if user is not None else None,
+        'identifier_hash': identifier_hash,
+        'matched_identifier_type': matched_identifier_type,
+        'user_group': user_group,
+        'phase1_version': phases['phase1']['version'],
+        'phase2_version': phases['phase2']['version'],
+    }
+    return {
+        'matched': user is not None,
+        'matched_identifier_type': matched_identifier_type,
+        'lookup_token': signing.dumps(
+            token_payload,
+            salt=DROPOUT_LOOKUP_TOKEN_SALT,
+            compress=True,
+        ),
+        'participant': {'username': user.username} if user is not None else None,
+        'phases': phases,
+    }
 
 
 def _persist_embedded_data(user, response: SurveyResponse) -> None:
@@ -114,6 +224,102 @@ def _bereal_gate(viewer, survey: Survey):
             'available_at': survey_day.isoformat(),
         }
     return True, None
+
+
+class DropoutSurveyContextView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        identifier = _normalize_dropout_identifier(request.data.get('identifier'))
+        if not identifier:
+            return Response(
+                {'detail': 'Enter a username or email.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user, matched_identifier_type = _dropout_lookup_user(identifier)
+        return Response(_dropout_lookup_payload(identifier, user, matched_identifier_type))
+
+
+class DropoutSurveyResponseSubmitView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        answers = request.data.get('answers')
+        if not isinstance(answers, dict) or not answers:
+            return Response(
+                {'detail': 'Submit at least one survey answer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lookup_token = request.data.get('lookup_token')
+        if lookup_token:
+            try:
+                token_payload = signing.loads(
+                    lookup_token,
+                    salt=DROPOUT_LOOKUP_TOKEN_SALT,
+                    max_age=DROPOUT_LOOKUP_TOKEN_MAX_AGE_SECONDS,
+                )
+            except signing.SignatureExpired:
+                return Response(
+                    {'detail': 'This lookup session expired. Please look up your account again.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except signing.BadSignature:
+                return Response(
+                    {'detail': 'Invalid lookup token.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            token_payload = {
+                'user_id': None,
+                'identifier_hash': '',
+                'matched_identifier_type': DropoutSurveyResponse.MATCHED_UNMATCHED,
+                'user_group': '',
+                'phase1_version': '',
+                'phase2_version': '',
+            }
+
+        user = None
+        user_id = token_payload.get('user_id')
+        if user_id is not None:
+            user = _dropout_participant_queryset().filter(id=user_id).first()
+            if user is None:
+                return Response(
+                    {'detail': 'This participant lookup is no longer valid.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        identifier_hash = token_payload.get('identifier_hash') or ''
+        matched_identifier_type = (
+            token_payload.get('matched_identifier_type')
+            or DropoutSurveyResponse.MATCHED_UNMATCHED
+        )
+        response = DropoutSurveyResponse.objects.create(
+            user=user,
+            identifier_hash=identifier_hash,
+            matched_identifier_type=matched_identifier_type,
+            user_group=token_payload.get('user_group') or '',
+            phase1_version=token_payload.get('phase1_version') or '',
+            phase2_version=token_payload.get('phase2_version') or '',
+            answers=answers,
+            lookup_metadata={
+                'identifier_hash': identifier_hash,
+                'matched': user is not None,
+                'matched_identifier_type': matched_identifier_type,
+                'source': 'jaewonkim.me/whoami-dropout',
+            },
+        )
+        return Response(
+            {
+                'id': response.id,
+                'matched': user is not None,
+                'submitted_at': response.submitted_at.isoformat(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class SurveyOfTheDayView(APIView):

@@ -591,6 +591,47 @@ class PointAward(AdoorTimestampedModel):
         return f'PointAward<{self.user_id}:{self.source_kind}:{self.source_slug}>'
 
 
+class DropoutSurveyResponse(AdoorTimestampedModel):
+    MATCHED_USERNAME = 'username'
+    MATCHED_EMAIL = 'email'
+    MATCHED_UNMATCHED = 'unmatched'
+    MATCHED_IDENTIFIER_TYPE_CHOICES = (
+        (MATCHED_USERNAME, 'Username'),
+        (MATCHED_EMAIL, 'Email'),
+        (MATCHED_UNMATCHED, 'Unmatched'),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='dropout_survey_responses',
+    )
+    identifier_hash = models.CharField(max_length=64, blank=True, default='')
+    matched_identifier_type = models.CharField(
+        max_length=20,
+        choices=MATCHED_IDENTIFIER_TYPE_CHOICES,
+        default=MATCHED_UNMATCHED,
+    )
+    user_group = models.CharField(max_length=20, blank=True, default='')
+    phase1_version = models.CharField(max_length=20, blank=True, default='')
+    phase2_version = models.CharField(max_length=20, blank=True, default='')
+    answers = models.JSONField(default=dict, blank=True)
+    lookup_metadata = models.JSONField(default=dict, blank=True)
+    submitted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-submitted_at', '-id']
+        indexes = [
+            models.Index(fields=['user', 'submitted_at'], name='surveys_drop_user_sub_idx'),
+            models.Index(fields=['identifier_hash'], name='surveys_drop_ident_idx'),
+        ]
+
+    def __str__(self):
+        return f'DropoutSurveyResponse<{self.user_id or "unmatched"}:{self.id}>'
+
+
 class SurveyAnswer(AdoorTimestampedModel):
     response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(SurveyQuestion, on_delete=models.PROTECT, related_name='answers')
