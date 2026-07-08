@@ -91,7 +91,14 @@ class EmailManager():
         message_data += f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}\n\n"
         message_data += _("감사합니다.")
         email = EmailMessage(mail_title, message_data, to=mail_to)
-        email.send()
+        try:
+            email.send(fail_silently=False)
+        except Exception as e:
+            tb = traceback.format_exc()
+            send_msg_to_slack(
+                text=f"*⚠️ 비밀번호 변경 이메일 전송 실패*\n```{tb}```",
+                level="WARNING"
+            )
 
     def check_activate_token(self, user, token):
         return self.activate_token_generator.check_token(user, token)
