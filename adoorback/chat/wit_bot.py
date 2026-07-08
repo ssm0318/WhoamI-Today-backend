@@ -180,4 +180,16 @@ def escalate_to_human(user):
     )
     NotificationActor.objects.create(user=user, notification=noti)
 
+    # The in-app Notification above only reaches the wit_admin account, so the
+    # owner sees it only while logged in there. Also ping Slack for immediacy.
+    # Best-effort: a failure here must never break the escalation itself.
+    try:
+        from adoorback.utils.alerts import send_user_event_to_slack
+        send_user_event_to_slack(
+            f"🆘 {user.username} asked wit_bot for a human — "
+            f"room /chats/group/{room.id}"
+        )
+    except Exception as exc:
+        logger.warning('wit_bot Slack escalation ping failed: %s', exc)
+
     return room
