@@ -554,6 +554,12 @@ class SendResetPasswordEmail(generics.CreateAPIView):
 
         if user:
             email_manager.send_reset_password_email(user)
+            try:
+                send_user_event_to_slack(
+                    f"🔑 Password reset requested by {user.username} ({user.email})"
+                )
+            except Exception:
+                pass
             return HttpResponse(status=200)
         else:
             return HttpResponse(status=404, content=b"We couldn't find a user with the given email.")
