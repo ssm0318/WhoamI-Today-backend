@@ -528,6 +528,27 @@ class SurveyResponseSubmitView(APIView):
             return Response(
                 {'detail': 'Already submitted.'}, status=status.HTTP_409_CONFLICT
             )
+        # Ping the research team when a participant drops feedback via the
+        # "Drop us a note" channel (anytime_reflection). GATED to that one
+        # slug: this endpoint is the generic submit handler for EVERY survey,
+        # so an ungated hook would flood Slack. Skip edit resubmissions and
+        # never let a Slack failure break the submission.
+        if survey.slug == 'anytime_reflection' and not is_edit:
+            try:
+                category = (
+                    response.answers.filter(question__slug='anytime_category')
+                    .values_list('value', flat=True)
+                    .first()
+                )
+                send_user_event_to_slack(
+                    f"*🗒️ Drop us a note*\n"
+                    f"```\n"
+                    f"User: {request.user.username} (ID: {request.user.id})\n"
+                    f"Category: {category or 'N/A'}\n"
+                    f"```"
+                )
+            except Exception:
+                pass
         return Response(
             {'id': response.id, 'point_award': serialize_point_award(point_award)},
             status=status.HTTP_201_CREATED,
