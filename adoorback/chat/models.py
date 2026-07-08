@@ -572,6 +572,27 @@ def fanout_wit_admin_messages(created, instance, **kwargs):
         except LookupError:
             return
         user = sender  # the regular user
+
+        # First inbound message in this support room → ping Slack so an operator
+        # gets push immediacy (the in-app proxy mirror below still carries the
+        # data). Gate on "no prior non-mirror message" so follow-up replies in
+        # an open ticket don't re-ping. Placed before the operator loop so it
+        # fires exactly once per message.
+        is_first_message = not room.messages.filter(
+            is_wit_admin_mirror=False,
+        ).exclude(id=instance.id).exists()
+        if is_first_message:
+            from adoorback.utils.alerts import send_user_event_to_slack
+            preview = (instance.content or instance.emoji or '(image)')[:300]
+            slack_text = (
+                f"*📮 WIT Admin — new support message*\n"
+                f"```\n"
+                f"From: {user.username} (ID: {user.id})\n"
+                f"Message: {preview}\n"
+                f"```"
+            )
+            transaction.on_commit(lambda: send_user_event_to_slack(slack_text))
+
         for op in operators:
             u1, u2 = (user, op) if user.id < op.id else (op, user)
             proxy_room = ChatRoom.objects.filter(
