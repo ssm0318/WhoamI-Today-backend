@@ -41,13 +41,12 @@ from surveys.serializers import (
     PastSurveySerializer, SurveyDetailSerializer, SurveyDraftSerializer,
     SurveyIndexEntrySerializer, SurveyResponseInputSerializer, validate_answer_value,
 )
-from surveys.app_usage import (
-    PARTICIPANT_ID_MAX, PARTICIPANT_ID_MIN, PARTICIPANT_REPLACED_ID,
-    PARTICIPANT_REPLACEMENT_ID,
-)
-
 DAILY_ARCHIVE_SURVEY_SLUG = 'daily_base'
 LA_TZ = ZoneInfo('America/Los_Angeles')
+DROP_OUT_PARTICIPANT_ID_MIN = 8
+DROP_OUT_PARTICIPANT_ID_MAX = 87
+DROP_OUT_PARTICIPANT_REPLACED_ID = 64
+DROP_OUT_PARTICIPANT_REPLACEMENT_ID = 114
 DROPOUT_LOOKUP_TOKEN_SALT = 'surveys.dropout.lookup'
 DROPOUT_LOOKUP_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 6
 DROPOUT_PHASES = {
@@ -67,10 +66,10 @@ def _dropout_participant_queryset():
         User.objects
         .filter(is_superuser=False)
         .filter(
-            Q(id__gte=PARTICIPANT_ID_MIN, id__lte=PARTICIPANT_ID_MAX)
-            | Q(id=PARTICIPANT_REPLACEMENT_ID)
+            Q(id__gte=DROP_OUT_PARTICIPANT_ID_MIN, id__lte=DROP_OUT_PARTICIPANT_ID_MAX)
+            | Q(id=DROP_OUT_PARTICIPANT_REPLACEMENT_ID)
         )
-        .exclude(id=PARTICIPANT_REPLACED_ID)
+        .exclude(id=DROP_OUT_PARTICIPANT_REPLACED_ID)
     )
 
 
