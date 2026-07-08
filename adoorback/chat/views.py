@@ -8,7 +8,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from adoorback.utils.alerts import send_msg_to_slack
+from adoorback.utils.alerts import send_msg_to_slack, send_user_event_to_slack
 from adoorback.utils.validators import adoor_exception_handler
 from django.contrib.contenttypes.models import ContentType
 from .models import Message, ChatRoom, ChatRequest, MessageReaction, GroupReadCursor, MAX_GROUP_MEMBERS, OnboardingEvent, get_or_create_chat_room, get_chat_room
@@ -900,6 +900,13 @@ class GroupChatCreate(generics.CreateAPIView):
 
         room = ChatRoom.objects.create(is_group=True, name=name)
         room.members.set(members)
+
+        try:
+            send_user_event_to_slack(
+                f"👥 {user.username} created group chat '{name or '(unnamed)'}' with {len(all_member_ids)} members"
+            )
+        except Exception:
+            pass
 
         serializer = ChatRoomSerializer(room, context={'request': request})
         return Response(serializer.data, status=201)
