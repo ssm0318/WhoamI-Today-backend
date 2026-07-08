@@ -66,6 +66,7 @@ from adoorback.utils.mission_day import get_today_la_boundary
 from adoorback.utils.exceptions import ExistingUsername, LongUsername, InvalidUsername, ExistingEmail, InvalidEmail, \
     NoUsername, WrongPassword, ExistingUsername, InvalidInviterEmail, InvalidInviterUsername, ConflictError
 from adoorback.utils.validators import adoor_exception_handler
+from adoorback.utils.alerts import send_user_event_to_slack
 from note.models import Note, ShareType
 from note.feed_grouping import group_note_entries, serialize_mission_grouped_notes, serialize_note_entries
 from note.serializers import NoteSerializer
@@ -1455,6 +1456,15 @@ class CurrentUserDelete(generics.DestroyAPIView):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.perform_destroy(instance)
+        # Notify study owner of the departure (churn signal). Fires only after
+        # the soft-delete commits, since perform_destroy is @transaction.atomic.
+        # instance.username survives the PII scrub, so it's still available.
+        try:
+            send_user_event_to_slack(
+                f"🗑️ Account deleted: @{instance.username} left the study"
+            )
+        except Exception:
+            pass
         response = Response(status=status.HTTP_204_NO_CONTENT)
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
         return response
