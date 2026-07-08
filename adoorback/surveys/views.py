@@ -14,6 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from adoorback.utils.alerts import send_user_event_to_slack
 from surveys.aggregation import (
     build_panel_distribution,
     compute_user_percentile,
@@ -311,6 +312,22 @@ class DropoutSurveyResponseSubmitView(APIView):
                 'source': 'jaewonkim.me/whoami-dropout',
             },
         )
+
+        # Notify the research team on Slack. This endpoint is unauthenticated
+        # and can be spammed with unmatched submissions, so never let a Slack
+        # failure break the participant's submission.
+        try:
+            who = user.username if user else '(unmatched)'
+            send_user_event_to_slack(
+                f"🚪 Dropout survey submitted — {who} "
+                f"(matched={user is not None}, via {matched_identifier_type}), "
+                f"group={token_payload.get('user_group') or '?'}, "
+                f"phase1={token_payload.get('phase1_version') or '?'}, "
+                f"phase2={token_payload.get('phase2_version') or '?'}"
+            )
+        except Exception:
+            pass
+
         return Response(
             {
                 'id': response.id,
