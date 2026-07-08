@@ -512,6 +512,21 @@ def create_chat_request_noti(created, instance, **kwargs):
             redirect_url=f'/users/{requester.username}',
         )
         NotificationActor.objects.create(user=requester, notification=noti)
+
+        # New chat request / first contact → ping Slack so an operator sees the
+        # reach-out with push immediacy. Fires only on `created`, so the
+        # implicit auto-accept path (handled in the `accepted is True` branch
+        # below) is excluded and blocked requesters are already filtered out
+        # above. MEDIUM volume. Deferred to on_commit since this receiver is
+        # @transaction.atomic.
+        try:
+            from adoorback.utils.alerts import send_user_event_to_slack
+            slack_text = (
+                f"💬 {requester.username} sent a chat request to {requestee.username}"
+            )
+            transaction.on_commit(lambda: send_user_event_to_slack(slack_text))
+        except Exception:
+            logger.exception('Failed to enqueue chat request Slack alert')
     elif instance.accepted is True:
         # Update the original "sent you a chat request" notification to point to the chat room
         instance.chat_request_targetted_notis.filter(user=requestee).update(
