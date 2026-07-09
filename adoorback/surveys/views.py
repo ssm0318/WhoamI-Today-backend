@@ -23,7 +23,7 @@ from surveys.aggregation import (
 )
 from surveys.models import (
     CADENCE_DAILY, INPUT_LESS_TYPES, PER_FRIEND_TYPES, ScheduledSurvey, Survey,
-    DropoutSurveyResponse, PointAward, SurveyAnswer, SurveyDraft,
+    DropoutSurveyDraft, DropoutSurveyResponse, PointAward, SurveyAnswer, SurveyDraft,
     SurveyQuestion, SurveyResponse, UserSurveyEmbeddedData,
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
@@ -84,6 +84,22 @@ def _dropout_identifier_hash(identifier: str) -> str:
         return ''
     raw = f'{settings.SECRET_KEY}:dropout-survey:{normalized}'
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+
+def _dropout_decode_lookup_token(lookup_token):
+    """Decode a signed dropout lookup token. Returns the payload dict, or None
+    if the token is missing, tampered with, or older than the max age
+    (SignatureExpired subclasses BadSignature, so both are covered)."""
+    if not lookup_token:
+        return None
+    try:
+        return signing.loads(
+            lookup_token,
+            salt=DROPOUT_LOOKUP_TOKEN_SALT,
+            max_age=DROPOUT_LOOKUP_TOKEN_MAX_AGE_SECONDS,
+        )
+    except signing.BadSignature:
+        return None
 
 
 def _dropout_phase_payload(user_group: str) -> dict:
@@ -313,6 +329,10 @@ class DropoutSurveyResponseSubmitView(APIView):
             },
         )
 
+        # A real response landed — clear any server-side autosave for it.
+        if identifier_hash:
+            DropoutSurveyDraft.objects.filter(identifier_hash=identifier_hash).delete()
+
         # Notify the research team on Slack. This endpoint is unauthenticated
         # and can be spammed with unmatched submissions, so never let a Slack
         # failure break the participant's submission.
@@ -336,6 +356,52 @@ class DropoutSurveyResponseSubmitView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class DropoutSurveyDraftView(APIView):
+    """Server-side autosave for an in-progress dropout survey. Authorized by the
+    signed lookup token and keyed by the salted identifier hash it carries, so no
+    raw username/email is stored and a participant can resume across devices.
+    Best-effort — the frontend also keeps a local copy."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        payload = _dropout_decode_lookup_token(request.data.get('lookup_token'))
+        identifier_hash = (payload or {}).get('identifier_hash') or ''
+        if not identifier_hash:
+            # Unmatched or expired token: nothing to persist server-side.
+            return Response({'saved': False})
+
+        draft = request.data.get('draft')
+        if not isinstance(draft, dict):
+            return Response(
+                {'detail': 'Draft must be an object.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        DropoutSurveyDraft.objects.update_or_create(
+            identifier_hash=identifier_hash,
+            defaults={'data': draft},
+        )
+        return Response({'saved': True})
+
+
+class DropoutSurveyDraftLoadView(APIView):
+    """Return the saved in-progress draft for the token's identifier, if any."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        payload = _dropout_decode_lookup_token(request.data.get('lookup_token'))
+        identifier_hash = (payload or {}).get('identifier_hash') or ''
+        if not identifier_hash:
+            return Response({'draft': None})
+
+        draft = DropoutSurveyDraft.objects.filter(identifier_hash=identifier_hash).first()
+        return Response({'draft': draft.data if draft else None})
 
 
 class SurveyOfTheDayView(APIView):

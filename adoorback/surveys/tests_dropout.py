@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from surveys.models import DropoutSurveyResponse
+from surveys.models import DropoutSurveyDraft, DropoutSurveyResponse
 
 
 User = get_user_model()
@@ -132,8 +132,31 @@ class DropoutSurveyResponseTests(APITestCase):
             'lookup_token': token,
             'answers': {
                 'phase1_participation': 'stopped',
-                'phase1_reasons': ['School exams, finals, assignments, or end-of-school-year timing.'],
-                'main_reason': 'Too many study tasks, surveys, or reminders.',
+                'phase1_reasons': [
+                    'Exams, finals, or assignments',
+                    'Bugs, glitches, or login/loading problems',
+                ],
+                'phase1_reasons_by_group': {
+                    'busy': ['Exams, finals, or assignments'],
+                    'app': ['Bugs, glitches, or login/loading problems'],
+                },
+                'phase1_comment': '',
+                'phase2_participation': 'stopped',
+                'phase2_same_as_phase1': True,
+                'phase2_reasons': [
+                    'Exams, finals, or assignments',
+                    'Bugs, glitches, or login/loading problems',
+                ],
+                'phase2_reasons_by_group': {
+                    'busy': ['Exams, finals, or assignments'],
+                    'app': ['Bugs, glitches, or login/loading problems'],
+                },
+                'phase2_comment': '',
+                'feature_preference': 'Ver.Q',
+                'version_comment': '',
+                'concerns': ['None'],
+                'concerns_comment': '',
+                'final_comment': '',
             },
         }
 
@@ -187,3 +210,66 @@ class DropoutSurveyResponseTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(DropoutSurveyResponse.objects.exists())
+
+    def test_draft_save_and_load_round_trip(self):
+        token = self.lookup_token('phasew')
+        draft = {'radios': {'phase1_participation': 'used_less'}, 'checks': {}, 'texts': {}}
+
+        save = self.client.post(
+            '/api/surveys/dropout/draft/',
+            {'lookup_token': token, 'draft': draft},
+            format='json',
+        )
+        self.assertEqual(save.status_code, status.HTTP_200_OK)
+        self.assertTrue(save.json()['saved'])
+        self.assertEqual(DropoutSurveyDraft.objects.count(), 1)
+
+        load = self.client.post(
+            '/api/surveys/dropout/draft/load/',
+            {'lookup_token': token},
+            format='json',
+        )
+        self.assertEqual(load.status_code, status.HTTP_200_OK)
+        self.assertEqual(load.json()['draft'], draft)
+
+    def test_draft_save_is_idempotent_per_identifier(self):
+        token = self.lookup_token('phasew')
+        for text in ['first', 'second']:
+            self.client.post(
+                '/api/surveys/dropout/draft/',
+                {'lookup_token': token, 'draft': {'texts': {'final_comment': text}}},
+                format='json',
+            )
+        self.assertEqual(DropoutSurveyDraft.objects.count(), 1)
+        load = self.client.post(
+            '/api/surveys/dropout/draft/load/',
+            {'lookup_token': token},
+            format='json',
+        )
+        self.assertEqual(load.json()['draft']['texts']['final_comment'], 'second')
+
+    def test_draft_cleared_after_response_submitted(self):
+        token = self.lookup_token('phasew')
+        self.client.post(
+            '/api/surveys/dropout/draft/',
+            {'lookup_token': token, 'draft': {'texts': {'final_comment': 'wip'}}},
+            format='json',
+        )
+        self.assertEqual(DropoutSurveyDraft.objects.count(), 1)
+
+        submit = self.client.post(
+            '/api/surveys/dropout/responses/',
+            {'lookup_token': token, 'answers': {'phase1_participation': 'stopped'}},
+            format='json',
+        )
+        self.assertEqual(submit.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(DropoutSurveyDraft.objects.count(), 0)
+
+    def test_draft_load_with_invalid_token_returns_none(self):
+        load = self.client.post(
+            '/api/surveys/dropout/draft/load/',
+            {'lookup_token': 'not-a-token'},
+            format='json',
+        )
+        self.assertEqual(load.status_code, status.HTTP_200_OK)
+        self.assertIsNone(load.json()['draft'])

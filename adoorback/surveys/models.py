@@ -632,6 +632,22 @@ class DropoutSurveyResponse(AdoorTimestampedModel):
         return f'DropoutSurveyResponse<{self.user_id or "unmatched"}:{self.id}>'
 
 
+class DropoutSurveyDraft(AdoorTimestampedModel):
+    """Server-side autosave of an in-progress dropout survey so a participant
+    can resume across devices. Keyed by the same salted identifier hash the
+    signed lookup token carries — no raw username/email is stored. The row is
+    deleted once the matching response is submitted."""
+
+    identifier_hash = models.CharField(max_length=64, unique=True)
+    data = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+
+    def __str__(self):
+        return f'DropoutSurveyDraft<{self.identifier_hash[:8]}:{self.id}>'
+
+
 class SurveyAnswer(AdoorTimestampedModel):
     response = models.ForeignKey(SurveyResponse, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(SurveyQuestion, on_delete=models.PROTECT, related_name='answers')
