@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 
 from surveys.models import PointAward, ScheduledSurvey, Survey, SurveyResponse
 from surveys.reimbursement_config import (
-    APP_USAGE_PHASES, INTERVIEW_SIGNUP_MAX_POINTS, POINTS_PER_DOLLAR,
-    WIT_BOT_AUDIT_PHASES,
+    APP_USAGE_PHASES, FRIEND_INVITE_MAX_POINTS, INTERVIEW_SIGNUP_MAX_POINTS,
+    INTERVIEW_SIGNUP_URL, POINTS_PER_DOLLAR, WIT_BOT_AUDIT_PHASES,
 )
 from surveys.retired import is_retired_survey_slug
 from surveys.scheduling import (
@@ -239,6 +239,12 @@ def serialize_reimbursement_award(award: PointAward) -> dict:
     elif award.source_kind == PointAward.SOURCE_INTERVIEW_SIGNUP:
         title_en = 'Interview'
         title_ko = 'Interview'
+    elif award.source_kind == PointAward.SOURCE_FRIEND_INVITE:
+        title_en = 'Friend invitations'
+        title_ko = '친구 초대'
+    elif award.source_kind == PointAward.SOURCE_RESEARCHER_ADJUSTMENT:
+        title_en = _source_slug_title(award.source_slug)
+        title_ko = title_en
 
     submitted_at = response.submitted_at if response is not None else award.created_at
     return {
@@ -265,6 +271,14 @@ def _survey_titles_for_user(survey: Survey, user) -> tuple[str, str]:
     return (
         substitute(survey.title_en, tokens),
         substitute(survey.title_ko, tokens),
+    )
+
+
+def _source_slug_title(source_slug: str) -> str:
+    return ' '.join(
+        part.capitalize()
+        for part in str(source_slug or '').replace('-', '_').split('_')
+        if part
     )
 
 
@@ -545,6 +559,7 @@ def available_max_for_user(user) -> int:
     total = sum(source['max_points'] for source in WIT_BOT_AUDIT_PHASES.values())
     total += sum(source['max_points'] for source in APP_USAGE_PHASES.values())
     total += INTERVIEW_SIGNUP_MAX_POINTS
+    total += FRIEND_INVITE_MAX_POINTS
     for scheduled in _visible_scheduled_surveys_for_points(user):
         total += scheduled.survey.point_value
     return total
@@ -583,18 +598,30 @@ def reimbursement_state_for_user(user) -> dict:
         .order_by('-created_at', '-id')
     )
     serialized_awards = [serialize_reimbursement_award(award) for award in awards]
-    serialized_awards.extend(_computed_missing_survey_awards_for_user(user, awards))
-    serialized_awards.extend(_computed_wit_bot_audit_awards_for_user(user, awards))
-    provisional_total = sum(award['awarded_points'] for award in serialized_awards)
     adjusted_total = sum(award['effective_points'] for award in serialized_awards)
+    interview_completed = any(
+        award.source_kind == PointAward.SOURCE_INTERVIEW_SIGNUP
+        and award.effective_points > 0
+        for award in awards
+    )
     return {
-        'provisional_total': provisional_total,
+        'is_final': True,
+        'provisional_total': adjusted_total,
         'adjusted_total': adjusted_total,
         'available_max': available_max_for_user(user),
         'dollar_estimate_cents': round(adjusted_total * 100 / POINTS_PER_DOLLAR),
         'points_per_dollar': POINTS_PER_DOLLAR,
         'awards': serialized_awards,
-        'pending_prereqs': pending_prereqs_for_user(user),
+        'pending_prereqs': [],
+        'interview_opportunity': {
+            'completed': interview_completed,
+            'potential_points': INTERVIEW_SIGNUP_MAX_POINTS,
+            'signup_url': None if interview_completed else INTERVIEW_SIGNUP_URL,
+        },
+        'policy_notice_en': (
+            'Surveys determined not to have been answered in good faith were not '
+            'credited, even when the survey was completed.'
+        ),
     }
 
 
