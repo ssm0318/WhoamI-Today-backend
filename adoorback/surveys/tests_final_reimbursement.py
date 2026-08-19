@@ -24,8 +24,9 @@ class FinalReimbursementConfigTests(SimpleTestCase):
     def test_final_source_values(self):
         expected_constants = {
             'WIT_BOT_AUDIT_PARTIAL_POINTS': 10,
-            'INTERVIEW_COMPLETED_POINTS': 100,
-            'INTERVIEW_REBECCA_POINTS': 125,
+            'INTERVIEW_COMPLETED_POINTS': 200,
+            'INTERVIEW_REBECCA_POINTS': 200,
+            'INTERVIEW_DOLLAR_CENTS': 2000,
             'DROPOUT_SURVEY_POINTS': 50,
             'FRIEND_INVITE_POINTS_PER_FRIEND': 100,
             'FRIEND_INVITE_MAX_POINTS': 500,
@@ -126,8 +127,8 @@ class ManualSourceScoringTests(SimpleTestCase):
         self.assertNotIn('staff', outcome.note)
 
     def test_interview_email_matching_and_rebecca_exception(self):
-        self.assertEqual(interview_points_for_email(' JENNYLNINH@GMAIL.COM '), 100)
-        self.assertEqual(interview_points_for_email('rebecca.laba@gmail.com'), 125)
+        self.assertEqual(interview_points_for_email(' JENNYLNINH@GMAIL.COM '), 200)
+        self.assertEqual(interview_points_for_email('rebecca.laba@gmail.com'), 200)
         self.assertEqual(interview_points_for_email('nasiu21321@gmail.com'), 0)
 
 

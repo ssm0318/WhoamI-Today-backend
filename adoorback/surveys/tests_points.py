@@ -345,7 +345,8 @@ class ReimbursementApiTests(APITestCase):
 
         opportunity = result.json()['interview_opportunity']
         self.assertFalse(opportunity['completed'])
-        self.assertEqual(opportunity['potential_points'], 100)
+        self.assertEqual(opportunity['potential_points'], 200)
+        self.assertEqual(opportunity['potential_dollar_cents'], 2000)
         self.assertEqual(
             opportunity['signup_url'],
             'https://calendly.com/jaewonkim/60min',
@@ -612,7 +613,7 @@ class PointManualCreditCommandTests(TestCase):
     def test_available_max_counts_both_wit_bot_audit_phases(self):
         viewer = make_user('viewer')
 
-        self.assertEqual(available_max_for_user(viewer), 800)
+        self.assertEqual(available_max_for_user(viewer), 900)
 
     def test_app_usage_full_credit_requires_first_four_and_later_activity(self):
         viewer = make_user('app_full')

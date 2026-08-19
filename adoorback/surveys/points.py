@@ -9,7 +9,7 @@ from surveys.models import (
 )
 from surveys.reimbursement_config import (
     APP_USAGE_PHASES, DROPOUT_SURVEY_DOLLAR_CENTS, DROPOUT_SURVEY_POINTS,
-    DROPOUT_SURVEY_URL, FRIEND_INVITE_MAX_POINTS,
+    DROPOUT_SURVEY_URL, FRIEND_INVITE_MAX_POINTS, INTERVIEW_DOLLAR_CENTS,
     INTERVIEW_SIGNUP_DEADLINE, INTERVIEW_SIGNUP_MAX_POINTS, INTERVIEW_SIGNUP_URL,
     POINTS_PER_DOLLAR, WIT_BOT_AUDIT_PHASES,
 )
@@ -635,6 +635,7 @@ def reimbursement_state_for_user(user) -> dict:
         'interview_opportunity': {
             'completed': interview_completed,
             'potential_points': INTERVIEW_SIGNUP_MAX_POINTS,
+            'potential_dollar_cents': INTERVIEW_DOLLAR_CENTS,
             'signup_url': None if interview_completed else INTERVIEW_SIGNUP_URL,
             'signup_deadline': INTERVIEW_SIGNUP_DEADLINE,
         },
