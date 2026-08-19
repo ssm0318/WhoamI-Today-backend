@@ -181,8 +181,9 @@ per-source totals, per-participant totals, and the approved survey exclusions.
 ## Reimbursement API
 
 `reimbursement_state_for_user` returns only materialized ledger rows plus
-currently available actions. It must not synthesize legacy survey or WIT-bot
-points at read time after finalization.
+the interview opportunity. Survey submissions and survey points are frozen;
+the API must not advertise additional survey work or synthesize legacy survey
+or WIT-bot points at read time after finalization.
 
 The response keeps `provisional_total` only if required for backward
 compatibility, but its value equals the final adjusted total. New copy and code
@@ -207,6 +208,10 @@ The page contains:
 3. credited items, grouped or labeled by source;
 4. zero-point/not-credited items with their audit note when useful; and
 5. the interview signup action for participants without interview credit.
+
+The study survey dataset is frozen. The page does not fetch the survey index,
+show open/late survey actions, or invite participants to complete additional
+surveys. The interview signup is the only remaining point-earning action.
 
 Required policy copy:
 

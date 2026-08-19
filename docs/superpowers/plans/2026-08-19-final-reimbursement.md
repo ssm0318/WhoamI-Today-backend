@@ -23,6 +23,7 @@
 - Friend invitations earn 100 per non-staff invitee, capped at 500.
 - Confirmed interviews earn 100 except `rebecca.laba@gmail.com`, which earns 125.
 - Participants without interview credit see `https://calendly.com/jaewonkim/60min`.
+- Survey submissions and survey points are frozen; the reimbursement page must not advertise additional surveys.
 - Delete only obsolete reimbursement-related files; preserve unrelated historical analysis.
 - Verify frontend UI at 375 px, 393 px, and 320 px.
 
@@ -33,7 +34,7 @@
 **Files:**
 - Modify: `adoorback/surveys/models.py`
 - Modify: `adoorback/surveys/reimbursement_config.py`
-- Create: `adoorback/surveys/migrations/0049_alter_pointaward_source_kind.py`
+- Create: `adoorback/surveys/migrations/0051_alter_pointaward_source_kind.py`
 - Test: `adoorback/surveys/tests_final_reimbursement.py`
 
 **Interfaces:**
@@ -104,7 +105,7 @@ SOURCE_KIND_CHOICES = (
 )
 ```
 
-Create migration `0049_alter_pointaward_source_kind.py` as an `AlterField` migration whose choices exactly match the model. The database column remains a `CharField(max_length=32)`.
+Create migration `0051_alter_pointaward_source_kind.py` as an `AlterField` migration whose choices exactly match the model. The database column remains a `CharField(max_length=32)`.
 
 - [ ] **Step 4: Run tests and migration checks**
 
@@ -118,7 +119,7 @@ Expected: tests pass and no uncreated migration is reported.
 - [ ] **Step 5: Commit the source definitions**
 
 ```bash
-git add adoorback/surveys/models.py adoorback/surveys/reimbursement_config.py adoorback/surveys/migrations/0049_alter_pointaward_source_kind.py adoorback/surveys/tests_final_reimbursement.py
+git add adoorback/surveys/models.py adoorback/surveys/reimbursement_config.py adoorback/surveys/migrations/0051_alter_pointaward_source_kind.py adoorback/surveys/tests_final_reimbursement.py
 git commit -m "feat(reimbursement): define final award sources"
 ```
 
@@ -577,10 +578,10 @@ interview_opportunity: {
 ```
 
 Make `getReimbursementState` always fetch `/surveys/reimbursement/`. Remove
-production use of `LOCAL_REIMBURSEMENT_PREVIEW_URL`, browser-local allocation
-cache, and local preview rendering from `Reimbursement.tsx`. Do not remove
-point-allocation tooling that is used outside the participant route unless no
-imports remain.
+the survey-index fetch, survey action construction, production use of
+`LOCAL_REIMBURSEMENT_PREVIEW_URL`, browser-local allocation cache, and local
+preview rendering from `Reimbursement.tsx`. Do not remove point-allocation
+tooling that is used outside the participant route unless no imports remain.
 
 - [ ] **Step 4: Implement final sections and copy**
 
@@ -592,6 +593,9 @@ Render:
 - positive awards under “Points you earned”;
 - zero/adjusted-to-zero rows under “Not credited” with the ledger note;
 - a 100-point interview action using API metadata when available.
+
+Assert that neither “Take survey” nor survey-index loading appears on the
+final page. The interview signup is the only remaining point-earning action.
 
 Replace translation keys so English and Korean both express finalized status.
 Run a key-parity assertion in the Jest test by importing both JSON objects and
