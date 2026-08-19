@@ -17,12 +17,12 @@ from surveys.app_usage import (
     sync_app_usage_awards,
 )
 from surveys.models import (
-    CADENCE_DAILY, CADENCE_WEEKLY, PointAward, ScheduledSurvey, Survey,
-    SurveyResponse,
+    CADENCE_DAILY, CADENCE_WEEKLY, DropoutSurveyResponse, PointAward,
+    ScheduledSurvey, Survey, SurveyResponse,
 )
 from surveys.points import (
     available_max_for_user, backfill_missing_survey_point_awards,
-    reimbursement_state_for_user,
+    reimbursement_state_for_user, round_reimbursement_cents,
 )
 from surveys.scheduling import _today_la_7am
 
@@ -237,6 +237,12 @@ class SurveyPointAwardSubmitTests(APITestCase):
 
 
 class ReimbursementApiTests(APITestCase):
+    def test_reimbursement_rounds_up_to_next_five_dollars(self):
+        self.assertEqual(round_reimbursement_cents(0), 0)
+        self.assertEqual(round_reimbursement_cents(176), 2000)
+        self.assertEqual(round_reimbursement_cents(225), 2500)
+        self.assertEqual(round_reimbursement_cents(250), 2500)
+
     def test_reimbursement_state_returns_totals_awards_and_available_max(self):
         viewer = make_user('viewer')
         survey = make_likert_survey('weekly_reward')
@@ -272,12 +278,38 @@ class ReimbursementApiTests(APITestCase):
         self.assertEqual(body['adjusted_total'], 4)
         self.assertGreaterEqual(body['available_max'], 16)
         self.assertEqual(body['points_per_dollar'], 10)
+        self.assertEqual(body['dollar_estimate_cents'], 500)
+        self.assertEqual(
+            body['rounding_notice_en'],
+            'Reimbursement amounts are rounded up to the next $5 increment.',
+        )
         self.assertTrue(body['is_final'])
         self.assertEqual(
             body['policy_notice_en'],
             'Surveys determined not to have been answered in good faith were not credited, even when the survey was completed.',
         )
         self.assertEqual(body['awards'][0]['effective_points'], 4)
+        self.assertEqual(body['dropout_survey'], {
+            'completed': False,
+            'url': 'https://jaewonkim.me/whoami-dropout/',
+        })
+        self.assertEqual(
+            body['interview_opportunity']['signup_deadline'],
+            '2026-08-31',
+        )
+
+        DropoutSurveyResponse.objects.create(
+            user=viewer,
+            matched_identifier_type=DropoutSurveyResponse.MATCHED_USERNAME,
+            answers={'phase1_participation': 'stopped'},
+        )
+
+        completed = self.client.get('/api/surveys/reimbursement/').json()
+        self.assertEqual(completed['adjusted_total'], 4)
+        self.assertEqual(completed['dropout_survey'], {
+            'completed': True,
+            'url': None,
+        })
         self.assertEqual(body['awards'][0]['awarded_points'], 16)
         self.assertEqual(body['awards'][0]['title_en'], 'T')
         self.assertEqual(body['awards'][0]['scheduled_survey_id'], scheduled.id)

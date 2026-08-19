@@ -70,7 +70,20 @@ class DropoutSurveyLookupTests(APITestCase):
         self.assertEqual(data['phases']['phase1']['version_label'], 'Ver.W')
         self.assertEqual(data['phases']['phase2']['version'], 'version_q')
         self.assertEqual(data['phases']['phase2']['version_label'], 'Ver.Q')
+        self.assertFalse(data['already_submitted'])
         self.assert_no_raw_email(data, self.w_first.email)
+
+    def test_lookup_marks_matched_participant_with_existing_response_as_submitted(self):
+        DropoutSurveyResponse.objects.create(
+            user=self.w_first,
+            matched_identifier_type=DropoutSurveyResponse.MATCHED_USERNAME,
+            answers={'phase1_participation': 'stopped'},
+        )
+
+        response = self.lookup('phasew')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.json()['already_submitted'])
 
     def test_lookup_by_email_is_case_insensitive_and_returns_q_first_context(self):
         response = self.lookup('PHASEQ@EXAMPLE.COM')
@@ -175,6 +188,25 @@ class DropoutSurveyResponseTests(APITestCase):
         self.assertEqual(stored.phase2_version, 'version_q')
         self.assertEqual(stored.answers, payload['answers'])
         self.assertNotIn(self.participant.email, json.dumps(response.json()))
+
+    def test_second_submission_for_matched_participant_is_rejected(self):
+        token = self.lookup_token('phasew')
+        first = self.client.post(
+            '/api/surveys/dropout/responses/',
+            {'lookup_token': token, 'answers': {'phase1_participation': 'stopped'}},
+            format='json',
+        )
+
+        second = self.client.post(
+            '/api/surveys/dropout/responses/',
+            {'lookup_token': token, 'answers': {'phase1_participation': 'used_less'}},
+            format='json',
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(second.json()['detail'], 'Dropout survey already submitted.')
+        self.assertEqual(DropoutSurveyResponse.objects.filter(user=self.participant).count(), 1)
 
     def test_unmatched_lookup_token_can_submit_without_user(self):
         token = self.lookup_token('unknown@example.com')

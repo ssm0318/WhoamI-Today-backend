@@ -4,10 +4,13 @@ from dataclasses import dataclass
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
-from surveys.models import PointAward, ScheduledSurvey, Survey, SurveyResponse
+from surveys.models import (
+    DropoutSurveyResponse, PointAward, ScheduledSurvey, Survey, SurveyResponse,
+)
 from surveys.reimbursement_config import (
-    APP_USAGE_PHASES, FRIEND_INVITE_MAX_POINTS, INTERVIEW_SIGNUP_MAX_POINTS,
-    INTERVIEW_SIGNUP_URL, POINTS_PER_DOLLAR, WIT_BOT_AUDIT_PHASES,
+    APP_USAGE_PHASES, DROPOUT_SURVEY_URL, FRIEND_INVITE_MAX_POINTS,
+    INTERVIEW_SIGNUP_DEADLINE, INTERVIEW_SIGNUP_MAX_POINTS, INTERVIEW_SIGNUP_URL,
+    POINTS_PER_DOLLAR, WIT_BOT_AUDIT_PHASES,
 )
 from surveys.retired import is_retired_survey_slug
 from surveys.scheduling import (
@@ -590,6 +593,14 @@ def pending_prereqs_for_user(user) -> list[dict]:
     return pending
 
 
+def round_reimbursement_cents(points: int) -> int:
+    """Convert points to dollars and round any positive amount up to $5."""
+    if points <= 0:
+        return 0
+    raw_cents = (points * 100 + POINTS_PER_DOLLAR - 1) // POINTS_PER_DOLLAR
+    return ((raw_cents + 499) // 500) * 500
+
+
 def reimbursement_state_for_user(user) -> dict:
     awards = list(
         PointAward.objects
@@ -604,19 +615,28 @@ def reimbursement_state_for_user(user) -> dict:
         and award.effective_points > 0
         for award in awards
     )
+    dropout_completed = DropoutSurveyResponse.objects.filter(user=user).exists()
     return {
         'is_final': True,
         'provisional_total': adjusted_total,
         'adjusted_total': adjusted_total,
         'available_max': available_max_for_user(user),
-        'dollar_estimate_cents': round(adjusted_total * 100 / POINTS_PER_DOLLAR),
+        'dollar_estimate_cents': round_reimbursement_cents(adjusted_total),
         'points_per_dollar': POINTS_PER_DOLLAR,
+        'rounding_notice_en': (
+            'Reimbursement amounts are rounded up to the next $5 increment.'
+        ),
         'awards': serialized_awards,
         'pending_prereqs': [],
         'interview_opportunity': {
             'completed': interview_completed,
             'potential_points': INTERVIEW_SIGNUP_MAX_POINTS,
             'signup_url': None if interview_completed else INTERVIEW_SIGNUP_URL,
+            'signup_deadline': INTERVIEW_SIGNUP_DEADLINE,
+        },
+        'dropout_survey': {
+            'completed': dropout_completed,
+            'url': None if dropout_completed else DROPOUT_SURVEY_URL,
         },
         'policy_notice_en': (
             'Surveys determined not to have been answered in good faith were not '

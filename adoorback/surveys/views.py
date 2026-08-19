@@ -155,6 +155,10 @@ def _dropout_lookup_payload(identifier: str, user, matched_identifier_type: str)
     }
     return {
         'matched': user is not None,
+        'already_submitted': (
+            user is not None
+            and DropoutSurveyResponse.objects.filter(user=user).exists()
+        ),
         'matched_identifier_type': matched_identifier_type,
         'lookup_token': signing.dumps(
             token_payload,
@@ -306,6 +310,11 @@ class DropoutSurveyResponseSubmitView(APIView):
                 return Response(
                     {'detail': 'This participant lookup is no longer valid.'},
                     status=status.HTTP_400_BAD_REQUEST,
+                )
+            if DropoutSurveyResponse.objects.filter(user=user).exists():
+                return Response(
+                    {'detail': 'Dropout survey already submitted.'},
+                    status=status.HTTP_409_CONFLICT,
                 )
 
         identifier_hash = token_payload.get('identifier_hash') or ''
