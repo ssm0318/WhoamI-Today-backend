@@ -28,7 +28,7 @@ from surveys.models import (
 )
 from surveys.privacy import compute_panel_eligibility, compute_responder_ids
 from surveys.points import (
-    create_survey_point_award, reimbursement_state_for_user,
+    create_survey_point_award, credit_dropout_survey_award, reimbursement_state_for_user,
     resolve_submit_scheduled_survey, serialize_point_award,
     wit_bot_audit_version_for_group,
 )
@@ -322,21 +322,24 @@ class DropoutSurveyResponseSubmitView(APIView):
             token_payload.get('matched_identifier_type')
             or DropoutSurveyResponse.MATCHED_UNMATCHED
         )
-        response = DropoutSurveyResponse.objects.create(
-            user=user,
-            identifier_hash=identifier_hash,
-            matched_identifier_type=matched_identifier_type,
-            user_group=token_payload.get('user_group') or '',
-            phase1_version=token_payload.get('phase1_version') or '',
-            phase2_version=token_payload.get('phase2_version') or '',
-            answers=answers,
-            lookup_metadata={
-                'identifier_hash': identifier_hash,
-                'matched': user is not None,
-                'matched_identifier_type': matched_identifier_type,
-                'source': 'jaewonkim.me/whoami-dropout',
-            },
-        )
+        with transaction.atomic():
+            response = DropoutSurveyResponse.objects.create(
+                user=user,
+                identifier_hash=identifier_hash,
+                matched_identifier_type=matched_identifier_type,
+                user_group=token_payload.get('user_group') or '',
+                phase1_version=token_payload.get('phase1_version') or '',
+                phase2_version=token_payload.get('phase2_version') or '',
+                answers=answers,
+                lookup_metadata={
+                    'identifier_hash': identifier_hash,
+                    'matched': user is not None,
+                    'matched_identifier_type': matched_identifier_type,
+                    'source': 'jaewonkim.me/whoami-dropout',
+                },
+            )
+            if user is not None:
+                credit_dropout_survey_award(user=user)
 
         # A real response landed — clear any server-side autosave for it.
         if identifier_hash:

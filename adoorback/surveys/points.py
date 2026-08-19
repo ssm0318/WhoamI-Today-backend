@@ -8,7 +8,8 @@ from surveys.models import (
     DropoutSurveyResponse, PointAward, ScheduledSurvey, Survey, SurveyResponse,
 )
 from surveys.reimbursement_config import (
-    APP_USAGE_PHASES, DROPOUT_SURVEY_URL, FRIEND_INVITE_MAX_POINTS,
+    APP_USAGE_PHASES, DROPOUT_SURVEY_DOLLAR_CENTS, DROPOUT_SURVEY_POINTS,
+    DROPOUT_SURVEY_URL, FRIEND_INVITE_MAX_POINTS,
     INTERVIEW_SIGNUP_DEADLINE, INTERVIEW_SIGNUP_MAX_POINTS, INTERVIEW_SIGNUP_URL,
     POINTS_PER_DOLLAR, WIT_BOT_AUDIT_PHASES,
 )
@@ -242,6 +243,9 @@ def serialize_reimbursement_award(award: PointAward) -> dict:
     elif award.source_kind == PointAward.SOURCE_INTERVIEW_SIGNUP:
         title_en = 'Interview'
         title_ko = 'Interview'
+    elif award.source_kind == PointAward.SOURCE_DROPOUT_SURVEY:
+        title_en = 'Dropout survey'
+        title_ko = '중도 이탈 설문'
     elif award.source_kind == PointAward.SOURCE_FRIEND_INVITE:
         title_en = 'Friend invitations'
         title_ko = '친구 초대'
@@ -637,6 +641,8 @@ def reimbursement_state_for_user(user) -> dict:
         'dropout_survey': {
             'completed': dropout_completed,
             'url': None if dropout_completed else DROPOUT_SURVEY_URL,
+            'potential_points': DROPOUT_SURVEY_POINTS,
+            'potential_dollar_cents': DROPOUT_SURVEY_DOLLAR_CENTS,
         },
         'policy_notice_en': (
             'Surveys determined not to have been answered in good faith were not '
@@ -658,3 +664,13 @@ def credit_manual_award(*, user, source_kind: str, source_slug: str, points: int
         },
     )
     return award
+
+
+def credit_dropout_survey_award(*, user):
+    return credit_manual_award(
+        user=user,
+        source_kind=PointAward.SOURCE_DROPOUT_SURVEY,
+        source_slug='dropout_survey',
+        points=DROPOUT_SURVEY_POINTS,
+        note='Completed dropout survey.',
+    )

@@ -26,6 +26,7 @@ class FinalReimbursementConfigTests(SimpleTestCase):
             'WIT_BOT_AUDIT_PARTIAL_POINTS': 10,
             'INTERVIEW_COMPLETED_POINTS': 100,
             'INTERVIEW_REBECCA_POINTS': 125,
+            'DROPOUT_SURVEY_POINTS': 50,
             'FRIEND_INVITE_POINTS_PER_FRIEND': 100,
             'FRIEND_INVITE_MAX_POINTS': 500,
             'INTERVIEW_SIGNUP_URL': 'https://calendly.com/jaewonkim/60min',

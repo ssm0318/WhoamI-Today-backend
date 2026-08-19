@@ -292,6 +292,8 @@ class ReimbursementApiTests(APITestCase):
         self.assertEqual(body['dropout_survey'], {
             'completed': False,
             'url': 'https://jaewonkim.me/whoami-dropout/',
+            'potential_points': 50,
+            'potential_dollar_cents': 500,
         })
         self.assertEqual(
             body['interview_opportunity']['signup_deadline'],
@@ -309,6 +311,8 @@ class ReimbursementApiTests(APITestCase):
         self.assertEqual(completed['dropout_survey'], {
             'completed': True,
             'url': None,
+            'potential_points': 50,
+            'potential_dollar_cents': 500,
         })
         self.assertEqual(body['awards'][0]['awarded_points'], 16)
         self.assertEqual(body['awards'][0]['title_en'], 'T')

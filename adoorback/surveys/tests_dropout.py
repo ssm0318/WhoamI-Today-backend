@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from surveys.models import DropoutSurveyDraft, DropoutSurveyResponse
+from surveys.models import DropoutSurveyDraft, DropoutSurveyResponse, PointAward
 
 
 User = get_user_model()
@@ -188,6 +188,12 @@ class DropoutSurveyResponseTests(APITestCase):
         self.assertEqual(stored.phase2_version, 'version_q')
         self.assertEqual(stored.answers, payload['answers'])
         self.assertNotIn(self.participant.email, json.dumps(response.json()))
+        award = PointAward.objects.get(
+            user=self.participant,
+            source_kind=PointAward.SOURCE_DROPOUT_SURVEY,
+            source_slug='dropout_survey',
+        )
+        self.assertEqual(award.effective_points, 50)
 
     def test_second_submission_for_matched_participant_is_rejected(self):
         token = self.lookup_token('phasew')
