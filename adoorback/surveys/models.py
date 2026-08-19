@@ -519,12 +519,14 @@ class PointAward(AdoorTimestampedModel):
     SOURCE_WIT_BOT_AUDIT = 'wit_bot_audit'
     SOURCE_APP_USAGE = 'app_usage'
     SOURCE_INTERVIEW_SIGNUP = 'interview_signup'
+    SOURCE_FRIEND_INVITE = 'friend_invite'
     SOURCE_RESEARCHER_ADJUSTMENT = 'researcher_adjustment'
     SOURCE_KIND_CHOICES = (
         (SOURCE_SURVEY, 'Survey response'),
         (SOURCE_WIT_BOT_AUDIT, 'Wit_bot audit pass'),
         (SOURCE_APP_USAGE, 'App usage'),
         (SOURCE_INTERVIEW_SIGNUP, 'Interview signup'),
+        (SOURCE_FRIEND_INVITE, 'Friend invitations'),
         (SOURCE_RESEARCHER_ADJUSTMENT, 'Researcher adjustment'),
     )
 
