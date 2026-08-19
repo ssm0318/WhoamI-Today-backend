@@ -24,6 +24,10 @@ PHASE_WINDOWS = {
     1: (date(2026, 5, 4), date(2026, 5, 18)),
     2: (date(2026, 5, 18), date(2026, 6, 1)),
 }
+PARTICIPANT_ID_MIN = 8
+PARTICIPANT_ID_MAX = 87
+PARTICIPANT_REPLACED_ID = 64
+PARTICIPANT_REPLACEMENT_ID = 114
 CORE_KINDS = {
     'chat',
     'checkin',
@@ -59,39 +63,50 @@ def _la_date(value: datetime) -> date:
     return timezone.localtime(value, LA_TZ).date()
 
 
-def _events_for_user(user, phase: int) -> list[tuple[datetime, str]]:
+def _events_for_user(user, phase: int, *, using: str = 'default') -> list[tuple[datetime, str]]:
     start, end = _phase_bounds(phase)
     user_filter = {'created_at__gte': start, 'created_at__lt': end}
+    user_id = user.pk if hasattr(user, 'pk') else int(user)
     events: list[tuple[datetime, str]] = []
 
     def add(queryset, kind: str, field: str = 'created_at'):
         events.extend((moment, kind) for moment in queryset.values_list(field, flat=True))
 
-    add(Note.objects.filter(author=user, **user_filter), 'note')
-    add(Comment.objects.filter(author=user, **user_filter), 'comment')
-    add(Reaction.objects.filter(user=user, **user_filter), 'reaction')
-    add(CheckInComponentEntry.objects.filter(owner=user, **user_filter), 'checkin')
-    add(CheckInPost.objects.filter(author=user, **user_filter), 'checkinpost')
+    add(Note.objects.using(using).filter(author_id=user_id, **user_filter), 'note')
+    add(Comment.objects.using(using).filter(author_id=user_id, **user_filter), 'comment')
+    add(Reaction.objects.using(using).filter(user_id=user_id, **user_filter), 'reaction')
+    add(CheckInComponentEntry.objects.using(using).filter(owner_id=user_id, **user_filter), 'checkin')
+    add(CheckInPost.objects.using(using).filter(author_id=user_id, **user_filter), 'checkinpost')
     add(
-        Message.objects
-        .filter(sender=user, **user_filter)
+        Message.objects.using(using)
+        .filter(sender_id=user_id, **user_filter)
         .exclude(Q(chat_room__user1_id=7) | Q(chat_room__user2_id=7) | Q(chat_room__members__id=7))
         .distinct(),
         'chat',
     )
-    add(FriendEvaluation.objects.filter(evaluator=user, **user_filter), 'friend_eval')
-    add(FriendRequest.objects.filter(requester=user, **user_filter), 'friend_request')
+    add(FriendEvaluation.objects.using(using).filter(evaluator_id=user_id, **user_filter), 'friend_eval')
+    add(FriendRequest.objects.using(using).filter(requester_id=user_id, **user_filter), 'friend_request')
     add(
-        FriendRequest.objects.filter(requestee=user, accepted=True, updated_at__gte=start, updated_at__lt=end),
+        FriendRequest.objects.using(using).filter(
+            requestee_id=user_id,
+            accepted=True,
+            updated_at__gte=start,
+            updated_at__lt=end,
+        ),
         'friend_accept',
         'updated_at',
     )
-    add(Subscription.objects.filter(subscriber=user, **user_filter), 'subscription')
+    add(Subscription.objects.using(using).filter(subscriber_id=user_id, **user_filter), 'subscription')
     return events
 
 
-def app_usage_metrics_for_user(user, phase: int) -> AppUsageMetrics:
-    events = _events_for_user(user, phase)
+def app_usage_metrics_for_user(
+    user,
+    phase: int,
+    *,
+    using: str = 'default',
+) -> AppUsageMetrics:
+    events = _events_for_user(user, phase, using=using)
     start, _end = PHASE_WINDOWS[phase]
     first_four_end = start.toordinal() + 4
 
@@ -161,7 +176,10 @@ def sync_app_usage_award_for_user(user, phase: int, *, dry_run: bool = False):
 
 def sync_app_usage_awards(*, phase: int | None = None, username: str | None = None, dry_run: bool = False):
     User = get_user_model()
-    users = User.objects.filter(id__gte=8, id__lte=87, is_superuser=False)
+    users = User.objects.filter(is_superuser=False).filter(
+        Q(id__gte=PARTICIPANT_ID_MIN, id__lte=PARTICIPANT_ID_MAX)
+        | Q(id=PARTICIPANT_REPLACEMENT_ID)
+    ).exclude(id=PARTICIPANT_REPLACED_ID)
     if username:
         users = users.filter(username=username)
     phases = [phase] if phase else sorted(PHASE_WINDOWS)

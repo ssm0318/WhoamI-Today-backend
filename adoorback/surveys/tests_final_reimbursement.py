@@ -1,11 +1,21 @@
 import importlib
+from datetime import datetime, timezone
+from io import StringIO
+from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase
 from django.test import SimpleTestCase
 
 from surveys import reimbursement_config
+from surveys.app_usage import app_usage_metrics_for_user
 from surveys.final_reimbursement import (
-    InviteeRecord, best_boss_quiz_score, friend_invite_outcome,
-    interview_points_for_email, wit_bot_outcome, wit_bot_points_for_score,
+    FinalAwardSpec, InviteeRecord, best_boss_quiz_score,
+    build_final_award_specs, friend_invite_outcome,
+    interview_points_for_email, reconcile_user_awards,
+    validate_interview_accounts, wit_bot_outcome, wit_bot_points_for_score,
 )
 from surveys.models import PointAward
 
@@ -48,6 +58,10 @@ class FinalReimbursementScoringInterfaceTests(SimpleTestCase):
             'wit_bot_outcome',
             'friend_invite_outcome',
             'interview_points_for_email',
+            'FinalAwardSpec',
+            'ReconciliationResult',
+            'build_final_award_specs',
+            'reconcile_user_awards',
         ):
             self.assertTrue(hasattr(scoring, name), name)
 
@@ -114,3 +128,185 @@ class ManualSourceScoringTests(SimpleTestCase):
         self.assertEqual(interview_points_for_email(' JENNYLNINH@GMAIL.COM '), 100)
         self.assertEqual(interview_points_for_email('rebecca.laba@gmail.com'), 125)
         self.assertEqual(interview_points_for_email('nasiu21321@gmail.com'), 0)
+
+
+class DatabaseAwareAppUsageTests(TestCase):
+    @patch('surveys.app_usage._events_for_user')
+    def test_metrics_passes_the_selected_database_to_event_queries(self, events_for_user):
+        user = get_user_model().objects.create(
+            username='restore_reader',
+            email='restore_reader@example.com',
+        )
+        events_for_user.return_value = [
+            (datetime(2026, 5, 4, 12, tzinfo=timezone.utc), 'note'),
+            (datetime(2026, 5, 5, 12, tzinfo=timezone.utc), 'comment'),
+        ]
+
+        app_usage_metrics_for_user(user, 1, using='phase1_restore')
+
+        events_for_user.assert_called_once_with(user, 1, using='phase1_restore')
+
+
+class FinalLedgerReconciliationTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create(
+            username='participant',
+            email='participant@example.com',
+            user_group='group_q_first',
+        )
+
+    @patch('surveys.app_usage.app_usage_metrics_for_user')
+    def test_build_specs_returns_every_final_non_survey_source(self, app_metrics):
+        app_metrics.side_effect = [
+            type('Metrics', (), {'points': 20, 'active_days': 2, 'first_four_days': 2,
+                                 'later_days': 0, 'core_event_count': 2})(),
+            type('Metrics', (), {'points': 0, 'active_days': 0, 'first_four_days': 0,
+                                 'later_days': 0, 'core_event_count': 0})(),
+        ]
+        get_user_model().objects.create(
+            username='invitee',
+            email='invitee@example.com',
+            invited_from=self.user,
+        )
+
+        specs = build_final_award_specs(
+            self.user,
+            phase1_database='phase1_restore',
+            phase2_database='default',
+        )
+
+        keys = {(spec.source_kind, spec.source_slug) for spec in specs}
+        self.assertEqual(keys, {
+            ('app_usage', 'app_usage_phase_1'),
+            ('app_usage', 'app_usage_phase_2'),
+            ('wit_bot_audit', 'wit_bot_audit_phase_1'),
+            ('wit_bot_audit', 'wit_bot_audit_phase_2'),
+            ('friend_invite', 'friend_invite'),
+        })
+        friend_spec = next(spec for spec in specs if spec.source_kind == 'friend_invite')
+        self.assertEqual(friend_spec.awarded_points, 100)
+        app_metrics.assert_any_call(self.user, 1, using='phase1_restore')
+        app_metrics.assert_any_call(self.user, 2, using='default')
+
+    def test_dry_run_writes_nothing_and_apply_is_idempotent(self):
+        specs = [
+            FinalAwardSpec(
+                'friend_invite',
+                'friend_invite',
+                100,
+                None,
+                'Eligible invites=1.',
+            ),
+        ]
+
+        dry = reconcile_user_awards(self.user, specs, apply=False)
+
+        self.assertEqual(dry.created, 1)
+        self.assertFalse(PointAward.objects.filter(user=self.user).exists())
+
+        reconcile_user_awards(self.user, specs, apply=True)
+        second = reconcile_user_awards(self.user, specs, apply=True)
+
+        self.assertEqual(second.unchanged, 1)
+        self.assertEqual(
+            PointAward.objects.filter(
+                user=self.user,
+                source_kind='friend_invite',
+                source_slug='friend_invite',
+            ).count(),
+            1,
+        )
+
+    def test_existing_survey_adjustments_are_never_overwritten(self):
+        award = PointAward.objects.create(
+            user=self.user,
+            source_kind='survey',
+            source_slug='post_study_q',
+            awarded_points=50,
+            adjusted_points=0,
+            note='Good-faith survey audit exclusion.',
+        )
+
+        reconcile_user_awards(self.user, [], apply=True)
+
+        award.refresh_from_db()
+        self.assertEqual(award.adjusted_points, 0)
+        self.assertEqual(award.note, 'Good-faith survey audit exclusion.')
+
+
+class FinalReimbursementCommandTests(TestCase):
+    def _create_interview_accounts(self):
+        emails = sorted({
+            'jennylninh@gmail.com',
+            'siddhub2001@gmail.com',
+            'yixin7@uw.edu',
+            'rebecca.laba@gmail.com',
+            'pinkchloeko@gmail.com',
+            'ole2@uw.edu',
+            'sai.yakumo770@gmail.com',
+            'superlegos113@gmail.com',
+            'anh.n.personal@gmail.com',
+            'sklein3@uw.edu',
+            'aishani.rao22@gmail.com',
+        })
+        return [
+            get_user_model().objects.create(
+                id=index,
+                username=f'participant_{index}',
+                email=email,
+                user_group='group_q_first',
+            )
+            for index, email in enumerate(emails, start=8)
+        ]
+
+    def test_interview_validation_rejects_a_missing_approved_email(self):
+        accounts = self._create_interview_accounts()
+
+        with self.assertRaisesMessage(ValueError, 'yixin7@uw.edu'):
+            validate_interview_accounts([
+                account for account in accounts
+                if account.email != 'yixin7@uw.edu'
+            ])
+
+    @patch('surveys.management.commands.finalize_reimbursement.build_final_award_specs')
+    def test_command_is_dry_run_by_default_and_apply_is_explicit(self, build_specs):
+        accounts = self._create_interview_accounts()
+        build_specs.return_value = [FinalAwardSpec(
+            'friend_invite', 'friend_invite', 100, None, 'Final invitation total.',
+        )]
+        output = StringIO()
+
+        call_command(
+            'finalize_reimbursement',
+            phase1_database='default',
+            stdout=output,
+        )
+
+        self.assertIn('DRY RUN', output.getvalue())
+        self.assertEqual(PointAward.objects.count(), 0)
+
+        call_command(
+            'finalize_reimbursement',
+            '--apply',
+            phase1_database='default',
+            stdout=StringIO(),
+        )
+
+        self.assertEqual(PointAward.objects.count(), len(accounts))
+
+    @patch('surveys.management.commands.finalize_reimbursement.validate_interview_accounts')
+    def test_command_converts_validation_failure_to_command_error(self, validate):
+        get_user_model().objects.create(
+            id=8,
+            username='participant',
+            email='participant@example.com',
+            user_group='group_q_first',
+        )
+        validate.side_effect = ValueError('Interview account mismatch.')
+
+        with self.assertRaisesMessage(CommandError, 'Interview account mismatch'):
+            call_command(
+                'finalize_reimbursement',
+                phase1_database='default',
+                stdout=StringIO(),
+            )
