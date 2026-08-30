@@ -18,7 +18,7 @@ from notification.helpers import find_like_noti, construct_message
 from firebase_admin.messaging import Message
 from firebase_admin._messaging_utils import (
     UnregisteredError, WebpushConfig, WebpushNotification,
-    APNSConfig, APNSPayload, Aps, ApsAlert, AndroidConfig, AndroidNotification,
+    APNSConfig, APNSPayload, Aps, AndroidConfig, AndroidNotification,
 )
 from custom_fcm.models import CustomFCMDevice
 from safedelete.models import SafeDeleteModel
@@ -149,15 +149,18 @@ class NotificationManager(SafeDeleteManager):
                                                message_ko=message_ko, message_en=message_en)
             NotificationActor.objects.create(user=actor, notification=noti)
 
-    def find_recent_message(self, user, actor):
+    def find_recent_message(self, user, actor, chat_room=None):
         cutoff = timezone.now() - timezone.timedelta(minutes=5)
-        return self.filter(
+        qs = self.filter(
             user=user,
             actors__in=[actor],
             target_type__model='message',
             is_read=False,
             notification_updated_at__gte=cutoff
-        ).order_by('-notification_updated_at').first()
+        )
+        if chat_room:
+            qs = qs.filter(target_id__in=chat_room.messages.values('id'))
+        return qs.order_by('-notification_updated_at').first()
 
 
 def default_user():
@@ -235,6 +238,10 @@ def get_notification_tag(instance):
     origin_model = instance.origin_type.model if instance.origin_type else None
 
     if target_model == 'message':
+        target = getattr(instance, 'target', None)
+        chat_room_id = getattr(target, 'chat_room_id', None)
+        if chat_room_id:
+            return f"chat_message_room_{chat_room_id}"
         if instance.origin_id:
             return f"chat_message_{instance.origin_id}"
     elif target_model == 'messagereaction':
@@ -258,58 +265,62 @@ def notify_firebase(instance):
     devices = CustomFCMDevice.objects.filter(user_id=instance.user.id, active=True)
     tag = get_notification_tag(instance)
     for device in devices:
-        body = instance.message_ko if device.language == 'ko' else instance.message_en
-        data = {
-            'notification_id': str(instance.id),
-            'message_en': instance.message_en or '',
-            'message_ko': instance.message_ko or '',
-            'url': instance.redirect_url,
-            'tag': tag,
-            'type': 'new',
-            'content-available': '1',  # for ios silent notification
-            'priority': 'high',  # for android
-        }
-        if device.type == 'web':
-            message = Message(
-                data=data,
-                webpush=WebpushConfig(
-                    notification=WebpushNotification(
-                        title='WhoAmI Today',
-                        body=body,
-                        tag=tag,
-                        renotify=True,
-                        icon='/whoami192.png',
-                    ),
-                ),
-            )
-        elif device.type == 'ios':
-            message = Message(
-                data=data,
-                apns=APNSConfig(
-                    payload=APNSPayload(
-                        aps=Aps(
-                            alert=ApsAlert(title='WhoAmI Today', body=body),
-                            sound='default',
-                            content_available=True,
+        try:
+            body = instance.message_ko if device.language == 'ko' else instance.message_en
+            data = {
+                'notification_id': str(instance.id),
+                'message_en': instance.message_en or '',
+                'message_ko': instance.message_ko or '',
+                'url': instance.redirect_url,
+                'tag': tag,
+                'type': 'new',
+                'content-available': '1',  # for ios silent notification
+                'priority': 'high',  # for android
+            }
+            if device.type == 'web':
+                message = Message(
+                    data=data,
+                    webpush=WebpushConfig(
+                        notification=WebpushNotification(
+                            title='WhoAmI Today',
+                            body=body,
+                            tag=tag,
+                            renotify=True,
+                            icon='/whoami192.png',
                         ),
                     ),
-                ),
-            )
-        elif device.type == 'android':
-            message = Message(
-                data=data,
-                android=AndroidConfig(
-                    priority='high',
-                    notification=AndroidNotification(
-                        title='WhoAmI Today',
-                        body=body,
-                        tag=tag,
+                )
+            elif device.type == 'ios':
+                message = Message(
+                    data=data,
+                    apns=APNSConfig(
+                        headers={
+                            'apns-collapse-id': tag,
+                        },
+                        payload=APNSPayload(
+                            aps=Aps(
+                                alert=body,
+                                sound='default',
+                                content_available=True,
+                                thread_id=tag,
+                            ),
+                        ),
                     ),
-                ),
-            )
-        else:
-            message = Message(data=data)
-        try:
+                )
+            elif device.type == 'android':
+                message = Message(
+                    data=data,
+                    android=AndroidConfig(
+                        priority='high',
+                        notification=AndroidNotification(
+                            title='WhoAmI Today',
+                            body=body,
+                            tag=tag,
+                        ),
+                    ),
+                )
+            else:
+                message = Message(data=data)
             response = device.send_message(message)
         except UnregisteredError:
             device.active = False

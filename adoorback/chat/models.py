@@ -305,7 +305,7 @@ def _send_message_notification(receiver_user, sender, instance, redirect_url, gr
             noti_ko = f"{sender.username}님이 메시지를 보냈습니다!"
             noti_en = f"{sender.username} sent you a message!"
 
-    recent_noti = Notification.objects.find_recent_message(receiver_user, sender)
+    recent_noti = Notification.objects.find_recent_message(receiver_user, sender, instance.chat_room)
 
     if recent_noti:
         current_count = 1
